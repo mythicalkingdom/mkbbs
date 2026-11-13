@@ -9,7 +9,7 @@ Procedure DoCfgMsg(MsgNum: Word);
 Implementation
 
 Uses Objects, Drivers, Views, App, MsgBox, MKString, MKGlobT, MKCfgAbs, MKMsgAbs,
-  MKMsgSqu, CfgForm, CfgList, CfgSec2, CfgNet;
+  MKMsgSqu, MKMsgMer, MKMsgSyn, CfgForm, CfgList, CfgSec2, CfgNet;
 
 Type
   UserRecord = Record
@@ -30,11 +30,11 @@ Type
     Hub: String[25];
     Select: String[4];
     TypeIdx: Byte;                       {0 Normal, 1 NetMail, 2 EchoMail}
-    FormatIdx: Byte;                     {0 H, 1 S, 2 F, 3 J, 4 other (unchanged)}
+    FormatIdx: Byte;                     {0 H, 1 S, 2 F, 3 J, 4 M, 5 Y, 6 other (unchanged)}
     End;
 
 Const
-  FormatChars = 'HSFJ';
+  FormatChars = 'HSFJMY';              {Hudson, Squish, *.Msg, JAM, Merlin, Synchronet}
 
 Var
   UR: ^UserRecord;
@@ -284,7 +284,7 @@ Procedure DoCfgMsg(MsgNum: Word);
   If P > 0 Then
     UR^.FormatIdx := P - 1
   Else
-    UR^.FormatIdx := 4;
+    UR^.FormatIdx := 6;
   Case Config^.GetMsgType(MsgNum) Of
     NetMail: UR^.TypeIdx := 1;
     EchoMail: UR^.TypeIdx := 2;
@@ -300,11 +300,11 @@ Procedure DoCfgMsg(MsgNum: Word);
   F.ReadOnly;
   F.AddString('Address:', UR^.Addr, 25, 'System address used in this area');
   F.OnF2(PickAddr, Nil, '');
-  F.At(3, 41, 3, 47);
+  F.At(3, 36, 3, 42);
   F.AddChoice('Type:', UR^.TypeIdx, 1, 0, 'Normal|NetMail|EchoMail',
     'Kind of mail (Space or the arrow keys change it)');
-  F.At(3, 58, 3, 66);
-  F.AddChoice('Format:', UR^.FormatIdx, 1, 0, 'Hudson|Squish|*.Msg|JAM|Other',
+  F.At(3, 53, 3, 61);
+  F.AddChoice('Format:', UR^.FormatIdx, 1, 0, 'Hudson|Squish|*.Msg|JAM|Merlin|Synchronet|Other',
     'Message base format (Other leaves the current one)');
   F.At(4, 3, 4, 14);
   F.AddNumber('Days Kept:', UR^.DaysKept, 2, 0, 65535, 'Days messages are kept');
@@ -329,7 +329,7 @@ Procedure DoCfgMsg(MsgNum: Word);
   F.At(7, 3, 7, 9);
   F.AddString('Area:', UR^.AreaTag, 40, 'Echomail area tag');
   F.At(7, 52, 7, 63);
-  F.AddString('File Id:', UR^.FileId, 13, 'File name (Squish) or directory (Fido)');
+  F.AddString('File Id:', UR^.FileId, 13, 'Base file name (no extension for Squish, JAM, Synchronet) or directory (*.Msg)');
   F.At(8, 3, 8, 9);
   F.ReadOnly;
   F.Show(60);
@@ -367,21 +367,24 @@ Procedure DoCfgMsg(MsgNum: Word);
       1: Config^.SetMsgType(MsgNum, NetMail);
       2: Config^.SetMsgType(MsgNum, EchoMail);
       End;
-    If UR^.FormatIdx < 4 Then
+    If UR^.FormatIdx < 6 Then
       Config^.SetMsgBaseType(MsgNum, FormatChars[UR^.FormatIdx + 1]);
-    If Config^.GetMsgBaseType(MsgNum) = 'S' Then
+    BT := Config^.GetMsgBaseType(MsgNum);
+    Msg := Nil;
+    Case BT Of
+      'S': Msg := New(SqMsgPtr, Init);
+      'M': Msg := New(MerlinMsgPtr, Init);
+      'Y': Msg := New(SynMsgPtr, Init);
+      End;
+    If Msg <> Nil Then
       Begin
-      Msg := New(SqMsgPtr, Init);
-      If Msg <> Nil Then
-        Begin
-        Msg^.SetMsgPath(Copy(Config^.GetMsgAreaId(MsgNum), 2, 128));
-        If Not Msg^.MsgBaseExists Then
-          If MessageBox('The Squish message base does not exist yet. Create it?',
-               Nil, mfConfirmation + mfYesButton + mfNoButton) = cmYes Then
-            If Msg^.CreateMsgBase(UR^.MsgsKept, UR^.DaysKept) <> 0 Then
-              MessageBox('Unable to create the message base', Nil, mfError + mfOKButton);
-        Dispose(Msg, Done);
-        End;
+      Msg^.SetMsgPath(Copy(Config^.GetMsgAreaId(MsgNum), 2, 128));
+      If Not Msg^.MsgBaseExists Then
+        If MessageBox('The message base does not exist yet. Create it?',
+             Nil, mfConfirmation + mfYesButton + mfNoButton) = cmYes Then
+          If Msg^.CreateMsgBase(UR^.MsgsKept, UR^.DaysKept) <> 0 Then
+            MessageBox('Unable to create the message base', Nil, mfError + mfOKButton);
+      Dispose(Msg, Done);
       End;
     End;
   Dispose(UR);

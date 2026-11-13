@@ -3344,6 +3344,16 @@ Function MKCfgObj.GetMsgAreaId(Area: Word): String;
            AddBackSlash(TmpStr);
            GetMsgAreaId := TmpStr + MKMsg^[Area].FileId;
            End;
+      'M': Begin                                {Merlin: path + file name as given}
+           TmpStr := 'M' + GetMsgPath(GetMsgPathNum(Area));
+           AddBackSlash(TmpStr);
+           GetMsgAreaId := TmpStr + MKMsg^[Area].FileId;
+           End;
+      'Y': Begin                                {Synchronet: path + base name, no extension}
+           TmpStr := 'Y' + GetMsgPath(GetMsgPathNum(Area));
+           AddBackSlash(TmpStr);
+           GetMsgAreaId := TmpStr + MKMsg^[Area].FileId;
+           End;
       Else
         GetMsgAreaId := '';
       End;
