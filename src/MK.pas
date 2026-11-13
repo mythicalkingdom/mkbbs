@@ -13,6 +13,43 @@ MKLogOn, MKAvatar, MKSnoop, Dos
 
 
 
+Function SysopCommand(Cmd: Char; Arg: LongInt): String;
+  {The sysop watching this node (mkmon) asks for something}
+  Var
+    Adj, Left: LongInt;
+
+  Begin
+  SysopCommand := '';
+  Case Cmd Of
+    'K': Begin
+         LogEntry.WriteEntry('Sysop disconnected the caller');
+         SysopCommand := 'Node ' + Long2Str(NodeNumber) + ' disconnected';
+         End;
+    '+': Begin
+         User.AdjustTime(Arg * 60);
+         LogEntry.WriteEntry('Sysop added ' + Long2Str(Arg) + ' minutes');
+         SysopCommand := 'Added ' + Long2Str(Arg) + ' min, ' +
+           Long2Str(User.TimeRemain Div 60) + ' min left';
+         End;
+    '-': Begin
+         Left := User.TimeRemain;
+         Adj := Arg * 60;
+         If Adj > Left - 60 Then
+           Adj := Left - 60;               {at least a minute stays: kick to end}
+         If Adj <= 0 Then
+           SysopCommand := 'Only ' + Long2Str(Left Div 60) + ' min left, not reduced'
+         Else
+           Begin
+           User.AdjustTime(-Adj);
+           LogEntry.WriteEntry('Sysop took ' + Long2Str(Adj Div 60) + ' minutes');
+           SysopCommand := 'Took ' + Long2Str(Adj Div 60) + ' min, ' +
+             Long2Str(User.TimeRemain Div 60) + ' min left';
+           End;
+         End;
+    End;
+  End;
+
+
 Var
   ExitLevel: Byte;
   i: Word;
@@ -114,8 +151,11 @@ If ComSession = Nil Then
  sockets live (environment MKRUN).}
 RunDir := GetEnv('MKRUN');
 If (RunDir <> '') And (NodeNumber > 0) Then
+  Begin
+  SnoopHandler := SysopCommand;
   ComSession := New(SnoopComPtr, Init(ComSession, True,
     RunDir + '/node' + Long2Str(NodeNumber) + '.snoop'));
+  End;
 CurrentPort := 1;
 If UserBaud = 0 Then
   UserBaud := 38400;                    {nominal speed of a network session}

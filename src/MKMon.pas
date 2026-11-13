@@ -18,7 +18,18 @@ Program MKMon;
 
      The session asks for the password in the environment MKMON_PASSWORD (plain
      text, or "sha1:" and the hex digest).  Without that variable only the
-     list (-l) works.  View only: nothing typed here reaches the caller.
+     list (-l) works.
+
+     In the node list: a node number and Enter watch the node, the number and
+     K disconnect it, the number and + / - give / take 5 minutes.  While
+     watching, everything is view only until typing is switched on; commands
+     start with Ctrl-A:
+         Ctrl-A T   typing on / off (what you type reaches the BBS as if the
+                    caller had typed it)
+         Ctrl-A K   disconnect the caller (asks Y/N)
+         Ctrl-A + / -   give / take 5 minutes
+         Ctrl-A A   send a real Ctrl-A (typing on)
+         Ctrl-A ?   help          Ctrl-X or Ctrl-A X   stop watching
 }
 
 Uses
@@ -50,6 +61,7 @@ Type
 
 Const
   MaxNodes = 255;
+  TimeStep = 5;                        {minutes for + and -}
   Esc = #27;
 
 
@@ -364,7 +376,164 @@ Procedure ShowNodes(Typed: String);
   If NumNodes = 0 Then
     SayLn('(nobody is online)');
   SayLn('');
-  Say('Node number to watch, R refresh, Q quit: ' + Typed);
+  SayLn('Type a node number, then:  Enter watch   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
+  Say('R refresh, Q quit: ' + Typed);
+  CommFlushOut;
+  End;
+
+
+Var
+  FSt: Byte;                           {APC filter: 0 text, 1 ESC, 2 in message, 3 ESC in message}
+  FMsg: String;                        {message being collected}
+  FDone: String;                       {last complete message}
+  FGot: Boolean;
+  FOut: Array[0..4095] Of Char;
+  FOutN: Word;
+
+
+Procedure FilterBytes(Var Buf; N: LongInt);
+  {Takes the answers (ESC _ text ESC \) out of the stream the node sends}
+  Var
+    k: LongInt;
+    B: Char;
+
+  Procedure Put1(C: Char);
+    Begin
+    If FOutN < SizeOf(FOut) Then
+      Begin
+      FOut[FOutN] := C;
+      Inc(FOutN);
+      End;
+    End;
+
+  Begin
+  FOutN := 0;
+  For k := 0 To N - 1 Do
+    Begin
+    B := Chr(Ord(PChar(@Buf)[k]));
+    Case FSt Of
+      0: If B = Esc Then FSt := 1 Else Put1(B);
+      1: If B = '_' Then
+           Begin
+           FSt := 2;
+           FMsg := '';
+           End
+         Else If B = Esc Then
+           Put1(B)                       {stay: another ESC may start it}
+         Else
+           Begin
+           Put1(Esc);
+           Put1(B);
+           FSt := 0;
+           End;
+      2: If B = Esc Then FSt := 3
+         Else If Length(FMsg) < 120 Then FMsg := FMsg + B;
+      3: If B = '\' Then
+           Begin
+           FDone := FMsg;
+           FGot := True;
+           FSt := 0;
+           End
+         Else
+           FSt := 2;
+      End;
+    End;
+  End;
+
+
+Procedure SendFrame(S: LongInt; Tag: Char; Arg: Byte; Var Data; N: Byte);
+  Var
+    Hd: String;
+
+  Begin
+  Hd := Tag;
+  If (Tag = '+') Or (Tag = '-') Then
+    Hd := Hd + Chr(Arg)
+  Else If Tag = 'D' Then
+    Hd := Hd + Chr(N);
+  fpSend(S, @Hd[1], Length(Hd), MSG_NOSIGNAL);
+  If (Tag = 'D') And (N > 0) Then
+    fpSend(S, @Data, N, MSG_NOSIGNAL);
+  End;
+
+
+Function OpenSnoop(Node: LongInt): LongInt;
+  {Socket to the node, -1 when it cannot be reached}
+  Var
+    S: LongInt;
+    A: TUnixSockAddr;
+    Path: String;
+
+  Begin
+  OpenSnoop := -1;
+  Path := RunDir + '/node' + Long2Str(Node) + '.snoop';
+  If Length(Path) > 100 Then
+    Exit;
+  S := fpSocket(AF_UNIX, SOCK_STREAM, 0);
+  If S < 0 Then
+    Exit;
+  FillChar(A, SizeOf(A), 0);
+  A.family := AF_UNIX;
+  Move(Path[1], A.path, Length(Path));
+  If fpConnect(S, @A, SizeOf(A)) <> 0 Then
+    Begin
+    fpClose(S);
+    Exit;
+    End;
+  OpenSnoop := S;
+  End;
+
+
+Function NodeCommand(Node: LongInt; Tag: Char; Arg: Byte): String;
+  {One command to a node, returns its answer}
+  Var
+    S: LongInt;
+    P: TPollFd;
+    Buf: Array[0..4095] Of Char;
+    N: LongInt;
+    T: Word;
+    Dummy: Byte;
+
+  Begin
+  S := OpenSnoop(Node);
+  If S < 0 Then
+    Begin
+    NodeCommand := 'Node ' + Long2Str(Node) + ' cannot be reached.';
+    Exit;
+    End;
+  FSt := 0;
+  FGot := False;
+  FDone := '';
+  SendFrame(S, Tag, Arg, Dummy, 0);
+  T := 0;
+  While (Not FGot) And (T < 40) Do         {up to 2 seconds}
+    Begin
+    P.fd := S;
+    P.events := POLLIN;
+    P.revents := 0;
+    If fpPoll(@P, 1, 50) > 0 Then
+      Begin
+      N := fpRead(S, Buf, SizeOf(Buf));
+      If N <= 0 Then
+        T := 100
+      Else
+        FilterBytes(Buf, N);
+      End
+    Else
+      Inc(T);
+    End;
+  fpClose(S);
+  If FGot Then
+    NodeCommand := FDone
+  Else
+    NodeCommand := 'No answer from node ' + Long2Str(Node) + '.';
+  End;
+
+
+Procedure Status(M: String);
+  {A line on the bottom row of the sysop's screen, then back to where the cursor was}
+  Begin
+  Say(Esc + '7' + Esc + '[999;1H' + Esc + '[0;7m ' + M + ' ' + Esc + '[0m' + Esc + '8');
   CommFlushOut;
   End;
 
@@ -373,42 +542,38 @@ Function Watch(Node: LongInt): String;
   {Show what the node sends until Ctrl-X; returns a message for the menu}
   Var
     S: LongInt;
-    A: TUnixSockAddr;
-    Path: String;
     Buf: Array[0..4095] Of Char;
     P: TPollFd;
     N: LongInt;
     C: Char;
-    Gone: Boolean;
+    Gone, Typing, Prefix, AskKick: Boolean;
+    Typed: Array[0..255] Of Char;
+    TypedN: Word;
+    Dummy: Byte;
 
   Begin
   Watch := '';
-  Path := RunDir + '/node' + Long2Str(Node) + '.snoop';
-  S := fpSocket(AF_UNIX, SOCK_STREAM, 0);
-  FillChar(A, SizeOf(A), 0);
-  A.family := AF_UNIX;
-  If (Length(Path) > 100) Or (S < 0) Then
+  S := OpenSnoop(Node);
+  If S < 0 Then
     Begin
-    Watch := 'Node ' + Long2Str(Node) + ' cannot be watched.';
-    Exit;
-    End;
-  Move(Path[1], A.path, Length(Path));
-  If fpConnect(S, @A, SizeOf(A)) <> 0 Then
-    Begin
-    fpClose(S);
     Watch := 'Node ' + Long2Str(Node) + ' cannot be watched (not running, or no snoop socket).';
     Exit;
     End;
   Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H' + 'Watching node ' + Long2Str(Node) +
-    '.  Ctrl-X ends.' + #13#10);
+    '.  Ctrl-X ends, Ctrl-A ? for the commands.' + #13#10);
   CommFlushOut;
-  Delay(1200);
+  Delay(1500);
   Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H');
   Gone := False;
+  Typing := False;
+  Prefix := False;
+  AskKick := False;
+  FSt := 0;
   Repeat
     P.fd := S;
     P.events := POLLIN;
     P.revents := 0;
+    FGot := False;
     If fpPoll(@P, 1, 50) > 0 Then
       Begin
       N := fpRead(S, Buf, SizeOf(Buf));
@@ -416,16 +581,64 @@ Function Watch(Node: LongInt): String;
         Gone := True
       Else
         Begin
-        ComSession^.SendBlock(Buf, N);
+        FilterBytes(Buf, N);
+        If FOutN > 0 Then
+          ComSession^.SendBlock(FOut, FOutN);
         CommFlushOut;
+        If FGot Then
+          Status(FDone);
         End;
       End;
+    TypedN := 0;
     While Not ComSession^.InEmpty Do
       Begin
       C := ComSession^.GetChar;
-      If C = #24 Then
-        Gone := True;                    {Ctrl-X}
+      If Prefix Then
+        Begin
+        Prefix := False;
+        Case UpCase(C) Of
+          'T': Begin
+               Typing := Not Typing;
+               If Typing Then
+                 Status('Typing is ON: what you type goes to the caller (Ctrl-A T stops)')
+               Else
+                 Status('Typing is off: view only');
+               End;
+          'K': Begin
+               AskKick := True;
+               Status('Disconnect the caller?  Y / N');
+               End;
+          '+', '=': SendFrame(S, '+', TimeStep, Dummy, 0);
+          '-', '_': SendFrame(S, '-', TimeStep, Dummy, 0);
+          'X', #24: Gone := True;
+          'A', #1: If Typing And (TypedN < 255) Then
+                     Begin
+                     Typed[TypedN] := #1;
+                     Inc(TypedN);
+                     End;
+          '?', 'H': Status('^A: T type  K kick  + / - ' + Long2Str(TimeStep) + ' min  X leave   Ctrl-X leave');
+          End;
+        End
+      Else If AskKick Then
+        Begin
+        AskKick := False;
+        If UpCase(C) = 'Y' Then
+          SendFrame(S, 'K', 0, Dummy, 0)
+        Else
+          Status('Not disconnected');
+        End
+      Else If C = #1 Then
+        Prefix := True
+      Else If C = #24 Then
+        Gone := True
+      Else If Typing And (TypedN < 255) Then
+        Begin
+        Typed[TypedN] := C;
+        Inc(TypedN);
+        End;
       End;
+    If TypedN > 0 Then
+      SendFrame(S, 'D', 0, Typed, TypedN);
     If Not ComSession^.GetCarrier Then
       Gone := True;
   Until Gone;
@@ -479,6 +692,38 @@ Procedure Monitor;
              ShowNodes(Typed);
              End;
         'Q', #24, #3: Exit;
+        'K', '+', '-', '=':
+             If Typed <> '' Then
+               Begin
+               N := Str2Long(Typed);
+               Typed := '';
+               LoadNodes;
+               Found := False;
+               For i := 1 To NumNodes Do
+                 If Nodes[i].Node = N Then
+                   Found := True;
+               If Not Found Then
+                 Msg := 'Node ' + Long2Str(N) + ' is not in use.'
+               Else If UpCase(C) = 'K' Then
+                 Begin
+                 SayLn('');
+                 Say('Disconnect node ' + Long2Str(N) + '?  Y / N ');
+                 CommFlushOut;
+                 If UpCase(Key(30000)) = 'Y' Then
+                   Msg := NodeCommand(N, 'K', 0)
+                 Else
+                   Msg := 'Not disconnected';
+                 End
+               Else If (C = '-') Then
+                 Msg := NodeCommand(N, '-', TimeStep)
+               Else
+                 Msg := NodeCommand(N, '+', TimeStep);
+               ShowNodes('');
+               SayLn('');
+               SayLn(Msg);
+               CommFlushOut;
+               Msg := '';
+               End;
         #13: Begin
              If Typed <> '' Then
                Begin

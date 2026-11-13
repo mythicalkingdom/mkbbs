@@ -11,9 +11,20 @@ Unit MKSnoop;   {Lets the sysop watch a session: a filter that copies the output
         1. the last Ring bytes of output, so the screen is not empty, then
         2. everything the BBS sends to the caller from then on.
 
-     View only: whatever the monitor sends back is never read.  A monitor that
-     cannot keep up (the socket is full) is dropped, the caller is never held
-     up by it.  The socket file is created with mode 0600: only the user that
+     A monitor that cannot keep up (the socket is full) is dropped, the caller
+     is never held up by it.
+
+     What the monitor sends back are commands (frames):
+
+        'D' n data(n)    n bytes typed by the sysop: they reach the BBS as if
+                         the caller had typed them (n = 0..255)
+        'K'              disconnect the caller (hang up)
+        '+' m / '-' m    give / take m minutes (1..255) of the caller's time
+                         (done by SnoopHandler, which the BBS supplies)
+
+     The answer to a command is a short text for the sysop, sent as an APC
+     string  ESC _ text ESC \  among the output (terminals ignore it; mkmon
+     takes it out).  The socket file is created with mode 0600: only the user that
      runs the BBS (and root) can attach.
 
      The listening socket is checked whenever the session is used, and while
@@ -30,6 +41,15 @@ Const
   SnoopMax  = 2;                       {Monitors at the same time}
 
 Type
+  SnoopCmdFunc = Function(Cmd: Char; Arg: LongInt): String;
+    {'K' (before the hang up), '+' or '-' with minutes; returns the message for
+     the sysop.  Set by the BBS, Nil = the BBS cannot do it.}
+
+Var
+  SnoopHandler: SnoopCmdFunc;
+
+
+Type
   SnoopComObj = Object(AbsComObj)
     Inner: AbsComPtr;
     OwnsInner: Boolean;
@@ -39,6 +59,11 @@ Type
     Ring: Array[0..SnoopRing - 1] Of Char;
     RingPos: LongInt;                  {Total bytes ever seen}
     Tick: Word;
+    Inj: Array[0..255] Of Char;        {typed by the sysop, not yet read}
+    InjHead, InjCount: Word;
+    CSt: Array[1..SnoopMax] Of Byte;   {frame parser of each monitor}
+    CTag: Array[1..SnoopMax] Of Char;
+    CLen: Array[1..SnoopMax] Of Byte;
     Constructor Init(AInner: AbsComPtr; AOwns: Boolean; SockPath: String);
     Destructor Done; Virtual;
     Function  OpenSession: Boolean; Virtual;
@@ -66,7 +91,12 @@ Type
     Function  GetWindowSize(Var C, R: Word): Boolean; Virtual;
     Function  WindowVersion: Word; Virtual;
     Function  Watchers: Word;          {Monitors attached now}
-    Procedure Accept;                  {Internal: take a waiting monitor}
+    Procedure Accept;                  {Internal: take a waiting monitor, read commands}
+    Procedure ReadCmds;                {Internal}
+    Procedure Feed(i: Word; B: Byte);  {Internal: one command byte}
+    Procedure Command(i: Word; Cmd: Char; Arg: LongInt); {Internal}
+    Procedure Reply(i: Word; Msg: String); {Internal}
+    Function  InjPop: Char;            {Internal}
     Procedure Copy2(Var Dt; DSize: Word);   {Internal: record and forward}
     End;
 
@@ -96,8 +126,13 @@ Constructor SnoopComObj.Init(AInner: AbsComPtr; AOwns: Boolean; SockPath: String
   ListenFd := -1;
   RingPos := 0;
   Tick := 0;
+  InjHead := 0;
+  InjCount := 0;
   For i := 1 To SnoopMax Do
+    Begin
     Clients[i] := -1;
+    CSt[i] := 0;
+    End;
   If (Path = '') Or (Length(Path) > 100) Then
     Exit;
   ListenFd := fpSocket(AF_UNIX, SOCK_STREAM, 0);
@@ -196,6 +231,7 @@ Procedure SnoopComObj.Accept;
   Begin
   If ListenFd < 0 Then
     Exit;
+  ReadCmds;
   C := fpAccept(ListenFd, Nil, Nil);
   If C < 0 Then
     Exit;
@@ -209,6 +245,7 @@ Procedure SnoopComObj.Accept;
     End;
   fpFcntl(C, F_SetFl, fpFcntl(C, F_GetFl) Or O_NONBLOCK);
   Clients[i] := C;
+  CSt[i] := 0;
   {the recent output, from the start of a line when the ring has wrapped}
   If RingPos < SnoopRing Then
     Begin
@@ -234,6 +271,112 @@ Procedure SnoopComObj.Accept;
     End;
   If N - k > 0 Then
     Put(Clients[i], Block[k], N - k);
+  End;
+
+
+Procedure SnoopComObj.Reply(i: Word; Msg: String);
+  Begin
+  If Clients[i] >= 0 Then
+    Begin
+    Msg := #27'_' + Msg + #27'\';
+    Put(Clients[i], Msg[1], Length(Msg));
+    End;
+  End;
+
+
+Function SnoopComObj.InjPop: Char;
+  Begin
+  InjPop := Inj[InjHead];
+  InjHead := (InjHead + 1) And 255;
+  Dec(InjCount);
+  End;
+
+
+Procedure SnoopComObj.Command(i: Word; Cmd: Char; Arg: LongInt);
+  Var
+    Msg: String;
+
+  Begin
+  Msg := '';
+  Case Cmd Of
+    'K': Begin
+         If @SnoopHandler <> Nil Then
+           Msg := SnoopHandler(Cmd, Arg);
+         If Msg = '' Then
+           Msg := 'Disconnected';
+         Reply(i, Msg);
+         Inner^.SendStr(#13#10'You have been disconnected by the sysop.'#13#10);
+         Inner^.FlushOut;
+         Inner^.Hangup;
+         End;
+    '+', '-': Begin
+              If @SnoopHandler <> Nil Then
+                Msg := SnoopHandler(Cmd, Arg)
+              Else
+                Msg := 'This BBS cannot change the time';
+              Reply(i, Msg);
+              End;
+    End;
+  End;
+
+
+Procedure SnoopComObj.Feed(i: Word; B: Byte);
+  Begin
+  Case CSt[i] Of
+    0: Begin                           {a command letter}
+       CTag[i] := Chr(B);
+       Case CTag[i] Of
+         'D': CSt[i] := 1;
+         '+', '-': CSt[i] := 3;
+         'K': Command(i, 'K', 0);
+         End;
+       End;
+    1: Begin                           {length of the typed text}
+       CLen[i] := B;
+       If B = 0 Then
+         CSt[i] := 0
+       Else
+         CSt[i] := 2;
+       End;
+    2: Begin                           {typed text}
+       If InjCount < 256 Then
+         Begin
+         Inj[(InjHead + InjCount) And 255] := Chr(B);
+         Inc(InjCount);
+         End;
+       Dec(CLen[i]);
+       If CLen[i] = 0 Then
+         CSt[i] := 0;
+       End;
+    3: Begin                           {minutes}
+       CSt[i] := 0;
+       If B > 0 Then
+         Command(i, CTag[i], B);
+       End;
+    End;
+  End;
+
+
+Procedure SnoopComObj.ReadCmds;
+  Var
+    i: Word;
+    N, k: LongInt;
+    Buf: Array[0..255] Of Byte;
+
+  Begin
+  For i := 1 To SnoopMax Do
+    If Clients[i] >= 0 Then
+      Begin
+      N := fpRecv(Clients[i], @Buf, SizeOf(Buf), MSG_NOSIGNAL);
+      If N = 0 Then
+        Begin
+        fpClose(Clients[i]);               {the monitor left}
+        Clients[i] := -1;
+        End
+      Else If N > 0 Then
+        For k := 0 To N - 1 Do
+          Feed(i, Buf[k]);
+      End;
   End;
 
 
@@ -284,7 +427,7 @@ Function SnoopComObj.GetCarrier: Boolean;
 Function SnoopComObj.InEmpty: Boolean;
   Begin
   Accept;
-  InEmpty := Inner^.InEmpty;
+  InEmpty := (InjCount = 0) And Inner^.InEmpty;
   End;
 
 
@@ -302,16 +445,30 @@ Function SnoopComObj.OutEmpty: Boolean;
 
 Function SnoopComObj.GetChar: Char;
   Begin
-  While (Not Inner^.WaitForChar(200)) And Inner^.GetCarrier Do
+  GetChar := #0;
+  Repeat
     Accept;
-  GetChar := Inner^.GetChar;
+    If InjCount > 0 Then
+      Begin
+      GetChar := InjPop;
+      Exit;
+      End;
+    If Inner^.WaitForChar(50) Then
+      Begin
+      GetChar := Inner^.GetChar;
+      Exit;
+      End;
+  Until Not Inner^.GetCarrier;
   End;
 
 
 Function SnoopComObj.PeekChar: Char;
   Begin
   Accept;
-  PeekChar := Inner^.PeekChar;
+  If InjCount > 0 Then
+    PeekChar := Inj[InjHead]
+  Else
+    PeekChar := Inner^.PeekChar;
   End;
 
 
@@ -351,8 +508,17 @@ Function SnoopComObj.SendBlock(Var Dt; DSize: Word): Word;
 
 
 Function SnoopComObj.GetBlock(Var Dt; DSize: Word): Word;
+  Var
+    N: Word;
+
   Begin
-  GetBlock := Inner^.GetBlock(Dt, DSize);
+  N := 0;
+  While (N < DSize) And (Not InEmpty) Do
+    Begin
+    TByteBlock(Dt)[N] := Ord(GetChar);
+    Inc(N);
+    End;
+  GetBlock := N;
   End;
 
 
@@ -364,8 +530,13 @@ Function SnoopComObj.WaitForChar(Ms: Word): Boolean;
   WaitForChar := False;
   Repeat
     Accept;
-    If Ms > 200 Then
-      T := 200
+    If InjCount > 0 Then
+      Begin
+      WaitForChar := True;
+      Exit;
+      End;
+    If Ms > 50 Then
+      T := 50
     Else
       T := Ms;
     If Inner^.WaitForChar(T) Then
@@ -387,6 +558,7 @@ Procedure SnoopComObj.SendStr(Str: String);
 
 Procedure SnoopComObj.FlushIn;
   Begin
+  InjCount := 0;
   Inner^.FlushIn;
   End;
 
@@ -440,4 +612,7 @@ Function SnoopComObj.WindowVersion: Word;
   End;
 
 
+
+Begin
+SnoopHandler := Nil;
 End.

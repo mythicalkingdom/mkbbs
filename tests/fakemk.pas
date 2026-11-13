@@ -5,8 +5,20 @@ program fakemk;
   until the caller hangs up or sends Q. }
 uses Dos, MKComAbs, MKSess, MKString, MKSnoop;
 var
+  Minutes: LongInt;
   i: Word; S, Typ, Addr, Cfg: String; Proxy: Boolean; Rate: LongInt; Node: LongInt; C: Char;
+function Sysop(Cmd: Char; Arg: LongInt): String;
 begin
+  case Cmd of
+    '+': begin Inc(Minutes, Arg); Sysop := 'Added ' + Long2Str(Arg) + ' min, ' + Long2Str(Minutes) + ' left'; end;
+    '-': begin Dec(Minutes, Arg); Sysop := 'Took ' + Long2Str(Arg) + ' min, ' + Long2Str(Minutes) + ' left'; end;
+    'K': Sysop := 'Node kicked';
+  end;
+end;
+
+begin
+  Minutes := 30;
+  SnoopHandler := Sysop;
   Proxy := False; Typ := ''; Addr := ''; Rate := 0; Node := 0;
   for i := 1 to ParamCount do begin
     S := ParamStr(i);

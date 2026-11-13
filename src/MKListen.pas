@@ -57,7 +57,8 @@ Program MKListen;
      Sysop monitor: a port of "type": "sysop" is not a caller.  Whoever connects
      (Telnet, localhost only: use ssh port forwarding to reach it from outside)
      gets mkmon, which asks for the "password" of the port, shows the nodes
-     with their user, activity, address and start time and lets the sysop watch
+     with their user, activity, address and start time and lets the sysop watch,
+     type into, disconnect or give or take time from
      (snoop) a node.  "mkmon" names the program (default: next to mk).
 
           { "port": 2330, "type": "sysop", "bind": "127.0.0.1",
