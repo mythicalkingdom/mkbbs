@@ -4,11 +4,12 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
-for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
+for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPath CfgMenu MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
 done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omk src/MK.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
 done
@@ -30,3 +31,9 @@ if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then
   build/syntest check build/work/fsx_bbs | grep -E 'FAIL|failures'
 fi
 [ "$(printf 'abc' | build/stdtest)" = 'ABC' ] && echo 'ok   MKComStd on a pipe' || { echo 'FAIL MKComStd on a pipe'; exit 1; }
+# configuration editor: edit a path on a copy of the sample config through a pseudo terminal, check the file
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  mkdir -p build/cfgwork/ra; cp -a bbs/bbsc/ra/. build/cfgwork/ra/
+  CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\x1b[B' '\r' '\t\t\t\t' '/x\\y' '\r' '\x1bx' 'y' > /dev/null 2>&1
+  strings build/cfgwork/ra/config.mk | grep -q '^/x/y/' && echo 'ok   mkconfig: edited path saved with slashes' || { echo 'FAIL mkconfig: edit not saved'; exit 1; }
+fi
