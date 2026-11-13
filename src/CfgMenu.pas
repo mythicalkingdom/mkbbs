@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent;
+  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea;
 
 Const
   cmGeneral = 1000;
@@ -284,8 +284,8 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmDoors: DoPickDoor;
       cmPackers: DoCfgPPack;
       cmOfflineType: DoCfgOffType;
-      cmMsgAreas: NotYet('Areas');
-      cmMsgOptions: NotYet('Msg Options');
+      cmMsgAreas: DoCfgMArea;
+      cmMsgOptions: ;                  {no screen in the original either}
       cmOrigin: DoCfgOrig;
       cmFastCombined: DoFastPick(1);
       cmFastAnsi: DoFastPick(2);

@@ -69,6 +69,7 @@ Type
     Vis: Byte;                         {Visible width, 0 = automatic}
     Filter: String[40];                {Allowed characters, '' = any}
     Zero: Byte;                        {Number shown with leading zeros to this width}
+    ReadOnly: Boolean;                 {Typing is ignored; F2 or Space chooses}
     Proc: CfgProc;                     {F2}
     ProcData: Pointer;
     ProcTitle: String[40];
@@ -84,6 +85,7 @@ Type
     NVis: Byte;
     NFilter: String[40];
     NZero: Byte;
+    NReadOnly: Boolean;
     F: Array[1..MaxCfgFields] Of CfgFieldRec;
     Constructor Init(ATitle: String);
     Procedure Window(X1, Y1, X2, Y2: Integer);
@@ -91,6 +93,7 @@ Type
     Procedure Show(Width: Byte);
     Procedure Filter(Chars: String);
     Procedure ZeroPad(Width: Byte);
+    Procedure ReadOnly;
     Procedure OnF2(Proc: CfgProc; Data: Pointer; ProcTitle: String);
     Procedure AddString(Lab: String; Var V; MaxLen: Byte; Hint: String);
     Procedure AddDir(Lab: String; Var V; MaxLen: Byte; Hint: String);
@@ -372,7 +375,7 @@ Procedure CfgDialog.HandleEvent(Var Event: TEvent);
       If Form^.F[i].View = PView(Event.InfoPtr) Then
         Begin
         If @Form^.F[i].Proc <> Nil Then
-          SetHint(Form^.F[i].Hint + '  (F2 = choose)')
+          SetHint(Form^.F[i].Hint + '  (F2 or Space = choose)')
         Else
           SetHint(Form^.F[i].Hint);
         Exit;
@@ -422,6 +425,17 @@ Procedure CfgInput.HandleEvent(Var Event: TEvent);
     ClearEvent(Event);
     Exit;
     End;
+  If (Event.What = evKeyDown) And (PCfgDialog(Owner)^.Form^.F[Idx].ReadOnly) Then
+    Begin
+    D := PCfgDialog(Owner);
+    If (Event.CharCode = ' ') And (@D^.Form^.F[Idx].Proc <> Nil) Then
+      Event.KeyCode := kbF2             {Space chooses, like F2}
+    Else If (Event.CharCode >= ' ') Or (Event.KeyCode = kbBack) Or (Event.KeyCode = kbDel) Then
+      Begin
+      ClearEvent(Event);                {read only: no typing}
+      Exit;
+      End;
+    End;
   If (Event.What = evKeyDown) And (Event.KeyCode = kbF2) Then
     Begin
     D := PCfgDialog(Owner);
@@ -454,6 +468,7 @@ Constructor CfgFormObj.Init(ATitle: String);
   NVis := 0;
   NFilter := '';
   NZero := 0;
+  NReadOnly := False;
   End;
 
 
@@ -476,6 +491,12 @@ Procedure CfgFormObj.At(Row, Col, FRow, FCol: Integer);
 Procedure CfgFormObj.Show(Width: Byte);
   Begin
   NVis := Width;
+  End;
+
+
+Procedure CfgFormObj.ReadOnly;
+  Begin
+  NReadOnly := True;
   End;
 
 
@@ -522,6 +543,8 @@ Procedure CfgFormObj.Add(K: CfgFieldKind; ALab: String; Var V; ASize: Byte;
   F[Count].Filter := NFilter;
   F[Count].Zero := NZero;
   NZero := 0;
+  F[Count].ReadOnly := NReadOnly;
+  NReadOnly := False;
   F[Count].Proc := Nil;
   F[Count].ProcData := Nil;
   F[Count].View := Nil;

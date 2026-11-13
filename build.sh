@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
-for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgList CfgPLan CfgPAddr CfgPPack CfgFArea CfgOff CfgFast CfgEPack CfgNet CfgESys CfgPSys CfgOrig CfgDoor CfgOffp CfgEvent CfgMenu MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
+for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgList CfgPLan CfgPAddr CfgPPack CfgFArea CfgOff CfgFast CfgEPack CfgNet CfgESys CfgPSys CfgOrig CfgDoor CfgOffp CfgEvent CfgMsg CfgMArea CfgMenu MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
 done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omk src/MK.pas
@@ -39,4 +39,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # General screen (converted layout): replace the BBS id, save
   CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\r' '\t\t\t' 'ZZQ' '\r' '\x1bx' 'y' > /dev/null 2>&1
   strings build/cfgwork/ra/config.mk | grep -q 'ZZQ' && echo 'ok   mkconfig: General screen edit saved' || { echo 'FAIL mkconfig: General edit not saved'; exit 1; }
+  # Events list -> event 1 -> Space changes the status choice -> OK, quit and save: the config file must change
+  mkdir -p build/cfgwork2/ra; cp -a bbs/bbsc/ra/. build/cfgwork2/ra/
+  CFGDIR=$PWD/build/cfgwork2/ra python3 tests/cfgshot.py '\x1be' '\r' ' ' '\r' '\t' '\t' '\r' '\x1bx' 'y' > /dev/null 2>&1
+  N=$(cmp -l bbs/bbsc/ra/config.mk build/cfgwork2/ra/config.mk | wc -l)
+  [ "$N" -ge 1 ] && [ "$N" -le 4 ] && echo 'ok   mkconfig: event status choice saved' || { echo "FAIL mkconfig: event edit ($N bytes differ)"; exit 1; }
 fi

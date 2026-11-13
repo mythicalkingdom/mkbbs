@@ -22,6 +22,11 @@ Type
 Procedure RunList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
   Edit: CfgItemEdit);
 
+Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Chosen: Word): Boolean;
+  {One item of 1..Count; Chosen is the item the bar starts on and gets the
+   choice.  True when one was chosen (Enter, Space, double click or OK).}
+
 Function RunChecks(Title: String; Names: String; Var Marked: CfgMarks): Boolean;
   {Names: the choices separated by '|'.  True when OK was chosen.}
 
@@ -139,6 +144,55 @@ Function RunMarkList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr
     Begin
     Marked := Work;
     RunMarkList := True;
+    End;
+  Dispose(D, Done);
+  End;
+
+
+Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Chosen: Word): Boolean;
+  Var
+    D: PDialog;
+    L: PItemList;
+    SB: PScrollBar;
+    R: TRect;
+    W, H, Rows: Integer;
+    DR: TRect;
+
+  Begin
+  RunPick := False;
+  If Count = 0 Then
+    Exit;
+  DeskTop^.GetExtent(DR);
+  Rows := Count;
+  If Rows > 14 Then
+    Rows := 14;
+  If Rows > DR.B.Y - 7 Then
+    Rows := DR.B.Y - 7;
+  W := Width + 6;
+  If W < 34 Then
+    W := 34;
+  H := Rows + 6;
+  R.Assign(0, 0, W, H);
+  New(D, Init(R, Title));
+  D^.Options := D^.Options Or ofCentered;
+  R.Assign(W - 3, 1, W - 2, 1 + Rows);
+  SB := New(PScrollBar, Init(R));
+  D^.Insert(SB);
+  R.Assign(2, 1, W - 3, 1 + Rows);
+  L := New(PItemList, Init(R, Count, SB, GetStr));
+  If (Chosen >= 1) And (Chosen <= Count) Then
+    L^.FocusItem(Chosen - 1);
+  D^.Insert(L);
+  R.Assign(2, H - 3, 12, H - 1);
+  D^.Insert(New(PButton, Init(R, 'O~K~', cmOK, bfDefault)));
+  R.Assign(14, H - 3, 26, H - 1);
+  D^.Insert(New(PButton, Init(R, 'Cancel', cmCancel, bfNormal)));
+  D^.SelectNext(False);
+  If Application^.ExecView(D) = cmOK Then
+    Begin
+    Chosen := L^.Focused + 1;
+    RunPick := True;
     End;
   Dispose(D, Done);
   End;
