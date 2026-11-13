@@ -15,7 +15,9 @@ Function DoMenu: Word;
 
 Implementation
 
-Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, CfgPath;
+Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
+  CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
+  CfgXfer, CfgEopt;
 
 Const
   cmGeneral = 1000;
@@ -62,6 +64,23 @@ Const
   cmEchoOpt = 1041;
   cmQuitCfg = 1042;
   cmQuitDlg = 2000;
+
+Procedure EditConfigSec(Cmd: Word);
+  Var
+    Sec: SecType;
+
+  Begin
+  Case Cmd Of
+    cmSecNewUser:    Begin Config^.GetNewUserSec(Sec); EnterSec(Sec, 'New User'); Config^.SetNewUserSec(Sec); End;
+    cmSecAttach:     Begin Config^.GetAttachSec(Sec); EnterSec(Sec, 'File Attach'); Config^.SetAttachSec(Sec); End;
+    cmSecRequest:    Begin Config^.GetRequestSec(Sec); EnterSec(Sec, 'File Request'); Config^.SetRequestSec(Sec); End;
+    cmSecCrash:      Begin Config^.GetCrashNMSec(Sec); EnterSec(Sec, 'Crash NM'); Config^.SetCrashNMSec(Sec); End;
+    cmSecForceCrash: Begin Config^.GetForceCrashNMSec(Sec); EnterSec(Sec, 'Force Crash NM'); Config^.SetForceCrashNMSec(Sec); End;
+    cmSecDelete:     Begin Config^.GetDeleteSec(Sec); EnterSec(Sec, 'Msg Delete'); Config^.SetDeleteSec(Sec); End;
+    cmSecUnReceive:  Begin Config^.GetUnRcvSec(Sec); EnterSec(Sec, 'Msg UnReceive'); Config^.SetUnRcvSec(Sec); End;
+    End;
+  End;
+
 
 Type
   CfgApp = Object(TApplication)
@@ -252,21 +271,16 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
     Case Event.Command Of
       cmQuitDlg, cmQuitCfg: AskQuit;
       cmPaths: DoCfgPath;
-      cmGeneral: NotYet('General');
+      cmGeneral: DoCfgGen;
       cmLanguage: NotYet('Language');
-      cmNewUsers: NotYet('New Users');
-      cmSecOptions: NotYet('Options');
-      cmSecNewUser: NotYet('New User');
-      cmSecAttach: NotYet('Attach');
-      cmSecRequest: NotYet('Request');
-      cmSecCrash: NotYet('Crash NM');
-      cmSecForceCrash: NotYet('Force Crash NM');
-      cmSecDelete: NotYet('Delete');
-      cmSecUnReceive: NotYet('UnReceive');
+      cmNewUsers: DoCfgNUser;
+      cmSecOptions: DoCfgSec;
+      cmSecNewUser, cmSecAttach, cmSecRequest, cmSecCrash, cmSecForceCrash,
+      cmSecDelete, cmSecUnReceive: EditConfigSec(Event.Command);
       cmAddresses: NotYet('Addresses');
-      cmPaging: NotYet('Paging');
-      cmModemResp: NotYet('Modem Resp');
-      cmErrorLevels: NotYet('ErrorLevels');
+      cmPaging: DoCfgPage;
+      cmModemResp: DoCfgResp;
+      cmErrorLevels: DoCfgEL;
       cmDoors: NotYet('Doors');
       cmPackers: NotYet('Packers');
       cmOfflineType: NotYet('Offline Type');
@@ -289,10 +303,10 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmFastHideSeen: NotYet('Hide Seen-By');
       cmOffCfg: NotYet('Offline');
       cmFileAreas: NotYet('Areas');
-      cmFileOptions: NotYet('Options');
+      cmFileOptions: DoCfgXfer;
       cmEvents: NotYet('Events');
       cmEchoSys: NotYet('Systems');
-      cmEchoOpt: NotYet('Options');
+      cmEchoOpt: DoCfgEOpt;
       Else Exit;
       End;
     ClearEvent(Event);
@@ -305,10 +319,12 @@ Function DoMenu: Word;
     A: CfgApp;
 
   Begin
+  MaroonOn;
   A.Init;
   A.Run;
   DoMenu := A.Chosen;
   A.Done;
+  MaroonOff;
   End;
 
 

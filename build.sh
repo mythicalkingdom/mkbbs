@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
-for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPath CfgMenu MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
+for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgMenu MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
 done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omk src/MK.pas
@@ -36,4 +36,7 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/cfgwork/ra; cp -a bbs/bbsc/ra/. build/cfgwork/ra/
   CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\x1b[B' '\r' '\t\t\t\t' '/x\\y' '\r' '\x1bx' 'y' > /dev/null 2>&1
   strings build/cfgwork/ra/config.mk | grep -q '^/x/y/' && echo 'ok   mkconfig: edited path saved with slashes' || { echo 'FAIL mkconfig: edit not saved'; exit 1; }
+  # General screen (converted layout): replace the BBS id, save
+  CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\r' '\t\t\t' 'ZZQ' '\r' '\x1bx' 'y' > /dev/null 2>&1
+  strings build/cfgwork/ra/config.mk | grep -q 'ZZQ' && echo 'ok   mkconfig: General screen edit saved' || { echo 'FAIL mkconfig: General edit not saved'; exit 1; }
 fi
