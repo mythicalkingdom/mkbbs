@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff;
+  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp;
 
 Const
   cmGeneral = 1000;
@@ -281,31 +281,31 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmPaging: DoCfgPage;
       cmModemResp: DoCfgResp;
       cmErrorLevels: DoCfgEL;
-      cmDoors: NotYet('Doors');
+      cmDoors: DoPickDoor;
       cmPackers: DoCfgPPack;
       cmOfflineType: DoCfgOffType;
       cmMsgAreas: NotYet('Areas');
       cmMsgOptions: NotYet('Msg Options');
-      cmOrigin: NotYet('Origin Lines');
-      cmFastCombined: NotYet('Combined');
-      cmFastAnsi: NotYet('Ansi');
-      cmFastHiBit: NotYet('Hi-Bit Chars');
-      cmFastTaglines: NotYet('Taglines');
-      cmFastFido: NotYet('Fido Info');
-      cmFastTear: NotYet('Reader Tearlines');
-      cmFastOffline: NotYet('Offline');
-      cmFastForceOff: NotYet('Force Offline');
-      cmFastDefComb: NotYet('Default Combined');
-      cmFastReadOrig: NotYet('Reader Origin');
-      cmFastImpPath: NotYet('Import Path');
-      cmFastHidePath: NotYet('Hide Path');
-      cmFastImpSeen: NotYet('Import Seen-By');
-      cmFastHideSeen: NotYet('Hide Seen-By');
-      cmOffCfg: NotYet('Offline');
+      cmOrigin: DoCfgOrig;
+      cmFastCombined: DoFastPick(1);
+      cmFastAnsi: DoFastPick(2);
+      cmFastHiBit: DoFastPick(3);
+      cmFastTaglines: DoFastPick(4);
+      cmFastFido: DoFastPick(5);
+      cmFastTear: DoFastPick(6);
+      cmFastOffline: DoFastPick(7);
+      cmFastForceOff: DoFastPick(8);
+      cmFastDefComb: DoFastPick(9);
+      cmFastReadOrig: DoFastPick(10);
+      cmFastImpPath: DoFastPick(11);
+      cmFastHidePath: DoFastPick(12);
+      cmFastImpSeen: DoFastPick(13);
+      cmFastHideSeen: DoFastPick(14);
+      cmOffCfg: EditOffCfgP;
       cmFileAreas: DoCfgFArea;
       cmFileOptions: DoCfgXfer;
       cmEvents: NotYet('Events');
-      cmEchoSys: NotYet('Systems');
+      cmEchoSys: DoCfgPSys;
       cmEchoOpt: DoCfgEOpt;
       Else Exit;
       End;

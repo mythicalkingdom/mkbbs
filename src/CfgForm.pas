@@ -25,6 +25,10 @@ Unit CfgForm;   {Data driven entry forms for the configuration editor (Free Visi
          AddChar     one character
          AddYesNo    Boolean (a check box)
          AddText     fixed text, no variable
+         AddChoice   one of a few names ('LZH|ZIP|ARC'): the variable (Size 1
+                     or 2 bytes) holds First + the position; Space, + / - or
+                     the arrow keys change it
+         AddAction   a button that calls a procedure (for a sub screen)
 
      Layout.  By default the fields are listed in one column (two or three if
      the dialog would be taller than the desktop).  The screens converted from
@@ -46,10 +50,11 @@ Uses Objects, Drivers, Views, Dialogs, App;
 
 Const
   MaxCfgFields = 64;
+  cmCfgAction = 9000;                  {+ field number: a button of AddAction}
 
 Type
   CfgFieldKind = (fkString, fkDir, fkFile, fkNumber, fkHex, fkChar, fkYesNo,
-    fkText);
+    fkText, fkChoice, fkAction);
 
   CfgProc = Procedure(Data: Pointer; Title: String);
 
@@ -66,6 +71,7 @@ Type
     Proc: CfgProc;                     {F2}
     ProcData: Pointer;
     ProcTitle: String[40];
+    Names: String[100];                {fkChoice: the choices, separated by |}
     View: PView;                       {Filled in by Execute}
     End;
 
@@ -92,6 +98,10 @@ Type
     Procedure AddChar(Lab: String; Var V; Hint: String);
     Procedure AddYesNo(Lab: String; Var V: Boolean; Hint: String);
     Procedure AddText(Text: String);
+    Procedure AddChoice(Lab: String; Var V; Size: Byte; First: LongInt;
+      Names: String; Hint: String);
+    Procedure AddAction(Caption: String; Proc: CfgProc; Data: Pointer;
+      ProcTitle: String; Hint: String);
     Function  Execute: Boolean;
     Procedure Add(K: CfgFieldKind; ALab: String; Var V; ASize: Byte;
       AMin, AMax: LongInt; AHint: String);     {Internal}
@@ -151,6 +161,66 @@ Function HexDigits(L: LongInt; N: Byte): String;
   End;
 
 
+Function NameAt(Const Names: String; Idx: LongInt): String;
+  Var
+    S: String;
+    p: Integer;
+
+  Begin
+  S := Names;
+  While Idx > 0 Do
+    Begin
+    p := Pos('|', S);
+    If p = 0 Then
+      Begin
+      NameAt := '';
+      Exit;
+      End;
+    S := Copy(S, p + 1, 255);
+    Dec(Idx);
+    End;
+  p := Pos('|', S);
+  If p > 0 Then
+    S := Copy(S, 1, p - 1);
+  NameAt := S;
+  End;
+
+
+Function NameCount(Const Names: String): Integer;
+  Var
+    i, N: Integer;
+
+  Begin
+  N := 1;
+  For i := 1 To Length(Names) Do
+    If Names[i] = '|' Then
+      Inc(N);
+  NameCount := N;
+  End;
+
+
+Function NameLongest(Const Names: String): Integer;
+  Var
+    i, L: Integer;
+
+  Begin
+  L := 0;
+  For i := 0 To NameCount(Names) - 1 Do
+    If Length(NameAt(Names, i)) > L Then
+      L := Length(NameAt(Names, i));
+  NameLongest := L;
+  End;
+
+
+Function ChoiceValue(Const R: CfgFieldRec): LongInt;
+  Begin
+  If R.Size = 1 Then
+    ChoiceValue := Byte(R.P^)
+  Else
+    ChoiceValue := Word(R.P^);
+  End;
+
+
 Function FieldText(Const R: CfgFieldRec): String;
   {The text of a variable as shown in its input line}
   Var
@@ -159,6 +229,7 @@ Function FieldText(Const R: CfgFieldRec): String;
 
   Begin
   Case R.Kind Of
+    fkChoice: FieldText := NameAt(R.Names, ChoiceValue(R) - R.Min);
     fkNumber, fkHex:
       Begin
       Case R.Size Of
@@ -186,6 +257,15 @@ Procedure StoreText(Const R: CfgFieldRec; S: String);
 
   Begin
   Case R.Kind Of
+    fkChoice:
+      Begin
+      For Code := 0 To NameCount(R.Names) - 1 Do
+        If NameAt(R.Names, Code) = S Then
+          Begin
+          L := R.Min + Code;
+          If R.Size = 1 Then Byte(R.P^) := L Else Word(R.P^) := L;
+          End;
+      End;
     fkNumber, fkHex:
       Begin
       If R.Kind = fkHex Then
@@ -238,7 +318,7 @@ Procedure CfgDialog.Reload;
           PCheckBoxes(Form^.F[i].View)^.Press(0);
         Form^.F[i].View^.DrawView;
         End;
-      fkText: ;
+      fkText, fkAction: ;
       Else
         Begin
         PInputLine(Form^.F[i].View)^.Data^ := FieldText(Form^.F[i]);
@@ -256,7 +336,7 @@ Procedure CfgDialog.Commit;
   For i := 1 To Form^.Count Do
     Case Form^.F[i].Kind Of
       fkYesNo: Boolean(Form^.F[i].P^) := PCheckBoxes(Form^.F[i].View)^.Mark(0);
-      fkText: ;
+      fkText, fkAction: ;
       Else StoreText(Form^.F[i], PInputLine(Form^.F[i].View)^.Data^);
       End;
   End;
@@ -268,6 +348,19 @@ Procedure CfgDialog.HandleEvent(Var Event: TEvent);
 
   Begin
   Inherited HandleEvent(Event);
+  If (Event.What = evCommand) And (Event.Command > cmCfgAction) And
+     (Event.Command <= cmCfgAction + Form^.Count) Then
+    Begin
+    i := Event.Command - cmCfgAction;
+    If @Form^.F[i].Proc <> Nil Then
+      Begin
+      Commit;
+      Form^.F[i].Proc(Form^.F[i].ProcData, Form^.F[i].ProcTitle);
+      Reload;
+      End;
+    ClearEvent(Event);
+    Exit;
+    End;
   If (Event.What = evBroadcast) And (Event.Command = cmReceivedFocus) Then
     Begin
     For i := 1 To Form^.Count Do
@@ -287,8 +380,43 @@ Procedure CfgDialog.HandleEvent(Var Event: TEvent);
 Procedure CfgInput.HandleEvent(Var Event: TEvent);
   Var
     D: PCfgDialog;
+    N: Integer;
+    V: LongInt;
 
   Begin
+  If (Event.What = evKeyDown) And (PCfgDialog(Owner)^.Form^.F[Idx].Kind = fkChoice) Then
+    Begin
+    D := PCfgDialog(Owner);
+    N := NameCount(D^.Form^.F[Idx].Names);
+    V := ChoiceValue(D^.Form^.F[Idx]) - D^.Form^.F[Idx].Min;
+    Case Event.KeyCode Of
+      kbRight, kbDown: Inc(V);
+      kbLeft, kbUp: Dec(V);
+      Else
+        Case Event.CharCode Of
+          ' ', '+': Inc(V);
+          '-': Dec(V);
+          Else
+            Begin
+            If Event.CharCode >= ' ' Then
+              ClearEvent(Event);              {typing is not allowed}
+            Inherited HandleEvent(Event);
+            Exit;
+            End;
+          End;
+      End;
+    V := (V + N) Mod N;
+    V := V + D^.Form^.F[Idx].Min;
+    If D^.Form^.F[Idx].Size = 1 Then
+      Byte(D^.Form^.F[Idx].P^) := V
+    Else
+      Word(D^.Form^.F[Idx].P^) := V;
+    Data^ := FieldText(D^.Form^.F[Idx]);
+    SelectAll(False);
+    DrawView;
+    ClearEvent(Event);
+    Exit;
+    End;
   If (Event.What = evKeyDown) And (Event.KeyCode = kbF2) Then
     Begin
     D := PCfgDialog(Owner);
@@ -441,6 +569,27 @@ Procedure CfgFormObj.AddText(Text: String);
   End;
 
 
+Procedure CfgFormObj.AddChoice(Lab: String; Var V; Size: Byte; First: LongInt;
+  Names: String; Hint: String);
+  Begin
+  Add(fkChoice, Lab, V, Size, First, First + NameCount(Names) - 1, Hint);
+  F[Count].Names := Names;
+  End;
+
+
+Procedure CfgFormObj.AddAction(Caption: String; Proc: CfgProc; Data: Pointer;
+  ProcTitle: String; Hint: String);
+  Var
+    Dummy: Byte;
+
+  Begin
+  Add(fkAction, Caption, Dummy, 0, 0, 0, Hint);
+  F[Count].Proc := Proc;
+  F[Count].ProcData := Data;
+  F[Count].ProcTitle := ProcTitle;
+  End;
+
+
 Function NumWidth(Const R: CfgFieldRec): Byte;
   Var
     A, B: String;
@@ -469,6 +618,8 @@ Function VisWidth(Const R: CfgFieldRec; Limit: Integer): Integer;
     fkNumber, fkHex: W := NumWidth(R) + 1;
     fkChar: W := 3;
     fkYesNo: W := 4;
+    fkChoice: W := NameLongest(R.Names) + 2;
+    fkAction: W := Length(R.Lab) + 4;
     Else W := R.Size + 2;               {an input line keeps a column at each end for the scroll arrows}
     End;
   If R.Vis > 0 Then
@@ -488,6 +639,7 @@ Function CfgFormObj.Execute: Boolean;
     Inp: PCfgInput;
     Chk: PCheckBoxes;
     Txt: PStaticText;
+    Btn: PButton;
     Res: Word;
     Widest: Integer;
     Absolute: Boolean;
@@ -509,6 +661,9 @@ Function CfgFormObj.Execute: Boolean;
     Begin
     W := WinW;
     H := WinH + 3;
+    For i := 1 To Count Do        {buttons are two lines high: keep the hint line free}
+      If F[i].Kind = fkAction Then
+        H := WinH + 4;
     Rows := H - 5;
     Cols := 1;
     FW := 46;
@@ -516,6 +671,8 @@ Function CfgFormObj.Execute: Boolean;
       Begin
       If F[i].Kind = fkText Then
         j := F[i].Col + Length(F[i].Lab) + 2
+      Else If F[i].Kind = fkAction Then
+        j := F[i].Col + Length(F[i].Lab) + 6
       Else If F[i].FCol > 0 Then
         j := F[i].FCol + VisWidth(F[i], FW) + 1
       Else
@@ -532,7 +689,7 @@ Function CfgFormObj.Execute: Boolean;
     Inc(LW);
     Widest := 8;
     For i := 1 To Count Do
-      If F[i].Kind <> fkText Then
+      If Not (F[i].Kind In [fkText, fkAction]) Then
         If VisWidth(F[i], 48) - 2 > Widest Then
           Widest := VisWidth(F[i], 48) - 2;
     Cols := 1;
@@ -592,6 +749,13 @@ Function CfgFormObj.Execute: Boolean;
         D^.Insert(Txt);
         F[i].View := Txt;
         End;
+      fkAction:
+        Begin
+        R.Assign(X, Y, X + Length(F[i].Lab) + 4, Y + 2);
+        Btn := New(PButton, Init(R, F[i].Lab, cmCfgAction + i, bfNormal));
+        D^.Insert(Btn);
+        F[i].View := Btn;
+        End;
       fkYesNo:
         Begin
         R.Assign(FX, FY, FX + 4, FY + 1);
@@ -606,18 +770,23 @@ Function CfgFormObj.Execute: Boolean;
       Else
         Begin
         R.Assign(FX, FY, FX + VW, FY + 1);
-        Inp := New(PCfgInput, Init(R, F[i].Size + 1));
+        Case F[i].Kind Of
+          fkNumber: j := NumWidth(F[i]);
+          fkHex: j := F[i].Size * 2;
+          fkChar: j := 1;
+          fkChoice: j := NameLongest(F[i].Names);
+          Else j := F[i].Size;
+          End;
+        Inp := New(PCfgInput, Init(R, j + 1));   {size of Data: fixed at Init}
         Inp^.Idx := i;
         If F[i].Kind = fkNumber Then
           Begin
           Inp^.SetValidator(New(PRangeValidator, Init(F[i].Min, F[i].Max)));
-          Inp^.MaxLen := NumWidth(F[i]);
           End
         Else If F[i].Kind = fkHex Then
           Begin
           CF := ['0'..'9', 'A'..'F', 'a'..'f'];
           Inp^.SetValidator(New(PFilterValidator, Init(CF)));
-          Inp^.MaxLen := F[i].Size * 2;
           End
         Else If F[i].Filter <> '' Then
           Begin
@@ -626,8 +795,6 @@ Function CfgFormObj.Execute: Boolean;
             CF := CF + [F[i].Filter[j]];
           Inp^.SetValidator(New(PFilterValidator, Init(CF)));
           End;
-        If F[i].Kind = fkChar Then
-          Inp^.MaxLen := 1;
         Inp^.Data^ := FieldText(F[i]);
         D^.Insert(Inp);
         F[i].View := Inp;

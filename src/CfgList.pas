@@ -25,6 +25,14 @@ Procedure RunList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
 Function RunChecks(Title: String; Names: String; Var Marked: CfgMarks): Boolean;
   {Names: the choices separated by '|'.  True when OK was chosen.}
 
+Type
+  CfgBigMarks = Array[1..500] Of Boolean;
+
+Function RunMarkList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Marked: CfgBigMarks): Boolean;
+  {Items 1..Count (at most 500) with a mark each; Enter, Space or a click toggle
+   the mark.  True when OK was chosen (Marked then holds the result).}
+
 Implementation
 
 Uses Objects, Drivers, Views, Dialogs, App;
@@ -58,6 +66,81 @@ Procedure ItemList.SelectItem(Item: LongInt);
   Begin
   Inherited SelectItem(Item);
   Message(Owner, evCommand, cmOK, @Self);     {same as the Edit button}
+  End;
+
+
+Type
+  PMarkList = ^MarkList;
+  MarkList = Object(ItemList)
+    Marks: ^CfgBigMarks;
+    Function  GetText(Item: LongInt; MaxLen: LongInt): String; Virtual;
+    Procedure SelectItem(Item: LongInt); Virtual;
+    End;
+
+Function MarkList.GetText(Item: LongInt; MaxLen: LongInt): String;
+  Begin
+  If Marks^[Item + 1] Then
+    GetText := Copy('[*] ' + Get(Item + 1), 1, MaxLen)
+  Else
+    GetText := Copy('[ ] ' + Get(Item + 1), 1, MaxLen);
+  End;
+
+Procedure MarkList.SelectItem(Item: LongInt);
+  Begin
+  Marks^[Item + 1] := Not Marks^[Item + 1];
+  DrawView;
+  End;
+
+
+Function RunMarkList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Marked: CfgBigMarks): Boolean;
+  Var
+    D: PDialog;
+    L: PMarkList;
+    SB: PScrollBar;
+    R: TRect;
+    W, H, Rows: Integer;
+    DR: TRect;
+    Work: CfgBigMarks;
+
+  Begin
+  RunMarkList := False;
+  If (Count = 0) Or (Count > 500) Then
+    Exit;
+  Work := Marked;
+  DeskTop^.GetExtent(DR);
+  Rows := Count;
+  If Rows > 14 Then
+    Rows := 14;
+  If Rows > DR.B.Y - 7 Then
+    Rows := DR.B.Y - 7;
+  W := Width + 10;
+  If W < 52 Then
+    W := 52;
+  H := Rows + 6;
+  R.Assign(0, 0, W, H);
+  New(D, Init(R, Title));
+  D^.Options := D^.Options Or ofCentered;
+  R.Assign(W - 3, 1, W - 2, 1 + Rows);
+  SB := New(PScrollBar, Init(R));
+  D^.Insert(SB);
+  R.Assign(2, 1, W - 3, 1 + Rows);
+  L := New(PMarkList, Init(R, Count, SB, GetStr));
+  L^.Marks := @Work;
+  D^.Insert(L);
+  R.Assign(2, H - 3, 12, H - 1);
+  D^.Insert(New(PButton, Init(R, 'O~K~', cmOK, bfDefault)));
+  R.Assign(14, H - 3, 26, H - 1);
+  D^.Insert(New(PButton, Init(R, 'Cancel', cmCancel, bfNormal)));
+  R.Assign(28, H - 3, W - 2, H - 2);
+  D^.Insert(New(PStaticText, Init(R, 'Space = mark / unmark')));
+  D^.SelectNext(False);
+  If Application^.ExecView(D) = cmOK Then
+    Begin
+    Marked := Work;
+    RunMarkList := True;
+    End;
+  Dispose(D, Done);
   End;
 
 
