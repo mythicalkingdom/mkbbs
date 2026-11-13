@@ -13,22 +13,29 @@ if not os.path.isdir(src):
 dst = os.path.join(work, 'ra')
 os.makedirs(dst, exist_ok=True)
 subprocess.check_call(['cp', '-a', src + '/.', dst + '/'])
-# point the message base directories at the private copy
+# point the message base directory of the Hudson areas at the private copy and every other
+# directory of the sample BBS at a place that does not exist: the test must never write
+# into the real sample bases
 p = os.path.join(dst, 'config.mk')
 d = bytearray(open(p, 'rb').read())
-old = os.path.realpath(src).encode() + b'/'
+root = os.path.realpath(os.path.join(root, 'bbs')).encode() + b'/'
+ra = os.path.realpath(src).encode() + b'/'
 new = dst.encode() + b'/'
 i = 0
+changed = 0
 while i < len(d) - 3:
     L = d[i]
-    if L == len(old) and bytes(d[i + 1:i + 1 + L]) == old:
-        d[i] = len(new)
-        d[i + 1:i + 1 + len(new)] = new
-        i += 1 + len(new)
+    s = bytes(d[i + 1:i + 1 + L])
+    if L > 0 and s.startswith(root):
+        rep = new if s == ra else b'/nonexistent/' + s[len(root):]
+        d[i] = len(rep)
+        d[i + 1:i + 1 + len(rep)] = rep
+        i += 1 + len(rep)
+        changed += 1
     else:
         i += 1
 open(p, 'wb').write(d)
-env = dict(os.environ, CFGPROG='mkread', CFGCWD=dst, CFGDIR=dst, CFGDELAY='0.8')
+env = dict(os.environ, CFGPROG='mkread', CFGCWD=dst, CFGDIR=dst, CFGDELAY='0.8', CFGARGS='-A183')
 shot = os.path.join(here, 'cfgshot.py')
 
 
@@ -38,10 +45,10 @@ def run(*keys):
 
 
 size0 = os.path.getsize(os.path.join(dst, 'msgidx.bbs'))
-s = run('\\t', '\\r')                          # Tab = next area with new mail, Enter = open it
-ok1 = 'Msg:' in s and 'Date:' in s
-print('ok  ' if ok1 else 'FAIL', 'mkread: a Squish message is displayed')
-run('\\t', '\\r', 'r', '\\x1b[H', '\\r', '\\r', 'n', 'reply from the test\\r', '\\x1b', 'y', 'y')
+s = run()                                      # -A183 opens area 183 (a Hudson area) at once
+ok1 = 'Area: 183' in s and 'From: Patrick' in s
+print('ok  ' if ok1 else 'FAIL', 'mkread: a message is displayed')
+run('r', '\\x1b[H', '\\r', '\\r', 'n', 'reply from the test\\r', '\\x1b', 'y', 'y')
 size1 = os.path.getsize(os.path.join(dst, 'msgidx.bbs'))
 ok2 = size1 == size0 + 3
 print('ok  ' if ok2 else 'FAIL', 'mkread: a reply was written to the Hudson base (%d -> %d bytes)' % (size0, size1))

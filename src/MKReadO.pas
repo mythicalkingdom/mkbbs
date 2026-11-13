@@ -8,8 +8,11 @@ Var
   UseEMS: Boolean;                     {Not used any more}
   CfgName: String;
   BBSType: Word;
+  StartArea: Word;                     {-A<n>: open this area at once instead of asking}
 
 Implementation
+
+Uses SysUtils;
 
 Procedure ProcCmdLine;
   Var
@@ -25,6 +28,7 @@ Procedure ProcCmdLine;
       Begin
       Case UpCase(TempStr[2]) of
         'C': CfgName := Copy(TempStr, 3, 128);
+        'A': StartArea := Word(StrToIntDef(Copy(TempStr, 3, 5), 0));
         'T': Begin
              Case UpCase(TempStr[3]) of
                'M': BbsType := 1;
@@ -43,6 +47,7 @@ Procedure ProcCmdLine;
 
 Begin
 BbsType := 0;
+StartArea := 0;
 UseEms := True;
 CfgName := '';
 ProcCmdLine;

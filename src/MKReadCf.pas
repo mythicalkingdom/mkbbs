@@ -154,7 +154,7 @@ Procedure EditHelp;
   Const
     CR = #13;
   Begin
-  ShowText('Message Editor',
+  ShowText('Message Editor Keys',
     'Arrows, Home, End, PgUp, PgDn   Move the cursor' + CR +
     'Ctrl-Left / Ctrl-Right          Word left / right' + CR +
     'Ctrl-PgUp / Ctrl-PgDn           Top / end of the text' + CR +
@@ -166,7 +166,12 @@ Procedure EditHelp;
     'Ctrl-Ins / Shift-Del / Shift-Ins  Copy / cut / paste' + CR +
     'Ctrl-U                          Undo' + CR +
     'Ctrl-Q F / Ctrl-Q A / Ctrl-L    Find / replace / find again' + CR +
-    'Esc                             Leave the editor (save or abandon)');
+    'Esc / F10                       Leave the editor (it asks to save)' + CR + CR +
+    'Text wraps at column 72 as you type.' + CR +
+    'Alt-Q / Alt-U                   Quote / unquote the selection or the line' + CR +
+    'Alt-S                           Select the next tagline' + CR +
+    'Alt-T                           Edit the taglines' + CR +
+    'F1                              This help');
   End;
 
 

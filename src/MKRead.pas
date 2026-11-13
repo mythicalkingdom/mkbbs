@@ -1449,17 +1449,286 @@ Function MKGetFileProc(MsgCode: Word; Prompt: String; ForceUp,
 
 {------------------------------------------------ the message editor}
 
+Const
+  hcEditor = 4000;                     {help context of the editor window: its status line}
+  RightMargin = 72;                    {word wrap column (the old editor)}
+  MaxEditLine = 79;
+  cmEditHelp = 3040;
+
+Var
+  EditArea: Word;                      {area the message in the editor is for}
+
 Type
+  PMsgEditor = ^MsgEditor;
+  MsgEditor = Object(TFileEditor)
+    Procedure HandleEvent(Var Event: TEvent); Virtual;
+    Procedure WrapLine;                {word wrap the line the cursor is on}
+    Procedure QuoteLines;              {quote the selection, or the line}
+    Procedure UnquoteLines;
+    End;
+
   PMsgEditWin = ^MsgEditWin;
-  MsgEditWin = Object(TEditWindow)
+  MsgEditWin = Object(TWindow)
+    Editor: PMsgEditor;
+    Constructor Init(Var Bounds: TRect; AFileName: String);
     Procedure HandleEvent(Var Event: TEvent); Virtual;
     End;
 
 
+Function LineStart(E: PMsgEditor; P: LongInt): LongInt;
+  {Start of the line that has position P (positions are the editor's buffer offsets)}
+  Begin
+  While (P > 0) And (E^.BufChar(P - 1) <> #10) And (E^.BufChar(P - 1) <> #13) Do
+    Dec(P);
+  LineStart := P;
+  End;
+
+
+Function ColumnOf(E: PMsgEditor; LS, P: LongInt): LongInt;
+  {Column (0 based, tabs to multiples of 8) of position P on the line starting at LS}
+  Var
+    C: LongInt;
+
+  Begin
+  C := 0;
+  While LS < P Do
+    Begin
+    If E^.BufChar(LS) = #9 Then
+      C := (C Div 8 + 1) * 8
+    Else
+      Inc(C);
+    Inc(LS);
+    End;
+  ColumnOf := C;
+  End;
+
+
+Function EditQuoteStr: String;
+  {The quote string of the settings with @ replaced by the initials of the person
+   the message is to, as when a reply is started}
+  Var
+    Q, T: String;
+    i: Word;
+
+  Begin
+  Q := '';
+  T := CfgRec.QuoteStr;
+  For i := 1 To Length(T) Do
+    If T[i] <> '@' Then
+      Q := Q + T[i]
+    Else
+      Begin
+      If WordCount(MsgHdrInfo.MsgTo) > 0 Then
+        Q := Q + Copy(ExtractWord(MsgHdrInfo.MsgTo, 1), 1, 1);
+      If WordCount(MsgHdrInfo.MsgTo) > 1 Then
+        Q := Q + Copy(ExtractWord(MsgHdrInfo.MsgTo, 2), 1, 1);
+      If WordCount(MsgHdrInfo.MsgTo) > 2 Then
+        Q := Q + Copy(ExtractWord(MsgHdrInfo.MsgTo, 3), 1, 1);
+      End;
+  EditQuoteStr := StripTrail(Q, ' ');
+  End;
+
+
+Procedure MsgEditor.WrapLine;
+  {Called after a character was typed: when the line has become longer than the
+   margin, break it at the last space before the margin}
+  Var
+    Cur, LS, P, Sp: LongInt;
+    Brk: Array[0..1] Of Char;
+
+  Begin
+  Cur := CurPtr;
+  LS := LineStart(@Self, Cur);
+  If ColumnOf(@Self, LS, Cur) <= RightMargin Then
+    Exit;
+  Sp := -1;
+  P := Cur;
+  While P > LS Do
+    Begin
+    Dec(P);
+    If (BufChar(P) = ' ') And (ColumnOf(@Self, LS, P) <= RightMargin) Then
+      Begin
+      Sp := P;
+      Break;
+      End;
+    End;
+  Brk[0] := #13;
+  Brk[1] := #10;
+  If Sp >= 0 Then
+    Begin                              {the space becomes the line break}
+    SetSelect(Sp, Sp + 1, False);
+    InsertText(@Brk, 2, False);
+    SetCurPtr(Cur + 1, 0);
+    End
+  Else If ColumnOf(@Self, LS, Cur) >= MaxEditLine Then
+    Begin                              {a word longer than a line: break before the last character}
+    SetCurPtr(Cur - 1, 0);
+    InsertText(@Brk, 2, False);
+    SetCurPtr(Cur + 2, 0);
+    End;
+  End;
+
+
+Procedure MsgEditor.QuoteLines;
+  Var
+    S, E, P: LongInt;
+    Q: String;
+    Last: LongInt;
+
+  Begin
+  Q := EditQuoteStr + ' ';
+  If SelStart <> SelEnd Then
+    Begin
+    S := LineStart(@Self, SelStart);
+    E := SelEnd;
+    End
+  Else
+    Begin
+    S := LineStart(@Self, CurPtr);
+    E := S;
+    End;
+  { quote the lines from the last to the first so that positions stay valid }
+  Last := LineStart(@Self, E);
+  P := Last;
+  While True Do
+    Begin
+    SetCurPtr(P, 0);
+    InsertText(@Q[1], Length(Q), False);
+    If P <= S Then
+      Break;
+    P := LineStart(@Self, P - 1);
+    If P < S Then
+      P := S;
+    End;
+  End;
+
+
+Procedure MsgEditor.UnquoteLines;
+  Var
+    S, E, P, Q, Gap: LongInt;
+    Finished: Boolean;
+
+  Begin
+  If SelStart <> SelEnd Then
+    Begin
+    S := LineStart(@Self, SelStart);
+    E := SelEnd;
+    End
+  Else
+    Begin
+    S := LineStart(@Self, CurPtr);
+    E := S;
+    End;
+  P := LineStart(@Self, E);
+  Finished := False;
+  While Not Finished Do
+    Begin
+    { a quote prefix is a few characters ending in '>' }
+    Q := P;
+    While (Q < P + 8) And (BufChar(Q) <> '>') And (BufChar(Q) <> #13) And (BufChar(Q) <> #10) Do
+      Inc(Q);
+    If BufChar(Q) = '>' Then
+      Begin
+      Gap := Q + 1 - P;
+      If BufChar(Q + 1) = ' ' Then
+        Inc(Gap);
+      SetSelect(P, P + Gap, False);
+      DeleteSelect;
+      End;
+    If P <= S Then
+      Finished := True
+    Else
+      Begin
+      P := LineStart(@Self, P - 1);
+      If P < S Then
+        P := S;
+      End;
+    End;
+  End;
+
+
+Procedure MsgEditor.HandleEvent(Var Event: TEvent);
+  Var
+    Typed: Boolean;
+
+  Begin
+  If Event.What = evKeyDown Then
+    Begin
+    Case Event.KeyCode Of
+      kbAltS:
+        Begin
+        DoTagPick(2);
+        DrawView;
+        ClearEvent(Event);
+        Exit;
+        End;
+      kbAltT:
+        Begin
+        DoTagPick(1);
+        DrawView;
+        ClearEvent(Event);
+        Exit;
+        End;
+      kbAltQ:
+        Begin
+        QuoteLines;
+        ClearEvent(Event);
+        Exit;
+        End;
+      kbAltU:
+        Begin
+        UnquoteLines;
+        ClearEvent(Event);
+        Exit;
+        End;
+      kbF1:
+        Begin
+        EditHelp;
+        ClearEvent(Event);
+        Exit;
+        End;
+      End;
+    End;
+  Typed := (Event.What = evKeyDown) And (Event.CharCode >= ' ') And
+    (Event.CharCode < #255) And (Event.KeyCode <> kbEsc);
+  Inherited HandleEvent(Event);
+  If Typed And (Event.What = evNothing) And IsValid Then
+    WrapLine;
+  End;
+
+
+Constructor MsgEditWin.Init(Var Bounds: TRect; AFileName: String);
+  Var
+    R: TRect;
+    HS, VS: PScrollBar;
+    Ind: PIndicator;
+
+  Begin
+  Inherited Init(Bounds, AFileName, wnNoNumber);
+  Options := Options Or ofTileable;
+  HelpCtx := hcEditor;
+  R.Assign(18, Size.Y - 1, Size.X - 2, Size.Y);
+  HS := New(PScrollBar, Init(R));
+  HS^.Options := HS^.Options Or ofPostProcess;
+  Insert(HS);
+  R.Assign(Size.X - 1, 1, Size.X, Size.Y - 1);
+  VS := New(PScrollBar, Init(R));
+  VS^.Options := VS^.Options Or ofPostProcess;
+  Insert(VS);
+  R.Assign(2, Size.Y - 1, 16, Size.Y);
+  Ind := New(PIndicator, Init(R));
+  Ind^.GrowMode := gfGrowLoY + gfGrowHiY;
+  Insert(Ind);
+  GetExtent(R);
+  R.Grow(-1, -1);
+  Editor := New(PMsgEditor, Init(R, HS, VS, Ind, AFileName));
+  Insert(Editor);
+  End;
+
+
 Procedure MsgEditWin.HandleEvent(Var Event: TEvent);
   Begin
-  If ((Event.What = evKeyDown) And ((Event.KeyCode = kbEsc) Or (Event.KeyCode = kbF10) Or
-      (Event.KeyCode = kbCtrlW))) Or
+  If ((Event.What = evKeyDown) And ((Event.KeyCode = kbEsc) Or (Event.KeyCode = kbF10))) Or
      ((Event.What = evCommand) And (Event.Command = cmClose)) Then
     Begin
     If Valid(cmClose) Then              {asks whether to save a changed text}
@@ -1472,16 +1741,16 @@ Procedure MsgEditWin.HandleEvent(Var Event: TEvent);
 
 
 Procedure EditMessageText(FN: String);
-  {First version: the plain Free Vision text editor on the message file.  Esc
-   closes it (it asks whether to save).  Word wrap, quoting help and tag line keys
-   come in later versions.}
+  {Esc (or F10) leaves the editor and asks whether to save a changed text.  Text
+   wraps at column 72; Alt-Q / Alt-U quote / unquote the selection or the line; Alt-S
+   selects the next tagline, Alt-T edits the taglines, F1 helps.}
   Var
     R: TRect;
     W: PMsgEditWin;
 
   Begin
   DeskTop^.GetExtent(R);
-  W := New(PMsgEditWin, Init(R, FN, wnNoNumber));
+  W := New(PMsgEditWin, Init(R, FN));
   If W <> Nil Then
     Begin
     DeskTop^.ExecView(W);
@@ -1714,6 +1983,7 @@ Procedure DoMsgFinish(NewArea: Word; DefPriv: Boolean;  Var NewNum: LongInt);
     End;
   If ContMsg Then
     Begin
+    EditArea := NewArea;
     EditMessageText(TempName);
     PrivWord := DoYesNo('[ Save Message ]', True);
     If PrivWord = 1 Then
@@ -2337,6 +2607,9 @@ Type
 
 
 Function MkrStatus.Hint(AHelpCtx: Word): String;
+  Var
+    T: String;
+
   Begin
   Case AHelpCtx Of
     cmArea: Hint := 'Select message area';
@@ -2353,6 +2626,16 @@ Function MkrStatus.Hint(AHelpCtx: Word): String;
     cmView: Hint := 'View Ansi/Avatar message';
     cmYours: Hint := 'Find messages to you';
     cmQuitMk: Hint := 'Quit';
+    hcEditor:
+      Begin
+      If MsgHdrInfo.RefNum = 0 Then
+        T := 'Message to ' + MsgHdrInfo.MsgTo + ' in ' + MsgName(EditArea)
+      Else
+        T := 'Replying to ' + MsgHdrInfo.MsgTo + ' in ' + MsgName(EditArea);
+      If CfgRec.Taglines Then
+        T := Copy(T, 1, 36) + '  ' + Copy(GetNextTag(CfgRec.NextTag), 1, 30);
+      Hint := T;
+      End;
     Else Hint := '';
     End;
   End;
@@ -2404,11 +2687,16 @@ Procedure MkrApp.InitStatusLine;
   GetExtent(R);
   R.A.Y := R.B.Y - 1;
   StatusLine := New(PMkrStatus, Init(R,
+    NewStatusDef(hcEditor, hcEditor,
+      NewStatusKey('~Esc~ End', kbNoKey, cmClose,
+      NewStatusKey('~F1~ Help', kbNoKey, cmMkHelp,
+      NewStatusKey('~Alt-S~ Tag', kbNoKey, cmClose + 5000,
+      NewStatusKey('~Alt-Q~ Quote', kbNoKey, cmClose + 5000, Nil)))),
     NewStatusDef(0, $FFFF,
       NewStatusKey('~F1~ Help', kbF1, cmMkHelp,
       NewStatusKey('~Enter~ Next', kbNoKey, cmNext,
       NewStatusKey('~Alt-X~ Quit', kbAltX, cmQuitMk, Nil))),
-    Nil)));
+    Nil))));
   End;
 
 
@@ -2701,7 +2989,14 @@ Procedure MkrApp.Startup;
   BadArea := True;
   FirstArea := True;
   Refresh;
-  DoPickArea;
+  If StartArea > 0 Then
+    Begin
+    FirstArea := False;
+    CurrArea := StartArea;
+    DoMsg;
+    End
+  Else
+    DoPickArea;
   End;
 
 

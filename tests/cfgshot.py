@@ -5,10 +5,10 @@
 import pty,os,time,select,struct,fcntl,termios,sys,re
 keys=[a.encode().decode('unicode_escape').encode('latin-1') for a in sys.argv[1:]]
 env={'TERM':'xterm','LANG':'C.UTF-8','LC_ALL':'C.UTF-8','MK':os.environ.get('CFGDIR','/tmp/claude-1000/racopy'),'PATH':os.environ['PATH']}
-PROG=os.environ.get('CFGPROG','mkconfig'); CWD=os.environ.get('CFGCWD','.'); HERE=os.path.dirname(os.path.abspath(__file__))
+PROG=os.environ.get('CFGPROG','mkconfig'); ARGS=os.environ.get('CFGARGS','').split(); CWD=os.environ.get('CFGCWD','.'); HERE=os.path.dirname(os.path.abspath(__file__))
 pid,fd=pty.fork()
 if pid==0:
-    os.environ.clear(); os.environ.update(env); os.chdir(CWD); os.execv(os.path.join(HERE,'..','build',PROG),[PROG])
+    os.environ.clear(); os.environ.update(env); os.chdir(CWD); os.execv(os.path.join(HERE,'..','build',PROG),[PROG]+ARGS)
 fcntl.ioctl(fd,termios.TIOCSWINSZ,struct.pack('HHHH',int(os.environ.get('CFGROWS','25')),int(os.environ.get('CFGCOLS','80')),0,0))
 def drain(t):
     buf=b''; end=time.time()+t
