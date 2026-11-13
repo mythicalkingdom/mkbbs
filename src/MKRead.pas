@@ -329,7 +329,10 @@ Procedure CloseArea;
     Begin
     If Not DoingYours Then
       Begin
-      MsgOut^.SetLastRead(GetUNum(MsgOutArea), HighestRead);
+      If CfgRec.LocalLast Then
+        LRead[MsgOutArea] := HighestRead
+      Else
+        MsgOut^.SetLastRead(GetUNum(MsgOutArea), HighestRead);
       End;
     If CloseMsgArea(MsgOut) Then;
     End;
@@ -841,7 +844,7 @@ Procedure SortMessages;
 Function MsgLess(XI, YI: Word): Boolean;
   Begin
   If ((CfgRec.MsgOrder < 1) or (CfgRec.MsgOrder > 4)) Then
-    CfgRec.MsgOrder := 1;
+    CfgRec.MsgOrder := 2;
   If ((MsgList[xi]^.WasRead and MsgList[yi]^.WasRead) Or
   ((Not MsgList[xi]^.WasRead) and (Not MsgList[yi]^.WasRead))) Then
     Begin
@@ -890,7 +893,10 @@ Procedure DoMsg;
   If Not BadArea Then
     Begin
     ProcessBox('Scanning Messages', '[ Please Wait ]');
-    HighestRead := MsgOut^.GetLastRead(GetUNum(MsgOutArea));
+    If CfgRec.LocalLast Then
+      HighestRead := LRead[CurrArea]
+    Else
+      HighestRead := MsgOut^.GetLastRead(GetUNum(MsgOutArea));
     StartRead := HighestRead;
     If CfgRec.NewOnly Then
       MsgOut^.SeekFirst(HighestRead + 1)
@@ -2552,7 +2558,25 @@ Procedure ReEditMsg;
 
 {------------------------------------------------ settings file}
 
+Var
+  LocalFile: String;                   {the local last read numbers}
+
+Function LoadLocalLast: Boolean;
+  Begin
+  LoadLocalLast := LoadFile(LocalFile, LRead, SizeOf(LRead)) = 0;
+  End;
+
+
+Procedure SaveLocalLast;
+  Begin
+  If SaveFile(LocalFile, LRead, SizeOf(LRead)) = 0 Then;
+  End;
+
+
 Procedure LoadCfg;
+  Var
+    P: Word;
+
   Begin
   If Length(CfgName) = 0 Then
     CfgName := Config^.GetBbsPath + 'MKRead.Cfg';
@@ -2564,14 +2588,26 @@ Procedure LoadCfg;
   CfgRec.Colors[5] := $1F;
   CfgRec.Colors[6] := $3E;
   CfgRec.Colors[7] := $1E;
+  LocalFile := CfgName;
+  P := Length(LocalFile);
+  While (P > 0) And (LocalFile[P] <> '.') And (LocalFile[P] <> '/') Do
+    Dec(P);
+  If (P > 0) And (LocalFile[P] = '.') Then
+    LocalFile := Copy(LocalFile, 1, P - 1);
+  LocalFile := LocalFile + '.Lrd';
   If FileExist(CfgName) Then
     Begin
-    If LoadFile(CfgName, CfgRec, SizeOf(CfgRec)) = 0 Then;
+    If SizeFile(CfgName) >= SizeOf(CfgRec) Then
+      Begin
+      If LoadFile(CfgName, CfgRec, SizeOf(CfgRec)) = 0 Then;
+      End
+    Else                                   {a settings file of an older version: no LocalLast yet}
+      If LoadFile(CfgName, CfgRec, SizeOf(CfgRec) - SizeOf(CfgRec.LocalLast)) = 0 Then;
     End
   Else
     Begin
     CfgRec.QuoteStr := ' @>';
-    CfgRec.MsgOrder := 1;
+    CfgRec.MsgOrder := 2;                  {message number}
     CfgRec.Taglines := True;
     EditCfg;
     End;
@@ -2997,7 +3033,8 @@ Procedure MkrApp.Startup;
   GoToXy(11 - (Length(Dstr) Div 2), 20);
   Write(VOut, DStr);
   Refresh;
-  GetLRead;
+  If Not (CfgRec.LocalLast And LoadLocalLast) Then
+    GetLRead;                              {from the message bases (or the first local run)}
   GetLastMsgs;
   LoadTwits;
   EnterNet := False;
@@ -3084,6 +3121,8 @@ Reader.Run;
 Reader.Done;
 Dispose(MsgBuffer);
 CloseArea;
+If CfgRec.LocalLast Then
+  SaveLocalLast;
 If SaveFile(CfgName, CfgRec, SizeOf(CfgRec)) = 0 Then;
 If FileExist('Taglines.MK') Then
   SaveTags('Taglines.MK')

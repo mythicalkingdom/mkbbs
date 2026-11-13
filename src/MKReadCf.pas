@@ -30,6 +30,7 @@ Type ReadCfgType = Record
   NetFido: Boolean;
   AnsiBaud: Word;
   PrnName: String[13];
+  LocalLast: Boolean;                  {Keep the last read numbers in MKRead.Lrd, not in the message bases}
   End;
 
 Var
@@ -254,6 +255,9 @@ Procedure EditCfg;
   F.AddNumber('Ansi Baud:', CfgRec.AnsiBaud, 2, 0, 65535, 'Speed for viewing Ansi messages (0 = fastest)');
   F.At(9, 23, 9, 37);
   F.AddString('Printer Name:', CfgRec.PrnName, 13, 'Printer device or file');
+  F.At(9, 55, 9, 72);
+  F.AddYesNo('Local Last Read:', CfgRec.LocalLast,
+    'Keep your last read numbers in MKRead.Lrd and leave the message bases alone');
   F.At(11, 27, 0, 0);
   F.AddText('---- Colors -----');
   F.At(12, 3, 12, 9);
