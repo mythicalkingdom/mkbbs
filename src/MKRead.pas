@@ -562,6 +562,32 @@ Function StripTag(TagStr: String): String;
   End;
 
 
+Var
+  StartRead: LongInt;                  {last read pointer of the area when it was opened}
+
+Function ReadPointer: LongInt;
+  {The new last read pointer: the highest message such that every message up to it
+   was read.  (Reading a message further down the sorted list does not skip the
+   unread messages before it.)}
+  Var
+    i: Word;
+    MinUnread, R: LongInt;
+
+  Begin
+  R := StartRead;
+  MinUnread := MaxLongInt;
+  For i := 1 To NumInList Do
+    If (MsgList[i]^.Area = CurrArea) And (Not MsgList[i]^.WasRead) And
+       (MsgList[i]^.MsgNum < MinUnread) Then
+      MinUnread := MsgList[i]^.MsgNum;
+  For i := 1 To NumInList Do
+    If (MsgList[i]^.Area = CurrArea) And MsgList[i]^.WasRead And
+       (MsgList[i]^.MsgNum < MinUnread) And (MsgList[i]^.MsgNum > R) Then
+      R := MsgList[i]^.MsgNum;
+  ReadPointer := R;
+  End;
+
+
 Procedure DisplayMsgHdr;
   Var
     TmpStr: String;
@@ -714,10 +740,9 @@ Procedure DisplayMsgHdr;
       End;
     TmpStr := MsgOut^.GetString(79);
     End;
-  If HighestRead < MsgOut^.GetMsgNum Then
-    HighestRead := MsgOut^.GetMsgNum;
-  If LRead[CurrArea] < MsgOut^.GetMsgNum Then
-    LRead[CurrArea] := MsgOut^.GetMsgNum;
+  HighestRead := ReadPointer;
+  If LRead[CurrArea] < HighestRead Then
+    LRead[CurrArea] := HighestRead;
   DisplayMsgTxt;
   TextAttr := CfgRec.Colors[3];
   If ((Upper(CfgRec.Name) = Upper(MsgOut^.GetTo)) And (Not MsgOut^.IsRcvd)) Then
@@ -866,6 +891,7 @@ Procedure DoMsg;
     Begin
     ProcessBox('Scanning Messages', '[ Please Wait ]');
     HighestRead := MsgOut^.GetLastRead(GetUNum(MsgOutArea));
+    StartRead := HighestRead;
     If CfgRec.NewOnly Then
       MsgOut^.SeekFirst(HighestRead + 1)
     Else
@@ -2181,7 +2207,7 @@ Procedure DoMsgFinish(NewArea: Word; DefPriv: Boolean;  Var NewNum: LongInt);
           MsgList[NumInList]^.MsgPos := NewMsg^.GetMsgLoc;
           MsgList[NumInList]^.MsgNum := NewMsg^.GetMsgNum;
           MsgList[NumInList]^.MsgFrom := Upper(NewMsg^.GetFrom);
-          MsgList[NumInList]^.WasRead := False;
+          MsgList[NumInList]^.WasRead := True;       {a message you wrote is not new to you}
           MsgList[NumInList]^.ToYou := ((Upper(CfgRec.Name) = Upper(NewMsg^.GetTo))
             And (Not NewMsg^.IsRcvd));
           MsgList[NumInList]^.Area := NewArea;
