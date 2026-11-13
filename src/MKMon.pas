@@ -52,6 +52,7 @@ Type
     Pid: LongInt;
     Port: LongInt;
     Typ: String[10];
+    Baud: LongInt;
     Addr: String[64];
     Start: LongInt;
     UserName: String[35];
@@ -187,6 +188,7 @@ Procedure ReadInfo(FName: String; Var N: NodeRec; Var Ok: Boolean);
       Else If K = 'pid' Then N.Pid := Str2Long(V)
       Else If K = 'port' Then N.Port := Str2Long(V)
       Else If K = 'type' Then N.Typ := V
+      Else If K = 'baud' Then N.Baud := Str2Long(V)
       Else If K = 'addr' Then N.Addr := V
       Else If K = 'start' Then N.Start := Str2Long(V);
       End;
@@ -530,11 +532,93 @@ Function NodeCommand(Node: LongInt; Tag: Char; Arg: Byte): String;
   End;
 
 
+Var
+  BarMsg: String;                      {an answer shown for a moment instead of the status}
+  BarTicks: Integer;                   {how much longer (in 50 ms steps)}
+  BarTyping: Boolean;
+  BarNode: LongInt;
+  BarInfo: String;                     {Node, name, activity ...}
+  BarRows, BarCols: Word;
+  BarVer: Word;
+
+
 Procedure Status(M: String);
-  {A line on the bottom row of the sysop's screen, then back to where the cursor was}
+  {Show an answer in the bar for 3 seconds}
   Begin
-  Say(Esc + '7' + Esc + '[999;1H' + Esc + '[0;7m ' + M + ' ' + Esc + '[0m' + Esc + '8');
-  CommFlushOut;
+  BarMsg := M;
+  BarTicks := 60;
+  End;
+
+
+Procedure BarSize;
+  {The sysop's window: the bar is its last row, the node's output scrolls above it}
+  Var
+    C, R: Word;
+
+  Begin
+  BarCols := 80;
+  BarRows := 25;
+  If ComSession^.GetWindowSize(C, R) Then
+    Begin
+    If C >= 40 Then
+      BarCols := C;
+    If R >= 5 Then
+      BarRows := R;
+    End;
+  BarVer := ComSession^.WindowVersion;
+  Say(Esc + '[1;' + Long2Str(BarRows - 1) + 'r');   {scrolling region without the bar}
+  End;
+
+
+Procedure BarRefresh;
+  {Who is on the node now}
+  Var
+    i: Word;
+
+  Begin
+  LoadNodes;
+  BarInfo := '';
+  For i := 1 To NumNodes Do
+    If Nodes[i].Node = BarNode Then
+      Begin
+      BarInfo := 'Node ' + Long2Str(Nodes[i].Node) + '  ';
+      If Nodes[i].UserName <> '' Then
+        BarInfo := BarInfo + Nodes[i].UserName + '  '
+      Else
+        BarInfo := BarInfo + '-  ';
+      If Nodes[i].Baud > 0 Then
+        BarInfo := BarInfo + Long2Str(Nodes[i].Baud) + ' ';
+      BarInfo := BarInfo + Nodes[i].Typ + '  ' + ActivityStr(Nodes[i].Status) + '  ' +
+        DurStr(fpTime - Nodes[i].Start) + '  ' + Nodes[i].Addr;
+      End;
+  If BarInfo = '' Then
+    BarInfo := 'Node ' + Long2Str(BarNode) + '  (ended)';
+  End;
+
+
+Procedure DrawBar;
+  Var
+    T, Col: String;
+
+  Begin
+  If BarTicks > 0 Then
+    Begin
+    T := ' ' + BarMsg;
+    Col := Esc + '[0;30;43m';            {answer: black on yellow}
+    End
+  Else
+    Begin
+    T := ' Ctrl-A=Help  ' + BarInfo;
+    If BarTyping Then
+      Begin
+      T := T + '  [TYPING]';
+      Col := Esc + '[0;1;37;41m';        {typing on: white on red}
+      End
+    Else
+      Col := Esc + '[0;30;47m';
+    End;
+  T := Pad(T, BarCols - 1);
+  Say(Esc + '7' + Esc + '[' + Long2Str(BarRows) + ';1H' + Col + T + Esc + '[0m' + Esc + '8');
   End;
 
 
@@ -550,6 +634,7 @@ Function Watch(Node: LongInt): String;
     Typed: Array[0..255] Of Char;
     TypedN: Word;
     Dummy: Byte;
+    Steps: Word;
 
   Begin
   Watch := '';
@@ -559,11 +644,17 @@ Function Watch(Node: LongInt): String;
     Watch := 'Node ' + Long2Str(Node) + ' cannot be watched (not running, or no snoop socket).';
     Exit;
     End;
-  Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H' + 'Watching node ' + Long2Str(Node) +
-    '.  Ctrl-X ends, Ctrl-A ? for the commands.' + #13#10);
-  CommFlushOut;
-  Delay(1500);
+  BarNode := Node;
+  BarMsg := '';
+  BarTicks := 0;
+  BarTyping := False;
   Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H');
+  BarSize;
+  Say(Esc + '[H');
+  BarRefresh;
+  DrawBar;
+  CommFlushOut;
+  Steps := 0;
   Gone := False;
   Typing := False;
   Prefix := False;
@@ -599,6 +690,7 @@ Function Watch(Node: LongInt): String;
         Case UpCase(C) Of
           'T': Begin
                Typing := Not Typing;
+               BarTyping := Typing;
                If Typing Then
                  Status('Typing is ON: what you type goes to the caller (Ctrl-A T stops)')
                Else
@@ -641,9 +733,31 @@ Function Watch(Node: LongInt): String;
       SendFrame(S, 'D', 0, Typed, TypedN);
     If Not ComSession^.GetCarrier Then
       Gone := True;
+    Inc(Steps);
+    If BarTicks > 0 Then
+      Begin
+      Dec(BarTicks);
+      If BarTicks = 0 Then
+        Steps := 20;                     {the answer is over: draw the status again}
+      End;
+    If ComSession^.WindowVersion <> BarVer Then
+      Begin
+      BarSize;
+      Steps := 20;
+      End;
+    If Steps >= 20 Then                  {every second, and after changes}
+      Begin
+      Steps := 0;
+      BarRefresh;
+      End;
+    If (Steps = 0) Or (BarTicks > 0) Then
+      Begin
+      DrawBar;
+      CommFlushOut;
+      End;
   Until Gone;
   fpClose(S);
-  Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H');
+  Say(Esc + '[0m' + Esc + '[r' + Esc + '[2J' + Esc + '[H');
   Watch := '';
   End;
 
