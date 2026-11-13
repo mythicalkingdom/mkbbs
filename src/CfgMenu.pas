@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgEopt;
+  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff;
 
 Const
   cmGeneral = 1000;
@@ -272,18 +272,18 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmQuitDlg, cmQuitCfg: AskQuit;
       cmPaths: DoCfgPath;
       cmGeneral: DoCfgGen;
-      cmLanguage: NotYet('Language');
+      cmLanguage: DoCfgPLan;
       cmNewUsers: DoCfgNUser;
       cmSecOptions: DoCfgSec;
       cmSecNewUser, cmSecAttach, cmSecRequest, cmSecCrash, cmSecForceCrash,
       cmSecDelete, cmSecUnReceive: EditConfigSec(Event.Command);
-      cmAddresses: NotYet('Addresses');
+      cmAddresses: DoCfgPAddr;
       cmPaging: DoCfgPage;
       cmModemResp: DoCfgResp;
       cmErrorLevels: DoCfgEL;
       cmDoors: NotYet('Doors');
-      cmPackers: NotYet('Packers');
-      cmOfflineType: NotYet('Offline Type');
+      cmPackers: DoCfgPPack;
+      cmOfflineType: DoCfgOffType;
       cmMsgAreas: NotYet('Areas');
       cmMsgOptions: NotYet('Msg Options');
       cmOrigin: NotYet('Origin Lines');
@@ -302,7 +302,7 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmFastImpSeen: NotYet('Import Seen-By');
       cmFastHideSeen: NotYet('Hide Seen-By');
       cmOffCfg: NotYet('Offline');
-      cmFileAreas: NotYet('Areas');
+      cmFileAreas: DoCfgFArea;
       cmFileOptions: DoCfgXfer;
       cmEvents: NotYet('Events');
       cmEchoSys: NotYet('Systems');
