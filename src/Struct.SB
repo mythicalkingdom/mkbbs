@@ -1,0 +1,422 @@
+{ *********** SuperBbs Types *************}
+
+Type
+  SbFlagType = Array[1..4] of Byte;
+
+  SbGosubDataType = array[1..20] of String[8];
+
+  SbNameIdxRec = Record
+    NameCrc32: LongInt;
+    HandleCrc32: LongInt;
+    Attr: Byte;
+    End;
+
+  SBFLSearchRec  = Record                               (* FLSEARCH.BBS *)
+    Name: String[60];
+    Directory: String[79];
+    Security: Integer;
+    Flags: SbFlagtype;
+    PFilesSec: Integer;   { Not yet used }
+    PFlags: SbFlagtype;  { Not yet used }
+    Attrib:             Byte;
+    Age:                Byte;
+    ListName:           String[67];
+    ExtraSpace:         Array[1..30] of Byte;
+    End;
+
+(*  Attrib:
+
+      Bit 0  : Exclude from template
+      Bit 1  : No downloads  { Used in template system only }
+      Bit 2  : No uploads    { Used in template system only }
+      Bit 3  : No virus check
+      Bit 4  : No dupe scan
+      bit 5  : No New files check
+      Bit 5-7: Unused
+
+*)
+
+
+  SbEventRecord = Record
+    Status:       Byte; { 0=Disabled 1=Enabled }
+    RunTime:      String[5];
+    ErrorLevel:   Byte;
+    Days:         Byte;
+    Forced:       Byte;
+    LastTimeRun:  String[8];
+    End;
+
+
+  SbUserRecord = Record              {USERS.BBS}
+                 Name:               String[35];
+                 City:               String[25];
+                 Password:           String[15];
+                 DataPhone,
+                 HomePhone:          String[12];
+                 LastTime:           String[5];
+                 LastDate:           String[8];
+                 Attrib:             Byte;
+                 Flags:              sbFlagType;
+                 Credit,
+                 Pending:            Integer;
+                 MsgsPosted,
+                 HighMsgRead,
+                 SecLvl,
+                 Times,
+                 Ups,
+                 Downs,
+                 UpK,
+                 DownK:              Word;
+                 TodayK:             Integer;
+                 Elapsed:            Integer;
+                 Len:                Integer;
+                 ExtraSpace1:        Array[1..2] of byte;
+                 Age:                Byte;
+                 ExtraUserrecPtr:    Integer;
+                 ExtraSpace2:        Array[1..3] of Byte;
+               End;
+
+{ Attrib:
+  bit 0: Deleted user                  bit 4: No-Kill
+  bit 1: Screen clear codes            bit 5: Ignore Download Hours
+  bit 2: More prompt                   bit 6: ANSI editor
+  bit 3: ANSI graphics                 bit 7: Do not disturb mode ON }
+
+  SbExtraUserRec = Record
+    Name: String[35];
+    Birthday: String[8];
+    Attr: Word;
+    Flags: LongInt;
+    FirstTime: String[5];
+    FirstDate: String[8];
+    Combined: Array[1..25] of Byte;
+    Comment: String[79];
+    DefProt: Char;
+    UserRecPtr: Integer;
+    Colors: Array[1..10] of Byte;
+    FileListType: Byte;
+    Alias: String[35];
+    MinutesUsed: LongInt;
+    ViewFileName: String[12];
+    MenuToRun: String[8];
+    TimeInBank: Word;
+    TodayCalls: Byte;
+    LanguageFileN: String[8];
+    ExpireDate: String[8];
+    CurrentFArea: Byte;
+    CurrentMArea: Byte;
+    CurrentDArea: Byte;
+    DefPacker: Byte; {1=zip 2=arc 3=lzh 4=arj}
+    LastNewFiles: String[8];
+    ExtraSpace: Array[1..403] of Byte;
+    End;
+
+
+
+  SbSysInfoRecord = Record             {SysInfo.Bbs}
+    CallCount:    LongInt;
+    LastCaller:   String[35];
+    ExtraSpace:   Array[1..128] of Byte;
+    End;
+
+  SbTimeLogRecord = Record             {TimeLog.Bbs}
+    StartDate:        String[8];
+    BusyPerHour:      Array[0..23] of Integer;
+    BusyPerDay:       Array[0..6] of Integer;
+    End;
+
+
+  SbBoardRecord = Record
+    Name:         String[16];
+    Typ:          Byte; { 0=Standard 1=Net 3=Echo }
+    Kinds:        Byte; { 0=Private & Public
+                          1=Private 2=Public 3=Read-Only }
+    Combined:     Boolean;
+    Aliases:      Byte; {0=no, 1=yes, 2=ask alias, 3=name/alias}
+    ReadSecLvl:   Integer;
+    ReadFlags:    SbFlagType;
+    WriteSecLvl:  Integer;
+    WriteFlags:   SbFlagType;
+    SysopSecLvl:  Integer;
+    SysopFlags:   SbFlagType;
+    End;
+
+  SbConfigRecord = Record
+    CommPort:      Integer;
+    InitBaud,
+    InitTimes,
+    AnswerWait:    Word;
+    ModemInitStr,
+    ModemBusyStr:  String[70];
+    ModemInitResp,
+    ModemBusyResp,
+    Resp300,
+    Resp1200,
+    Resp2400:      String[40];
+    MenuPath,
+    TextPath,
+    NetPath:      String[66];
+    MinBaud,
+    GraphicsBaud,
+    XferBaud:      Integer;
+    LowBaudStart,
+    LowBaudEnd,
+    DownloadStart,
+    DownloadEnd,
+    PagingStart,
+    PagingEnd:     String[5];
+    MatrixZone,
+    MatrixNet,
+    MatrixNode:    Integer;
+    AkaNet,
+    AkaNode:       Array[1..5] of Integer;
+    NetMailBoard:  Integer;
+    DefaultSec:                Integer;
+    DefaultCredit:             Integer;
+    DefaultFlags: SbFlagType;
+    EditorCmdStr:    String[70];
+    OriginLine:      String[60];
+    SysopName: String[35];
+    AutoLogonChar,
+    FastLogon,
+    ScreenBlanking,
+    UseLastRead,
+    MonoMode,
+    DirectWrite,
+    SnowCheck,
+    NetEchoExit,
+    OneWordNames,
+    CheckMail,
+    AskHomePhone,
+    AskDataPhone,
+    GraphicsAvail:   Boolean;
+    InactiveTimeOut: Integer;
+    LogonTime:       Integer;
+    DefFgColor:      Integer;
+    DefBgColor:      Integer;
+    PasswordTries:   Integer;
+    MaxPageTimes:    Integer;
+    PageBellLen:     Integer;
+    Use_Xmodem:      Boolean;
+    Use_Xmodem1k:    Boolean;
+    Use_Ymodem:      Boolean;
+    Use_YmodemG:     Boolean;
+    Use_Sealink:     Boolean;
+    Use_Zmodem:      Boolean;
+    Inp_Fields:      Boolean;
+    QuoteStr:        String[3];
+    UploadCredit:    Integer;
+    LoadingMessage:  String[70];
+    SelectionPrompt: String[70];
+    VersionID:       Word;
+    Resp4800,
+    Resp9600:        String[40];
+    AkaZone:         Array[1..5] of Integer;
+    MatrixPoint:     Integer;
+    AkaPoint:        Array[1..5] of Integer;
+    UseAka:          Array[1..200] of Byte;
+    AskAge:          Boolean;         { Not used }
+    SystemName:      String[40];
+    RegKey:          Longint;
+    EntryfieldColor: Byte;
+    MenuBorderColor: Byte;
+    SysOpSeclvl:     Integer;
+    AllowDelMsgs:    Boolean;
+    EventRec:        Array[1..30] of SbEventRecord;
+    BoardRec:        Array[1..200] of SbBoardRecord;
+    End;
+
+  SbExtraConfig = Record
+    SystemPath,
+    MsgBasePath,
+    TempPath:            String[66];
+    RedirectDevice:      String[12];
+    Resp19200,
+    Resp38400:           String[40];
+    ShowSecurity:        Boolean;
+    ShowPswdAtLogon:     Boolean;
+    BetaCode:            Longint;
+    DefaultBoard:        Array[1..200] of boolean;
+    Empty1:              Array[1..284] of byte;
+    AllowCat:            Boolean;
+    Answerboard:         Byte;
+    Use7bitChars:        Boolean;
+    BufferSize:          Word;
+    Empty2:              Array[1..45] of byte;
+    EntryColor:          Byte;
+    FilesBeforeRatio:    Byte;
+    MinSpace:            Word;
+    ClearTemp:           Boolean;
+    Empty3:              Array[1..163] of byte;
+    UseAliasSystem:      Boolean;
+    Ansilogon:           Byte; {0 = No,1 = Yes,2 = Auto detect}
+    ExcludeSysOp:        Boolean;
+    Empty4:              Array[1..122] of byte;
+    AltFkeys:            Array[1..10] of string[60];
+    Checkfiles:          Boolean;
+    PasswordBoard:       Byte;
+    Alt_J_Swaptoems:     Boolean;
+    MaxTimeInBank:       Word;
+    NoBirthDayAsk:       Boolean;
+    MaxDescLines:        Byte;
+    Empty5:              Array[1..45] of byte;
+    FastMailCheck:       Boolean;
+    DefaultColors:       Array[1..10] of byte;
+    Empty6:              Array[1..45] of byte;
+    LinesInSystem:       Byte;
+    CommonDir:           String[79];
+    VersionNumber:       Word;
+    FullScrChatBaud:     Word;
+    PressEnterColor:     Byte;
+    AreaSelectColor:     Array[1..3] of byte;
+    StatusLineColor:     Byte;
+    VirusChkMode:        Byte;
+    WorkPath:            String[79];
+    WatchCDatDos:        Boolean;
+    UseCtrlX:            Boolean;
+    MsgAfterPageBoard:   Byte;
+    SearchAliases:       Boolean;
+    EchoConvert:         Boolean;
+    SwapAtPackers: Boolean;
+    InternalProtocols: Byte;
+    {bit 0=Zmodem 1=Ymodem 2=Xmodem 3=1k 4=1k-g 5=ymodemg}
+    FirstMenuInSystem: String[8];
+    ColoredQuoteText: Boolean;
+    AddUploadersName: Boolean;
+    DaysUntilExpiration: Word;
+    QWKBBSID: String[6];
+    QwkDefaultBoard: Byte;
+    QwkMaxNrToPack: Integer;
+    StatusLineStr: Array[1..2] of String[100];
+    Location: String[40];
+    USPhoneNrFormat: Boolean;
+    DLCounterLBracket: Char;
+    DLCounterRBracket: Char;
+    QwkAllowTagLines: Byte; {0=no 1=yes 2= local only}
+    LogOnSecLvl: Word;
+    LogOnAge: Byte;
+    LogOnPassword: String[15];
+    NoGroupMailCheck: Boolean;
+    NoUserlistInType27: Boolean;
+    GroupMsgSecLvl: Word;
+    AskSex: Boolean;
+    AskAnsi: Byte; {0=ask 1=yes 2=no}
+    AskMailCheck: Byte;
+    AskNewFilesCHeck: Byte;
+    AskFullScrEditor: Byte;
+    AskFullScrViewer: Byte;
+    AskPagePause: Byte;
+    AskScreenClrs: Byte;
+    PageStart: Array[0..6] of String[5];
+    PageEnd: Array[0..6] of String[5];
+    UseIEMSI: Boolean;
+    CapitalizeCity: Boolean;
+    CapitalizeAlias: Boolean;
+    VirusScannerCmd: String[127];
+    NoExtractBeforeScan: Boolean;
+    VirusFoundErrorLvl: Byte;
+    SysopsFScrChatClr: Byte;
+    UsersFScrChatClr: Byte;
+    ScanForDupePhones: Byte; {0=no 1-log entry 2=don't allow}
+    NormalLongDesc: Boolean;
+    NodeListPath: String[72];
+    MinCrashMailSec: Word;
+    NoDorInfo1: Boolean;
+    NoTouch: Boolean;
+    ZoneMatching: Boolean;
+    StrictDupeCheck: Boolean;
+    NoExtendedInfo: Boolean;
+    BirthdayVerify: Boolean;
+    RealMsgNumbers: Boolean;
+    LocalAttachPath: String[66];
+    NoLACheckAtLogOn: Boolean;
+    AllowedPackers: Byte;
+    {Bit 0=zip 1=arc 2=lzh 3=arj}
+    BoardsFileToCurDir: Boolean;
+    UnLockPwd: String[15];
+    Resp7200: String[40];
+    Resp12000: String[40];
+    Resp14400: String[40];
+    LineEditorQuote: Byte; {0=intelligent 1=normal 2=no}
+    SevenBitOnly: Boolean;
+    NoFileFlagging: Boolean;
+    ReplyingToStr: String[80];
+    FreeFileTimeCheck: Byte; {0=no 1=yes 2=event}
+    PageReasonToSubj: Boolean;
+    AgeGraphStartAge: Byte;
+    ETGCLocalAttr: Word;
+    AskCombinedBoards: Boolean;
+    AskCombinedMailCheck: Byte; {0=ask 1=yes 2=no}
+    UseNewFilesCheckDate: Boolean;
+    BurnOutSecs: Word;
+    NoNamesInGroupMail: Boolean;
+    AutoChatCapture: Boolean;
+    AskDefProto: Boolean;
+    AskHotKeys: Byte; {0=ask 1=yes 2=no}
+    FreeAttaches: Boolean;
+    LogOnFlags: LongInt;
+    NoRemoteSysop: Boolean;
+    FScrReaderColors: Array[1..12] of Byte;
+    NewsDateCheck: Boolean;
+    NoNameIdx: Boolean;
+    AkaZone: Array[1..15] of Word;
+    AkaNet: Array[1..15] of Word;
+    AkaNode: Array[1..15] of Word;
+    AkaPoint: Array[1..15] of Word;
+    MinorVersionNum: Byte;
+    ExtraSpace: Array[1..2709] of Byte;
+    End;
+
+
+  SBExitRecord = Record
+                 BaudRate:        Word;
+                 SysInfo:         SbSysInfoRecord;
+                 TimeLogInfo:     SbTimeLogRecord;
+                 UserInfo:        SbUserRecord;
+                 EventInfo:       SbEventRecord;
+                 NetMailEntered:  Boolean;
+                 EchoMailEntered: Boolean;
+                 LoginTime:       String[5];
+                 LoginDate:       String[8];
+                 TmLimit:         Integer;
+                 LoginSec:        LongInt;
+                 Credit:          LongInt;
+                 UserRecNum:      Integer;
+                 ReadThru:        Integer;
+                 PageTimes:       Integer;
+                 DownLimit:       Integer;
+                 WantChat:        Boolean;
+                 GosubLevel:      Byte;
+                 GosubData:       SbGosubDataType;
+                 Menu:            String[8];
+               End;
+
+
+
+Type SBMsgBoardRec = Record              { Boards.Bbs }
+  Name: String[30];
+  ShortName: String[12];
+  Typ: Byte; {0=local 1=Net 3=Echo}
+  Kinds: Byte; {0=Both 1=Priv 2=Publ 3=ReadOnly}
+  Aliases: Byte; {0=no 1=yes 2=ask 3=alias/name}
+  ReadSec: Word;
+  ReadFlags: LongInt;
+  WriteSec: Word;
+  WriteFlags: LongInt;
+  SysopSec: Word;
+  SysopFlags: LongInt;
+  Group: Char;
+  ReplyStatus: Byte; {0=normal 1=net/normal 2=net only 3=no replies}
+  Age: Byte;
+  Attr: Word;
+  End;
+
+{   1= combined}
+{   2= Default combined}
+{   4= Allow msg delete}
+{   8= Allow taglines}
+{  16= Use in templates}
+{  32= Convert 8bit to 7bit}
+{  64= Forced on in mailcheck}
+
+

@@ -1,0 +1,20 @@
+{$I-}
+{$V-}
+{$S+}
+{$F+}
+{$D-}
+{$L-}
+{$R-}
+{$X+}
+
+{$IFNDEF WINDOWS}
+{$O+}                       {Make units overlayable}
+{$IFNDEF VIRTUALPASCAL}
+{$X-}     {Turn off extended syntax}
+{$ENDIF}
+{$ENDIF}
+
+{$IFDEF WINDOWS}
+  {$DEFINE BASMINT}         {Use BASM for interrupts under windows}
+{$ENDIF}
+

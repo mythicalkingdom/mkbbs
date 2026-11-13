@@ -1,0 +1,15 @@
+{ MKB.Def - common compiler settings for the MK units (Free Pascal)      }
+{ Included by every unit.  Original Turbo Pascal switches that have no    }
+{ meaning under FPC ($F far calls, $O overlays, $D debug info, $L local   }
+{ symbols, $S stack check, $X extended syntax) were removed.             }
+
+{$MODE TP}          { Turbo Pascal dialect: 16-bit Integer, ShortString,
+                      Object types, s[0] length byte, etc.                }
+{$I-}               { No automatic I/O error halts - code checks IOResult }
+{$V-}               { Relaxed var-string checking                         }
+{$R-}               { No range checking                                   }
+{$Q-}               { No overflow checking                                }
+{$S+}               { Stack checking                                      }
+{$PACKRECORDS 1}    { Turbo Pascal records/objects are packed.  FPC aligns
+                      fields by default, which would break every on-disk
+                      record layout (JAM, Squish, Hudson, packets...).    }

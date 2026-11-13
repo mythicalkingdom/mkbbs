@@ -1,0 +1,425 @@
+
+{       ********** Ezy Structures ************        }
+
+Const
+  MaxMsgAreas = 1024;
+
+
+Type ConstType = Record                {Constant.Ezy in BBS dir}
+  Vers: String[8];
+  SystemName: String[40];
+  SysopName: String[35];
+  SysopHdl: String[35];
+  BBSLocation: String[35];
+  MultiLine: Boolean;
+  UsableMsg: Word;
+  UsableFile: Word;
+  WatchArea: Word;
+  PageMsgArea: Word;
+  PwdMsgArea: Word;
+  MinTime: Byte;
+  Extra1: Array[1..11] of Byte;
+  Attr1: Word;
+  Attr2: Word;
+  MaxRescan: Word;
+  BoardId: String[8];
+  OfflineMax: Word;
+  BadOffline: Word;
+  Addr: Array[1..16] of AddrType;
+  NetBoard: Array[1..16] of Word;
+  NewGroup: Array[1..16] of Char;
+  NewStart: Array[1..16] of Word;
+  QuoteStr: String[5];
+  MailSwap: Boolean;
+  UnknownArea: Byte;
+  FeditSwap: Byte;
+  ViewSwap: Byte;
+  MinULSpace: Word;
+  InputColor: Byte;
+  BadMsgArea: Word;
+  Extra2: Array[1..89] of Byte;
+  End;
+
+
+Type UsersType = Record                {Users.Bbs file in userbase path}
+  Name: String[35];                    {Users Name - Proper Case}
+  Handle: String[35];
+  Pwd: String[15];
+  Security: Word;
+  Attr: Byte;
+  Attr2: Byte;
+  Attr3: Byte;
+  Attr4: Byte;
+  Flags: LongInt;
+  DPhone: String[14];                  {Users Date/Business Phone}
+  HPhone: String[14];                  {Home/Voice Phone}
+  End;
+
+
+Const                                  {Users.Attr values}
+  uaDeleted =      1;                  {User is deleted}
+  uaScrnClr =      2;                  {Clear screen between displays}
+  uaMore =         4;                  {Ask more?}
+  uaAnsi =         8;                  {Wants ansi screens}
+  uaNoKill =      16;                  {Do not purge ever}
+  uaIgnorePts =   32;                  {Ignore DL hours}
+  uaFullScrEd =   64;                  {Use full screen editor}
+  uaQuiet =      128;
+
+  ua2NoRatio =     1;
+  ua2IBMChars =    2;
+  ua2USDate =      4;
+  ua2IgnoreHrs =   8;
+  ua2Exclude =    16;
+  ua2Avatar  =    32;
+  ua2IgnoreTime = 64;
+  ua2IgnoreMsg = 128;
+
+  ua3Silent =      1;
+  ua3AutoPage =    2;
+  ua3Hold =        4;
+  ua3Combined =    8;
+
+
+Type ExtUserType = Record              {UsersExt.Bbs file in userbase path}
+  City: String[25];
+  LastDateOn: LongInt;
+  Credit: Word;
+  Pending: Word;
+  MsgsEntered: Word;
+  TimesCalled: Word;
+  ULFiles: Word;
+  TodayK: Word;
+  ElapsedTime: Word;
+  DLFiles: Word;
+  ULK: LongInt;
+  DLK: LongInt;
+  ScrnLen: Byte;
+  LastPwdChange: Byte;
+  BankTime: Word;
+  BankKBytes: Word;
+  FilePoints: Word;
+  Packer: Byte;
+  LastQwk: Byte;
+  Comment: String[40];
+  Colors: Array[1..4] of Byte;
+  Background: Byte;
+  SessionFailures: Byte;
+  TopMenu: String[8];
+  NewPoints: Word;
+  BirthYear: Word;
+  BirthMonth: Byte;
+  BirthDay: Byte;
+  Groups: LongInt;
+  RegDate: Word;
+  FirstDate: Word;
+  NewDate: Word;
+  Protocol: Char;
+  TimeRemain: Word;
+  CurrFileArea: Word;
+  CurrMsgArea: Word;
+  MaxQwkMsgs: Word;
+  MaxPerArea: Word;
+  TodayBankK: Integer;
+  Forward: String[35];
+  TodayCalls: Byte;
+  TodayBankT: Integer;
+  Extra: Array[1..4] of Byte;
+  End;
+
+
+Type BbsCfg = Record                   {Config.Ezy file}
+  Version: String[8];
+  DefaultLang: String[8];
+  Extra1: Array[1..68] of Byte;
+  LogFileName: String[60];
+  TxtPath: String[60];
+  MenuPath: String[60];
+  MenuRamPath: String[60];
+  NetMailPath: String[60];
+  NodeListPath: String[60];
+  MsgPath: String[60];
+  FilePath: String[60];
+  Extra2: String[60];
+  BiPath: String[60];
+  TempPath: String[60];
+  UserBasePath: String[60];
+  AvtPath: String[60];
+  AscPath: String[60];
+  AscLoBitPath: String[60];
+  FileMaintPath: String[60];
+  AttachPath: String[60];
+  SoundPath: String[60];
+  FastIdxPath: String[60];
+  SystemPwd: String[15];
+  SysopPwd: String[15];
+  NewUserPwd: String[15];
+  NewTopMenu: String[8];
+  Extra3: Array[1..4] of Byte;
+  InBoundMail: String[60];
+  OutBoundMail: String[60];
+  UploadPath: String[60];
+  SwapFile: String[60];
+  MultiPath: String[60];
+  Brackets: String[2];
+  IdleTime: Byte;
+  MinMsgChk: Byte;
+  LogInTime: Byte;
+  Extra4: Byte;
+  AnswerDelay: Byte;
+  ShellSwap: Boolean;
+  HiBit: Boolean;
+  DispPass: Boolean;
+  AskLocalPwd: Boolean;
+  FastLogOn: Boolean;
+  RemoteSysop: Boolean;
+  PrinterLog: Boolean;
+  AskPhone1: Boolean;
+  AskColor: Boolean;
+  AskHandle: Boolean;
+  AskBD: Boolean;
+  ForcePhone: Boolean;
+  DirectWrite: Boolean;
+  SnowCheck: Boolean;
+  Extra5: Byte;
+  ScrnBlank: Byte;
+  OneWord: Boolean;
+  CheckMail: Byte;
+  CheckFile: Byte;
+  AskAnsi: Byte;
+  AskFullScrn: Byte;
+  AskScrnClr: Byte;
+  AskMore: Byte;
+  AskAvatar: Byte;
+  AskIBMChar: Byte;
+  AskUpdate: Byte;
+  AskDataPhone: Boolean;
+  PhoneMask: String[14];
+  NamePrompt: String[60];
+  PwdPrompt: String[60];
+  ShellPrompt: String[60];
+  Shell2Prompt: String[60];
+  EnterPrompt: String[60];
+  ChatPrompt: String[60];
+  ListPrompt: String[60];
+  F7Top: String[79];
+  F7Bottom: String[79];
+  Extra6: Array[1..84] of Byte;
+  Chat2Prompt: String[60];
+  ScrnLenPrompt: String[60];
+  ScrnClrPrompt: String[60];
+  LocPrompt: String[60];
+  FreePrompt: String[60];
+  LoadPrompt: String[60];
+  AvatarPrompt: String[60];
+  HandlePrompt: String[60];
+  Security: Word;
+  LogOnSec: Word;
+  Flags: LongInt;
+  MinPwdLen: Byte;
+  DispFWin: Byte;
+  DispBWin: Byte;
+  DispPopF: Byte;
+  DIspPopBord: Byte;
+  DispPopB: Byte;
+  DispF: Byte;
+  Extra7: Byte;
+  CommPort: Byte;
+  PassLogOns: Byte;
+  BDCheck: Byte;
+  PrinterPort: Byte;
+  PwdTries: Byte;
+  TopMenu: String[8];
+  Extra8: LongInt;
+  WatchMsg: Word;
+  NMCredit: Word;
+  AnsiBaud: Word;
+  Extra9: Word;
+  SlowBaud: Word;
+  MinBaud: Word;
+  LowSecBeg: Word;
+  LowSecEnd: Word;
+  LoBaudStart: Word;
+  LoBaudEnd: Word;
+  QuoteStr: String[5];
+  Extra10: Byte;
+  Offhook: Boolean;
+  CrashForce: Word;
+  CrashSec: Word;
+  NetFAttachSec: Word;
+  DispH: Byte;
+  Extra11: Byte;
+  MaxPages: Byte;
+  MaxPageFiles: Byte;
+  PageLength: Byte;
+  PageStart: Array[0..6] of Word;
+  PageMsgArea: Word;
+  FAttachSec: Word;
+  ULMsgSec: Word;
+  UpdateUserSec: Word;
+  DefReadSec: Word;
+  DefWriteSec: Word;
+  DefSysSec: Word;
+  NMReplySec: Word;
+  NMKillAsk: Byte;
+  SwapPack: Byte;
+  Extra12: Array[1..9] of Byte;
+  DispPopT: Byte;
+  PageStop: Array[0..6] of Word;
+  Extra13: Array[1..22] of Byte;
+  CallStart: Word;
+  CallEnd: Word;
+  Extra14: Word;
+  AltFKeys: Array[1..10] of String[60];
+  CtlFKeys: Array[1..10] of String[40];
+  Extra15: LongInt;
+  DefPoints: Word;
+  KsPerP: Byte;
+  PUpload: Byte;
+  Warn1: Byte;
+  Warn2: Byte;
+  Extra16: Word;
+  MinFree: Word;
+  BiModemSwap: Boolean;
+  BusyModem: Boolean;
+  ScrHt: Boolean;
+  MsgTmpNoNode: Boolean;
+  SwapUL: Boolean;
+  PhoneLogOn: Byte;
+  CarrierDet: Byte;
+  NewFilesHi: Boolean;
+  MaxDesc: Byte;
+  MinDesc: Byte;
+  ReqRcpt: Word;
+  ShowDate: Boolean;
+  ShowSize: Byte;
+  ULName: Boolean;
+  DLCount: Boolean;
+  Extar17: Boolean;
+  ShowSec: Boolean;
+  ShowSDate: Boolean;
+  ShowSSize: Byte;
+  ShowUploader: Boolean;
+  ShowDLCount: Boolean;
+  Extra18: Boolean;
+  ShowSSec: Boolean;
+  ShowTime: Boolean;
+  ShowPoints: Boolean;
+  ShowSTime: Boolean;
+  ShowSPoints: Boolean;
+  PointPercent: Word;
+  AutoDetect: Byte;
+  DispSecFile: Boolean;
+  AskReason: Boolean;
+  DelBadFile: Boolean;
+  Extra19: Byte;
+  SwapView: Byte;
+  Extra20: Char;
+  SecFilesChar: Char;
+  PwdChar: Char;
+  LocalIdle: Boolean;
+  ConvMaster: Byte;
+  LeftBrkt: String[1];
+  RightBrkt: String[1];
+  IgnorePtsSec: Word;
+  MinAge: Byte;
+  Extra21: Byte;
+  ModemEff: Array[1..11] of Word;
+  ModemBaud: Array[1..11] of Word;
+  ConnectStr: Array[1..11] of String[15];
+  Extra22: Array[1..10] of Byte;
+  CfgAttr: Word;
+  UserColor: Array[1..4] of Byte;
+  UserBack: Byte;
+  NewUserColor: Byte;
+  ChStatColor: Byte;
+  EnterColor: Byte;
+  USDate: Boolean;
+  OvrPath: String[60];
+  Extra23: string[35];
+  OvrEms: Boolean;
+  SwapEzy: Byte;
+  FileSecPath: String[60];
+  Extra24: Boolean;
+  MultiTask: Byte;
+  MaxBaud: Word; {LongInt ???}
+  LockedComm: Boolean;
+  FileReqSec: Word;
+  AutoAnswer: Boolean;
+  Response: String[10];
+  RingStr: String[10];
+  InitTries: Byte;
+  InitStr1: String[60];
+  InitStr2: String[60];
+  BusyStr: String[20];
+  AnswerStr: String[20];
+  MailerStr: String[60];
+  ModemStart: Word;
+  ModemEnd: Word;
+  ModemDelay: Byte;
+  SendBrk: Boolean;
+  EditCmdPath: String[60];
+  Origin: String[50];
+  FaxConnect: String[15];
+  Extra25: Array[1..16] of Byte;
+  ULCredit: Word;
+  Extra26: String[35];
+  ShowNewFileChar: Byte;
+  Zone: Array[1..16] of Word;
+  Net: Array[1..16] of Word;
+  Node: Array[1..16] of Word;
+  Point: Array[1..16] of Word;
+  Extra27: Array[1..16] of Word;
+  Extra28: Array[1..16] of String[20];
+  NoCarrier: String[20];
+  GuestName: String[35];
+  Extra29: Array[1..685] of Byte;
+  End;
+
+
+Type MsgAreaType = Record              {Messages.Ezy in the system dir}
+  Name: String[30];                    {Name of message area}
+  AreaTag: String[30];
+  ShortName: String[12];               {Short name of msg area}
+  Typ: Byte;
+  MsgKinds: Byte;
+  Attr: Byte;
+  Attr2: Byte;
+  Attr3: Byte;
+  DaysKept: Byte;
+  RcvdDays: Byte;
+  MsgsKept: Word;
+  KKept: Word;
+  ReadSec: Word;
+  ReadFlags: LongInt;
+  WriteSec: Word;
+  WriteFlags: LongInt;
+  SysopSec: Word;
+  SysopFlags: LongInt;
+  Origin: String[50];
+  Addr: Byte;                          {Which address to use}
+  SeenBy: Word;
+  AreaGroup: Char;
+  MsgGroup: Char;
+{  DestNodes: Array[1..3] of Byte;}
+  DestNodes: Array[1.. (128 Div 8)] of Byte;
+  EchoFeed: Byte;
+  End;
+
+
+
+Type FileAreaType = Record             {Files.MK file}
+  Name: String[30];                    {Name - blank = unused}
+  Attr: Byte;
+  Convert: Byte;
+  FileGroup: Char;
+  UpTmplt: Word;
+  ULPath: Word;
+  FreeSpace: LongInt;
+  SecLevel: Word;
+  SecFlags: LongInt;
+  SysopLevel: Word;
+  SysopFlags: LongInt;
+  End;
+
+

@@ -1,0 +1,265 @@
+{ ***************** QuickBbs 2.75 Types ******************}
+
+Const
+  QBMaxMsgAreas  = 200;
+  QBMaxFileAreas = 200;
+
+Type
+
+  QBFlagType = array[1..4] of Byte;
+
+  QBTypeMsgs  = (QBStandard, QBNetmail, QBEMail, QBEchoMail);
+  QBKindMsgs  = (QBBoth, QBPrivate, QBPublic, QBROnly);
+  QBAskType   = (QBNo, QBMaybe, QBYes);
+
+  QBSecurityRecord = Record
+    Security : Word;
+    Flags    : QbFlagType;
+    End;
+
+  QBUserRecord = record
+    Name        : String[35];
+    City        : String[25];
+    Pwd         : String[15];
+    DataPhone,
+    HomePhone   : String[12];
+    LastTime    : String[5];
+    LastDate    : String[8];
+    Attrib      : Byte;
+    Flags       : QbFlagType;
+    Credit,
+    Pending,
+    TimesPosted,
+    HighMsgRead,
+    SecLvl,
+    Times,
+    Ups,
+    Downs,
+    UpK,
+    DownK,
+    TodayK      : Word;
+    Elapsed,
+    Len         : Integer;
+    CombinedPtr : Word; (* Record number in COMBINED.BBS *)
+    AliasPtr    : Word; (* Record number in ALIAS.BBS *)
+    Birthday    : Longint;
+    End;
+
+{ Attrib:
+      Bit 0: Deleted                   Bit 1: Screen Clear Codes
+      Bit 2: More Prompt               Bit 3: ANSI
+      Bit 4: No-Kill                   Bit 5: Ignore Download Hours
+      Bit 6: ANSI Full Screen Editor   Bit 7: Sex (0=male, 1=female)}
+
+  QbAliasRecord = String[35]; (* for ALIAS.BBS *)
+
+  QbCombSelectType = array[1..QbMaxMsgAreas] of Boolean; (* for COMBINED.BBS *)
+
+  QbSysInfoRecord = record
+    CallCount  : LongInt;
+    LastCaller : String[35];
+    ExtraSpace : array[1..128] of Byte;
+    End;
+
+  QbTimeLogRecord = record
+    StartDate   : String[8];
+    BusyPerHour : array[0..23] of Integer;
+    BusyPerDay  : array[0..6] of Integer;
+    End;
+
+   QbEventRecord = record (* EVENTCFG.DAT *)
+     Status      : Byte;
+     RunTime     : LongInt;
+     ErrorLevel  : Byte;
+     Days        : Byte;
+     Forced      : Byte;
+     LastTimeRun : LongInt;
+     Spare       : Array[1..7] of Byte;
+     End;
+
+  QbEventRecordArray = Array[1..30] of QBEventRecord;
+
+  QbGosubDataType = array[1..20] of String[8];
+
+  QbExitRecord = record
+    BaudRate        : Integer;
+    SysInfo         : QbSysInfoRecord;
+    TimeLogInfo     : QbTimeLogRecord;
+    UserInfo        : QbUserRecord;
+    EventInfo       : QbEventRecord;
+    NetMailEntered  : Boolean;
+    EchoMailEntered : Boolean;
+    LoginTime       : String[5];
+    LoginDate       : String[8];
+    TmLimit         : Integer;
+    LoginSec        : LongInt;
+    Credit          : LongInt;
+    UserRecNum      : Integer;
+    ReadThru        : Integer;
+    PageTimes       : Integer;
+    DownLimit       : Integer;
+    WantChat        : Boolean;
+    GosubLevel      : Byte;
+    GosubData       : QbGosubDataType;
+    Menu            : String[8];
+    End;
+
+  QbFileAreaRecord = Record (* FILECFG.DAT *)
+    AreaName,
+    FilePath,
+    ListPath    : String[66];
+    AllowUploads,
+    IgnoreKlimit,
+    IgnoreRatio : Boolean;
+    DlSec       : QBSecurityRecord;
+    SearchSec   : QBSecurityRecord;
+    TemplateSec : QBSecurityRecord;
+    Spare       : Array[1..12] of Byte;
+  End;
+
+  QBBoardRecord = record (* MSGCFG.DAT *)
+    Name: String[40];
+    Typ: QBTypeMsgs;
+    Kinds: QBKindMsgs;
+    Combined        : Boolean;
+    Aliases         : QbAskType;
+    Aka             : Byte;
+    OriginLine      : String[58];
+    AllowDelete     : Boolean;
+    KeepCnt,                (* Max # of Msgs to keep *)
+    KillRcvd,               (* Kill received msgs after this many days *)
+    KillOld         : Word; (* Kill msgs after this many days *)
+    ReadSec         : QBSecurityRecord;
+    WriteSec        : QBSecurityRecord;
+    TemplateSec     : QBSecurityRecord;
+    SysopSec        : QBSecurityRecord;
+    Spare           : Array[1..12] of Byte;
+    End;
+
+
+  QBConfigRecord = record  (* QUICKCFG.DAT *)
+    VersionID : Word;
+    Node      : Byte;
+                      (*  Modem Parameters  *)
+    CommPort      : Integer;
+    InitBaud      : Word;
+    ModemDelay    : Word;
+    InitTimes,
+    AnswerWait    : Integer;
+    ModemInitStr,
+    ModemBusyStr  : String[70];
+    ModemInitResp,
+    ModemBusyResp,
+    Resp300,
+    Resp1200,
+    Resp2400,
+    Resp9600,
+    Resp19200,
+    Resp38400     : String[40];
+
+    (*  System Paths  *)
+    EditorCmdStr    : String[70];
+    MenuPath,
+    TextPath,
+    NetPath,
+    NodelistPath,
+    MsgPath,
+    SwapPath,
+    OverlayPath     : String[66];
+
+    (* System misc strings *)
+    LoadingMessage  : String[70];
+    SelectionPrompt : String[70];
+    NoMailString    : String[70];
+    OriginLine      : String[58];
+    QuoteStr        : String[3];
+
+    (*  User Restrictions *)
+    LowBaudStart,
+    LowBaudEnd,
+    DownloadStart,
+    DownloadEnd     : LongInt;
+    MaxPageTimes,
+    PageBellLen     : Integer;
+    PagingStart,
+    PagingEnd       : LongInt;
+    MinBaud,
+    GraphicsBaud,
+    XferBaud        : Integer;
+
+    (*  Matrix Information  *)
+    MatrixZone,
+    MatrixNet,
+    MatrixNode,
+    MatrixPoint     : array[0..10] of Integer;
+    NetMailBoard    : Integer;
+
+    (*  Default Information for New Users  *)
+    DefaultSec      : QBSecurityRecord;
+    MinimumSec      : QBSecurityRecord;
+    DefaultCredit   : Integer;
+
+    (*  Sysop Security Etc. *)
+    SysopSecurity   : QBSecurityRecord;
+    SysopName       : String[35];
+    SystemName      : String[40];
+    RegKey          : LongInt;
+
+    (*  Misc System Parameters  *)
+
+    TextFileShells,
+    AltJswap,
+    Editorswap,
+    AutoLogonChar,
+    FastLogon,
+    UseLastRead,
+    MonoMode,
+    DirectWrite,
+    SnowCheck,
+    NetEchoExit,
+    OneWordNames,
+    CheckMail,
+    AskHomePhone,
+    AskDataPhone,
+    AskBirthday,
+    AskSex,
+    Use_Xmodem,
+    Use_Xmodem1k,
+    Use_Ymodem,
+    Use_YmodemG,
+    Use_Sealink,
+    Use_Zmodem,
+    Inp_Fields,
+    GraphicsAvail,
+    ForceUS_Phone   : Boolean;
+    InactiveTimeOut : Integer;
+    LogonTime       : Integer;
+    DefFgColor      : Integer;
+    DefBgColor      : Integer;
+    PasswordTries   : Integer;
+    EntFldColor     : Byte; (* Color for entry fields *)
+    BorderColor     : Byte; (* Color for menu borders *)
+    WindowColor     : Byte;
+    StatusBarColor  : Byte;
+    UploadCredit    : Integer;
+    ScreenBlank     : Byte;
+
+    (* Callback verifier *)
+    VerifierInit    : string[35];
+    DialString      : string[15];
+    DialSuffix      : string[15];
+    DupeCheck       : Boolean;
+    NewUserSec,
+    MemberSec       : Word;
+    MemberFlags     : Array[1..4,1..8] of Char;
+    LDcost          : Word;
+    LDenable,
+    ResumeLocal,
+    ResumeLD        : Boolean;
+    LDstart,
+    LDend           : Longint;
+
+    ExtraSpace      : Array[1..400] of Byte;
+
+    End;
+

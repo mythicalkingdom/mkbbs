@@ -1,0 +1,573 @@
+{ *************** Remote Access Types v2.50 gamma *******************}
+
+Type
+  RaMsgType = (RALocalMail, RANetMail, RAEchoMail, RAInternet, RANewsgroup);
+  RaFlagType =  Array[1..4] of Byte;
+  RaTime = String[5];
+  RaDate = String[8];
+  RaLongDate = String[9];
+  RaVideoType = (Auto, Short, Long);
+  RAOrphanType = (Ignore, Create, Kill);
+  RaCombinedRecord = array[1..25] of Byte;
+  RaAskType = (RAYes, RANo, RAAsk, RAOnly);
+  RaMsgKindsType  = (RABoth, RAPrivate, RAPublic, RAROnly, RANoReply);
+  RaResetType = (RANever, RAWeek, RAMonth, RAYear);
+  RaByteArray32 = Array[1..32] of Byte;
+
+
+  RALimitsRecord = Record
+    Security: Word;
+    LTime: Word;
+    L300: Word;
+    L1200: Word;
+    L2400: Word;
+    L4800: Word;
+    L7200: Word;
+    L9600: Word;
+    L12000: Word;
+    L14400: Word;
+    L16800: Word;
+    L19200: Word;
+    L38400: Word;
+    LLocal: Word;
+    RatioNum: Word;
+    RatioK: Word;
+    PerMinCost: Real;
+    Extra: Array[1..42] of Byte;
+    End;
+
+
+  RaLanguageRecord = Record
+    Name: String[20];
+    Attribute: Byte;
+    DefName: String[60];
+    MenuPath: String[60];
+    TextPath: String[60];
+    QuesPath: String[60];
+    Security: Word;
+    Flags: LongInt;
+    NotFlags: LongInt;
+    Extra: Array[1..190] of Byte;
+    End;
+
+
+  RAFilesHdrRecord = Record
+    Name: String[12];
+    Size: LongInt;
+    Crc: LongInt;
+    Uploader: String[35];
+    ULDate: LongInt;
+    FileDate: LongInt;
+    LastDL: LongInt;
+    TimesDL: Word;
+    Attr: Byte;
+    Pwd: String[15];
+    KeyWord: Array[1..5] of String[15];
+    Cost: Word;
+    LongDescPtr: LongInt;
+    Extra: Array[1..20] of Byte;
+    End;
+
+  Const
+    rafhDel        =   1;
+    rafhUnlist     =   2;
+    rafhFree       =   4;
+    rafhUnAvail    =   8;
+    rafhLocked     =  16;
+    rafhMissing    =  32;
+    rafhNoTime     =  64;
+
+
+  Type RAFilesIdxRecord = Record
+    Name: String[12];
+    ULDate: LongInt;
+    KeyWordCRC: Array[1..5] of LongInt;
+    LongDescPtr: LongInt;
+    End;
+
+  RaSysInfoRecord  = record
+    TotalCalls     : LongInt;
+    LastCaller     : String[35];
+    LastHandle: String[35];
+    ExtraSpace     : array[1..92] of Byte;
+    End;
+
+
+  RaNetAddress = record
+    Zone,
+    Net,
+    Node,
+    Point          : Word;
+    End;
+
+
+  RaMessageRecord  = Record                 {Messages.Ra}
+    AreaNum: Word;
+    Extra1: Word;
+    Name: String[40];
+    Typ: RaMsgType;
+    MsgKinds: RaMsgKindsType;
+    Attribute: Byte;
+    { Bit 0 = Enable EchoInfo         1 = Combined access
+          2 = File attaches           3 = Allow aliases
+          4 = SoftCr as character     5 = Force handle
+          6 = Allow Deletes           7 = JAM area}
+    DaysKill,    { Kill older than 'x' days }
+    RecvKill: Byte; { Kill recv msgs, recv for more than 'x' days }
+    CountKill: Word;
+    ReadSecurity: Word;
+    ReadFlags: RaFlagType;
+    ReadNotFlags: RAFlagType;
+    WriteSecurity: Word;
+    WriteFlags: RaFlagType;
+    WriteNotFlags: RAFlagType;
+    SysopSecurity: Word;
+    SysopFlags: RaFlagType;
+    SysopNotFlags: RAFlagType;
+    OriginLine: String[60];
+    AkaAddress: Byte;
+    Age: Byte;
+    JamBase: String[60];
+    Group: Word;
+    AltGroup: Array[1..3] of Word;
+    Attr2: Byte;
+      {Bit 0 = Incl all in group }
+    NetMailArea: Word;
+    Extra2: Array[1..7] of Byte;
+    End;
+
+  RAGroupRecord = Record
+    AreaNum: Word;
+    Name: String[40];
+    Security: Word;
+    Flags: RAFlagType;
+    NotFlags: RAFlagType;
+    Extra: Array[1..100] of Byte;
+    End;
+
+  RaFilesRecord = Record                    {Files.Ra}
+    AreaNum: Word;
+    Extra1: Word;
+    Name: String[40];
+    Attrib         : Byte;
+    FilePath       : String[40];
+    KillDaysDL: Word;
+    KillDaysFD: Word;
+    Pwd: String[15];
+    MoveArea: Word;
+    Age: Byte;
+    CvtExt: Byte;
+    Group: Word;
+    Attr2: Byte;
+     {Bit 0 = include in all groups}
+    DefCost: Word;
+    ULArea: Word;
+    ULSecurity: Word;
+    ULFlags: RAFlagType;
+    ULNotFlags: RAFlagType;
+    Security       : Word;
+    Flags          : RaFlagType;
+    NotFlags: RAFlagType;
+    ListSecurity: Word;
+    ListFlags: RAFlagType;
+    ListNotFlags: RAFlagType;
+    AltGroup: Array[1..3] of Word;
+    Device: Byte;
+    Extra2: Array[1..13] of Byte;
+    End;
+
+
+  RAConfRecord = Record
+    Name: String[8];
+    Parent: String[8];
+    Desc: String[70];
+    Attr: Byte;
+      {Bit 0 = Private                1 = Unlisted
+           2 = Global                 3 = Permanent
+           4 = Use Handles }
+    Moderator: String[35];
+    Lang: String[20];
+    Pwd: String[15];
+    Security: Word;
+    Flags: RAFlagType;
+    NumNodes: Byte;
+    Active: Array[1..250] of Byte;
+    Child: Array[1..250] of Boolean;
+    NotFlags: RAFlagType;
+    Extra: Array[1..96] of Byte;
+    End;
+
+  RAModemRecord = Record
+    CommPort: Byte;
+    InitTries: Byte;
+    BufferSize: Word;
+    ModemDelay: Word;
+    MaxSpeed: LongInt;
+    SendBreak: Boolean;
+    LockModem: Boolean;
+    AnswerPhone: Boolean;
+    Offhook: Boolean;
+    InitStr: String[70];
+    InitStr2: String[70];
+    BusyStr: String[70];
+    InitResp: String[40];
+    BusyResp: String[40];
+    Connect300: String[40];
+    Connect1200: String[40];
+    Connect2400: String[40];
+    Connect4800: String[40];
+    Connect7200: String[40];
+    Connect9600: String[40];
+    Connect12k: String[40];
+    Connect14k: String[40];
+    Connect19k: String[40];
+    Connect38k: String[40];
+    ConnectFax: String[40];
+    RingStr: String[20];
+    AnswerStr: String[20];
+    ErrorFreeStr: String[15];
+    Extra: Array[1..300] of Byte;
+    End;
+
+  RAArcRecord = Record
+    Ext: String[3];
+    UnpackCmd: String[60];
+    PackCmd: String[60];
+    End;
+
+  RaConfigRecord = Record                   {Config.Ra}
+    VersionID           : Word;
+    xCommPort            : Byte;
+    xBaud                : LongInt;
+    xInitTries           : Byte;
+    xInitStr,
+    xBusyStr             : String[70];
+    xInitResp,
+    xBusyResp,
+    xConnect300,
+    xConnect1200,
+    xConnect2400,
+    xConnect4800,
+    xConnect9600,
+    xConnect19k,
+    xConnect38k          : String[40];
+    xAnswerPhone         : Boolean;
+    xRing,
+    xAnswerStr           : String[20];
+    xFlushBuffer         : Boolean;
+    xModemDelay          : Integer;
+    MinimumBaud,
+    GraphicsBaud,
+    TransferBaud        : Word;
+    SlowBaudTimeStart,
+    SlowBaudTimeEnd,
+    DownloadTimeStart,
+    DownloadTimeEnd: RaTime;
+    PageStart: Array[0..6] of RaTime;
+    PageEnd: Array[0..6] of RaTime;
+    SeriNum: String[22];
+    CustNum: String[22];
+    FreeSpace: Array[1..24] of Byte;
+    PwdExpiry           : Word;
+    MenuPath,
+    TextPath,
+    AttachPath,
+    NodelistPath,
+    MsgBasePath,
+    SysPath,
+    ExternalEdCmd       : String[60];
+    Address             : Array[0..9] of RaNetAddress;
+    SystemName          : String[30];
+    NewSecurity         : Word;
+    NewCredit           : Word;
+    NewFlags            : RaFlagType;
+    OriginLine          : String[60];
+    QuoteString         : String[15];
+    Sysop               : String[35];
+    LogFileName         : String[60];
+    FastLogon,
+    AllowSysRem,
+    MonoMode,
+    StrictPwdChecking,
+    DirectWrite,
+    SnowCheck           : Boolean;
+    CreditFactor        : Integer;
+    UserTimeOut,
+    LogonTime,
+    PasswordTries,
+    MaxPage,
+    PageLength          : Word;
+    CheckForMultiLogon,
+    ExcludeSysopFromList,
+    OneWordNames        : Boolean;
+    CheckMail           : RaAskType;
+    AskVoicePhone,
+    AskDataPhone,
+    DoFullMailCheck,
+    AllowFileShells,
+    FixUploadDates,
+    FreezeChat: Boolean;
+    ANSI,                       { ANSI: Yes, no, or ask new users     }
+    ClearScreen,                { Clear:        "                     }
+    MorePrompt          : RaAskType;    { More:         "                     }
+    UploadMsgs          : Boolean;
+    KillSent            : RAAskType;    { Kill/Sent     "                     }
+    CrashAskSec         : Word;       { Min sec# to ask 'Crash Mail ?'      }
+    CrashAskFlags       : RAFlagType;
+    CrashSec            : Word;       { Min sec# to always send crash mail. }
+    CrashFlags          : RaFlagType;
+    FAttachSec          : Word;       {        "    ask 'File Attach ?'     }
+    FAttachFlags        : RaFlagType;
+    NormFore,
+    NormBack,
+    StatFore,
+    StatBack,
+    HiBack,
+    HiFore,
+    WindFore,
+    WindBack,
+    ExitLocal,
+    Exit300,
+    Exit1200,
+    Exit2400,
+    Exit4800,
+    Exit9600,
+    Exit19k,
+    Exit38k             : Byte;
+    MultiLine           : Boolean;
+    MinPwdLen           : Byte;
+    MinUpSpace          : Word;
+    HotKeys             : RaAskType;
+    BorderFore,
+    BorderBack,
+    BarFore,
+    BarBack,
+    LogStyle,
+    MultiTasker,
+    PwdBoard            : Byte;
+    xBufferSize          : Word;
+    FKeys               : Array[1..10] of String[60];
+    WhyPage             : Boolean;
+    LeaveMsg            : Byte;
+    ShowMissingFiles    : Boolean;
+    xLockModem: Boolean;
+    FreeSpace2: Array[1..10] of Byte;
+    AllowNetmailReplies : Boolean;
+    LogonPrompt         : String[40];
+    CheckNewFiles       : raAskType;
+    ReplyHeader         : String[60];
+    BlankSecs           : byte;
+    ProtocolAttrib      : Array[1..6] of Byte;
+    xErrorFreeString     : String[15];
+    xDefaultCombined     : Array[1..25] of Byte;
+    RenumThreshold      : Word;
+    LeftBracket,
+    RightBracket        : Char;
+    AskForHandle        : Boolean;
+    AskForBirthDate     : Boolean;
+    GroupMailSec: Word;
+    ConfirmMsgDeletes   : Boolean;
+    FreeSpace3: Array[1..30] of Byte;
+    TempScanDir: String[60];
+    ScanNow: RAAskType;
+    xUnknownArcAction: Byte;
+    xFailedUnpackAction: Byte;
+    FailedScanAction: Byte; {Bit 0=mark del 1=mark unlist 2=mark not}
+    xUnknownArcArea: Word;
+    xFailedUnpackArea: Word;
+    FailedScanArea: Word;
+    ScanCmd: String[60];
+    xDeductIfUnknown: Boolean;
+    NewUserGroup        : Byte;
+    AVATAR              : RaAskType;
+    BadPwdArea          : Byte;
+    Location            : String[40];
+    DoAfterAction       : Byte; {0 = wait for CR, > 0 = wait for x seconds}
+    CRprompt            : String[40];
+    CRfore,
+    CRback              : Byte;
+    LangHdr: String[40];
+    xSendBreak           : Boolean;
+    ListPath            : String[60];
+    FullMsgView         : RaAskType;
+    EMSI_Enable,
+    EMSI_NewUser        : Boolean;
+    EchoChar: String[1];
+    Connect7200: String[40];
+    Connect12000: String[40];
+    Connect14400: String[40];
+    Exit7200: Byte;
+    Exit12000: Byte;
+    Exit14400: Byte;
+    ChatCommand: String[60];
+    ExtEd: RaAskType;
+    NewUserLanguage: Byte;
+    LanguagePrompt: String[40];
+    VideoMode: RaVideoType;
+    AutoDetectAnsi: Boolean;
+    xOffHook: Boolean;
+    NewUserDateFormat: Byte;
+    KeyBoardPwd: String[15];
+    CapLocation: Boolean;
+    NewUserSub: Byte;
+    PrinterName: String[4];
+    HiLitePromptFore: Byte;
+    HiLitePromptBack: Byte;
+    xInitStr2: String[70];
+    AltJSwap: Boolean;
+    SemPath: String[60];
+    AutoChatCapture: Boolean;
+    FileBasePath: String[60];
+    NewFileTag: Boolean;
+    IgnoreDupeExt: Boolean;
+    TempCDFilePath: String[60];
+    TagFore: Byte;
+    TagBack: Byte;
+    xConnect16k: String[40];
+    Exit16k: Byte;
+    FilePayBack: Byte;
+    FileLine: String[200];
+    FileMissingLine: String[200];
+    NewUserULCredit: Byte;
+    NewUserULCreditK: Word;
+    ArcInfo: Array[1..10] of RAArcRecord;
+    RAMgrAltFKeys: Array[1..5] of String[60];
+    ArcViewCmd: String[60];
+    xConnectFax: String[40];
+    ExitFax: Byte;
+    UseXms: Boolean;
+    UseEms: Boolean;
+    CheckDOB: Byte;
+    EchoCheck: RAAskType;
+    ccSec: Word;
+    ReturnRecSec: Word;
+    HonorNetReq: Boolean;
+    DefaultCombined: RACombinedRecord;
+    AskForSex: Boolean;
+    AskForAddr: Boolean;
+    DLDesc: RAAskType;
+    NewPhoneScan: Boolean;
+    FutureExpansion: Array[1..587] of Byte;
+    End;
+
+  RaUSERSXIrecord  = record
+    Extra: Array[1..200] of Byte;
+    End;
+
+  RaUsersRecord = Record
+    Name: String[35];
+    Location: String[25];
+    Organization: String[50];
+    Addr1: String[50];
+    Addr2: String[50];
+    Addr3: String[50];
+    Handle: String[35];
+    Comment: String[80];
+    PwdCrc: LongInt;
+    DataPhone: String[15];
+    VoicePhone: String[15];
+    LastTime: RaTime;
+    LastDate: RaDate;
+    Attribute: Byte;
+    { Bit 0: Deleted                       1: Clear screen
+          2: More prompt                   3: ANSI
+          4: No-kill                       5: Xfer priority
+          6: Full screen msg editor        7: Quiet mode }
+    Attr2: Byte;
+    { Bit 0: Hotkey                         1: Avt0
+          2: FullScrMsgView                 3: Hidden
+          4: Page Priority                  5: No echomail scan
+          6: Guest                          7: Post bill}
+    Flags: RaFlagType;
+    Credit: LongInt;
+    Pending: LongInt;
+    MsgsPosted: Word;
+    Security: Word;
+    LastRead: LongInt;
+    NoCalls: LongInt;
+    Uploads: LongInt;
+    Downloads: LongInt;
+    UploadsK: LongInt;
+    DownloadsK: LongInt;
+    TodayK: LongInt;
+    Elapsed: Integer;
+    ScreenLength: Word;
+    LastPwdChange: Byte;
+    Group: Word;
+    Combined: Array[1..200] of Word;
+    FirstDate: RADate;
+    BirthDate: RADate;
+    SubDate: RADate;
+    ScreenWidth: Byte;
+    Language: Byte;
+    DateFormat: Byte;
+    ForwardTo: String[35];
+    MsgArea: Word;
+    FileArea: Word;
+    DefProt: Char;
+    FileGroup: Word;
+    LastDOBCheck: Byte;
+    Sex: Byte;
+    XIRecord: LongInt;
+    MsgGroup: WOrd;
+    Extra: Array[1..48] of Byte;
+    End;
+
+
+  RaTIMELOGrecord  = record
+    StartDate      : RaDate;
+    BusyPerHour    : array[0..23] of Word;
+    BusyPerDay     : array[0..6] of Word;
+    End;
+
+  RaEVENTrecord    = record
+    Status         : Byte; { 0=Deleted 1=Enabled 2=Disabled }
+    StartTime      : RaTime;
+    ErrorLevel     : Byte;
+    Days           : Byte;
+    Forced         : Byte;
+    LastTimeRun    : RaDate;
+    End;
+
+  RaEVENTrecordArray = array[1..20] of RaEVENTrecord;
+
+  RaExitInfoRecord = record
+    Baud             : Word;
+    SysInfo          : RaSYSINFOrecord;
+    TimeLogInfo      : RaTIMELOGrecord;
+    UserInfo         : RaUSERSrecord;
+    EventInfo        : RaEVENTrecord;
+    NetMailEntered,
+    EchoMailEntered  : Boolean;
+    LoginTime        : RaTime;
+    LoginDate        : RaDate;
+    TimeLimit        : Word;
+    LoginSec: LongInt;
+    UserRecord: Integer;
+    ReadThru: Word;
+    NumberPages,
+    DownloadLimit    : Word;
+    TimeOfCreation   : RaTime;
+    LogonPasswordCRC: LongInt;
+    WantChat         : Boolean;
+    DeductedTime     : Integer;
+    MenuStack        : Array[1..50] of String[8];
+    MenuStackPointer : Byte;
+    UserXIinfo       : RaUSERSXIrecord;
+    ErrorFreeConnect,
+    SysopNext        : Boolean;
+    EMSI_Session     : Boolean;        { These fields hold  }
+    EMSI_Crtdef,                       { data related to an }
+    EMSI_Protocols,                    { EMSI session       }
+    EMSI_Capabilities,
+    EMSI_Requests,
+    EMSI_Software    : String[40];
+    Hold_Attr1,
+    Hold_Attr2,
+    Hold_Len         : Byte;
+    PageReason: String[80];
+    StatusLine: Byte;
+    ExtraSpace: Array[1..99] of Byte;
+    End;
+
+

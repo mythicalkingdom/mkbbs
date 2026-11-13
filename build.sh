@@ -1,0 +1,32 @@
+#!/bin/sh
+# Build all converted MK units and run the tests.
+# Usage: ./build.sh   (objects go to ./build)
+set -e
+cd "$(dirname "$0")"
+mkdir -p build
+for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
+  fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
+done
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omk src/MK.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
+for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
+  fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
+done
+mkdir -p build/work
+build/smoke build/work
+build/mertest build/work | grep -E 'FAIL|failures'
+build/merstress build/work | grep -E 'FAIL|failures'
+build/comtest | grep -E 'FAIL|failures'
+build/dupetest build/work | grep -E 'FAIL|failures'
+build/doortest build/work | grep -E 'FAIL|failures'
+build/opentest build/work | grep -E 'FAIL|failures'
+build/syntest selftest build/work | grep -E 'FAIL|failures'
+build/teltest | grep -E "FAIL|failures"
+build/wstest | grep -E "FAIL|failures"
+build/listentest build/mklisten build/fakemk build/work 2>&1 | grep -E "^(FAIL|failures)"
+# the real Synchronet sample base (from the JS project): every index CRC must match ours
+if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then
+  cp javascript/message_bases/synchronet/fsx_bbs.s?? build/work/
+  build/syntest check build/work/fsx_bbs | grep -E 'FAIL|failures'
+fi
+[ "$(printf 'abc' | build/stdtest)" = 'ABC' ] && echo 'ok   MKComStd on a pipe' || { echo 'FAIL MKComStd on a pipe'; exit 1; }
