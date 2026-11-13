@@ -533,6 +533,12 @@ Function NodeCommand(Node: LongInt; Tag: Char; Arg: Byte): String;
 
 
 Var
+  BarDirty: Boolean;                   {the bar must be drawn (when the stream is between sequences)}
+  BarShown: String;                    {what the bar said when it was drawn last}
+  StSt: Byte;                          {the node's stream: 0 text, 1 after ESC, 2 in CSI, 3 in a string,
+                                        4 ESC in a string, 5 ESC + intermediate}
+  CsiBuf: String[24];
+  Sgr: String;                         {the colors the node has set (to put them back after the bar)}
   BarMsg: String;                      {an answer shown for a moment instead of the status}
   BarTicks: Integer;                   {how much longer (in 50 ms steps)}
   BarTyping: Boolean;
@@ -547,6 +553,75 @@ Procedure Status(M: String);
   Begin
   BarMsg := M;
   BarTicks := 60;
+  BarDirty := True;
+  End;
+
+
+Procedure Track(Var Buf; N: LongInt);
+  {Follows the node's output: where an escape sequence ends (the bar is only drawn
+   between sequences), the colors it set, and screen clears (they wipe the bar)}
+  Var
+    k: LongInt;
+    B: Byte;
+    Seq: String;
+
+  Begin
+  For k := 0 To N - 1 Do
+    Begin
+    B := Ord(PChar(@Buf)[k]);
+    Case StSt Of
+      0: If B = 27 Then StSt := 1;
+      1: If B = Ord('[') Then
+           Begin
+           StSt := 2;
+           CsiBuf := '';
+           End
+         Else If B In [Ord(']'), Ord('P'), Ord('X'), Ord('^'), Ord('_')] Then
+           StSt := 3
+         Else If (B >= $20) And (B <= $2F) Then
+           StSt := 5
+         Else If B = 27 Then
+           StSt := 1
+         Else
+           Begin
+           If B = Ord('c') Then
+             Sgr := '';                  {full reset}
+           StSt := 0;
+           End;
+      5: If B = 27 Then
+           StSt := 1
+         Else If (B < $20) Or (B > $2F) Then
+           StSt := 0;
+      2: If B = 27 Then
+           StSt := 1
+         Else If (B >= $30) And (B <= $3F) Then
+           Begin
+           If Length(CsiBuf) < 24 Then
+             CsiBuf := CsiBuf + Chr(B);
+           End
+         Else If (B >= $40) And (B <= $7E) Then
+           Begin
+           If B = Ord('m') Then
+             Begin
+             Seq := Esc + '[' + CsiBuf + 'm';
+             If (CsiBuf = '') Or (CsiBuf = '0') Then
+               Sgr := ''
+             Else If (Copy(CsiBuf, 1, 2) = '0;') Or (CsiBuf[1] = ';') Then
+               Sgr := Seq
+             Else If Length(Sgr) + Length(Seq) > 200 Then
+               Sgr := Seq
+             Else
+               Sgr := Sgr + Seq;
+             End
+           Else If (B = Ord('J')) And (CsiBuf = '2') Then
+             BarDirty := True;           {the screen was cleared}
+           StSt := 0;
+           End;
+      3: If B = 7 Then StSt := 0
+         Else If B = 27 Then StSt := 4;
+      4: If B = Ord('\') Then StSt := 0 Else StSt := 3;
+      End;
+    End;
   End;
 
 
@@ -589,10 +664,20 @@ Procedure BarRefresh;
       If Nodes[i].Baud > 0 Then
         BarInfo := BarInfo + Long2Str(Nodes[i].Baud) + ' ';
       BarInfo := BarInfo + Nodes[i].Typ + '  ' + ActivityStr(Nodes[i].Status) + '  ' +
-        DurStr(fpTime - Nodes[i].Start) + '  ' + Nodes[i].Addr;
+        Nodes[i].Addr;
       End;
   If BarInfo = '' Then
     BarInfo := 'Node ' + Long2Str(BarNode) + '  (ended)';
+  End;
+
+
+Function BarKey: String;
+  {Everything the bar shows (not the time left of an answer)}
+  Begin
+  If BarTicks > 0 Then
+    BarKey := BarMsg + #1 + Long2Str(Ord(BarTyping))
+  Else
+    BarKey := BarInfo + #2 + Long2Str(Ord(BarTyping));
   End;
 
 
@@ -618,7 +703,11 @@ Procedure DrawBar;
       Col := Esc + '[0;30;47m';
     End;
   T := Pad(T, BarCols - 1);
-  Say(Esc + '7' + Esc + '[' + Long2Str(BarRows) + ';1H' + Col + T + Esc + '[0m' + Esc + '8');
+  {save the cursor, draw, restore the cursor, then the colors the node had set}
+  Say(Esc + '7' + Esc + '[' + Long2Str(BarRows) + ';1H' + Col + T + Esc + '[0m' + Esc + '8' +
+    Esc + '[0m' + Sgr);
+  BarShown := BarKey;
+  BarDirty := False;
   End;
 
 
@@ -635,7 +724,7 @@ Function Watch(Node: LongInt): String;
     TypedN: Word;
     Dummy: Byte;
     Steps: Word;
-    Dirty: Boolean;                      {the node sent something: the bar may be covered}
+    FirstData: Boolean;
     Pend: String[16];                    {an escape sequence from the sysop's terminal, maybe an answer}
     PendAge: Word;
     k: Word;
@@ -694,6 +783,8 @@ Function Watch(Node: LongInt): String;
     Watch := 'Node ' + Long2Str(Node) + ' cannot be watched (not running, or no snoop socket).';
     Exit;
     End;
+  StSt := 0;
+  Sgr := '';
   BarNode := Node;
   BarMsg := '';
   BarTicks := 0;
@@ -705,12 +796,15 @@ Function Watch(Node: LongInt): String;
   DrawBar;
   CommFlushOut;
   Steps := 0;
+  FirstData := True;
   Gone := False;
   Typing := False;
   Prefix := False;
   AskKick := False;
-  Dirty := False;
   Pend := '';
+  StSt := 0;
+  Sgr := '';
+  BarDirty := True;                    {the first draw}
   PendAge := 0;
   FSt := 0;
   Repeat
@@ -729,7 +823,12 @@ Function Watch(Node: LongInt): String;
         If FOutN > 0 Then
           Begin
           ComSession^.SendBlock(FOut, FOutN);
-          Dirty := True;
+          Track(FOut, FOutN);
+          If FirstData Then
+            Begin
+            FirstData := False;
+            BarDirty := True;            {what the node sent first may have covered the bar}
+            End;
           End;
         CommFlushOut;
         If FGot Then
@@ -802,24 +901,21 @@ Function Watch(Node: LongInt): String;
       Gone := True;
     Inc(Steps);
     If BarTicks > 0 Then
-      Begin
       Dec(BarTicks);
-      If BarTicks = 0 Then
-        Steps := 20;                     {the answer is over: draw the status again}
-      End;
     If ComSession^.WindowVersion <> BarVer Then
       Begin
       BarSize;
-      Steps := 20;
+      BarDirty := True;
       End;
-    If Steps >= 20 Then                  {every second, and after changes}
+    If Steps >= 20 Then                  {look at who is on the node once a second}
       Begin
       Steps := 0;
       BarRefresh;
       End;
-    If (Steps = 0) Or (Steps = 10) Or (BarTicks > 0) Or Dirty Then
+    If BarKey <> BarShown Then
+      BarDirty := True;                  {the text changed}
+    If BarDirty And (StSt = 0) Then      {never inside one of the node's escape sequences}
       Begin
-      Dirty := False;
       DrawBar;
       CommFlushOut;
       End;

@@ -115,6 +115,26 @@ try:
     s.sendall(b'\x1b')                       # a lone Esc is a key
     b = read_until(caller, b'\x1b', 3)
     check('a lone Esc reaches the BBS', b'\x1b' in b)
+    # the bar is never drawn inside an escape sequence of the node's output
+    time.sleep(3.3)                          # earlier answers are gone from the bar
+    read_until(s, b'zzzz', 0.5)
+    caller.sendall(b'\x1b[3')               # a sequence that is not finished
+    time.sleep(0.4)
+    s.sendall(b'\x01?')
+    b = read_until(s, b'^A: T type', 1.5)
+    check('bar waits while the node is inside an escape sequence', b'^A: T type' not in b)
+    caller.sendall(b'1M')                    # finished
+    b = read_until(s, b'^A: T type', 3)
+    check('bar is drawn when the sequence is complete', b'^A: T type' in b)
+    # the bar puts the node's colors back
+    time.sleep(3.3)
+    caller.sendall(b'#')                     # the node sets bold red
+    time.sleep(0.4)
+    s.sendall(b'\x01?')
+    b = read_until(s, b'^A: T type', 3)
+    time.sleep(0.2); b += read_until(s, b'zzzz', 0.3)
+    check('colors of the node are restored after the bar', b'\x1b8\x1b[0m\x1b[1;31m' in b)
+    time.sleep(3.3)
     s.sendall(b'\x01+')
     b = read_until(s, b'Added 5 min, 35 left', 3)
     check('Ctrl-A + adds time: ' + b[-40:].decode('latin-1'), b'Added 5 min, 35 left' in b)

@@ -44,6 +44,7 @@ begin
     if ComSession^.WaitForChar(200) then begin
       C := CommRecv;
       if UpCase(C) = 'Q' then begin CommSend('!'); CommFlushOut; CommHangup; end
+      else if C = '#' then ComSession^.SendStr(#27'[1;31m')   {sets bold red: no text}
       else CommSend(UpCase(C));
     end;
   CommRelease;
