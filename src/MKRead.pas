@@ -661,7 +661,7 @@ Procedure DisplayMsgHdr;
   Else
     Begin
     GoToXy(8, 5);
-    Write ('     ');
+    Write(VOut, '     ');
     GoToXy(15, 5);
     Write(VOut, '     ');
     GoToXy(22, 5);
