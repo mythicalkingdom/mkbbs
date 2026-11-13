@@ -1,0 +1,36 @@
+{
+  "_note": "Example configuration for mklisten. Copy it, change the paths, and run: mklisten -c yourfile.json (add -t to only check it). Keys starting with _ are ignored.",
+  "mk": "/usr/local/bin/mk",
+  "logfile": "/var/log/mkbbs/mklisten.log",
+  "workdir": "/bbs/ra",
+  "nodes": "1-8",
+  "ports": [
+    {
+      "port": 2323,
+      "type": "telnet",
+      "baud": 38400,
+      "config": "/bbs/ra"
+    },
+    {
+      "port": 2324,
+      "type": "raw",
+      "baud": 38400,
+      "config": "/bbs/ra"
+    },
+    {
+      "port": 2325,
+      "type": "ws",
+      "baud": 38400,
+      "config": "/bbs/ra"
+    },
+    {
+      "_note": "wss: stunnel accepts TLS (for example on 443) and connects here with protocol = proxy",
+      "port": 2326,
+      "type": "ws",
+      "bind": "127.0.0.1",
+      "proxy": true,
+      "baud": 38400,
+      "config": "/bbs/ra"
+    }
+  ]
+}
