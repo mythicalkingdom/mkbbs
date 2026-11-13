@@ -9,7 +9,7 @@ PROG=os.environ.get('CFGPROG','mkconfig'); CWD=os.environ.get('CFGCWD','.'); HER
 pid,fd=pty.fork()
 if pid==0:
     os.environ.clear(); os.environ.update(env); os.chdir(CWD); os.execv(os.path.join(HERE,'..','build',PROG),[PROG])
-fcntl.ioctl(fd,termios.TIOCSWINSZ,struct.pack('HHHH',25,80,0,0))
+fcntl.ioctl(fd,termios.TIOCSWINSZ,struct.pack('HHHH',int(os.environ.get('CFGROWS','25')),int(os.environ.get('CFGCOLS','80')),0,0))
 def drain(t):
     buf=b''; end=time.time()+t
     while time.time()<end:
@@ -23,7 +23,7 @@ def drain(t):
 data=drain(1.2)
 for k in keys:
     os.write(fd,k); data+=drain(float(os.environ.get('CFGDELAY','0.5')))
-H,W=25,80
+H,W=int(os.environ.get('CFGROWS','25')),int(os.environ.get('CFGCOLS','80'))
 g=[[' ']*W for _ in range(H)]; cy=cx=0
 s=data.decode('utf-8','replace')
 i=0

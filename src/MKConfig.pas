@@ -9,7 +9,7 @@ Program MKConfig;
 
 Uses
   MKString, MKCfgAbs, MKCfgMK, MKCfgSB, MKCfgQB, MKCfgRA, MKGlobT,
-  Default, CfgMenu;
+  Default, CfgMenu, MKKbd;
 
 Var
   Choice: Word;
@@ -38,6 +38,7 @@ If Config^.GetError <> 0 Then
   SetFileDefaults(Config^);
   SetEchoDefaults(Config^);
   End;
+InstallKeyboard;                        {Esc and the Ctrl keys work}
 Choice := DoMenu;
 Case Choice Of
   1: Begin

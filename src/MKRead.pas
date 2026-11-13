@@ -17,7 +17,7 @@ Uses
   MKVCrt, MKString, MKFile, MKCfgAbs, MKRCfgRA, MKCfgSB, MKCfgQB, MKRCfgMK,
   MKCfgTxt, MKGlobT, MKMsgAbs, MKOpen, MKRCfgEz, MKMsgHud, MKMsgEzy, MKMsgJam,
   MKRCfgR2, MKReadCf, MKMisc, MKDos, HdrEnt, MKEnter, QuoteCvt, MkTagLn,
-  MKAvatar, MKRBan, MKReadO, CfgBox, CfgList;
+  MKAvatar, MKRBan, MKReadO, MKKbd, CfgBox, CfgList;
 
 Const
   TempName = 'MsgTmp.MK';
@@ -55,7 +55,10 @@ Procedure ScreenView.Draw;
   For Y := 0 To Size.Y - 1 Do
     Begin
     For X := 0 To Size.X - 1 Do
-      B[X] := VScreen^[(Y + FirstRow) * VCols + X];
+      If (X < VCols) And (Y + FirstRow < VRows) Then
+        B[X] := VScreen^[(Y + FirstRow) * VCols + X]
+      Else
+        B[X] := $0720;                 {a blank: the terminal is larger than the 80 x 25 reader screen}
     WriteLine(0, Y, Size.X, 1, B);
     End;
   End;
@@ -2752,6 +2755,7 @@ If Config^.GetError <> 0 Then
   End;
 Scr := Nil;
 AnsiV := Nil;
+InstallKeyboard;                       {Esc and the Ctrl keys work}
 EditorDialog := StdEditorDialog;     {the editor's own "save changes?" and error boxes}
 Reader.Init;
 Reader.Startup;

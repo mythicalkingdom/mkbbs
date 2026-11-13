@@ -41,7 +41,7 @@ size0 = os.path.getsize(os.path.join(dst, 'msgidx.bbs'))
 s = run('\\t', '\\r')                          # Tab = next area with new mail, Enter = open it
 ok1 = 'Msg:' in s and 'Date:' in s
 print('ok  ' if ok1 else 'FAIL', 'mkread: a Squish message is displayed')
-run('\\t', '\\r', 'r', '\\x1b[H', '\\r', '\\r', 'n', 'reply from the test\\r', '\\x1b[21~', 'y', 'y')
+run('\\t', '\\r', 'r', '\\x1b[H', '\\r', '\\r', 'n', 'reply from the test\\r', '\\x1b', 'y', 'y')
 size1 = os.path.getsize(os.path.join(dst, 'msgidx.bbs'))
 ok2 = size1 == size0 + 3
 print('ok  ' if ok2 else 'FAIL', 'mkread: a reply was written to the Hudson base (%d -> %d bytes)' % (size0, size1))

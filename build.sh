@@ -42,7 +42,7 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   strings build/cfgwork/ra/config.mk | grep -q 'ZZQ' && echo 'ok   mkconfig: General screen edit saved' || { echo 'FAIL mkconfig: General edit not saved'; exit 1; }
   # Events list -> event 1 -> Space changes the status choice -> OK, quit and save: the config file must change
   mkdir -p build/cfgwork2/ra; cp -a bbs/bbsc/ra/. build/cfgwork2/ra/
-  CFGDIR=$PWD/build/cfgwork2/ra python3 tests/cfgshot.py '\x1be' '\r' ' ' '\r' '\t' '\t' '\r' '\x1bx' 'y' > /dev/null 2>&1
+  CFGDIR=$PWD/build/cfgwork2/ra python3 tests/cfgshot.py '\x1be' '\r' ' ' '\r' '\x1b' '\x1bx' 'y' > /dev/null 2>&1
   N=$(cmp -l bbs/bbsc/ra/config.mk build/cfgwork2/ra/config.mk | wc -l)
   [ "$N" -ge 1 ] && [ "$N" -le 4 ] && echo 'ok   mkconfig: event status choice saved' || { echo "FAIL mkconfig: event edit ($N bytes differ)"; exit 1; }
 fi
