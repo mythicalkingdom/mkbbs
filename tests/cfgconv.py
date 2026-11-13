@@ -91,12 +91,14 @@ def convert(src, dst):
     calls = []
     cur_id = None
     pos = 0
-    for m in re.finditer(r'(\{id\w+:\})|(\b(Add\w+Field)\s*\()|(UserSet1\s*:=[^;]*;)|(esFieldOptionsOn\(([^)]*)\))', body):
+    padzero = False
+    for m in re.finditer(r'(\{id\w+:\})|(\b(Add\w+Field)\s*\()|(UserSet1\s*:=[^;]*;)|(esFieldOptionsOn\(([^)]*)\))|(SetPadChar\(\x27(.)\x27\))', body):
         if m.group(1): cur_id = m.group(1)[1:-2]; continue
+        if m.group(7): padzero = (m.group(8) == '0'); continue
         if m.group(3):
             end = balanced(body, m.end())
             args = split_args(body[m.end():end])
-            calls.append((m.group(3), args, cur_id))
+            calls.append((m.group(3), args, cur_id, padzero))
             cur_id = None
         elif m.group(4):
             notes.append('UserSet1: ' + m.group(4))
@@ -104,13 +106,13 @@ def convert(src, dst):
             notes.append('efForceUpper used')
     nf = [c for c in calls if c[0] != 'AddTextField']
     if len(idorder) == len(nf):
-        calls = [(k, a, (idorder[nf.index((k, a, f))] if k != 'AddTextField' else f)) for (k, a, f) in calls]
+        calls = [(k, a, (idorder[nf.index((k, a, f, z))] if k != 'AddTextField' else f), z) for (k, a, f, z) in calls]
     else:
         notes.append('id count %d != fields %d (comments used)' % (len(idorder), len(nf)))
     lines = []
     extra_uses = set()
     maxrow = 0
-    for kind, a, fid in calls:
+    for kind, a, fid, zpad in calls:
         def emit_at(pr, pc, fr, fc):
             return 'F.At(%s, %s, %s, %s);' % (pr, pc, fr, fc)
         if kind == 'AddTextField':
@@ -134,6 +136,7 @@ def convert(src, dst):
             prompt, pr, pc, mask, fr, fc, hi, mn, mx, var = a[:10]
             size = {'AddByteField': 1, 'AddNumericByteField': 1, 'AddWordField': 2, 'AddLongField': 4}[kind]
             lines.append(emit_at(pr, pc, fr, fc))
+            if zpad: lines.append('F.ZeroPad(%d);' % len(mask.strip("'")))
             if mask.strip("'").upper() and set(mask.strip("'").upper()) == {'K'}:
                 lines.append('F.AddHex(%s, %s, %d, %s);' % (prompt, var, size, hint_of(prompt)))
             else:

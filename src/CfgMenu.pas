@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp;
+  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent;
 
 Const
   cmGeneral = 1000;
@@ -304,7 +304,7 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmOffCfg: EditOffCfgP;
       cmFileAreas: DoCfgFArea;
       cmFileOptions: DoCfgXfer;
-      cmEvents: NotYet('Events');
+      cmEvents: DoCfgEvent;
       cmEchoSys: DoCfgPSys;
       cmEchoOpt: DoCfgEOpt;
       Else Exit;

@@ -68,6 +68,7 @@ Type
     Row, Col, FRow, FCol: Integer;     {0 = not placed}
     Vis: Byte;                         {Visible width, 0 = automatic}
     Filter: String[40];                {Allowed characters, '' = any}
+    Zero: Byte;                        {Number shown with leading zeros to this width}
     Proc: CfgProc;                     {F2}
     ProcData: Pointer;
     ProcTitle: String[40];
@@ -82,12 +83,14 @@ Type
     NRow, NCol, NFRow, NFCol: Integer; {Pending placement for the next field}
     NVis: Byte;
     NFilter: String[40];
+    NZero: Byte;
     F: Array[1..MaxCfgFields] Of CfgFieldRec;
     Constructor Init(ATitle: String);
     Procedure Window(X1, Y1, X2, Y2: Integer);
     Procedure At(Row, Col, FRow, FCol: Integer);
     Procedure Show(Width: Byte);
     Procedure Filter(Chars: String);
+    Procedure ZeroPad(Width: Byte);
     Procedure OnF2(Proc: CfgProc; Data: Pointer; ProcTitle: String);
     Procedure AddString(Lab: String; Var V; MaxLen: Byte; Hint: String);
     Procedure AddDir(Lab: String; Var V; MaxLen: Byte; Hint: String);
@@ -241,6 +244,8 @@ Function FieldText(Const R: CfgFieldRec): String;
         S := HexDigits(L, R.Size * 2)
       Else
         Str(L, S);
+      While Length(S) < R.Zero Do
+        S := '0' + S;
       FieldText := S;
       End;
     fkChar: FieldText := Char(R.P^);
@@ -448,6 +453,7 @@ Constructor CfgFormObj.Init(ATitle: String);
   NRow := 0;
   NVis := 0;
   NFilter := '';
+  NZero := 0;
   End;
 
 
@@ -470,6 +476,12 @@ Procedure CfgFormObj.At(Row, Col, FRow, FCol: Integer);
 Procedure CfgFormObj.Show(Width: Byte);
   Begin
   NVis := Width;
+  End;
+
+
+Procedure CfgFormObj.ZeroPad(Width: Byte);
+  Begin
+  NZero := Width;
   End;
 
 
@@ -508,6 +520,8 @@ Procedure CfgFormObj.Add(K: CfgFieldKind; ALab: String; Var V; ASize: Byte;
   F[Count].FCol := NFCol;
   F[Count].Vis := NVis;
   F[Count].Filter := NFilter;
+  F[Count].Zero := NZero;
+  NZero := 0;
   F[Count].Proc := Nil;
   F[Count].ProcData := Nil;
   F[Count].View := Nil;
@@ -643,6 +657,7 @@ Function CfgFormObj.Execute: Boolean;
     Res: Word;
     Widest: Integer;
     Absolute: Boolean;
+    LS: Integer;
     CF: TCharSet;
     j: Word;
 
@@ -654,6 +669,9 @@ Function CfgFormObj.Execute: Boolean;
   DeskW := R.B.X - R.A.X;
   DeskH := R.B.Y - R.A.Y;
   Absolute := (WinW > 0) And (F[1].Row > 0);
+  LS := 0;
+  If Absolute Then
+    LS := 1;
   LW := 0;
   FW := 46;
   ColW := 0;
@@ -674,7 +692,7 @@ Function CfgFormObj.Execute: Boolean;
       Else If F[i].Kind = fkAction Then
         j := F[i].Col + Length(F[i].Lab) + 6
       Else If F[i].FCol > 0 Then
-        j := F[i].FCol + VisWidth(F[i], FW) + 1
+        j := F[i].FCol + VisWidth(F[i], FW)
       Else
         j := 0;
       If j > W Then
@@ -700,14 +718,14 @@ Function CfgFormObj.Execute: Boolean;
     If FW > 48 Then
       FW := 48;
     ColW := LW + FW + 3;
-    If (Cols * ColW + 3 > DeskW) Then
+    If (Cols * ColW + 4 > DeskW) Then
       Begin
-      FW := (DeskW - 3) Div Cols - LW - 3;
+      FW := (DeskW - 4) Div Cols - LW - 3;
       If FW < 6 Then
         FW := 6;
       ColW := LW + FW + 3;
       End;
-    W := Cols * ColW + 3;
+    W := Cols * ColW + 4;
     H := Rows + 5;
     End;
   If W < 46 Then
@@ -726,7 +744,9 @@ Function CfgFormObj.Execute: Boolean;
       Begin
       X := F[i].Col;
       Y := F[i].Row;
-      FX := F[i].FCol;
+      FX := F[i].FCol - 1;           {the input line's left margin sits left of the old field}
+      If FX < 1 Then
+        FX := 1;
       FY := F[i].FRow;
       If FY = 0 Then
         FY := Y;
@@ -735,7 +755,7 @@ Function CfgFormObj.Execute: Boolean;
       Begin
       Col := (i - 1) Div Rows;
       Row := (i - 1) Mod Rows;
-      X := 2 + Col * ColW;
+      X := 3 + Col * ColW;
       Y := 1 + Row;
       FX := X + LW + 1;
       FY := Y;
@@ -764,8 +784,9 @@ Function CfgFormObj.Execute: Boolean;
           Chk^.Press(0);
         D^.Insert(Chk);
         F[i].View := Chk;
-        R.Assign(X, Y, X + Length(F[i].Lab) + 1, Y + 1);
-        D^.Insert(New(PLabel, Init(R, F[i].Lab, Chk)));
+        R.Assign(X, Y, X + Length(F[i].Lab), Y + 1);
+        If F[i].Lab <> '' Then
+          D^.Insert(New(PStaticText, Init(R, F[i].Lab)));
         End;
       Else
         Begin
@@ -798,8 +819,9 @@ Function CfgFormObj.Execute: Boolean;
         Inp^.Data^ := FieldText(F[i]);
         D^.Insert(Inp);
         F[i].View := Inp;
-        R.Assign(X, Y, X + Length(F[i].Lab) + 1, Y + 1);
-        D^.Insert(New(PLabel, Init(R, F[i].Lab, Inp)));
+        R.Assign(X, Y, X + Length(F[i].Lab), Y + 1);
+        If F[i].Lab <> '' Then
+          D^.Insert(New(PStaticText, Init(R, F[i].Lab)));
         End;
       End;
     End;
