@@ -2947,6 +2947,8 @@ Procedure MkrApp.HandleEvent(Var Event: TEvent);
       kbDel: Cmd := cmDelete;
       kbEnter: Cmd := cmNext;
       kbBack: Cmd := cmPrior;
+      kbLeft: Cmd := cmPrior;
+      kbRight: Cmd := cmNext;
       kbAltT: Cmd := cmEditTags;
       kbAltS: Cmd := cmSelectTag;
       kbAltR: Cmd := cmResortMsgs;
