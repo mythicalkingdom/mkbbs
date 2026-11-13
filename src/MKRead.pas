@@ -2610,6 +2610,7 @@ Procedure LoadCfg;
     CfgRec.MsgOrder := 2;                  {message number}
     CfgRec.Taglines := True;
     EditCfg;
+    If SaveFile(CfgName, CfgRec, SizeOf(CfgRec)) = 0 Then;   {kept even if MKRead ends badly}
     End;
   If CfgRec.Colors[7] = 0 Then
     CfgRec.Colors[7] := CfgRec.Colors[1];

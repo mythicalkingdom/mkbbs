@@ -54,6 +54,20 @@ Program MKListen;
 
      "stype" is accepted for "type" (the name the JavaScript BBS used).
 
+     Sysop monitor: a port of "type": "sysop" is not a caller.  Whoever connects
+     (Telnet, localhost only: use ssh port forwarding to reach it from outside)
+     gets mkmon, which asks for the "password" of the port, shows the nodes
+     with their user, activity, address and start time and lets the sysop watch
+     (snoop) a node.  "mkmon" names the program (default: next to mk).
+
+          { "port": 2330, "type": "sysop", "bind": "127.0.0.1",
+            "password": "secret", "config": "/bbs/mk" }
+
+     "password" is the text itself, or "sha1:" and the lower case hex digest of
+     it.  To let mkmon see the nodes, the listener keeps a directory "rundir"
+     (default /tmp/mklisten-<uid>, mode 0700) with node<N>.info (written here)
+     and node<N>.snoop (the Unix socket mk opens; environment MKRUN tells mk).
+
      TLS (telnets, wss): let stunnel terminate it and connect to a local port of
      this program, with "protocol = proxy" in the stunnel service and
      "bind": "127.0.0.1" / "proxy": true on the port, e.g.
@@ -80,6 +94,8 @@ Type
     Env: TStringList;
     Args: String;
     Proxy: Boolean;
+    Sysop: Boolean;
+    Password: String;
     Fd: LongInt;
     End;
 
@@ -88,6 +104,7 @@ Type
     Node: Integer;
     PortNo: Integer;
     Addr: String;
+    Started: LongInt;
     End;
 
 
@@ -99,6 +116,8 @@ Var
   Foreground: Boolean = True;
   TestOnly: Boolean = False;
   MkPath: String = 'mk';
+  MonPath: String = '';
+  RunDir: String = '';
   RunUser, RunGroup: String;
   LogPath, PidPath, WorkDir: String;
   BusyMsg: String = 'Sorry, all lines are busy. Please try again later.';
@@ -216,6 +235,8 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   P.Env := TStringList.Create;
   P.Args := '';
   P.Proxy := False;
+  P.Sysop := False;
+  P.Password := '';
   P.Fd := -1;
   For i := 0 To O.Count - 1 Do
     Begin
@@ -226,8 +247,13 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     Else If (Key = 'type') Or (Key = 'stype') Then
       Begin
       P.SType := LowerCase(JStr(V, Where + '.type'));
-      If (P.SType <> 'telnet') And (P.SType <> 'raw') And (P.SType <> 'ws') Then
-        Die(Where + '.type must be "telnet", "raw" or "ws" (TLS: put stunnel in front)');
+      If P.SType = 'sysop' Then
+        Begin
+        P.Sysop := True;
+        P.SType := 'telnet';
+        End
+      Else If (P.SType <> 'telnet') And (P.SType <> 'raw') And (P.SType <> 'ws') Then
+        Die(Where + '.type must be "telnet", "raw", "ws" or "sysop" (TLS: put stunnel in front)');
       End
     Else If Key = 'baud' Then
       P.Baud := JInt(V, Where + '.baud', 0, 1000000)
@@ -241,6 +267,8 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
       P.Env.Add('MK=' + JStr(V, Where + '.config'))
     Else If Key = 'proxy' Then
       P.Proxy := JBool(V, Where + '.proxy')
+    Else If Key = 'password' Then
+      P.Password := JStr(V, Where + '.password')
     Else If Key = 'env' Then
       Begin
       If V.JSONType <> jtObject Then
@@ -270,6 +298,16 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   If P.Proxy And (P.Bind <> '127.0.0.1') Then
     Die('port ' + IntToStr(P.Port) +
       ': "proxy": true needs "bind": "127.0.0.1" (anyone able to connect could fake an address)');
+  If P.Sysop Then
+    Begin
+    If P.Bind <> '127.0.0.1' Then
+      Die('port ' + IntToStr(P.Port) +
+        ': a sysop port must have "bind": "127.0.0.1" (reach it with ssh port forwarding)');
+    If P.Password = '' Then
+      Die('port ' + IntToStr(P.Port) + ': a sysop port needs a "password"');
+    If P.MaxPerIp = 0 Then
+      P.MaxPerIp := 2;
+    End;
   SetLength(Ports, Length(Ports) + 1);
   Ports[High(Ports)] := P;
   End;
@@ -310,6 +348,8 @@ Procedure LoadConfig;
     Key := LowerCase(O.Names[i]);
     V := O.Items[i];
     If Key = 'mk' Then MkPath := JStr(V, 'mk')
+    Else If Key = 'mkmon' Then MonPath := JStr(V, 'mkmon')
+    Else If Key = 'rundir' Then RunDir := JStr(V, 'rundir')
     Else If Key = 'user' Then RunUser := JStr(V, 'user')
     Else If Key = 'group' Then RunGroup := JStr(V, 'group')
     Else If Key = 'logfile' Then LogPath := JStr(V, 'logfile')
@@ -336,6 +376,8 @@ Procedure LoadConfig;
     LoadPort(TJSONObject(V.Items[i]), i);
     End;
   Root.Free;
+  If MonPath = '' Then
+    MonPath := ExtractFilePath(MkPath) + 'mkmon';
   End;
 
 
@@ -366,9 +408,12 @@ Procedure OpenListeners;
     If fpListen(S, 16) <> 0 Then
       Die('listen: error ' + IntToStr(fpGetErrno));
     Ports[i].Fd := S;
-    Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' ' +
-      Ports[i].SType + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
-      IntToStr(Ports[i].First) + '-' + IntToStr(Ports[i].Last));
+    If Ports[i].Sysop Then
+      Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' sysop monitor')
+    Else
+      Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' ' +
+        Ports[i].SType + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
+        IntToStr(Ports[i].First) + '-' + IntToStr(Ports[i].Last));
     End;
   End;
 
@@ -437,6 +482,54 @@ Procedure Daemonize;
   End;
 
 
+Procedure PrepareRunDir;
+  {Own directory for the node files; whatever a previous run left is stale}
+  Var
+    SR: TSearchRec;
+
+  Begin
+  If RunDir = '' Then
+    RunDir := '/tmp/mklisten-' + IntToStr(fpGetUid);
+  If (Length(RunDir) > 1) And (RunDir[Length(RunDir)] = '/') Then
+    SetLength(RunDir, Length(RunDir) - 1);
+  fpMkdir(RunDir, &700);
+  fpChmod(RunDir, &700);
+  If FindFirst(RunDir + '/node*', faAnyFile, SR) = 0 Then
+    Begin
+    Repeat
+      DeleteFile(RunDir + '/' + SR.Name);
+    Until FindNext(SR) <> 0;
+    FindClose(SR);
+    End;
+  Log('node files in ' + RunDir);
+  End;
+
+
+Procedure WriteNodeInfo(Const C: TChild);
+  Var
+    L: TStringList;
+
+  Begin
+  L := TStringList.Create;
+  Try
+    L.Add('node=' + IntToStr(C.Node));
+    L.Add('pid=' + IntToStr(C.Pid));
+    L.Add('port=' + IntToStr(Ports[C.PortNo].Port));
+    L.Add('type=' + Ports[C.PortNo].SType);
+    L.Add('baud=' + IntToStr(Ports[C.PortNo].Baud));
+    L.Add('addr=' + C.Addr);
+    L.Add('start=' + IntToStr(C.Started));
+    Try
+      L.SaveToFile(RunDir + '/node' + IntToStr(C.Node) + '.info');
+    Except
+      Log('cannot write the node file in ' + RunDir);
+    End;
+  Finally
+    L.Free;
+  End;
+  End;
+
+
 Function NodeInUse(N: Integer): Boolean;
   Var
     i: Integer;
@@ -495,8 +588,15 @@ Procedure ReapChildren;
           How := 'exit ' + IntToStr(wexitstatus(Status))
         Else
           How := 'signal ' + IntToStr(wtermsig(Status));
-        Log('node ' + IntToStr(Children[i].Node) + ' ended (' + How + ') ' +
-          Children[i].Addr);
+        If Children[i].Node > 0 Then
+          Begin
+          Log('node ' + IntToStr(Children[i].Node) + ' ended (' + How + ') ' +
+            Children[i].Addr);
+          DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.info');
+          DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.snoop');
+          End
+        Else
+          Log('sysop monitor ended (' + How + ') ' + Children[i].Addr);
         For j := i To High(Children) - 1 Do
           Children[j] := Children[j + 1];
         SetLength(Children, Length(Children) - 1);
@@ -535,6 +635,12 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     Children[High(Children)].Node := Node;
     Children[High(Children)].PortNo := PortNo;
     Children[High(Children)].Addr := Addr;
+    Children[High(Children)].Started := fpTime;
+    If Node > 0 Then
+      WriteNodeInfo(Children[High(Children)]);
+    If P.Sysop Then
+      Log('sysop monitor on port ' + IntToStr(P.Port) + ' from ' + Addr + ' pid ' + IntToStr(Pid))
+    Else
     Log('node ' + IntToStr(Node) + ' ' + P.SType + ':' + IntToStr(P.Port) + ' from ' +
       Addr + ' pid ' + IntToStr(Pid));
     Exit;
@@ -555,10 +661,15 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
   If WorkDir <> '' Then
     fpChdir(WorkDir);
   ArgS := TStringList.Create;
-  ArgS.Add(MkPath);
-  ArgS.Add('-N' + IntToStr(Node));
+  If P.Sysop Then
+    ArgS.Add(MonPath)
+  Else
+    Begin
+    ArgS.Add(MkPath);
+    ArgS.Add('-N' + IntToStr(Node));
+    End;
   ArgS.Add('-S' + UpperCase(P.SType));
-  If P.Baud > 0 Then
+  If (P.Baud > 0) And (Not P.Sysop) Then
     ArgS.Add('-B' + IntToStr(P.Baud));
   If P.Proxy Then
     ArgS.Add('-H');
@@ -592,13 +703,19 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     End;
   For j := 0 To P.Env.Count - 1 Do
     EnvS.Add(P.Env[j]);
+  EnvS.Add('MKRUN=' + RunDir);
+  If P.Sysop Then
+    EnvS.Add('MKMON_PASSWORD=' + P.Password);
   SetLength(Envv, EnvS.Count + 1);
   For i := 0 To EnvS.Count - 1 Do
     Envv[i] := PChar(EnvS[i]);
   Envv[EnvS.Count] := Nil;
-  fpExecve(MkPath, PPChar(@Argv[0]), PPChar(@Envv[0]));
+  If P.Sysop Then
+    fpExecve(MonPath, PPChar(@Argv[0]), PPChar(@Envv[0]))
+  Else
+    fpExecve(MkPath, PPChar(@Argv[0]), PPChar(@Envv[0]));
   Ch := fpGetErrno;
-  W := 'mklisten: cannot start ' + MkPath + ' (error ' + IntToStr(Ch) + ')' + #10;
+  W := 'mklisten: cannot start ' + Argv[0] + ' (error ' + IntToStr(Ch) + ')' + #10;
   fpWrite(2, W[1], Length(W));
   fpExit(127);
   End;
@@ -636,8 +753,11 @@ Procedure Accept(PortNo: Integer);
     Refuse(C, 'too many callers from this address', Addr);
     Exit;
     End;
-  Node := FreeNode(Ports[PortNo]);
-  If Node = 0 Then
+  If Ports[PortNo].Sysop Then
+    Node := 0
+  Else
+    Node := FreeNode(Ports[PortNo]);
+  If (Node = 0) And (Not Ports[PortNo].Sysop) Then
     Begin
     Refuse(C, 'no free node on port ' + IntToStr(Ports[PortNo].Port), Addr);
     Exit;
@@ -746,6 +866,7 @@ Begin
     If IOResult <> 0 Then ;
     End;
   DropPrivileges;
+  PrepareRunDir;
   MainLoop;
   If PidPath <> '' Then
     DeleteFile(PidPath);

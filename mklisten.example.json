@@ -31,6 +31,14 @@
       "proxy": true,
       "baud": 38400,
       "config": "/bbs/ra"
+    },
+    {
+      "_note": "sysop monitor: telnet to 127.0.0.1:2330 (from elsewhere use ssh -L 2330:127.0.0.1:2330), password in plain text or sha1:<hex digest>",
+      "port": 2330,
+      "type": "sysop",
+      "bind": "127.0.0.1",
+      "password": "change-me",
+      "config": "/bbs/ra"
     }
   ]
 }

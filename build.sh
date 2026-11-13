@@ -4,11 +4,12 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
-for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgList CfgPLan CfgPAddr CfgPPack CfgFArea CfgOff CfgFast CfgEPack CfgNet CfgESys CfgPSys CfgOrig CfgDoor CfgOffp CfgEvent CfgMsg CfgMArea CfgMenu CfgBox MKNSrch MKCfgTxt MKRBan QuoteCvt MkTagLn MKReadO MKReadCf HdrEnt MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess; do
+for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgList CfgPLan CfgPAddr CfgPPack CfgFArea CfgOff CfgFast CfgEPack CfgNet CfgESys CfgPSys CfgOrig CfgDoor CfgOffp CfgEvent CfgMsg CfgMArea CfgMenu CfgBox MKNSrch MKCfgTxt MKRBan QuoteCvt MkTagLn MKReadO MKReadCf HdrEnt MKVCrt MKScrn MKMusic MKAvatar MKRemote MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess MKSnoop; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
 done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omk src/MK.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkread src/MKRead.pas
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
@@ -26,6 +27,8 @@ build/syntest selftest build/work | grep -E 'FAIL|failures'
 build/teltest | grep -E "FAIL|failures"
 build/wstest | grep -E "FAIL|failures"
 build/listentest build/mklisten build/fakemk build/work 2>&1 | grep -E "^(FAIL|failures)"
+mkdir -p build/work/mon
+python3 tests/montest.py build/mklisten build/fakemk build/mkmon build/work/mon | grep -E "^(FAIL|failures)"
 # the real Synchronet sample base (from the JS project): every index CRC must match ours
 if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then
   cp javascript/message_bases/synchronet/fsx_bbs.s?? build/work/

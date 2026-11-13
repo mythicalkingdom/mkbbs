@@ -11,6 +11,7 @@ src = os.path.join(root, 'bbs', 'bbsc', 'ra')
 if not os.path.isdir(src):
     print('skip: no sample BBS'); sys.exit(0)
 dst = os.path.join(work, 'ra')
+shutil.rmtree(dst, ignore_errors=True)       # a clean copy every time
 os.makedirs(dst, exist_ok=True)
 subprocess.check_call(['cp', '-a', src + '/.', dst + '/'])
 # point the message base directory of the Hudson areas at the private copy and every other
@@ -44,6 +45,7 @@ def run(*keys):
     return r.stdout
 
 
+run('\r')                                     # first run: accept the default settings (writes MKRead.Cfg)
 size0 = os.path.getsize(os.path.join(dst, 'msgidx.bbs'))
 s = run()                                      # -A183 opens area 183 (a Hudson area) at once
 ok1 = 'Area: 183' in s and 'From: Patrick' in s

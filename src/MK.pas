@@ -7,7 +7,7 @@ Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
 MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB,
-MKLogOn, MKAvatar
+MKLogOn, MKAvatar, MKSnoop, Dos
   ;
 
 
@@ -23,6 +23,7 @@ Var
   SessAddr: String;
   SessRate: LongInt;
   SessProxy: Boolean;
+  RunDir: String;
 
 Begin
 StartUpPath := GetCurrentPath;
@@ -109,6 +110,12 @@ If ComSession = Nil Then
   WriteLn(StdErr, SessionError);
   Halt(1);
   End;
+{The sysop monitor (mkmon) may watch this node: mklisten says where the
+ sockets live (environment MKRUN).}
+RunDir := GetEnv('MKRUN');
+If (RunDir <> '') And (NodeNumber > 0) Then
+  ComSession := New(SnoopComPtr, Init(ComSession, True,
+    RunDir + '/node' + Long2Str(NodeNumber) + '.snoop'));
 CurrentPort := 1;
 If UserBaud = 0 Then
   UserBaud := 38400;                    {nominal speed of a network session}

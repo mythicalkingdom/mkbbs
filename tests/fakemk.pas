@@ -3,7 +3,7 @@ program fakemk;
 { Stands in for "mk" in the listener test.  Takes the same options (-N -S -B -A),
   builds the session the same way, says who it is, then echoes upper-cased input
   until the caller hangs up or sends Q. }
-uses Dos, MKComAbs, MKSess, MKString;
+uses Dos, MKComAbs, MKSess, MKString, MKSnoop;
 var
   i: Word; S, Typ, Addr, Cfg: String; Proxy: Boolean; Rate: LongInt; Node: LongInt; C: Char;
 begin
@@ -22,6 +22,8 @@ begin
   Cfg := GetEnv('MK');
   ComSession := CreateSession(Typ, Rate, Addr, Proxy);
   if ComSession = Nil then begin WriteLn(StdErr, SessionError); Halt(3); end;
+  if (GetEnv('MKRUN') <> '') and (Node > 0) then
+    ComSession := New(SnoopComPtr, Init(ComSession, True, GetEnv('MKRUN') + '/node' + Long2Str(Node) + '.snoop'));
   CommInit;
   ComSession^.SendStr('NODE ' + Long2Str(Node) + ' TYPE ' + Typ + ' BAUD ' + Long2Str(Rate) +
     ' ADDR ' + ComSession^.GetRemoteAddr + ' MK=' + Cfg + #13#10);
