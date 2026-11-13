@@ -77,15 +77,14 @@ begin
   if ParamCount < 3 then begin writeln('usage'); Halt(2); end;
   Work := ParamStr(3);
   Cfg := TStringList.Create;
-  Cfg.Add('mk ' + ParamStr(2));
-  Cfg.Add('logfile ' + Work + '/listen.log');
-  Cfg.Add('pidfile ' + Work + '/listen.pid');
-  Cfg.Add('port 24601'); Cfg.Add('type telnet'); Cfg.Add('baud 9600'); Cfg.Add('nodes 1-2');
-  Cfg.Add('config /cfg/x'); Cfg.Add('bind 127.0.0.1');
-  Cfg.Add('port 24602'); Cfg.Add('type raw'); Cfg.Add('nodes 3-4'); Cfg.Add('maxperip 1');
-  Cfg.Add('bind 127.0.0.1');
-  Cfg.Add('port 24603'); Cfg.Add('type ws'); Cfg.Add('nodes 5-6'); Cfg.Add('bind 127.0.0.1');
-  Cfg.Add('proxy yes'); Cfg.Add('baud 19200');
+  Cfg.Add('{ "mk": "' + ParamStr(2) + '", "logfile": "' + Work + '/listen.log",');
+  Cfg.Add('  "pidfile": "' + Work + '/listen.pid", "_note": "test",');
+  Cfg.Add('  "ports": [');
+  Cfg.Add('    { "port": 24601, "type": "telnet", "baud": 9600, "nodes": "1-2",');
+  Cfg.Add('      "config": "/cfg/x", "bind": "127.0.0.1" },');
+  Cfg.Add('    { "port": 24602, "stype": "raw", "nodes": [3, 4], "maxperip": 1, "bind": "127.0.0.1" },');
+  Cfg.Add('    { "port": 24603, "type": "ws", "nodes": 5, "bind": "127.0.0.1", "proxy": true, "baud": 19200 }');
+  Cfg.Add('  ] }');
   Cfg.SaveToFile(Work + '/listen.cfg');
 
   Listener := fpFork;

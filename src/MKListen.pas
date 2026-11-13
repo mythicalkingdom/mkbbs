@@ -2,13 +2,14 @@ Program MKListen;
 
 {$MODE OBJFPC}
 {$H+}
+{$WARN SYMBOL_DEPRECATED OFF}
 
-{
+(*
      mklisten - accepts callers on TCP ports and starts one "mk" per caller.
 
         mklisten [-f] [-d] [-t] [-c configfile]
 
-          -c file   configuration (default /etc/mkbbs/mklisten.cfg)
+          -c file   JSON configuration (default /etc/mkbbs/mklisten.json)
           -f        stay in the foreground and also log to the terminal (default)
           -d        become a daemon (fork, setsid, stdio to /dev/null)
           -t        check the configuration and exit
@@ -22,45 +23,50 @@ Program MKListen;
      BBS configuration directory is "config", i.e. env MK=...).  One process per
      caller: nothing is shared between callers except the files on disk.
 
-     Configuration file (blank lines and # ; comments ignored; keys before the
-     first "port" line are global, the ones after it belong to that port):
+     Configuration file: one JSON object (no comments; keys starting with "_"
+     are ignored, handy for notes).  Top level keys are global, "ports" is a list
+     of port objects that start from the global "nodes" and "maxperip":
 
-        mk        /usr/local/bin/mk       program to start (global)
-        user      mkbbs                   drop to this user after binding (global)
-        group     mkbbs                   ... and this group (global)
-        logfile   /var/log/mkbbs/listen.log
-        pidfile   /var/run/mklisten.pid
-        workdir   /bbs                    current directory of mk (global)
-        nodes     1-8                     node numbers handed out (global default)
-        maxperip  3                       simultaneous callers per address on a port (0 = any)
-        busy      All lines are busy.     sent to a caller when no node is free
+        {
+          "mk":       "/usr/local/bin/mk",     program to start
+          "user":     "mkbbs",                 drop to this user after binding
+          "group":    "mkbbs",                 ... and this group
+          "logfile":  "/var/log/mkbbs/listen.log",
+          "pidfile":  "/var/run/mklisten.pid",
+          "workdir":  "/bbs",                  current directory of mk
+          "nodes":    "1-8",                   node numbers handed out (N, "N-M" or [N, M])
+          "maxperip": 3,                       callers per address on a port (0 = any)
+          "busy":     "All lines are busy.",   sent when no node is free
+          "ports": [
+            { "port": 2323,                    required
+              "type": "telnet",                "telnet" | "raw" | "ws"
+              "baud": 2400,                    emulated speed, 0 = full speed
+              "bind": "0.0.0.0",               address to listen on (IPv4)
+              "nodes": "1-4",                  nodes for this port
+              "maxperip": 2,
+              "config": "/bbs/mk",             same as "env": {"MK": "/bbs/mk"}
+              "env":  { "NAME": "value" },     more environment
+              "args": ["-L", "-X"],            extra words for the command line
+              "proxy": true }                  PROXY header from stunnel comes
+                                               first; needs "bind": "127.0.0.1"
+          ]
+        }
 
-        port      2323                    start of a port block
-        type      telnet                  telnet | raw | ws   (TLS: stunnel in front)
-        baud      2400                    emulated speed, 0 = full speed
-        bind      0.0.0.0                 address to listen on (IPv4)
-        proxy     yes                     a PROXY protocol header (stunnel) comes
-                                          first and gives the caller's address;
-                                          needs "bind 127.0.0.1" on the same port
-        nodes     1-4                     nodes for this port
-        maxperip  2
-        config    /bbs/mk                 same as  env MK=/bbs/mk
-        env       NAME=VALUE              more environment (repeat)
-        args      -L -X                   extra words for the command line
+     "stype" is accepted for "type" (the name the JavaScript BBS used).
 
      TLS (telnets, wss): let stunnel terminate it and connect to a local port of
      this program, with "protocol = proxy" in the stunnel service and
-     "bind 127.0.0.1" / "proxy yes" on the port, e.g.
+     "bind": "127.0.0.1" / "proxy": true on the port, e.g.
 
         stunnel:   [mkbbs-wss]  accept = 443  connect = 127.0.0.1:2325
                                 cert = ...  key = ...  protocol = proxy
-        mklisten:  port 2325  /  type ws  /  bind 127.0.0.1  /  proxy yes
+        mklisten:  { "port": 2325, "type": "ws", "bind": "127.0.0.1", "proxy": true }
 
      SIGTERM / SIGINT stop the listener; callers already connected keep running.
-}
+*)
 
 Uses
-  BaseUnix, Sockets, Users, SysUtils, Classes;
+  BaseUnix, Sockets, Users, SysUtils, Classes, fpjson, jsonparser;
 
 
 Type
@@ -89,7 +95,7 @@ Function c_setgroups(N: PtrUInt; List: Pointer): cInt; cdecl; external 'c' name 
 
 
 Var
-  CfgFile: String = '/etc/mkbbs/mklisten.cfg';
+  CfgFile: String = '/etc/mkbbs/mklisten.json';
   Foreground: Boolean = True;
   TestOnly: Boolean = False;
   MkPath: String = 'mk';
@@ -125,136 +131,211 @@ Procedure Die(Msg: String);
   End;
 
 
-Procedure ParseNodes(S: String; Var F, L: Integer; Where: String);
+Procedure ParseNodes(D: TJSONData; Var F, L: Integer; Where: String);
+  {"nodes": 3   or   "nodes": "1-4"   or   "nodes": [1, 4]}
   Var
+    S: String;
     p: Integer;
 
   Begin
-  p := Pos('-', S);
-  If p = 0 Then
+  F := -1;
+  L := -1;
+  If D.JSONType = jtNumber Then
     Begin
-    F := StrToIntDef(S, -1);
+    F := D.AsInteger;
     L := F;
     End
-  Else
+  Else If D.JSONType = jtString Then
     Begin
-    F := StrToIntDef(Copy(S, 1, p - 1), -1);
-    L := StrToIntDef(Copy(S, p + 1, 20), -1);
+    S := D.AsString;
+    p := Pos('-', S);
+    If p = 0 Then
+      Begin
+      F := StrToIntDef(S, -1);
+      L := F;
+      End
+    Else
+      Begin
+      F := StrToIntDef(Copy(S, 1, p - 1), -1);
+      L := StrToIntDef(Copy(S, p + 1, 20), -1);
+      End;
+    End
+  Else If (D.JSONType = jtArray) And (D.Count = 2) Then
+    Begin
+    F := D.Items[0].AsInteger;
+    L := D.Items[1].AsInteger;
     End;
   If (F < 1) Or (L < F) Or (L > 255) Then
-    Die(Where + ': nodes must be N or N-M within 1..255');
+    Die(Where + ': "nodes" must be N, "N-M" or [N, M] within 1..255');
+  End;
+
+
+Function JStr(D: TJSONData; Where: String): String;
+  Begin
+  If D.JSONType <> jtString Then
+    Die(Where + ' must be a string');
+  JStr := D.AsString;
+  End;
+
+
+Function JInt(D: TJSONData; Where: String; Min, Max: LongInt): LongInt;
+  Begin
+  If D.JSONType <> jtNumber Then
+    Die(Where + ' must be a number');
+  JInt := D.AsInteger;
+  If (JInt < Min) Or (JInt > Max) Then
+    Die(Where + ' must be between ' + IntToStr(Min) + ' and ' + IntToStr(Max));
+  End;
+
+
+Function JBool(D: TJSONData; Where: String): Boolean;
+  Begin
+  If D.JSONType <> jtBoolean Then
+    Die(Where + ' must be true or false');
+  JBool := D.AsBoolean;
+  End;
+
+
+Procedure LoadPort(O: TJSONObject; Idx: Integer);
+  Var
+    P: TPort;
+    i, j: Integer;
+    Key, Where: String;
+    V: TJSONData;
+    E: TJSONObject;
+
+  Begin
+  Where := 'ports[' + IntToStr(Idx) + ']';
+  P.Port := 0;
+  P.SType := 'telnet';
+  P.Baud := 0;
+  P.Bind := '0.0.0.0';
+  P.First := GFirst;
+  P.Last := GLast;
+  P.MaxPerIp := GMaxPerIp;
+  P.Env := TStringList.Create;
+  P.Args := '';
+  P.Proxy := False;
+  P.Fd := -1;
+  For i := 0 To O.Count - 1 Do
+    Begin
+    Key := LowerCase(O.Names[i]);
+    V := O.Items[i];
+    If Key = 'port' Then
+      P.Port := JInt(V, Where + '.port', 1, 65535)
+    Else If (Key = 'type') Or (Key = 'stype') Then
+      Begin
+      P.SType := LowerCase(JStr(V, Where + '.type'));
+      If (P.SType <> 'telnet') And (P.SType <> 'raw') And (P.SType <> 'ws') Then
+        Die(Where + '.type must be "telnet", "raw" or "ws" (TLS: put stunnel in front)');
+      End
+    Else If Key = 'baud' Then
+      P.Baud := JInt(V, Where + '.baud', 0, 1000000)
+    Else If Key = 'bind' Then
+      P.Bind := JStr(V, Where + '.bind')
+    Else If Key = 'nodes' Then
+      ParseNodes(V, P.First, P.Last, Where)
+    Else If Key = 'maxperip' Then
+      P.MaxPerIp := JInt(V, Where + '.maxperip', 0, 1000)
+    Else If Key = 'config' Then
+      P.Env.Add('MK=' + JStr(V, Where + '.config'))
+    Else If Key = 'proxy' Then
+      P.Proxy := JBool(V, Where + '.proxy')
+    Else If Key = 'env' Then
+      Begin
+      If V.JSONType <> jtObject Then
+        Die(Where + '.env must be an object {"NAME": "value"}');
+      E := TJSONObject(V);
+      For j := 0 To E.Count - 1 Do
+        P.Env.Add(E.Names[j] + '=' + JStr(E.Items[j], Where + '.env.' + E.Names[j]));
+      End
+    Else If Key = 'args' Then
+      Begin
+      If V.JSONType = jtString Then
+        P.Args := V.AsString
+      Else If V.JSONType = jtArray Then
+        Begin
+        P.Args := '';
+        For j := 0 To V.Count - 1 Do
+          P.Args := P.Args + ' ' + JStr(V.Items[j], Where + '.args');
+        End
+      Else
+        Die(Where + '.args must be a string or an array of strings');
+      End
+    Else If Copy(Key, 1, 1) <> '_' Then
+      Die(Where + ': unknown key "' + O.Names[i] + '"');
+    End;
+  If P.Port = 0 Then
+    Die(Where + ' has no "port"');
+  If P.Proxy And (P.Bind <> '127.0.0.1') Then
+    Die('port ' + IntToStr(P.Port) +
+      ': "proxy": true needs "bind": "127.0.0.1" (anyone able to connect could fake an address)');
+  SetLength(Ports, Length(Ports) + 1);
+  Ports[High(Ports)] := P;
   End;
 
 
 Procedure LoadConfig;
   Var
-    T: TStringList;
-    i, p, Cur: Integer;
-    Line, Key, Val, Where: String;
+    Src: TFileStream;
+    Parser: TJSONParser;
+    Root: TJSONData;
+    O: TJSONObject;
+    i: Integer;
+    Key: String;
+    V: TJSONData;
 
   Begin
   If Not FileExists(CfgFile) Then
     Die('cannot read ' + CfgFile);
-  T := TStringList.Create;
-  T.LoadFromFile(CfgFile);
-  Cur := -1;
-  For i := 0 To T.Count - 1 Do
-    Begin
-    Line := T[i];
-    p := Pos('#', Line);
-    If p > 0 Then
-      Line := Copy(Line, 1, p - 1);
-    p := Pos(';', Line);
-    If p > 0 Then
-      Line := Copy(Line, 1, p - 1);
-    Line := Trim(Line);
-    If Line = '' Then
-      Continue;
-    Where := CfgFile + ' line ' + IntToStr(i + 1);
-    p := Pos(' ', Line);
-    If p = 0 Then
-      p := Pos(#9, Line);
-    If p = 0 Then
-      Begin
-      Key := LowerCase(Line);
-      Val := '';
-      End
-    Else
-      Begin
-      Key := LowerCase(Copy(Line, 1, p - 1));
-      Val := Trim(Copy(Line, p + 1, 1000));
-      End;
-    If Key = 'port' Then
-      Begin
-      If (StrToIntDef(Val, 0) < 1) Or (StrToIntDef(Val, 0) > 65535) Then
-        Die(Where + ': bad port number');
-      Cur := Length(Ports);
-      SetLength(Ports, Cur + 1);
-      Ports[Cur].Port := StrToInt(Val);
-      Ports[Cur].SType := 'telnet';
-      Ports[Cur].Baud := 0;
-      Ports[Cur].Bind := '0.0.0.0';
-      Ports[Cur].First := GFirst;
-      Ports[Cur].Last := GLast;
-      Ports[Cur].MaxPerIp := GMaxPerIp;
-      Ports[Cur].Env := TStringList.Create;
-      Ports[Cur].Args := '';
-      Ports[Cur].Proxy := False;
-      Ports[Cur].Fd := -1;
-      End
-    Else If Cur < 0 Then
-      Begin                              {global keys}
-      If Key = 'mk' Then MkPath := Val
-      Else If Key = 'user' Then RunUser := Val
-      Else If Key = 'group' Then RunGroup := Val
-      Else If Key = 'logfile' Then LogPath := Val
-      Else If Key = 'pidfile' Then PidPath := Val
-      Else If Key = 'workdir' Then WorkDir := Val
-      Else If Key = 'busy' Then BusyMsg := Val
-      Else If Key = 'nodes' Then ParseNodes(Val, GFirst, GLast, Where)
-      Else If Key = 'maxperip' Then GMaxPerIp := StrToIntDef(Val, 0)
-      Else Die(Where + ': unknown global key "' + Key + '"');
-      End
-    Else
-      Begin                              {port keys}
-      If Key = 'type' Then
-        Begin
-        Ports[Cur].SType := LowerCase(Val);
-        If (Ports[Cur].SType <> 'telnet') And (Ports[Cur].SType <> 'raw') And
-           (Ports[Cur].SType <> 'ws') Then
-          Die(Where + ': type must be telnet, raw or ws (TLS: put stunnel in front)');
-        End
-      Else If Key = 'baud' Then
-        Begin
-        Ports[Cur].Baud := StrToIntDef(Val, -1);
-        If Ports[Cur].Baud < 0 Then
-          Die(Where + ': bad baud');
-        End
-      Else If Key = 'bind' Then Ports[Cur].Bind := Val
-      Else If Key = 'nodes' Then ParseNodes(Val, Ports[Cur].First, Ports[Cur].Last, Where)
-      Else If Key = 'maxperip' Then Ports[Cur].MaxPerIp := StrToIntDef(Val, 0)
-      Else If Key = 'config' Then Ports[Cur].Env.Add('MK=' + Val)
-      Else If Key = 'env' Then
-        Begin
-        If Pos('=', Val) < 2 Then
-          Die(Where + ': env needs NAME=VALUE');
-        Ports[Cur].Env.Add(Val);
-        End
-      Else If Key = 'proxy' Then
-        Begin
-        Ports[Cur].Proxy := (LowerCase(Val) = 'yes') Or (LowerCase(Val) = 'on') Or (Val = '1');
-        End
-      Else If Key = 'args' Then Ports[Cur].Args := Val
-      Else Die(Where + ': unknown port key "' + Key + '"');
-      End;
+  Src := TFileStream.Create(CfgFile, fmOpenRead Or fmShareDenyNone);
+  Parser := TJSONParser.Create(Src, True);
+  Try
+    Try
+      Root := Parser.Parse;
+    Except
+      On E: Exception Do
+        Die(CfgFile + ': not valid JSON (' + E.Message + ')');
     End;
-  T.Free;
-  If Length(Ports) = 0 Then
-    Die(CfgFile + ': no port defined');
-  For i := 0 To High(Ports) Do
-    If Ports[i].Proxy And (Ports[i].Bind <> '127.0.0.1') Then
-      Die('port ' + IntToStr(Ports[i].Port) +
-        ': proxy yes needs bind 127.0.0.1 (anyone able to connect could fake an address)');
+  Finally
+    Parser.Free;
+    Src.Free;
+  End;
+  If (Root = Nil) Or (Root.JSONType <> jtObject) Then
+    Die(CfgFile + ': the top level must be a JSON object');
+  O := TJSONObject(Root);
+  { global settings first: ports take their defaults from them }
+  For i := 0 To O.Count - 1 Do
+    Begin
+    Key := LowerCase(O.Names[i]);
+    V := O.Items[i];
+    If Key = 'mk' Then MkPath := JStr(V, 'mk')
+    Else If Key = 'user' Then RunUser := JStr(V, 'user')
+    Else If Key = 'group' Then RunGroup := JStr(V, 'group')
+    Else If Key = 'logfile' Then LogPath := JStr(V, 'logfile')
+    Else If Key = 'pidfile' Then PidPath := JStr(V, 'pidfile')
+    Else If Key = 'workdir' Then WorkDir := JStr(V, 'workdir')
+    Else If Key = 'busy' Then BusyMsg := JStr(V, 'busy')
+    Else If Key = 'nodes' Then ParseNodes(V, GFirst, GLast, 'nodes')
+    Else If Key = 'maxperip' Then GMaxPerIp := JInt(V, 'maxperip', 0, 1000)
+    Else If Key = 'ports' Then
+      Begin
+      If V.JSONType <> jtArray Then
+        Die('"ports" must be an array');
+      End
+    Else If Copy(Key, 1, 1) <> '_' Then
+      Die(CfgFile + ': unknown key "' + O.Names[i] + '"');
+    End;
+  V := O.Find('ports');
+  If (V = Nil) Or (V.Count = 0) Then
+    Die(CfgFile + ': no ports defined ("ports": [ ... ])');
+  For i := 0 To V.Count - 1 Do
+    Begin
+    If V.Items[i].JSONType <> jtObject Then
+      Die('ports[' + IntToStr(i) + '] must be an object');
+    LoadPort(TJSONObject(V.Items[i]), i);
+    End;
+  Root.Free;
   End;
 
 
