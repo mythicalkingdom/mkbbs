@@ -257,7 +257,7 @@ Procedure EditCfg;
   F.AddString('Printer Name:', CfgRec.PrnName, 13, 'Printer device or file');
   F.At(9, 55, 9, 72);
   F.AddYesNo('Local Last Read:', CfgRec.LocalLast,
-    'Keep your last read numbers in MKRead.Lrd and leave the message bases alone');
+    'Keep your last read numbers in MKRead.Lrd (starting at zero) and leave the message bases alone');
   F.At(11, 27, 0, 0);
   F.AddText('---- Colors -----');
   F.At(12, 3, 12, 9);

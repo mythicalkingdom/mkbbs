@@ -2764,6 +2764,7 @@ Procedure MkrApp.InitStatusLine;
 
 Procedure MkrApp.DoCommand(Cmd: Word);
   Var
+    WasLocal: Boolean;
     i: Word;
     TmpStr: String;
 
@@ -2825,7 +2826,10 @@ Procedure MkrApp.DoCommand(Cmd: Word);
         End;
     cmConfig:
       Begin
+      WasLocal := CfgRec.LocalLast;
       EditCfg;
+      If CfgRec.LocalLast And (Not WasLocal) And (Not FileExist(LocalFile)) Then
+        FillChar(LRead, SizeOf(LRead), 0);   {switched to local last read: start at zero}
       DisplayCurrentMsg;
       End;
     cmJump:
@@ -3033,8 +3037,13 @@ Procedure MkrApp.Startup;
   GoToXy(11 - (Length(Dstr) Div 2), 20);
   Write(VOut, DStr);
   Refresh;
-  If Not (CfgRec.LocalLast And LoadLocalLast) Then
-    GetLRead;                              {from the message bases (or the first local run)}
+  If CfgRec.LocalLast Then
+    Begin
+    If Not LoadLocalLast Then
+      FillChar(LRead, SizeOf(LRead), 0);   {first local run: everything is new}
+    End
+  Else
+    GetLRead;                              {from the message bases}
   GetLastMsgs;
   LoadTwits;
   EnterNet := False;
