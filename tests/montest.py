@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sysop monitor: mklisten with a telnet port and a sysop port, fakemk as the BBS.
 usage: montest.py <mklisten> <fakemk> <mkmon> <workdir>"""
-import os, socket, subprocess, sys, time, json, hashlib
+import os, re, socket, subprocess, sys, time, json, hashlib
 
 mklisten, fakemk, mkmon, work = [os.path.abspath(a) for a in sys.argv[1:5]]
 os.makedirs(work, exist_ok=True)
@@ -29,10 +29,14 @@ def connect(port):
     raise SystemExit('cannot connect')
 
 
+BAR = re.compile(rb'\x1b7\x1b\[\d+;1H.*?\x1b8')
+
+
 def read_until(s, needle, secs=4):
+    # the status bar may be drawn in between: match without it, return the raw bytes
     buf = b''
     end = time.time() + secs
-    while time.time() < end and needle not in buf:
+    while time.time() < end and needle not in buf and needle not in BAR.sub(b'', buf):
         try:
             d = s.recv(4096)
             if not d:
@@ -86,7 +90,7 @@ try:
     time.sleep(2.0)
     caller.sendall(b'hello')
     b = read_until(s, b'HELLO', 4)
-    check('caller output is mirrored to the monitor', b'HELLO' in b)
+    check('caller output is mirrored to the monitor', b'HELLO' in BAR.sub(b'', b))
     time.sleep(1.2)
     b += read_until(s, b'zzzz', 1.5)
     check('scrolling region keeps the bottom row free', b'\x1b[1;24r' in b)
@@ -145,7 +149,7 @@ try:
     read_until(s, b'R refresh, Q quit', 5)
     s.sendall(b'1\r')
     b = read_until(s, b'AGAIN', 5)
-    check('late monitor sees the recent output', b'AGAIN' in b)
+    check('late monitor sees the recent output', b'AGAIN' in BAR.sub(b'', b))
     s.sendall(b'\x18'); time.sleep(0.3); s.close()
 
     # kick from the node list
