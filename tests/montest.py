@@ -109,6 +109,12 @@ try:
     s.sendall(b'ab')
     b = read_until(caller, b'AB', 3)
     check('typed text reaches the BBS as the caller\'s input', b'AB' in b and b'VIEW' not in b)
+    s.sendall(b'\x1b[24;1Rc')                # a terminal answer, then a letter
+    b = read_until(caller, b'C', 3)
+    check('terminal answers are not typed into the BBS', b'C' in b and b'24' not in b and b'\x1b' not in b)
+    s.sendall(b'\x1b')                       # a lone Esc is a key
+    b = read_until(caller, b'\x1b', 3)
+    check('a lone Esc reaches the BBS', b'\x1b' in b)
     s.sendall(b'\x01+')
     b = read_until(s, b'Added 5 min, 35 left', 3)
     check('Ctrl-A + adds time: ' + b[-40:].decode('latin-1'), b'Added 5 min, 35 left' in b)

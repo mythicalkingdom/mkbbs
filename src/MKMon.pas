@@ -635,6 +635,56 @@ Function Watch(Node: LongInt): String;
     TypedN: Word;
     Dummy: Byte;
     Steps: Word;
+    Dirty: Boolean;                      {the node sent something: the bar may be covered}
+    Pend: String[16];                    {an escape sequence from the sysop's terminal, maybe an answer}
+    PendAge: Word;
+    k: Word;
+
+  Procedure TypeByte(Ch: Char);
+    {What the sysop types, for the caller.  The terminal's answers to queries the
+     BBS sent (a cursor position report ESC [ row ; col R) are not typed text.}
+    Procedure Add(Ch2: Char);
+      Begin
+      If TypedN < 255 Then
+        Begin
+        Typed[TypedN] := Ch2;
+        Inc(TypedN);
+        End;
+      End;
+    Procedure Flush;
+      Var
+        k: Word;
+      Begin
+      For k := 1 To Length(Pend) Do
+        Add(Pend[k]);
+      Pend := '';
+      End;
+
+    Begin
+    PendAge := 0;
+    If Pend = '' Then
+      Begin
+      If Ch = #27 Then
+        Pend := #27
+      Else
+        Add(Ch);
+      End
+    Else
+      Begin
+      Pend := Pend + Ch;
+      If (Length(Pend) = 2) And (Ch <> '[') Then
+        Flush
+      Else If (Length(Pend) > 2) And (Ch In ['0'..'9', ';']) Then
+        Begin
+        If Length(Pend) >= 14 Then
+          Flush;
+        End
+      Else If (Length(Pend) > 2) And (Ch = 'R') And (Pos(';', Pend) > 0) Then
+        Pend := ''                       {the answer: drop it}
+      Else If Length(Pend) > 2 Then
+        Flush;
+      End;
+    End;
 
   Begin
   Watch := '';
@@ -659,6 +709,9 @@ Function Watch(Node: LongInt): String;
   Typing := False;
   Prefix := False;
   AskKick := False;
+  Dirty := False;
+  Pend := '';
+  PendAge := 0;
   FSt := 0;
   Repeat
     P.fd := S;
@@ -674,7 +727,10 @@ Function Watch(Node: LongInt): String;
         Begin
         FilterBytes(Buf, N);
         If FOutN > 0 Then
+          Begin
           ComSession^.SendBlock(FOut, FOutN);
+          Dirty := True;
+          End;
         CommFlushOut;
         If FGot Then
           Status(FDone);
@@ -723,10 +779,21 @@ Function Watch(Node: LongInt): String;
         Prefix := True
       Else If C = #24 Then
         Gone := True
-      Else If Typing And (TypedN < 255) Then
+      Else If Typing Then
+        TypeByte(C);
+      End;
+    If Pend <> '' Then
+      Begin
+      Inc(PendAge);                      {a lone Esc is a key: let it go after a moment}
+      If PendAge >= 2 Then
         Begin
-        Typed[TypedN] := C;
-        Inc(TypedN);
+        For k := 1 To Length(Pend) Do
+          If TypedN < 255 Then
+            Begin
+            Typed[TypedN] := Pend[k];
+            Inc(TypedN);
+            End;
+        Pend := '';
         End;
       End;
     If TypedN > 0 Then
@@ -750,8 +817,9 @@ Function Watch(Node: LongInt): String;
       Steps := 0;
       BarRefresh;
       End;
-    If (Steps = 0) Or (BarTicks > 0) Then
+    If (Steps = 0) Or (Steps = 10) Or (BarTicks > 0) Or Dirty Then
       Begin
+      Dirty := False;
       DrawBar;
       CommFlushOut;
       End;
