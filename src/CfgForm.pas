@@ -73,6 +73,8 @@ Type
     Proc: CfgProc;                     {F2}
     ProcData: Pointer;
     ProcTitle: String[40];
+    LeaveProc: CfgProc;                {Called when the cursor leaves the field}
+    LeaveData: Pointer;
     Names: String[100];                {fkChoice: the choices, separated by |}
     View: PView;                       {Filled in by Execute}
     End;
@@ -95,6 +97,7 @@ Type
     Procedure ZeroPad(Width: Byte);
     Procedure ReadOnly;
     Procedure OnF2(Proc: CfgProc; Data: Pointer; ProcTitle: String);
+    Procedure OnLeave(Proc: CfgProc; Data: Pointer);
     Procedure AddString(Lab: String; Var V; MaxLen: Byte; Hint: String);
     Procedure AddDir(Lab: String; Var V; MaxLen: Byte; Hint: String);
     Procedure AddFile(Lab: String; Var V; MaxLen: Byte; Hint: String);
@@ -369,6 +372,17 @@ Procedure CfgDialog.HandleEvent(Var Event: TEvent);
     ClearEvent(Event);
     Exit;
     End;
+  If (Event.What = evBroadcast) And (Event.Command = cmReleasedFocus) Then
+    Begin
+    For i := 1 To Form^.Count Do
+      If (Form^.F[i].View = PView(Event.InfoPtr)) And (@Form^.F[i].LeaveProc <> Nil) Then
+        Begin
+        Commit;
+        Form^.F[i].LeaveProc(Form^.F[i].LeaveData, '');
+        Reload;
+        Exit;
+        End;
+    End;
   If (Event.What = evBroadcast) And (Event.Command = cmReceivedFocus) Then
     Begin
     For i := 1 To Form^.Count Do
@@ -512,6 +526,15 @@ Procedure CfgFormObj.Filter(Chars: String);
   End;
 
 
+Procedure CfgFormObj.OnLeave(Proc: CfgProc; Data: Pointer);
+  Begin
+  If Count = 0 Then
+    Exit;
+  F[Count].LeaveProc := Proc;
+  F[Count].LeaveData := Data;
+  End;
+
+
 Procedure CfgFormObj.OnF2(Proc: CfgProc; Data: Pointer; ProcTitle: String);
   Begin
   If Count = 0 Then
@@ -547,6 +570,8 @@ Procedure CfgFormObj.Add(K: CfgFieldKind; ALab: String; Var V; ASize: Byte;
   NReadOnly := False;
   F[Count].Proc := Nil;
   F[Count].ProcData := Nil;
+  F[Count].LeaveProc := Nil;
+  F[Count].LeaveData := Nil;
   F[Count].View := Nil;
   NRow := 0;
   NVis := 0;
@@ -701,10 +726,18 @@ Function CfgFormObj.Execute: Boolean;
   If Absolute Then
     Begin
     W := WinW;
-    H := WinH + 3;
-    For i := 1 To Count Do        {buttons are two lines high: keep the hint line free}
+    j := 1;                        {rows used by the fields (buttons are two lines high)}
+    For i := 1 To Count Do
+      Begin
+      Row := F[i].Row;
+      If F[i].FRow > Row Then
+        Row := F[i].FRow;
       If F[i].Kind = fkAction Then
-        H := WinH + 4;
+        Inc(Row);
+      If Row > j Then
+        j := Row;
+      End;
+    H := j + 4;
     Rows := H - 5;
     Cols := 1;
     FW := 46;

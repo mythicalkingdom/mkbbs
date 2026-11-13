@@ -17,15 +17,23 @@ Interface
 Type
   CfgItemStr = Function(Item: Word): String;
   CfgItemEdit = Procedure(Item: Word);
+  CfgNavFn = Function(Cur: Word; Forward: Boolean): Word;
   CfgMarks = Array[1..32] Of Boolean;
 
 Procedure RunList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
   Edit: CfgItemEdit);
 
+Procedure ShowText(Title: String; Text: String);
+  {A dialog with a few lines of text (separated by #13) and an OK button}
+
 Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
   Var Chosen: Word): Boolean;
   {One item of 1..Count; Chosen is the item the bar starts on and gets the
    choice.  True when one was chosen (Enter, Space, double click or OK).}
+
+Function RunPickNav(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Chosen: Word; Nav: CfgNavFn): Boolean;
+  {Like RunPick; Tab and Shift-Tab call Nav(current item, forward) and move the bar there}
 
 Function RunChecks(Title: String; Names: String; Var Marked: CfgMarks): Boolean;
   {Names: the choices separated by '|'.  True when OK was chosen.}
@@ -46,7 +54,9 @@ Type
   PItemList = ^ItemList;
   ItemList = Object(TListViewer)
     Get: CfgItemStr;
+    Nav: CfgNavFn;
     Constructor Init(Var R: TRect; ACount: Word; AScroll: PScrollBar; AGet: CfgItemStr);
+    Procedure HandleEvent(Var Event: TEvent); Virtual;
     Function  GetText(Item: LongInt; MaxLen: LongInt): String; Virtual;
     Procedure SelectItem(Item: LongInt); Virtual;
     End;
@@ -57,7 +67,26 @@ Constructor ItemList.Init(Var R: TRect; ACount: Word; AScroll: PScrollBar;
   Begin
   Inherited Init(R, 1, Nil, AScroll);
   Get := AGet;
+  Nav := Nil;
   SetRange(ACount);
+  End;
+
+
+Procedure ItemList.HandleEvent(Var Event: TEvent);
+  Var
+    N: Word;
+
+  Begin
+  If (Event.What = evKeyDown) And (@Nav <> Nil) And
+     ((Event.KeyCode = kbTab) Or (Event.KeyCode = kbShiftTab)) Then
+    Begin
+    N := Nav(Focused + 1, Event.KeyCode = kbTab);
+    If (N >= 1) And (N <= Range) Then
+      FocusItem(N - 1);
+    ClearEvent(Event);
+    Exit;
+    End;
+  Inherited HandleEvent(Event);
   End;
 
 
@@ -149,8 +178,8 @@ Function RunMarkList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr
   End;
 
 
-Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
-  Var Chosen: Word): Boolean;
+Function RunPickNav(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Chosen: Word; Nav: CfgNavFn): Boolean;
   Var
     D: PDialog;
     L: PItemList;
@@ -160,7 +189,7 @@ Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
     DR: TRect;
 
   Begin
-  RunPick := False;
+  RunPickNav := False;
   If Count = 0 Then
     Exit;
   DeskTop^.GetExtent(DR);
@@ -181,6 +210,7 @@ Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
   D^.Insert(SB);
   R.Assign(2, 1, W - 3, 1 + Rows);
   L := New(PItemList, Init(R, Count, SB, GetStr));
+  L^.Nav := Nav;
   If (Chosen >= 1) And (Chosen <= Count) Then
     L^.FocusItem(Chosen - 1);
   D^.Insert(L);
@@ -192,10 +222,46 @@ Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
   If Application^.ExecView(D) = cmOK Then
     Begin
     Chosen := L^.Focused + 1;
-    RunPick := True;
+    RunPickNav := True;
     End;
   Dispose(D, Done);
   End;
+
+
+Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
+  Var Chosen: Word): Boolean;
+  Begin
+  RunPick := RunPickNav(Title, Count, Width, GetStr, Chosen, Nil);
+  End;
+
+
+
+Procedure ShowText(Title: String; Text: String);
+  {Text: lines separated by #13}
+  Var
+    D: PDialog;
+    R: TRect;
+    N, i: Integer;
+    W: Integer;
+
+  Begin
+  N := 1;
+  For i := 1 To Length(Text) Do
+    If Text[i] = #13 Then
+      Inc(N);
+  W := 78;
+  R.Assign(0, 0, W, N + 5);
+  New(D, Init(R, Title));
+  D^.Options := D^.Options Or ofCentered;
+  R.Assign(2, 1, W - 2, N + 1);
+  D^.Insert(New(PStaticText, Init(R, Text)));
+  R.Assign(W Div 2 - 5, N + 2, W Div 2 + 5, N + 4);
+  D^.Insert(New(PButton, Init(R, 'O~K~', cmOK, bfDefault)));
+  D^.SelectNext(False);
+  Application^.ExecView(D);
+  Dispose(D, Done);
+  End;
+
 
 
 Procedure RunList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
