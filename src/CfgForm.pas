@@ -873,6 +873,8 @@ Function CfgFormObj.Execute: Boolean;
           Inp^.SetValidator(New(PFilterValidator, Init(CF)));
           End;
         Inp^.Data^ := FieldText(F[i]);
+        If F[i].ReadOnly And (@F[i].Proc = Nil) Then
+          Inp^.Options := Inp^.Options And Not ofSelectable;   {shown only: Tab skips it}
         D^.Insert(Inp);
         F[i].View := Inp;
         R.Assign(X, Y, X + Length(F[i].Lab), Y + 1);

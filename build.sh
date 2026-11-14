@@ -13,6 +13,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkread src/MKRead.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmenu src/MKMenu.pas
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -56,6 +57,12 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/readwork
   python3 tests/readtest.py build/readwork | grep -E "^(ok|FAIL)" | tee build/readwork/result.txt
   if grep -q FAIL build/readwork/result.txt; then exit 1; fi
+fi
+# MKMenu: edit, pick a command, insert, delete, save a private copy of a sample menu
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  mkdir -p build/menuwork
+  python3 tests/menutest.py build/menuwork | grep -E "^(ok|FAIL)" | tee build/menuwork/result.txt
+  if grep -q FAIL build/menuwork/result.txt; then exit 1; fi
 fi
 # the real mk with the sysop monitor: log in, chat from the monitor, time, kick (private copy of the sample BBS)
 if [ -f bbs/bbsc/ra/config.mk ]; then
