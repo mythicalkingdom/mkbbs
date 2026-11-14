@@ -15,6 +15,9 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkread src/MKRead.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmenu src/MKMenu.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkusered src/MKUserEd.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omklist src/MKList.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -65,6 +68,10 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/menutest.py build/menuwork | grep -E "^(ok|FAIL)" | tee build/menuwork/result.txt
   if grep -q FAIL build/menuwork/result.txt; then exit 1; fi
 fi
+# language compiler: the sample LC files must compile back to the same bytes; area list and nodelist tools
+mkdir -p build/work/lc build/work/tools
+python3 tests/lctest.py build/mklc build/work/lc | grep -E "^(FAIL|failures)"
+python3 tests/toolstest.py build build/work/tools | grep -E "^(FAIL|failures)"
 # MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files
 if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/userwork
