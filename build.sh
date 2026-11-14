@@ -18,7 +18,20 @@ if [ -f "$BASIC_SRC/Basic.pas" ]; then
 else
   echo "BASIC interpreter not found in $BASIC_SRC (set MKBASIC): menu command 169 will be a stub"
 fi
-fpc -B -Fusrc -FEbuild -FUbuild -vew $BASICFLAGS -omk src/MK.pas
+# menu command 170 runs Pascal programs with the mkpascal interpreter (also a separate project): ../mkpascal-fpc/src or MKPASCAL
+PASCAL_SRC="${MKPASCAL:-../mkpascal-fpc/src}"
+PASCALFLAGS=""
+if [ -f "$PASCAL_SRC/mkpascal.pas" ]; then
+  # its units get their language mode from its own compiler flags (not from directives in the files), so they are
+  # compiled on their own, with those flags, into build/pascal; mk then only sees the compiled units
+  mkdir -p build/pascal
+  fpc -Mobjfpc -Sh -O2 -vewn -Fu"$PASCAL_SRC" -FUbuild/pascal -FEbuild/pascal "$PASCAL_SRC/mkpascal.pas" > /dev/null
+  PASCALFLAGS="-dMKPASCAL -Fubuild/pascal"
+  echo "Pascal interpreter: $PASCAL_SRC"
+else
+  echo "Pascal interpreter not found in $PASCAL_SRC (set MKPASCAL): menu command 170 will be a stub"
+fi
+fpc -B -Fusrc -FEbuild -FUbuild -vew $BASICFLAGS $PASCALFLAGS -omk src/MK.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
@@ -96,6 +109,15 @@ if [ -n "$BASICFLAGS" ]; then
   MK=$PWD/build/work/basic build/basictest build/work/basic original/PROMPTS.LC | grep -E "^(FAIL|failures)"
   if [ -f bbs/bbsc/ra/config.mk ]; then
     python3 tests/basicmenutest.py build/work/basicmenu | grep -E "^(FAIL|failures)"
+  fi
+fi
+# menu command 170 (Pascal programs): unit test on a scripted session, then the real mk over telnet
+if [ -n "$PASCALFLAGS" ]; then
+  mkdir -p build/work/pascal
+  fpc -B -Fusrc -FEbuild -FUbuild -vew $PASCALFLAGS tests/pascaltest.pas
+  MK=$PWD/build/work/pascal build/pascaltest build/work/pascal original/PROMPTS.LC | grep -E "^(FAIL|failures)"
+  if [ -f bbs/bbsc/ra/config.mk ]; then
+    python3 tests/pascalmenutest.py build/work/pascalmenu | grep -E "^(FAIL|failures)"
   fi
 fi
 # MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files

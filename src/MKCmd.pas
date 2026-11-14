@@ -26,7 +26,7 @@ Implementation
 Uses MKFile, MKString, MKCodes, MKDoor, MKMenus, MKCfgAbs, MKComAbs,
   MKCFile, MKMRead, MKEnter, MKName, MKMisc, MKDos, MKShell, MKPage,
   MKQuest, MKMsgSel, MKProt, MKLogEnt, MKMiscB, MKCD, MKRCfgMK, MKLogOn,
-  MKOfflin, MKBasicRun,
+  MKOfflin, MKBasicRun, MKPascalRun,
     MKVCrt,
   Dos;
 
@@ -766,6 +766,7 @@ Procedure ProcessCmd(Item: Word);
     167: AskOffAllYour;                     {Ask search all areas for yours}
     168: AskOffZero;                        {Ask send zero msg packets}
     169: RunBasicProgram(Menu.GetData(Item)); {Run a BASIC program (mkbasic)}
+    170: RunPascalProgram(Menu.GetData(Item)); {Run a Pascal program (mkpascal)}
     End;
   End;
 

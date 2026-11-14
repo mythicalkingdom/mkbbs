@@ -1,4 +1,4 @@
-; Based on the original MKMENU.TXT; adds command 169, Run BASIC program (169, 425) and lists it in group 557.
+; Based on the original MKMENU.TXT; adds commands 169 Run BASIC program (169, 425) and 170 Run Pascal program (170, 426) and lists them in group 557.
 ; Compile with mklc: build/mklc lang/MKMENU.TXT writes lang/MKMENU.LC for the BBS directory.
 ;
 ;                             MKMenu Menu Definition
@@ -169,7 +169,7 @@
 554 Message Commands
 555 22 23 24 25 26 27 28 44 49
 556 External & Misc
-557 7 9 11 12 15 47 149 169
+557 7 9 11 12 15 47 149 169 170
 558 User Options
 559 16 17 18 19 20 21 41 57 58 61 65
 560 Display Commands
@@ -182,3 +182,5 @@
 567 159 160 161 162 163 164 165 166 167 168
 169 Run BASIC program
 425 Path of the BASIC program (.BAS), looked for in the BBS directory if not complete
+170 Run Pascal program
+426 Path of the Pascal program (.PAS) and its parameters, looked for in the BBS directory if not complete

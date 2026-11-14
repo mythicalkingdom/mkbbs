@@ -266,7 +266,7 @@ Function CmdStr(Item: Word): String;
 Function PickCommand(Var Typ: Byte): Boolean;
   {Two lists as before: the group of commands, then the command}
   Var
-    G, C, i, k: Word;
+    G, C, i, k, G0: Word;
     SubStr: String;
     Num: Word;
     Done: Boolean;
@@ -294,11 +294,17 @@ Function PickCommand(Var Typ: Byte): Boolean;
         End;
       End;
     End;
+  G0 := G;
   Done := False;
   While Not Done Do
     Begin
     If Not RunPick('Command Groups', NumGroups, 34, GroupStr, G) Then
       Exit;
+    If G <> G0 Then
+      Begin
+      C := 1;                          {another group: the list starts at the top}
+      G0 := G;
+      End;
     GroupNo := G;
     SubStr := Prompts.GetString(551 + (G - 1) * 2);
     k := WordCount(SubStr);

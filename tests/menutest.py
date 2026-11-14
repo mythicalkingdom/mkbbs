@@ -122,6 +122,14 @@ d = open(p, 'rb').read()
 check('saved: item 1 has type 169 (was %d), the rest is as it was' % rec(orig, 1)[0],
       rec(d, 1)[0] == 169 and rec(d, 1)[1:] == rec(orig, 1)[1:] and d[2 * REC:] == orig[2 * REC:])
 
+# the Pascal command (170) is the 9th of the same group
+p = fresh()
+run(p, '\r', '\t', '\x1bOQ', '\x1b[A', '\x1b[A', '\x1b[A', '\r', *(['\x1b[B'] * 8), '\r', '\r', '\x1bs', '\r', '\x1bx')
+d = open(p, 'rb').read()
+check('Pascal command: item 1 saved with type 170', rec(d, 1)[0] == 170 and rec(d, 1)[1:] == rec(orig, 1)[1:])
+s = run(fresh(), '\r', '\t', '\x1bOQ', '\x1b[A', '\x1b[A', '\x1b[A', '\r', *(['\x1b[B'] * 8), '\r')
+check('... with its descriptions in the form', 'Run Pascal program' in s and 'Path of the Pascal program' in s)
+
 # save under a new name
 p = fresh()
 newp = os.path.join(work, 'copy.mnu')
