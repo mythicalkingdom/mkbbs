@@ -26,7 +26,7 @@ Implementation
 Uses MKFile, MKString, MKCodes, MKDoor, MKMenus, MKCfgAbs, MKComAbs,
   MKCFile, MKMRead, MKEnter, MKName, MKMisc, MKDos, MKShell, MKPage,
   MKQuest, MKMsgSel, MKProt, MKLogEnt, MKMiscB, MKCD, MKRCfgMK, MKLogOn,
-  MKOfflin,
+  MKOfflin, MKBasicRun,
     MKVCrt,
   Dos;
 
@@ -765,6 +765,7 @@ Procedure ProcessCmd(Item: Word);
     166: AskOffOwn;                         {Ask rcv own messages}
     167: AskOffAllYour;                     {Ask search all areas for yours}
     168: AskOffZero;                        {Ask send zero msg packets}
+    169: RunBasicProgram(Menu.GetData(Item)); {Run a BASIC program (mkbasic)}
     End;
   End;
 

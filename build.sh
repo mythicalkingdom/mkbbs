@@ -8,7 +8,17 @@ mkdir -p build
 for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgList CfgPLan CfgPAddr CfgPPack CfgFArea CfgOff CfgFast CfgEPack CfgNet CfgESys CfgPSys CfgOrig CfgDoor CfgOffp CfgEvent CfgMsg CfgMArea CfgMenu CfgBox MKNSrch MKCfgTxt MKRBan QuoteCvt MkTagLn MKReadO MKReadCf HdrEnt MKVCrt MKScrn MKMusic MKAvatar MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess MKSnoop; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
 done
-fpc -B -Fusrc -FEbuild -FUbuild -vew -omk src/MK.pas
+# menu command 169 runs BASIC programs with the mkbasic interpreter (a separate project): found next to this
+# one or named by MKBASIC; without it the command only says that BASIC is not available
+BASIC_SRC="${MKBASIC:-../mkbasic-fpc/src}"
+BASICFLAGS=""
+if [ -f "$BASIC_SRC/Basic.pas" ]; then
+  BASICFLAGS="-dMKBASIC -Fu$BASIC_SRC"
+  echo "BASIC interpreter: $BASIC_SRC"
+else
+  echo "BASIC interpreter not found in $BASIC_SRC (set MKBASIC): menu command 169 will be a stub"
+fi
+fpc -B -Fusrc -FEbuild -FUbuild -vew $BASICFLAGS -omk src/MK.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
@@ -78,6 +88,15 @@ python3 tests/nodetest.py build build/work/nodetest | grep -E "^(FAIL|failures)"
 # configuration converter: Remote Access -> MK / QuickBBS / SuperBBS on a copy of the sample BBS
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/cvttest.py build build/work/cvt | grep -E "^(FAIL|failures)"
+fi
+# menu command 169 (BASIC programs): unit test on a scripted session, then the real mk over telnet
+if [ -n "$BASICFLAGS" ]; then
+  mkdir -p build/work/basic
+  fpc -B -Fusrc -FEbuild -FUbuild -vew $BASICFLAGS tests/basictest.pas
+  MK=$PWD/build/work/basic build/basictest build/work/basic original/PROMPTS.LC | grep -E "^(FAIL|failures)"
+  if [ -f bbs/bbsc/ra/config.mk ]; then
+    python3 tests/basicmenutest.py build/work/basicmenu | grep -E "^(FAIL|failures)"
+  fi
 fi
 # MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files
 if [ -f bbs/bbsc/ra/config.mk ]; then

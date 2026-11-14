@@ -115,6 +115,7 @@ Function  shReset(Var F: File; RecSize: Word): Boolean;
 Function  shRead(Var F: File; Var Rec; ReadSize: Word; Var NumRead: Word): Boolean;
 Function  shWrite(Var F: File; Var Rec; ReadSize: Word): Boolean;
 Function  ResolveCase(FName: String): String;
+Function  ResolvePathCase(FName: String): String; {Every part of the path, not only the file name}
   {The DOS files were named in either case; Unix cares.  Returns FName if it
    exists, else the same path with the file name in lower case, else in upper
    case, if one of those exists, else FName unchanged.}
@@ -493,6 +494,62 @@ Function ResolveCase(FName: String): String;
     End;
   FindClose(SR);
   If IoResult <> 0 Then;
+  End;
+
+
+Function ResolvePathCase(FName: String): String;
+  {ResolveCase for every part of the path: GAMES/Loop.Bas finds games/loop.bas.  Parts that do
+   not exist are left as they are.}
+  Var
+    Cur, Rest, Part, Found: String;
+    p: Word;
+    SR: SearchRec;
+
+  Begin
+  ResolvePathCase := FName;
+  If (FName = '') Or RawExists(FName) Then
+    Exit;
+  Cur := '';
+  Rest := FName;
+  If Rest[1] = '/' Then
+    Begin
+    Cur := '/';
+    Delete(Rest, 1, 1);
+    End;
+  While Rest <> '' Do
+    Begin
+    p := Pos('/', Rest);
+    If p = 0 Then
+      Begin
+      ResolvePathCase := Cur + Copy(ResolveCase(Cur + Rest), Length(Cur) + 1, 255);   {the file}
+      Exit;
+      End;
+    Part := Copy(Rest, 1, p - 1);
+    Rest := Copy(Rest, p + 1, 255);
+    If Part <> '' Then
+      Begin
+      Found := Part;
+      If Not DirExist(Cur + Part) Then
+        Begin
+        If Cur = '' Then
+          FindFirst('*', Directory, SR)
+        Else
+          FindFirst(Cur + '*', Directory, SR);
+        While DosError = 0 Do
+          Begin
+          If ((SR.Attr And Directory) <> 0) And (Upper(SR.Name) = Upper(Part)) Then
+            Begin
+            Found := SR.Name;
+            Break;
+            End;
+          FindNext(SR);
+          End;
+        FindClose(SR);
+        End;
+      Cur := Cur + Found + '/';
+      End;
+    End;
+  ResolvePathCase := Cur;
   End;
 
 

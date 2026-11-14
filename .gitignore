@@ -3,3 +3,4 @@ build/
 javascript/
 RA.LOG
 ExitInfo.Bbs
+lang/*.LC

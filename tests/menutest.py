@@ -3,6 +3,8 @@
 insert, delete, save; the bytes of the file are checked.
 usage: menutest.py <work dir>   (needs bbs/bbsc/ra and bbs/bbsc/myth/menus, i.e. the sample BBS)"""
 import os, subprocess, sys, shutil
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cfgpatch
 
 here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.join(here, '..')
@@ -12,6 +14,14 @@ menu = os.path.join(root, 'bbs', 'bbsc', 'myth', 'menus', 'message.mnu')
 if not (os.path.isdir(cfg) and os.path.exists(menu)):
     print('skip: no sample BBS'); sys.exit(0)
 os.makedirs(work, exist_ok=True)
+# the language file of the editor: MKMENU.LC is compiled from lang/MKMENU.TXT (it has the BASIC command 169)
+tmpcfg = cfgpatch.short_dir() + '/r'
+shutil.copytree(cfg, tmpcfg)
+for f in os.listdir(tmpcfg):
+    if f.lower() == 'mkmenu.lc':
+        os.remove(os.path.join(tmpcfg, f))
+subprocess.run([os.path.join(root, 'build', 'mklc'), os.path.join(root, 'lang', 'MKMENU.TXT')], capture_output=True, check=True)
+shutil.copy(os.path.join(root, 'lang', 'MKMENU.LC'), os.path.join(tmpcfg, 'MKMENU.LC'))
 REC = 167
 fails = 0
 
@@ -30,7 +40,7 @@ def fresh():
 
 
 def run(path, *keys):
-    env = dict(os.environ, CFGPROG='mkmenu', CFGCWD=work, CFGDIR=os.path.realpath(cfg), CFGARGS=path, CFGDELAY='0.6')
+    env = dict(os.environ, CFGPROG='mkmenu', CFGCWD=work, CFGDIR=tmpcfg, CFGARGS=path, CFGDELAY='0.6')
     return subprocess.run([sys.executable, os.path.join(here, 'cfgshot.py')] + list(keys), env=env,
                           capture_output=True, text=True).stdout
 
@@ -100,6 +110,17 @@ shutil.copy(os.path.join(root, 'bbs', 'bbsc', 'myth', 'menus', 'file.mnu'), othe
 p = fresh()
 s = run(p, '\x1bl', '\x15', other, '\r')
 check('load: the other menu is shown', 'other.mnu' in s and 'test.mnu' not in s)
+
+# the BASIC command (169, group "External & Misc", 8th in it): picked from the lists, saved in the file
+p = fresh()
+s = run(p, '\r', '\t', '\x1bOQ', '\x1b[A', '\x1b[A', '\x1b[A', '\r')
+check('External & Misc lists "Run BASIC program"', 'Run BASIC program' in s and '169' in s)
+s = run(p, '\r', '\t', '\x1bOQ', '\x1b[A', '\x1b[A', '\x1b[A', '\r', *(['\x1b[B'] * 7), '\r')
+check('the form shows type 169 with its descriptions', ' 169' in s and 'Run BASIC program' in s and 'Path of the BASIC program' in s)
+run(p, '\r', '\t', '\x1bOQ', '\x1b[A', '\x1b[A', '\x1b[A', '\r', *(['\x1b[B'] * 7), '\r', '\r', '\x1bs', '\r', '\x1bx')
+d = open(p, 'rb').read()
+check('saved: item 1 has type 169 (was %d), the rest is as it was' % rec(orig, 1)[0],
+      rec(d, 1)[0] == 169 and rec(d, 1)[1:] == rec(orig, 1)[1:] and d[2 * REC:] == orig[2 * REC:])
 
 # save under a new name
 p = fresh()

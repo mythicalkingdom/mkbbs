@@ -32,13 +32,17 @@ WANTSD = [ "$(SYSTEMD)" != no ] && { [ -n "$(DESTDIR)" ] || { [ "$$(id -u)" = 0 
 
 PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklist mknodelist mknodeidx mkcfgcvt
 
-.PHONY: all test install uninstall clean
+.PHONY: all test install uninstall clean lang
 
 all: build/.built
 
 # one stamp for the whole build: rebuilt when a source or the build script changed
 build/.built: $(wildcard src/*.pas src/*.MK src/*.Def) build.sh
 	./build.sh --build-only
+
+# language files from lang/*.TXT (lang/MKMENU.LC goes into the BBS directory)
+lang: build/.built
+	build/mklc lang/MKMENU.TXT
 
 test:
 	./build.sh
