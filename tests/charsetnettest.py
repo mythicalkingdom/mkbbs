@@ -183,17 +183,21 @@ try:
 
     # a UTF-8 caller gets a black background after every colour reset that sets none; a CP437 caller is untouched
     def resets(d):
+        """colour resets without a foreground / background and whether ESC[37;40m (or the missing half) follows"""
         bad = total = 0
-        for m in re.finditer(rb'\x1b\[([0-9;]*)m(\x1b\[40m)?', d):
+        for m in re.finditer(rb'\x1b\[([0-9;]*)m(\x1b\[(?:37;40|37|40)m)?', d):
             nums = [int(v or 0) for v in m.group(1).split(b';')] if m.group(1) else [0]
-            if 0 in nums and not any(40 <= v <= 49 or 100 <= v <= 107 for v in nums):
+            fg = any(30 <= v <= 39 or 90 <= v <= 97 for v in nums)
+            bg = any(40 <= v <= 49 or 100 <= v <= 107 for v in nums)
+            if 0 in nums and not (fg and bg):
                 total += 1
-                bad += m.group(2) is None
+                want = b'\x1b[37;40m' if not fg and not bg else (b'\x1b[40m' if fg else b'\x1b[37m')
+                bad += m.group(2) != want
         return bad, total
-    check('XTERM caller: a black background is set before the first box character', 0 <= x.find(b'\x1b[40m') < x.find(b'\xe2'))
+    check('XTERM caller: light gray on black is set before the first box character', 0 <= x.find(b'\x1b[37;40m') < x.find(b'\xe2'))
     bad, total = resets(x)
-    check('XTERM caller: every colour reset without a background is followed by ESC[40m (%d of %d)' % (total - bad, total), total > 0 and bad == 0)
-    check('ANSI-BBS caller: no ESC[40m added', resets(b)[0] == resets(b)[1] and not b.startswith(b'\x1b[40m'))
+    check('XTERM caller: every colour reset is followed by the missing default colours (%d of %d)' % (total - bad, total), total > 0 and bad == 0)
+    check('ANSI-BBS caller: nothing added', b'\x1b[37;40m' not in b)
 
     # the caller switches the character set with the menu command (type 171)
     c = Caller(24671, 'XTERM')

@@ -330,7 +330,7 @@ Var
   BgInit: Boolean;                     {the black background was set for this caller}
   SgrState: Byte;                      {0 text, 1 after ESC, 2 inside ESC [ ...}
   SgrNum: Integer;                     {the number being read, -1 = none yet}
-  SgrReset, SgrBg: Boolean;            {this sequence resets / sets a background}
+  SgrReset, SgrBg, SgrFg: Boolean;     {this sequence resets / sets a background / sets a foreground}
 
 
 Procedure SendRaw(Const S: String);
@@ -353,13 +353,15 @@ Procedure SgrNumber;
     SgrReset := True;
   If ((SgrNum >= 40) And (SgrNum <= 48)) Or ((SgrNum >= 100) And (SgrNum <= 107)) Then
     SgrBg := True;
+  If ((SgrNum >= 30) And (SgrNum <= 39)) Or ((SgrNum >= 90) And (SgrNum <= 97)) Then
+    SgrFg := True;
   SgrNum := -1;
   End;
 
 
 Procedure TrackSgr(Ch: Char);
-  {Watch the text going out: after an ANSI colour reset that sets no background, add a black one.
-   The art is drawn for a DOS screen (black) and a themed terminal's default background is not.}
+  {Watch the text going out: after an ANSI colour reset that sets no foreground or background, add light gray / black.
+   The art is drawn for a DOS screen and a themed terminal's default colours are not those.}
   Begin
   Case SgrState Of
     0: If Ch = #27 Then
@@ -370,6 +372,7 @@ Procedure TrackSgr(Ch: Char);
          SgrNum := -1;
          SgrReset := False;
          SgrBg := False;
+         SgrFg := False;
          End
        Else
          SgrState := 0;
@@ -389,8 +392,15 @@ Procedure TrackSgr(Ch: Char);
         If Ch = 'm' Then
           Begin
           SgrNumber;
-          If SgrReset And (Not SgrBg) Then
-            SendRaw(#27'[40m');
+          If SgrReset And Not (SgrBg And SgrFg) Then
+            Begin                      {the DOS defaults: light gray on black}
+            If SgrFg Then
+              SendRaw(#27'[40m')
+            Else If SgrBg Then
+              SendRaw(#27'[37m')
+            Else
+              SendRaw(#27'[37;40m');
+            End;
           End;
         End
       Else If Not (Ch In [#32..#63]) Then
@@ -416,7 +426,7 @@ Function SendText(Ch: Char): Boolean;
   If (Not BgInit) And (SgrState = 0) Then
     Begin
     BgInit := True;
-    SendRaw(#27'[40m');
+    SendRaw(#27'[37;40m');
     End;
   If Ch < #128 Then
     Begin
