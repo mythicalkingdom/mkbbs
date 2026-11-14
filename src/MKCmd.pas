@@ -618,7 +618,6 @@ Procedure ProcessCmd(Item: Word);
          User.DisplayNewLine;
          If Length(TmpStr) > 0 Then
            User.SetUserCity(TmpStr);
-         User.StatusDisplay(User.GetStatusType);
          End;
     017: ChangePwd;                         {Password change}
     018: Begin                              {Screen length}
@@ -631,7 +630,6 @@ Procedure ProcessCmd(Item: Word);
     019: Begin                              {Screen clearing}
          User.DisplayNewLine;
          User.SetUserScrnClr(Not User.GetUserScrnClr);
-         User.StatusDisplay(User.GetStatusType);
          User.DisplayStr(Prompts.GetString(25) + ' ');
          If User.GetUserScrnClr Then
            User.DisplayStrLn(Prompts.GetString(23))
@@ -643,7 +641,6 @@ Procedure ProcessCmd(Item: Word);
     020: Begin                              {More? page pausing}
          User.DisplayNewLine;
          User.SetUserMore(Not User.GetUserMore);
-         User.StatusDisplay(User.GetStatusType);
          User.DisplayStr(Prompts.GetString(27) + ' ');
          If User.GetUserMore Then
            User.DisplayStrLn(Prompts.GetString(23))
@@ -655,7 +652,6 @@ Procedure ProcessCmd(Item: Word);
     021: Begin                              {Toggle Ansi}
          User.DisplayNewLine;
          User.SetUserAnsi(Not User.GetUserAnsi);
-         User.StatusDisplay(User.GetStatusType);
          User.DisplayStr(Prompts.GetString(149) + ' ');
          If User.GetUserAnsi Then
            User.DisplayStrLn(Prompts.GetString(23))
@@ -708,7 +704,6 @@ Procedure ProcessCmd(Item: Word);
     041: Begin                              {Toggle full screen editor}
          User.DisplayNewLine;
          User.SetUserFullEd(Not User.GetUserFullEd);
-         User.StatusDisplay(User.GetStatusType);
          User.DisplayStr(Prompts.GetString(26) + ' ');
          If User.GetUserFullEd Then
            User.DisplayStrLn(Prompts.GetString(23))
@@ -735,7 +730,6 @@ Procedure ProcessCmd(Item: Word);
     061: Begin                              {Toggle avatar}
          User.DisplayNewLine;
          User.SetUserAvatar(Not User.GetUserAvatar);
-         User.StatusDisplay(User.GetStatusType);
          User.DisplayStr(Prompts.GetString(150) + ' ');
          If User.GetUserAvatar Then
            User.DisplayStrLn(Prompts.GetString(23))

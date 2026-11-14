@@ -10,7 +10,7 @@ Procedure PagePlay(PageTune: String);
 Implementation
 
 
-Uses MKFile, MKString, MKMusic, MKDoor, MKCfgAbs, MKEnter, MKGlobT,
+Uses MKFile, MKString, MKMusic, MKDoor, MKSnoop, MKCfgAbs, MKEnter, MKGlobT,
   Dos;
 
 
@@ -18,29 +18,31 @@ Var
   PageChar: Char;
 
 Procedure PageKey(Var Stop: Boolean);
+  {The sysop answers the page from mkmon: Ctrl-A C (or the C key in chat mode)
+   chats, A sends the caller on to the message prompt}
   Var
     Ch: Char;
 
   Begin
-  Ch := UpCase(LocalReadKey);
-  Case ch Of
-    #0:  Begin
-         ch := LocalReadKey;
-         If ch = #46 Then
-           Begin
-           PageChar := #0;
+  If SysopChatWanted Then
+    Begin
+    SysopChatWanted := False;
+    PageChar := 'C';
+    Stop := True;
+    End
+  Else
+    Begin
+    Ch := UpCase(SysopReadKey);
+    Case Ch Of
+      'A': Begin
+           Stop := True;
+           PageChar := 'A';
+           End;
+      'C': Begin
+           PageChar := 'C';
            Stop := True;
            End;
-         User.LocalCommand(ch);
-         End;
-    'A': Begin
-         Stop := True;
-         PageChar := 'A';
-         End;
-    'C': Begin
-         PageChar := 'C';
-         Stop := True;
-         End;
+      End;
     End;
   End;
 
@@ -115,7 +117,7 @@ Procedure DoPage;
     PageTune: Word;
 
   Begin
-  MusicKeyPressed := LocalKeyPressed;
+  MusicKeyPressed := SysopWaiting;
   MusicKeyProc := PageKey;
   PageChar := ' ';
   PageTune := User.GetUserPageTune;
@@ -145,7 +147,7 @@ Procedure DoPage;
   If (PageOk = 0) Then
     Begin
     User.SetUserPageTimes(PageTimes);
-    User.SetStatusType(6);
+    SnoopNotify('Page from ' + User.GetUserName + ': ' + User.GetChatReason);
     User.DisplayNewLine;
     User.DisplayStrLn(Prompts.GetString(095));
     PageStr := Config^.FindBbsFile('PAGE.' + Long2Str(PageTune)) + 'PAGE.' +

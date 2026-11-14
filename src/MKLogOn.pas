@@ -179,7 +179,6 @@ Procedure LogOnUser;
     End;
   User.SetUserDLLimit(GetKFromLimit(TmpStr, UserBaud));
   User.SetStartTime;
-  User.StatusDisplay(User.GetStatusType);
   If BbsDisplay.DisplayBbsFile('WELCOME', '') = '' Then;
   If BbsDisplay.DisplayBbsFile('WELCOME1', '') = '' Then;
   LDate := LongDate(User.GetUserLastDate);
@@ -675,7 +674,6 @@ Procedure StartUpUser;
   User.SetUserMore(False);
   User.SetUserPageTimes(0);
   User.ClearGoSub;
-  User.StatusDisplay(User.GetStatusType);
   End;
 
 

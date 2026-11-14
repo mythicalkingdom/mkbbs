@@ -331,7 +331,6 @@ Function BbsDisplayObj.DisplayBbsFile(FileName: String; HotStr: String): Char;
   DInfo^.TChar := #0;
   DInfo^.DisplayError := 0;
   DInfo^.FileName := ScreenFileExpand(FileName);
-  User.StatusDisplay(User.GetStatusType);
   If Not FileExist(DInfo^.FileName) Then
     DInfo^.DisplayError := 3000;
   If DInfo^.DisplayError = 0 Then

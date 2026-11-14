@@ -116,7 +116,6 @@ begin
   { MKDoor on a loopback session }
   L.Init;
   ComSession := @L;
-  Sem.Init;
   User.Init;
   ClrScr;
   User.DisplayStr('Hello caller');
@@ -175,7 +174,6 @@ begin
   Check('DetectWindow for a new user takes the window', User.GetUserScrLength = 24);
   ComSession := @L;
   User.Done;
-  Sem.Done;
   ComSession := Nil;
   writeln('failures: ', Fails);
   Halt(Fails);

@@ -333,7 +333,6 @@ Procedure DoCDRom(CtlName: String; DirPath: String);
     User.DisplayStr(Prompts.GetString(318) + ' ');
     InStr := User.InputStr('', 79 - Length(Prompts.GetString(318)));
     InStr := StripBoth(InStr, ' ');
-    User.StatusDisplay(User.GetStatusType);
     User.DisplayNewLine;
     If Length(InStr) > 0 Then
       Begin

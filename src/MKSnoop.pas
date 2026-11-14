@@ -18,12 +18,17 @@ Unit MKSnoop;   {Lets the sysop watch a session: a filter that copies the output
 
         'D' n data(n)    n bytes typed by the sysop: they reach the BBS as if
                          the caller had typed them (n = 0..255)
+        'S' n data       n bytes typed by the sysop for a chat or for answering
+                         a page: kept apart (SysopKeyPressed / SysopReadKey),
+                         they are not the caller's input
+        'C'              the sysop asks for a chat (SnoopHandler 'C')
         'K'              disconnect the caller (hang up)
         '+' m / '-' m    give / take m minutes (1..255) of the caller's time
                          (done by SnoopHandler, which the BBS supplies)
 
      The answer to a command is a short text for the sysop, sent as an APC
-     string  ESC _ text ESC \  among the output (terminals ignore it; mkmon
+     string  ESC _ text ESC \  among the output; the BBS can also tell all
+     monitors something (SnoopNotify: "Chat started" ...) (terminals ignore it; mkmon
      takes it out).  The socket file is created with mode 0600: only the user that
      runs the BBS (and root) can attach.
 
@@ -42,8 +47,8 @@ Const
 
 Type
   SnoopCmdFunc = Function(Cmd: Char; Arg: LongInt): String;
-    {'K' (before the hang up), '+' or '-' with minutes; returns the message for
-     the sysop.  Set by the BBS, Nil = the BBS cannot do it.}
+    {'K' (before the hang up), 'C' (chat), '+' or '-' with minutes; returns the
+     message for the sysop.  Set by the BBS, Nil = the BBS cannot do it.}
 
 Var
   SnoopHandler: SnoopCmdFunc;
@@ -61,6 +66,9 @@ Type
     Tick: Word;
     Inj: Array[0..255] Of Char;        {typed by the sysop, not yet read}
     InjHead, InjCount: Word;
+    Sys: Array[0..255] Of Char;        {typed by the sysop for a chat / page}
+    SysHead, SysCount: Word;
+    InChat: Boolean;                   {a chat is going on (a monitor that comes later is told)}
     CSt: Array[1..SnoopMax] Of Byte;   {frame parser of each monitor}
     CTag: Array[1..SnoopMax] Of Char;
     CLen: Array[1..SnoopMax] Of Byte;
@@ -102,6 +110,15 @@ Type
 
   SnoopComPtr = ^SnoopComObj;
 
+Var
+  ActiveSnoop: SnoopComPtr;            {the session of this process, Nil without one}
+
+
+Function  SysopKeyPressed: Boolean;    {The sysop typed a key for the chat / the page}
+Function  SysopReadKey: Char;          {It (#0 when there is none)}
+Procedure SysopFlushKeys;
+Procedure SnoopNotify(Msg: String);    {Tell the monitors (shown in their bar)}
+
 
 Implementation
 
@@ -128,6 +145,10 @@ Constructor SnoopComObj.Init(AInner: AbsComPtr; AOwns: Boolean; SockPath: String
   Tick := 0;
   InjHead := 0;
   InjCount := 0;
+  SysHead := 0;
+  SysCount := 0;
+  InChat := False;
+  ActiveSnoop := @Self;
   For i := 1 To SnoopMax Do
     Begin
     Clients[i] := -1;
@@ -170,6 +191,8 @@ Destructor SnoopComObj.Done;
     i: Word;
 
   Begin
+  If ActiveSnoop = @Self Then
+    ActiveSnoop := Nil;
   For i := 1 To SnoopMax Do
     If Clients[i] >= 0 Then
       fpClose(Clients[i]);
@@ -271,6 +294,8 @@ Procedure SnoopComObj.Accept;
     End;
   If N - k > 0 Then
     Put(Clients[i], Block[k], N - k);
+  If InChat Then
+    Reply(i, 'Chat started: type to the caller, Esc ends');
   End;
 
 
@@ -309,6 +334,13 @@ Procedure SnoopComObj.Command(i: Word; Cmd: Char; Arg: LongInt);
          Inner^.FlushOut;
          Inner^.Hangup;
          End;
+    'C': Begin
+         If @SnoopHandler <> Nil Then
+           Msg := SnoopHandler(Cmd, Arg)
+         Else
+           Msg := 'This BBS cannot chat';
+         Reply(i, Msg);
+         End;
     '+', '-': Begin
               If @SnoopHandler <> Nil Then
                 Msg := SnoopHandler(Cmd, Arg)
@@ -326,9 +358,10 @@ Procedure SnoopComObj.Feed(i: Word; B: Byte);
     0: Begin                           {a command letter}
        CTag[i] := Chr(B);
        Case CTag[i] Of
-         'D': CSt[i] := 1;
+         'D', 'S': CSt[i] := 1;
          '+', '-': CSt[i] := 3;
          'K': Command(i, 'K', 0);
+         'C': Command(i, 'C', 0);
          End;
        End;
     1: Begin                           {length of the typed text}
@@ -339,7 +372,15 @@ Procedure SnoopComObj.Feed(i: Word; B: Byte);
          CSt[i] := 2;
        End;
     2: Begin                           {typed text}
-       If InjCount < 256 Then
+       If CTag[i] = 'S' Then
+         Begin
+         If SysCount < 256 Then
+           Begin
+           Sys[(SysHead + SysCount) And 255] := Chr(B);
+           Inc(SysCount);
+           End;
+         End
+       Else If InjCount < 256 Then
          Begin
          Inj[(InjHead + InjCount) And 255] := Chr(B);
          Inc(InjCount);
@@ -613,6 +654,58 @@ Function SnoopComObj.WindowVersion: Word;
 
 
 
+Function SysopKeyPressed: Boolean;
+  Begin
+  SysopKeyPressed := False;
+  If ActiveSnoop = Nil Then
+    Exit;
+  If ActiveSnoop^.SysCount = 0 Then
+    ActiveSnoop^.Accept;               {the monitor's keys may be waiting on the socket}
+  SysopKeyPressed := ActiveSnoop^.SysCount > 0;
+  End;
+
+
+Function SysopReadKey: Char;
+  Begin
+  SysopReadKey := #0;
+  If ActiveSnoop = Nil Then
+    Exit;
+  With ActiveSnoop^ Do
+    If SysCount > 0 Then
+      Begin
+      SysopReadKey := Sys[SysHead];
+      SysHead := (SysHead + 1) And 255;
+      Dec(SysCount);
+      End;
+  End;
+
+
+Procedure SysopFlushKeys;
+  Begin
+  If ActiveSnoop <> Nil Then
+    ActiveSnoop^.SysCount := 0;
+  End;
+
+
+Procedure SnoopNotify(Msg: String);
+  Var
+    i: Word;
+
+  Begin
+  If ActiveSnoop = Nil Then
+    Exit;
+  If Copy(Msg, 1, 12) = 'Chat started' Then
+    ActiveSnoop^.InChat := True
+  Else If Copy(Msg, 1, 10) = 'Chat ended' Then
+    ActiveSnoop^.InChat := False;
+  With ActiveSnoop^ Do
+    For i := 1 To SnoopMax Do
+      If Clients[i] >= 0 Then
+        Reply(i, Msg);
+  End;
+
+
 Begin
 SnoopHandler := Nil;
+ActiveSnoop := Nil;
 End.

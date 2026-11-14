@@ -21,11 +21,14 @@ Program MKMon;
      list (-l) works.
 
      In the node list: a node number and Enter watch the node, the number and
-     K disconnect it, the number and + / - give / take 5 minutes.  While
+     K disconnect it, C chat with the caller (watches the node, the chat starts
+     when the BBS is ready), + / - give / take 5 minutes.  While
      watching, everything is view only until typing is switched on; commands
      start with Ctrl-A:
          Ctrl-A T   typing on / off (what you type reaches the BBS as if the
                     caller had typed it)
+         Ctrl-A C   chat: what you type appears on the caller's screen (as
+                    in the old local chat), Esc ends it.  Also answers a page.
          Ctrl-A K   disconnect the caller (asks Y/N)
          Ctrl-A + / -   give / take 5 minutes
          Ctrl-A A   send a real Ctrl-A (typing on)
@@ -378,7 +381,7 @@ Procedure ShowNodes(Typed: String);
   If NumNodes = 0 Then
     SayLn('(nobody is online)');
   SayLn('');
-  SayLn('Type a node number, then:  Enter watch   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
+  SayLn('Type a node number, then:  Enter watch   C chat   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
   Say('R refresh, Q quit: ' + Typed);
   CommFlushOut;
   End;
@@ -451,10 +454,10 @@ Procedure SendFrame(S: LongInt; Tag: Char; Arg: Byte; Var Data; N: Byte);
   Hd := Tag;
   If (Tag = '+') Or (Tag = '-') Then
     Hd := Hd + Chr(Arg)
-  Else If Tag = 'D' Then
+  Else If (Tag = 'D') Or (Tag = 'S') Then
     Hd := Hd + Chr(N);
   fpSend(S, @Hd[1], Length(Hd), MSG_NOSIGNAL);
-  If (Tag = 'D') And (N > 0) Then
+  If ((Tag = 'D') Or (Tag = 'S')) And (N > 0) Then
     fpSend(S, @Data, N, MSG_NOSIGNAL);
   End;
 
@@ -542,6 +545,7 @@ Var
   BarMsg: String;                      {an answer shown for a moment instead of the status}
   BarTicks: Integer;                   {how much longer (in 50 ms steps)}
   BarTyping: Boolean;
+  BarChat: Boolean;
   BarNode: LongInt;
   BarInfo: String;                     {Node, name, activity ...}
   BarRows, BarCols: Word;
@@ -675,9 +679,9 @@ Function BarKey: String;
   {Everything the bar shows (not the time left of an answer)}
   Begin
   If BarTicks > 0 Then
-    BarKey := BarMsg + #1 + Long2Str(Ord(BarTyping))
+    BarKey := BarMsg + #1 + Long2Str(Ord(BarTyping)) + Long2Str(Ord(BarChat))
   Else
-    BarKey := BarInfo + #2 + Long2Str(Ord(BarTyping));
+    BarKey := BarInfo + #2 + Long2Str(Ord(BarTyping)) + Long2Str(Ord(BarChat));
   End;
 
 
@@ -694,7 +698,12 @@ Procedure DrawBar;
   Else
     Begin
     T := ' Ctrl-A=Help  ' + BarInfo;
-    If BarTyping Then
+    If BarChat Then
+      Begin
+      T := T + '  [CHAT: Esc ends]';
+      Col := Esc + '[0;1;37;45m';        {chat: white on magenta}
+      End
+    Else If BarTyping Then
       Begin
       T := T + '  [TYPING]';
       Col := Esc + '[0;1;37;41m';        {typing on: white on red}
@@ -711,7 +720,7 @@ Procedure DrawBar;
   End;
 
 
-Function Watch(Node: LongInt): String;
+Function Watch(Node: LongInt; ChatFirst: Boolean): String;
   {Show what the node sends until Ctrl-X; returns a message for the menu}
   Var
     S: LongInt;
@@ -719,7 +728,7 @@ Function Watch(Node: LongInt): String;
     P: TPollFd;
     N: LongInt;
     C: Char;
-    Gone, Typing, Prefix, AskKick: Boolean;
+    Gone, Typing, Prefix, AskKick, ChatOn: Boolean;
     Typed: Array[0..255] Of Char;
     TypedN: Word;
     Dummy: Byte;
@@ -789,6 +798,7 @@ Function Watch(Node: LongInt): String;
   BarMsg := '';
   BarTicks := 0;
   BarTyping := False;
+  BarChat := False;
   Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H');
   BarSize;
   Say(Esc + '[H');
@@ -797,8 +807,11 @@ Function Watch(Node: LongInt): String;
   CommFlushOut;
   Steps := 0;
   FirstData := True;
+  If ChatFirst Then
+    SendFrame(S, 'C', 0, Dummy, 0);
   Gone := False;
   Typing := False;
+  ChatOn := False;
   Prefix := False;
   AskKick := False;
   Pend := '';
@@ -832,7 +845,19 @@ Function Watch(Node: LongInt): String;
           End;
         CommFlushOut;
         If FGot Then
+          Begin
+          If Copy(FDone, 1, 12) = 'Chat started' Then
+            Begin
+            ChatOn := True;
+            BarChat := True;
+            End
+          Else If Copy(FDone, 1, 10) = 'Chat ended' Then
+            Begin
+            ChatOn := False;
+            BarChat := False;
+            End;
           Status(FDone);
+          End;
         End;
       End;
     TypedN := 0;
@@ -851,6 +876,7 @@ Function Watch(Node: LongInt): String;
                Else
                  Status('Typing is off: view only');
                End;
+          'C': SendFrame(S, 'C', 0, Dummy, 0);
           'K': Begin
                AskKick := True;
                Status('Disconnect the caller?  Y / N');
@@ -863,7 +889,7 @@ Function Watch(Node: LongInt): String;
                      Typed[TypedN] := #1;
                      Inc(TypedN);
                      End;
-          '?', 'H': Status('^A: T type  K kick  + / - ' + Long2Str(TimeStep) + ' min  X leave   Ctrl-X leave');
+          '?', 'H': Status('^A: T type  C chat  K kick  + / - ' + Long2Str(TimeStep) + ' min  X leave   Ctrl-X leave');
           End;
         End
       Else If AskKick Then
@@ -878,7 +904,7 @@ Function Watch(Node: LongInt): String;
         Prefix := True
       Else If C = #24 Then
         Gone := True
-      Else If Typing Then
+      Else If Typing Or ChatOn Then
         TypeByte(C);
       End;
     If Pend <> '' Then
@@ -896,7 +922,10 @@ Function Watch(Node: LongInt): String;
         End;
       End;
     If TypedN > 0 Then
-      SendFrame(S, 'D', 0, Typed, TypedN);
+      If ChatOn Then
+        SendFrame(S, 'S', 0, Typed, TypedN)      {to the caller's screen, as chat}
+      Else
+        SendFrame(S, 'D', 0, Typed, TypedN);     {as the caller's input}
     If Not ComSession^.GetCarrier Then
       Gone := True;
     Inc(Steps);
@@ -970,6 +999,30 @@ Procedure Monitor;
              ShowNodes(Typed);
              End;
         'Q', #24, #3: Exit;
+        'C': If Typed <> '' Then
+               Begin
+               N := Str2Long(Typed);
+               Typed := '';
+               LoadNodes;
+               Found := False;
+               For i := 1 To NumNodes Do
+                 If Nodes[i].Node = N Then
+                   Found := True;
+               If Found Then
+                 Begin
+                 Msg := Watch(N, True);        {asks for the chat once the window is up}
+                 End
+               Else
+                 Msg := 'Node ' + Long2Str(N) + ' is not in use.';
+               ShowNodes('');
+               If Msg <> '' Then
+                 Begin
+                 SayLn('');
+                 SayLn(Msg);
+                 CommFlushOut;
+                 Msg := '';
+                 End;
+               End;
         'K', '+', '-', '=':
              If Typed <> '' Then
                Begin
@@ -1013,7 +1066,7 @@ Procedure Monitor;
                  If Nodes[i].Node = N Then
                    Found := True;
                If Found Then
-                 Msg := Watch(N)
+                 Msg := Watch(N, False)
                Else
                  Msg := 'Node ' + Long2Str(N) + ' is not in use.';
                End;

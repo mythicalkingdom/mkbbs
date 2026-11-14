@@ -8,7 +8,7 @@ Unit MKDoor;
 
 Interface
 
-Uses MKGlobT, MKStr, MKRemote, MKRCfgMK, MKRCfgRA, MKCfgSB, MKCfgQB, MKMsgHud,
+Uses MKGlobT, MKStr, MKSnoop, MKRCfgMK, MKRCfgRA, MKCfgSB, MKCfgQB, MKMsgHud,
   Dos;
 
 
@@ -44,7 +44,6 @@ Type UserInfoType = Record
   Extra: Array[1..4000] of Byte;
   ExitSize: Word;
   BatchMode: Boolean;
-  StatType: Byte;
   BbsType: Byte;
   TemplateMsg: Word;
   TemplateFile: Word;
@@ -85,10 +84,6 @@ Type DoorUser = Object
   Function  OK: Boolean;                 {After CheckInput is all ok?}
   Function  GetNotOkReason: Word;        {Get reason ok is false}
   Procedure SetOk(St: Boolean); {Set ok to false}
-  Procedure StatusDisplay(StatusType: Byte); {Display status info at
-                                          bottom of screen}
-  Function  GetStatusType: Byte;         {Get current status display type}
-  Procedure SetStatusType(ST:Byte);      {Set current status display type}
   Function  GetChatReason: String;       {Get chat reason}
   Procedure SetChatReason(Reason: String); {Set chat reason}
   Procedure CheckInput;                  {Check time remain, carrier, etc}
@@ -109,7 +104,6 @@ Type DoorUser = Object
   Procedure AnsiChat;                    {Internal use}
   Procedure AvatarChat;                  {Internal use}
   Procedure DoChat;                      {Start chat}
-  Procedure LocalCommand(CommandChar:Char); {Process local command}
   Procedure WaitEnter;                   {Wait for enter to be pressed}
   Procedure PressEnter;                  {Ask user to Press Enter}
   Function  InputChr(Var Ch:Char): Boolean; {True if char read and returned
@@ -283,12 +277,13 @@ Type DoorUser = Object
 Var
   Prompts: StrObj;
   User:DoorUser;
-  Sem: RemoteCheck;
 
 
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
-Function LocalKeyPressed: Boolean;
-Function LocalReadKey: Char;
+Var
+  SysopChatWanted: Boolean;            {the sysop (mkmon) asked for a chat; DoChat starts at the next InputChr}
+
+Function SysopWaiting: Boolean;        {the sysop asked for a chat, or typed a key for the chat / the page}
 
 Implementation
 
@@ -301,51 +296,9 @@ Uses
 Type
   RaExitInfoPtr = ^RaExitInfoRecord;
 
-Const
-  ExtraKey: Char = #0;
-  ExtraWaiting: Boolean = False;
-
-
-Function LocalKeyPressed: Boolean;
+Function SysopWaiting: Boolean;
   Begin
-  LocalKeyPressed := KeyPressed or Sem.KeyPressed or ExtraWaiting;
-  End;
-
-
-Function LocalReadKey: Char;
-  Var
-    KeyFound: Boolean;
-
-  Begin
-  If Not ExtraWaiting Then
-    Begin
-    KeyFound := False;
-    While Not KeyFound Do
-      Begin
-      If KeyPressed Then
-        Begin
-        ExtraKey := ReadKey;
-        LocalReadKey := ExtraKey;
-        If ExtraKey = #0 Then
-          Begin
-          ExtraWaiting := True;
-          ExtraKey := ReadKey;
-          End;
-        KeyFound := True;
-        End
-      Else
-        If Sem.KeyPressed Then
-          Begin
-          LocalReadKey := Sem.ReadKey;
-          KeyFound := True;
-          End;
-      End;
-    End
-  Else
-    Begin
-    LocalReadKey := ExtraKey;
-    ExtraWaiting := False;
-    End;
+  SysopWaiting := SysopChatWanted Or SysopKeyPressed;
   End;
 
 
@@ -537,19 +490,6 @@ Procedure DoorUser.SetOk(St: Boolean); {Set ok to false}
   UserInfo^.NotOkReason := 1;
   End;
 
-Function DoorUser.GetStatusType: Byte;
-  Begin
-  GetStatusType := UserInfo^.StatType;
-  End;
-
-
-Procedure DoorUser.SetStatusType(ST:Byte); {Set current status display type}
-  Begin
-  UserInfo^.StatType := ST;
-  StatusDisplay(ST);
-  End;
-
-
 Function DoorUser.GetChatReason: String;
   Begin
   GetChatReason := UserInfo^.ChatReason;
@@ -559,110 +499,6 @@ Function DoorUser.GetChatReason: String;
 Procedure DoorUser.SetChatReason(Reason: String);
   Begin
   UserInfo^.ChatReason := Copy(Reason, 1, 50);
-  End;
-
-
-Procedure DoorUser.StatusDisplay(StatusType: Byte);
-  Type  ByteArray = Array[1..4] of Byte;
-  Var
-    TempX: Byte;
-    TempY: Byte;
-    TempAttr: Byte;
-
-  Begin
-    TempX := WhereX;
-    TempY := WhereY;
-    TempAttr := TextAttr;
-    Window(1, ScrnHeight - 1, ScrnWidth, ScrnHeight);
-    TextAttr := LightGray Shl 4;
-    ClrScr;
-    Case StatusType Of
-      1:Begin
-        GoToXy(1,1);
-        Write(VOut, ' ', GetUserName,' from ', GetUserCity,
-          ' at ', UserInfo^.ExitInfo.Baud, ' Baud');
-        GoToXy(1,2);
-        Write(VOut, ' Security ', UserInfo^.ExitInfo.User.Security);
-        If UserInfo^.BatchMode Then
-          Write(VOut, ' Batch Mode')
-        Else
-          Begin
-          Write(VOut, '  Time: ', TimeRemain div 60, ' Minutes                               (F9)= Help');
-          If GetUserAnsi Then
-            Begin
-            GoToXy(38,2);
-            Write(VOut, '(Ansi)');
-            End;
-          If GetUserAvatar Then
-            Begin
-            GoToXy(48,2);
-            Write(VOut, '(Avatar)');
-            End;
-          End;
-        End;
-      2:Begin
-        GoToXy(1,1);
-        Write(VOut, ' Voice# ',PadRight(GetUserVoicePhone,' ',15));
-        Write(VOut, 'Last Call ',UserInfo^.ExitInfo.User.LastTimeOn);
-        Write(VOut, ' on ', UserInfo^.ExitInfo.User.LastDateOn);
-        GoToXy(1,2);
-        Write(VOut, ' Data # ' + PadRight(GetUserDataPhone, ' ', 15));
-        Write(VOut, 'Times Called ', GetUserTimesCalled);
-        End;
-      3:Begin
-        GoToXy(1,1);
-        Write(VOut, ' Uploads ',UserInfo^.ExitInfo.User.ULK,'k, ');
-        Write(VOut, UserInfo^.ExitInfo.User.ULFiles, ' Files');
-        GoToXy(40,1);
-        Write(VOut, 'Downloads ',UserInfo^.ExitInfo.User.DLK,'k, ');
-        Write(VOut, UserInfo^.ExitInfo.User.DLFiles, ' Files');
-        GoToXy(1,2);
-        Write(VOut, ' Flags:  ');
-        Write(VOut, Flag2Str(ByteArray(UserInfo^.ExitInfo.User.Flags)[1]) + '  ');
-        Write(VOut, Flag2Str(ByteArray(UserInfo^.ExitInfo.User.Flags)[2]) + '  ');
-        Write(VOut, Flag2Str(ByteArray(UserInfo^.ExitInfo.User.Flags)[3]) + '  ');
-        Write(VOut, Flag2Str(ByteArray(UserInfo^.ExitInfo.User.Flags)[4]) + '  ');
-        End;
-      4:;
-      5: Begin
-         GoToXy(1,1);
-         Write(VOut, ' Msgs Posted: ', GetUserMsgsEntered);
-         Write(VOut, '    High Read: ', GetUserCombRead);
-         GoToXy(1,2);
-         Write(VOut, ' NetMail Credit: ', GetUserCredit);
-         Write(VOut, '    Pending: ', GetUserPending);
-         End;
-      6: Begin
-         GoToXy(1,1);
-         Write(VOut, ' Choose (C)hat or (A)bort Page  /  (ALT-C) Chat without Page  BD=');
-         Write(VOut, GetUserBirthDate);
-         GoToXy(1,2);
-         Write(VOut, ' Chat Reason: ', GetChatReason);
-         End;
-      7: Begin
-         GoToXy(1,1);
-         Write(VOut, BBSVersion);
-         GoToXy(1,2);
-         Write(VOut, GetCommInfo);
-         End;
-      9:Begin
-        GoToXy(1,1);
-        Write(VOut, ' Alt-H=HangUp   Alt-C=Chat  Alt-J=Jump To Dos   =Adjust Time ');
-        Case UserInfo^.BbsType of
-          1: Write(VOut, 'MK');
-          2: Write(VOut, 'RA');
-          3: Write(VOut, 'QB');
-          4: Write(VOut, 'SB');
-          Else
-            Write(VOut, UserInfo^.BbsType);
-          End;
-        GoToXy(1,2);
-        Write(VOut, ' F1=Normal F2=Call Data F3=Xfer Data F5=Msg Data F6=Chat Info F9=Help');
-        End;
-      End;
-    Window (1, 1, ScrnWidth, ScrnHeight - 2);
-    TextAttr := TempAttr;
-    GoToXY(TempX, TempY);
   End;
 
 
@@ -740,7 +576,6 @@ Procedure DoorUser.DisplayChr (OutChr:Char);
       End;
     End;
   AvatarChar(OutChr);
-  Sem.SendChar(OutChr);
   End;
 
 
@@ -758,7 +593,6 @@ Procedure DoorUser.DisplayStr (OutStr:String);
     AvatarChar(OutStr[I]);
     Inc(I);
     End;
-  Sem.SendStr(OutStr);
   End;
 
 
@@ -832,15 +666,10 @@ Procedure DoorUser.AnsiChat;
   ChatPos := 0;
   While ((Not ChatDone) and CommCarrier) Do
     Begin
-    If LocalKeyPressed Then
+    If SysopKeyPressed Then
       Begin
-      ChChar := LocalReadKey;
+      ChChar := SysopReadKey;
       Case ChChar of
-        #000: Begin
-              ChChar := LocalReadkey;
-              If ChChar <> #46 Then
-                LocalCommand(ChChar);
-              End;
         #008, #$7f: Begin
               If (ChatPos > 0) Then
                 Begin
@@ -982,17 +811,12 @@ Procedure DoorUser.AvatarChat;
   CallerY := CallerBeg;
   While ((Not ChatDone) and CommCarrier) Do
     Begin
-    If LocalKeyPressed Then
+    If SysopKeyPressed Then
       Begin
       DisplayStr('' + Chr(SysopY) + Chr(SysopX));
       DisplayAttr(SysopAttr);
-      ChChar := LocalReadKey;
+      ChChar := SysopReadKey;
       Case ChChar of
-        #000: Begin
-              ChChar := LocalReadkey;
-              If ChChar <> #46 Then
-                LocalCommand(ChChar);
-              End;
         #008, #$7f: Begin
               If (SysopX > 1) Then
                 Begin
@@ -1132,10 +956,14 @@ Procedure DoorUser.DoChat;
     UserInfo^.Chat := True;
     PostStatus(uoChat);
     UserInfo^.ChatStart := CurrentTime;
+    SysopChatWanted := False;
+    SysopFlushKeys;
+    SnoopNotify('Chat started: type to the caller, Esc ends');
     If GetUserAvatar Then
       AvatarChat
     Else
       AnsiChat;
+    SnoopNotify('Chat ended');
     Inc(UserInfo^.ExitInfo.TimeLimit, ((CurrentTime - UserInfo^.ChatStart) Div 60));
     Inc(UserInfo^.TimeLimit, (CurrentTime - UserInfo^.ChatStart));
     UserInfo^.Chat := False;
@@ -1172,85 +1000,6 @@ Procedure DoorUser.DisplayCenterStrLn(OutStr: String);
   If Length(OutStr) < 79 Then
     User.DisplayStr(PadRight('',' ',(80 - Length(OutStr)) Div 2));
   DisplayStrLn(OutStr);
-  End;
-
-
-Procedure DoorUser.LocalCommand(CommandChar:Char);
-  Var
-    i: Integer;
-    CDirStr: String;
-    SaveBuf: Pointer;
-    Tx, Ty, Ta: Byte;
-    SwapResult: Integer;
-
-  Begin
-  Case CommandChar of
-    #035: Begin {Alt-H}
-          UserInfo^.Ok := False;
-          UserInfo^.NotOkReason := 6;
-          CommHangup;
-          End;
-    #036: Begin {Alt-J}
-          If CommActive Then
-            CommRelease;
-          DoShell(GetEnv(ShellEnvVar), True, True);
-          If CommActive Then
-            Begin
-            CommInit;
-            End;
-          SetTimeOut;
-          End;
-    #046: Begin {Alt-C}
-          DoChat;
-          SetTimeOut;
-          End;
-    #059: Begin {F1}
-          UserInfo^.StatType := 1;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #060: Begin {F2}
-          UserInfo^.StatType := 2;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #061: Begin {F3}
-          UserInfo^.StatType := 3;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #062: Begin {F4}
-          UserInfo^.StatType := 4;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #063: Begin {F5}
-          UserInfo^.StatType := 5;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #064: Begin {F6}
-          UserInfo^.StatType := 6;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #065: Begin {F7}
-          UserInfo^.StatType := 7;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #066: Begin {F8}
-          UserInfo^.StatType := 8;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #067: Begin {F9}
-          UserInfo^.StatType := 9;
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #072: Begin
-          Inc(UserInfo^.TimeLimit,60);
-          Inc(UserInfo^.ExitInfo.TimeLimit);
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    #080: Begin
-          Dec(UserInfo^.TimeLimit,60);
-          Dec(UserInfo^.ExitInfo.TimeLimit);
-          StatusDisplay(UserInfo^.StatType);
-          End;
-    End;
   End;
 
 
@@ -1298,16 +1047,11 @@ Function DoorUser.WasAnsiDetected: Boolean;
 Function DoorUser.InputChr(Var Ch:Char): Boolean;
   Begin
   InputChr := False;
-  If LocalKeyPressed Then
-    Begin
+  If SysopChatWanted Then
+    Begin                                {the sysop asked for a chat (mkmon)}
+    SysopChatWanted := False;
+    DoChat;
     SetTimeOut;
-    Ch := LocalReadKey;
-    If Ch = #0 Then
-      LocalCommand(LocalReadKey)
-    Else
-      Begin
-      InputChr := True;
-      End;
     End
   Else
     Begin
@@ -1416,10 +1160,8 @@ Procedure DoorUser.DisplayFile(FileName: String);
     NumRead: Word;
     Found: Boolean;
     Ext: String[4];
-    TmpStr: String;
 
   Begin
-  StatusDisplay(UserInfo^.StatType);
   If Not shAssign (Afile,FileName) Then;
   FileMode := fmReadOnly + fmDenyNone;
   If shReset (Afile,1) Then
@@ -1442,9 +1184,6 @@ Procedure DoorUser.DisplayFile(FileName: String);
         AvatarChar(Buffer[i]);
         Inc(i);
         End;
-      Move(Buffer, TmpStr[1], NumRead);   {copy the block just shown for the snoop (was reversed)}
-      TmpStr[0] := Chr(NumRead);
-      Sem.SendStr(TmpStr);
       End;
     Close(Afile);
     If IoResult <> 0 Then
@@ -1466,11 +1205,9 @@ Function DoorUser.DisplayHotFile(FileName: String; HotStr: String): Char;
     Ext: String[4];
     IChr: Char;
     HotStop: Boolean;
-    TmpStr: String;
 
   Begin
   HotStop := False;
-  StatusDisplay(UserInfo^.StatType);
   If Not shAssign (Afile,FileName) Then;
   FileMode := fmReadOnly + fmDenyNone;
   If shReset (Afile,1) Then
@@ -1498,9 +1235,6 @@ Function DoorUser.DisplayHotFile(FileName: String; HotStr: String): Char;
           AvatarChar(Buffer[i]);
           Inc(i);
           End;
-        Move(Buffer, TmpStr[1], NumRead);   {copy the block just shown for the snoop (was reversed)}
-        TmpStr[0] := Chr(NumRead);
-        Sem.SendStr(TmpStr);
         End;
       End;
     Close(Afile);
@@ -1882,7 +1616,6 @@ Procedure DoorUser.Init;
   UserInfo^.BatchMode := False;
   UserInfo^.Chat := False;
   UserInfo^.IdleTime := 180;
-  UserInfo^.StatType := 1;
   UserInfo^.TimeLimit := 3600;
   UserInfo^.StartDay := GetCurrentDay;
   UserInfo^.StartTime := CurrentTime;
@@ -3785,7 +3518,6 @@ Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
   Exec(EName, CStr);
   ChDir(StripTrail(CDirStr, DirectorySeparator));
   If IoResult <> 0 Then;
-  User.StatusDisplay(User.GetStatusType);
   User.SetTimeOut;
   End;
 

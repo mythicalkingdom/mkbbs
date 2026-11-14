@@ -25,6 +25,11 @@ Function SysopCommand(Cmd: Char; Arg: LongInt): String;
          LogEntry.WriteEntry('Sysop disconnected the caller');
          SysopCommand := 'Node ' + Long2Str(NodeNumber) + ' disconnected';
          End;
+    'C': Begin
+         SysopChatWanted := True;
+         LogEntry.WriteEntry('Sysop asked for a chat');
+         SysopCommand := 'Chat requested: it starts when the BBS is ready';
+         End;
     '+': Begin
          User.AdjustTime(Arg * 60);
          LogEntry.WriteEntry('Sysop added ' + Long2Str(Arg) + ' minutes');
@@ -164,12 +169,6 @@ If IoResult <> 0 Then;
 If LogToPrinter Then
   LogEntry.SetPrnName(Config^.GetPrnName);
 ClrScr;
-Sem.Init;
-Sem.SetNode(NodeNumber);
-Sem.SetCheckPath(Config^.GetSemaphorePath);
-Sem.SetCheckDelay(100);
-Sem.CI^.ShowOut := True;
-Sem.CI^.CheckIn := True;
 Prompts.Init;
 Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.LC') +
   Config^.GetLangFile(1) + '.LC');
@@ -186,7 +185,6 @@ BbsDisplay.Init;
 User.SetSessionTimeLimit(600);
 User.SetStartTime;
 User.SetIdleTimeLimit(240);
-User.StatusDisplay(User.GetStatusType);
 User.SetUserBaud(UserBaud);
 If Reload Then
   Begin
@@ -231,7 +229,6 @@ Else
 User.GetUserSec(Sec);
 User.ClearScreen;
 User.DisplayNewLine;
-User.StatusDisplay(User.GetStatusType);
 User.ClearScreen;
 User.DisplayAttr(Config^.GetSystemColor(1));
 User.SetMore(True);
@@ -271,7 +268,6 @@ User.Done;
 LogEntry.WriteEntry('Leaving MK Bbs');
 LogEntry.Done;
 Config^.Done;
-Sem.Done;
 CommRelease;
 Dispose(ComSession, Done);
 ComSession := Nil;
