@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """MKLC: every sample *.LC of the original folder is turned back into text, compiled again and must
 come out byte for byte the same.   usage: lctest.py <mklc> <work dir>"""
-import glob, os, struct, subprocess, sys
+import glob, os, shutil, struct, subprocess, sys
 
 mklc, work = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
-orig = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'original')
+here = os.path.dirname(os.path.abspath(__file__))
+orig = os.path.join(here, '..', 'original')
 os.makedirs(work, exist_ok=True)
 fails = 0
 
@@ -47,6 +48,28 @@ for f in files:
     same = os.path.exists(out) and open(out, 'rb').read() == data
     check('%s: %d texts, compiled again = the original (%d bytes)' % (name, len(lines), len(data)),
           r.returncode == 0 and same)
+
+# the author's own sources (tests/lang/NAME.TXT, copies of his files) compile to exactly his NAME.LC
+for f in files:
+    name = os.path.basename(f)[:-3]
+    txt = os.path.join(here, 'lang', name + '.TXT')
+    if not os.path.exists(txt):
+        continue
+    d2 = os.path.join(work, 'src_' + name)
+    os.makedirs(d2, exist_ok=True)
+    shutil.copy(txt, d2)
+    r = subprocess.run([mklc, os.path.join(d2, name + '.TXT')], capture_output=True, text=True)
+    out = os.path.join(d2, name + '.LC')
+    check('%s.TXT (his source) compiles to his %s.LC' % (name, name),
+          r.returncode == 0 and os.path.exists(out) and open(out, 'rb').read() == open(f, 'rb').read())
+for name in ('MKUPACK', 'VT100'):                      # sources without a compiled file here
+    txt = os.path.join(here, 'lang', name + '.TXT')
+    if os.path.exists(txt):
+        d2 = os.path.join(work, 'src_' + name)
+        os.makedirs(d2, exist_ok=True)
+        shutil.copy(txt, d2)
+        r = subprocess.run([mklc, os.path.join(d2, name + '.TXT')], capture_output=True, text=True)
+        check('%s.TXT compiles without errors' % name, r.returncode == 0)
 
 # errors: no argument, a missing file, a wrong line number is reported and left out
 r = subprocess.run([mklc], capture_output=True, text=True)
