@@ -181,6 +181,20 @@ try:
     check('the same screens: the UTF-8 stream has as many characters as the CP437 stream has high bytes (%d / %d)' % (nonascii, high(b)),
           nonascii == high(b))
 
+    # a UTF-8 caller gets a black background after every colour reset that sets none; a CP437 caller is untouched
+    def resets(d):
+        bad = total = 0
+        for m in re.finditer(rb'\x1b\[([0-9;]*)m(\x1b\[40m)?', d):
+            nums = [int(v or 0) for v in m.group(1).split(b';')] if m.group(1) else [0]
+            if 0 in nums and not any(40 <= v <= 49 or 100 <= v <= 107 for v in nums):
+                total += 1
+                bad += m.group(2) is None
+        return bad, total
+    check('XTERM caller: a black background is set before the first box character', 0 <= x.find(b'\x1b[40m') < x.find(b'\xe2'))
+    bad, total = resets(x)
+    check('XTERM caller: every colour reset without a background is followed by ESC[40m (%d of %d)' % (total - bad, total), total > 0 and bad == 0)
+    check('ANSI-BBS caller: no ESC[40m added', resets(b)[0] == resets(b)[1] and not b.startswith(b'\x1b[40m'))
+
     # the caller switches the character set with the menu command (type 171)
     c = Caller(24671, 'XTERM')
     check('toggle: logged in', c.login())
