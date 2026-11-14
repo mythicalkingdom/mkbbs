@@ -49,7 +49,7 @@ Interface
 Uses Objects, Drivers, Views, Dialogs, App;
 
 Const
-  MaxCfgFields = 64;
+  MaxCfgFields = 80;
   cmCfgAction = 9000;                  {+ field number: a button of AddAction}
 
 Type
@@ -70,6 +70,7 @@ Type
     Filter: String[40];                {Allowed characters, '' = any}
     Zero: Byte;                        {Number shown with leading zeros to this width}
     ReadOnly: Boolean;                 {Typing is ignored; F2 or Space chooses}
+    Hidden: Boolean;                   {Shown as stars unless the cursor is in it (passwords)}
     Proc: CfgProc;                     {F2}
     ProcData: Pointer;
     ProcTitle: String[40];
@@ -88,6 +89,7 @@ Type
     NFilter: String[40];
     NZero: Byte;
     NReadOnly: Boolean;
+    NHidden: Boolean;
     F: Array[1..MaxCfgFields] Of CfgFieldRec;
     Constructor Init(ATitle: String);
     Procedure Window(X1, Y1, X2, Y2: Integer);
@@ -96,6 +98,7 @@ Type
     Procedure Filter(Chars: String);
     Procedure ZeroPad(Width: Byte);
     Procedure ReadOnly;
+    Procedure Hidden;
     Procedure OnF2(Proc: CfgProc; Data: Pointer; ProcTitle: String);
     Procedure OnLeave(Proc: CfgProc; Data: Pointer);
     Procedure AddString(Lab: String; Var V; MaxLen: Byte; Hint: String);
@@ -137,7 +140,9 @@ Type
   PCfgInput = ^CfgInput;
   CfgInput = Object(TInputLine)
     Idx: Word;
+    Masked: Boolean;
     Procedure HandleEvent(Var Event: TEvent); Virtual;
+    Procedure Draw; Virtual;
     End;
 
 
@@ -399,6 +404,23 @@ Procedure CfgDialog.HandleEvent(Var Event: TEvent);
   End;
 
 
+Procedure CfgInput.Draw;
+  Var
+    Save: String;
+
+  Begin
+  If Masked And ((State And sfFocused) = 0) And (Length(Data^) > 0) Then
+    Begin
+    Save := Data^;
+    FillChar(Data^[1], Length(Data^), '*');
+    Inherited Draw;
+    Data^ := Save;
+    End
+  Else
+    Inherited Draw;
+  End;
+
+
 Procedure CfgInput.HandleEvent(Var Event: TEvent);
   Var
     D: PCfgDialog;
@@ -483,6 +505,7 @@ Constructor CfgFormObj.Init(ATitle: String);
   NFilter := '';
   NZero := 0;
   NReadOnly := False;
+  NHidden := False;
   End;
 
 
@@ -511,6 +534,12 @@ Procedure CfgFormObj.Show(Width: Byte);
 Procedure CfgFormObj.ReadOnly;
   Begin
   NReadOnly := True;
+  End;
+
+
+Procedure CfgFormObj.Hidden;
+  Begin
+  NHidden := True;
   End;
 
 
@@ -568,6 +597,8 @@ Procedure CfgFormObj.Add(K: CfgFieldKind; ALab: String; Var V; ASize: Byte;
   NZero := 0;
   F[Count].ReadOnly := NReadOnly;
   NReadOnly := False;
+  F[Count].Hidden := NHidden;
+  NHidden := False;
   F[Count].Proc := Nil;
   F[Count].ProcData := Nil;
   F[Count].LeaveProc := Nil;
@@ -856,6 +887,7 @@ Function CfgFormObj.Execute: Boolean;
           End;
         Inp := New(PCfgInput, Init(R, j + 1));   {size of Data: fixed at Init}
         Inp^.Idx := i;
+        Inp^.Masked := F[i].Hidden;
         If F[i].Kind = fkNumber Then
           Begin
           Inp^.SetValidator(New(PRangeValidator, Init(F[i].Min, F[i].Max)));

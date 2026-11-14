@@ -14,6 +14,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkread src/MKRead.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmenu src/MKMenu.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkusered src/MKUserEd.pas
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -63,6 +64,12 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/menuwork
   python3 tests/menutest.py build/menuwork | grep -E "^(ok|FAIL)" | tee build/menuwork/result.txt
   if grep -q FAIL build/menuwork/result.txt; then exit 1; fi
+fi
+# MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  mkdir -p build/userwork
+  python3 tests/usertest.py build/userwork | grep -E "^(ok|FAIL)" | tee build/userwork/result.txt
+  if grep -q FAIL build/userwork/result.txt; then exit 1; fi
 fi
 # the real mk with the sysop monitor: log in, chat from the monitor, time, kick (private copy of the sample BBS)
 if [ -f bbs/bbsc/ra/config.mk ]; then
