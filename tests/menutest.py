@@ -2,7 +2,7 @@
 """MKMenu through a pseudo terminal on a private copy of a sample menu: edit, pick a command,
 insert, delete, save; the bytes of the file are checked.
 usage: menutest.py <work dir>   (needs bbs/bbsc/ra and bbs/bbsc/myth/menus, i.e. the sample BBS)"""
-import os, subprocess, sys, shutil
+import os, re, subprocess, sys, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cfgpatch
 
@@ -53,8 +53,44 @@ def prompt(r):
     return r[7:8 + r[7]][1:].decode('latin-1')
 
 
+def raw_sgr(path, *keys):
+    """the colour codes the program sends (the text screen of cfgshot cannot show colours or blinking)"""
+    import pty, select, struct, fcntl, termios, re
+    env = {'TERM': 'xterm', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'MK': tmpcfg, 'PATH': os.environ['PATH']}
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.environ.clear(); os.environ.update(env); os.chdir(work)
+        os.execv(os.path.join(root, 'build', 'mkmenu'), ['mkmenu', path])
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 25, 80, 0, 0))
+    buf = b''
+
+    def drain(t):
+        nonlocal buf
+        end = __import__('time').time() + t
+        while __import__('time').time() < end:
+            r, _, _ = select.select([fd], [], [], 0.1)
+            if r:
+                try:
+                    buf += os.read(fd, 65536)
+                except OSError:
+                    return
+    drain(1.2)
+    for k in keys:
+        os.write(fd, k.encode().decode('unicode_escape').encode('latin-1')); drain(0.5)
+    os.kill(pid, 9)
+    os.waitpid(pid, 0)
+    return re.findall(r'\x1b\[([0-9;]*)m', buf.decode('utf-8', 'replace'))
+
+
 orig = open(menu, 'rb').read()
 check('sample menu has whole records', len(orig) % REC == 0)
+
+# colours: the list must not come out in Free Vision's error attribute (blinking white on red), and the
+# bar must move: the item under it has another colour than the others
+sg = raw_sgr(fresh())
+check('no blinking text anywhere on the list screen', not [x for x in sg if '5' in x.split(';')])
+sg2 = raw_sgr(fresh(), '\x1b[B')
+check('the list uses its normal and its selection colours', any(x.startswith('30;46') for x in sg2) and any(x == '97;42' for x in sg2))
 
 # the list
 p = fresh()

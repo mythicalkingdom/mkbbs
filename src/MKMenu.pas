@@ -22,7 +22,7 @@ Program MKMenu;
 }
 
 Uses
-  Objects, Drivers, Views, Menus, App, Dos,
+  Objects, Drivers, Views, Menus, Dialogs, App, Dos,
   MKString, MKFile, MKGlobT, MKMenuCf, CfgBox, CfgList, CfgPal, MKKbd;
 
 
@@ -49,7 +49,8 @@ Type
     End;
 
   PMenuWin = ^MenuWin;
-  MenuWin = Object(TWindow)
+  MenuWin = Object(TDialog)              {a dialog: its palette has the colours a list needs (a plain
+                                          window's has not: the list came out in blinking error colours)}
     Procedure ShowName;
     End;
 
@@ -111,7 +112,7 @@ Constructor MenuApp.Init;
   Inherited Init;
   DeskTop^.GetExtent(R);
   R.Grow(-3, 0);
-  New(Win, Init(R, '', wnNoNumber));
+  New(Win, Init(R, ''));
   Win^.Flags := wfMove;
   Win^.GetExtent(R);
   R.Grow(-1, -1);
