@@ -18,6 +18,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkusered src/MKUserEd.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklist src/MKList.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -72,6 +73,10 @@ fi
 mkdir -p build/work/lc build/work/tools
 python3 tests/lctest.py build/mklc build/work/lc | grep -E "^(FAIL|failures)"
 python3 tests/toolstest.py build build/work/tools | grep -E "^(FAIL|failures)"
+# configuration converter: Remote Access -> MK / QuickBBS / SuperBBS on a copy of the sample BBS
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/cvttest.py build build/work/cvt | grep -E "^(FAIL|failures)"
+fi
 # MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files
 if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/userwork

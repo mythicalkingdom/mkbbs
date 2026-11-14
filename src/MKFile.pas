@@ -454,6 +454,7 @@ Function ResolveCase(FName: String): String;
     E: ExtStr;
     i: Word;
     Alt: String;
+    SR: SearchRec;
 
   Begin
   ResolveCase := FName;
@@ -471,7 +472,27 @@ Function ResolveCase(FName: String): String;
   For i := 1 To Length(Alt) Do
     Alt[i] := UpCase(Alt[i]);
   If RawExists(D + Alt) Then
+    Begin
     ResolveCase := D + Alt;
+    Exit;
+    End;
+  { any other spelling (Messages.Mk for Messages.MK ...): look through the directory }
+  If IoResult <> 0 Then;
+  If D = '' Then
+    FindFirst('*', ReadOnly + Hidden + Archive, SR)
+  Else
+    FindFirst(D + '*', ReadOnly + Hidden + Archive, SR);
+  While DosError = 0 Do
+    Begin
+    If Upper(SR.Name) = Alt Then
+      Begin
+      ResolveCase := D + SR.Name;
+      Break;
+      End;
+    FindNext(SR);
+    End;
+  FindClose(SR);
+  If IoResult <> 0 Then;
   End;
 
 
