@@ -111,6 +111,14 @@ While i <= ParamCount Do
            End;
       'R': Reload := True;
       'T': TimeToEvent := Str2Long(Copy(TmpStr,3,5));
+      'U': Begin                       {character set of the caller's text}
+           If (Copy(TmpStr,3,10) = 'UTF8') Or (Copy(TmpStr,3,10) = 'UTF-8') Then
+             CharsetMode := 2
+           Else If Copy(TmpStr,3,10) = 'CP437' Then
+             CharsetMode := 1
+           Else
+             CharsetMode := 0;         {AUTO: by the terminal type}
+           End;
       'V': Begin
            ScrnWidth := 80;
            ScrnHeight := 25;

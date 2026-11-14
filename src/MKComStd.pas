@@ -34,6 +34,7 @@ Type StdComObj = Object(FdComObj)
   Procedure Hangup; Virtual;
   Function  GetCommInfo: String; Virtual;
   Function  GetRemoteAddr: String; Virtual;
+  Function  GetTermType: String; Virtual;
   Procedure RestoreTty;                {Internal}
   End;
 
@@ -113,6 +114,15 @@ Function StdComObj.GetCommInfo: String;
     GetCommInfo := 'Terminal (standard input/output)'
   Else
     GetCommInfo := 'Standard input/output (socket or pipe)';
+  End;
+
+
+Function StdComObj.GetTermType: String;
+  Begin
+  If IsTty Then
+    GetTermType := GetEnv('TERM')      {a local terminal}
+  Else
+    GetTermType := '';
   End;
 
 

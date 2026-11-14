@@ -81,6 +81,7 @@ Type TelnetComObj = Object(AbsComObj)
   Procedure SetBPS(Rate: LongInt); Virtual;
   Function  GetCommInfo: String; Virtual;
   Function  GetRemoteAddr: String; Virtual;
+  Function  GetTermType: String; Virtual;
   Procedure SetRemoteAddr(Addr: String); Virtual;
   Function  GetWindowSize(Var C, R: Word): Boolean; Virtual;
   Function  WindowVersion: Word; Virtual;
@@ -493,6 +494,15 @@ Procedure TelnetComObj.SetBPS(Rate: LongInt);
 Function TelnetComObj.GetCommInfo: String;
   Begin
   GetCommInfo := 'Telnet over ' + Inner^.GetCommInfo;
+  End;
+
+
+Function TelnetComObj.GetTermType: String;
+  Begin
+  If TermType <> '' Then
+    GetTermType := TermType
+  Else
+    GetTermType := Inner^.GetTermType;
   End;
 
 

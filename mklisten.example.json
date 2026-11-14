@@ -9,6 +9,7 @@
       "port": 2323,
       "type": "telnet",
       "baud": 38400,
+      "charset": "auto",
       "config": "/bbs/ra"
     },
     {

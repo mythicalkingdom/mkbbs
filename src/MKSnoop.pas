@@ -95,6 +95,7 @@ Type
     Function  GetBPS: LongInt; Virtual;
     Function  GetCommInfo: String; Virtual;
     Function  GetRemoteAddr: String; Virtual;
+    Function  GetTermType: String; Virtual;
     Procedure SetRemoteAddr(Addr: String); Virtual;
     Function  GetWindowSize(Var C, R: Word): Boolean; Virtual;
     Function  WindowVersion: Word; Virtual;
@@ -626,6 +627,12 @@ Function SnoopComObj.GetBPS: LongInt;
 Function SnoopComObj.GetCommInfo: String;
   Begin
   GetCommInfo := Inner^.GetCommInfo;
+  End;
+
+
+Function SnoopComObj.GetTermType: String;
+  Begin
+  GetTermType := Inner^.GetTermType;
   End;
 
 

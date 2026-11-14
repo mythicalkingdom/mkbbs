@@ -543,6 +543,22 @@ Procedure PostMsg(Cmd: String);
   End;
 
 
+Procedure ToggleCharset;                {Type 171: UTF-8 or CP437 text}
+  Begin
+  User.DisplayNewLine;
+  If CallerUtf8 Then
+    CharsetMode := 1
+  Else
+    CharsetMode := 2;
+  If CharsetMode = 2 Then
+    User.DisplayStrLn('Character set: UTF-8 (the DOS box characters are translated)')
+  Else
+    User.DisplayStrLn('Character set: CP437 (sent as the DOS programs wrote it)');
+  User.DisplayNewLine;
+  User.PressEnter;
+  End;
+
+
 Procedure GoToMenu(Item: Word);        {Process type 1 or 4}
   Begin
   If ParseMenuData(Item) Then
@@ -767,6 +783,7 @@ Procedure ProcessCmd(Item: Word);
     168: AskOffZero;                        {Ask send zero msg packets}
     169: RunBasicProgram(Menu.GetData(Item)); {Run a BASIC program (mkbasic)}
     170: RunPascalProgram(Menu.GetData(Item)); {Run a Pascal program (mkpascal)}
+    171: ToggleCharset;                     {Toggle UTF-8 / CP437 text}
     End;
   End;
 

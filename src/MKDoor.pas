@@ -281,20 +281,124 @@ Var
 
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
 Var
+  CharsetMode: Byte;                   {0 = by the terminal type, 1 = CP437 as it is, 2 = UTF-8 (mk -U, the menu command)}
   SysopChatWanted: Boolean;            {the sysop (mkmon) asked for a chat; DoChat starts at the next InputChr}
 
 Function SysopWaiting: Boolean;        {the sysop asked for a chat, or typed a key for the chat / the page}
+Function CallerUtf8: Boolean;          {text for the caller is sent as UTF-8 (CP437 translated)}
 
 Implementation
 
 Uses
     MKVCrt,
     MKScrn,
-  MKString, MKFile, MKAvatar, MKComAbs, MKCfgAbs, MKMisc, MKDos;
+  MKString, MKFile, MKAvatar, MKComAbs, MKCfgAbs, MKMisc, MKDos, MKCp437;
 
 
 Type
   RaExitInfoPtr = ^RaExitInfoRecord;
+
+Function CallerUtf8: Boolean;
+  Const
+    LastTerm: String[40] = '#';
+    LastUtf8: Boolean = False;
+  Var
+    T: String;
+
+  Begin
+  Case CharsetMode Of
+    1: CallerUtf8 := False;
+    2: CallerUtf8 := True;
+    Else
+      Begin
+      If ComSession = Nil Then
+        T := ''
+      Else
+        T := ComSession^.GetTermType;
+      If T <> LastTerm Then
+        Begin
+        LastTerm := T;
+        LastUtf8 := TermWantsUtf8(T);
+        End;
+      CallerUtf8 := LastUtf8;
+      End;
+    End;
+  End;
+
+
+Function SendText(Ch: Char): Boolean;
+  {One character of text for the caller: as it is, or as the UTF-8 of its CP437 meaning.  False =
+   nothing was sent (the line is full), try again; a character of several bytes is sent whole.}
+  Var
+    S: String;
+    i: Word;
+
+  Begin
+  If (Ch < #128) Or (Not CallerUtf8) Then
+    Begin
+    SendText := CommSendNw(Ch);
+    Exit;
+    End;
+  S := Cp437ToUtf8(Ord(Ch));
+  If Not CommSendNw(S[1]) Then
+    Begin
+    SendText := False;
+    Exit;
+    End;
+  For i := 2 To Length(S) Do
+    While (Not CommSendNw(S[i])) And User.OK Do
+      User.CheckInput;
+  SendText := True;
+  End;
+
+
+Function RecvText: Char;
+  {One character the caller typed (CommRecv is waiting): a UTF-8 caller's letters are turned back into CP437}
+  Var
+    First, B: Char;
+    Need, i: Byte;
+    U: LongInt;
+    Got: Boolean;
+
+  Begin
+  First := CommRecv;
+  RecvText := First;
+  If (First < #$C0) Or (Not CallerUtf8) Then
+    Exit;
+  If First >= #$F0 Then
+    Need := 3
+  Else If First >= #$E0 Then
+    Need := 2
+  Else
+    Need := 1;
+  U := Ord(First) And ($3F Shr Need);
+  Got := True;
+  For i := 1 To Need Do
+    Begin
+    If CommInEmpty And (ComSession <> Nil) Then
+      ComSession^.WaitForChar(100);
+    If CommInEmpty Then
+      Got := False
+    Else
+      Begin
+      B := CommPeek;
+      If (B < #$80) Or (B >= #$C0) Then
+        Got := False
+      Else
+        Begin
+        B := CommRecv;
+        U := (U Shl 6) Or (Ord(B) And $3F);
+        End;
+      End;
+    If Not Got Then
+      Break;
+    End;
+  If Got And (U <= $FFFF) And (Utf8ToCp437(U) <> 0) Then
+    RecvText := Chr(Utf8ToCp437(U))
+  Else
+    RecvText := '?';
+  End;
+
 
 Function SysopWaiting: Boolean;
   Begin
@@ -562,10 +666,10 @@ Procedure DoorUser.DisplayChr (OutChr:Char);
   Begin
   If CommActive Then
     Begin
-    If Not CommSendNw(OutChr) Then
+    If Not SendText(OutChr) Then
       Begin
       CharWait := CurrentTime + UserInfo^.IdleTime;
-      While ((Not CommSendNw(OutChr)) and UserInfo^.OK And
+      While ((Not SendText(OutChr)) and UserInfo^.OK And
       (CurrentTime <= CharWait)) Do
         CheckInput;
       If (CommActive and (CurrentTime > CharWait)) Then
@@ -588,7 +692,7 @@ Procedure DoorUser.DisplayStr (OutStr:String);
   While ((i <= Length(OutStr)) and UserInfo^.Ok) Do
     Begin
     If CommActive Then
-      While ((Not CommSendNw(OutStr[i])) and UserInfo^.OK) Do
+      While ((Not SendText(OutStr[i])) and UserInfo^.OK) Do
         CheckInput;
     AvatarChar(OutStr[I]);
     Inc(I);
@@ -712,7 +816,7 @@ Procedure DoorUser.AnsiChat;
       End;
     If Not CommInEmpty Then
       Begin
-      ChChar := CommRecv;
+      ChChar := RecvText;
       Case ChChar Of
         #008, #$7f: Begin
               If (ChatPos > 0) Then
@@ -880,7 +984,7 @@ Procedure DoorUser.AvatarChat;
       Begin
       DisplayStr('' + Chr(CallerY) + Chr(CallerX));
       DisplayAttr(CallerAttr);
-      ChChar := CommRecv;
+      ChChar := RecvText;
       Case ChChar Of
         #008, #$7f: Begin
               If (CallerX > 1) Then
@@ -1058,7 +1162,7 @@ Function DoorUser.InputChr(Var Ch:Char): Boolean;
     If (CommActive and (Not CommInEmpty)) Then
       Begin
       InputChr := True;
-      Ch := CommRecv;
+      Ch := RecvText;
       SetTimeOut;
       End
     Else
@@ -1175,7 +1279,7 @@ Procedure DoorUser.DisplayFile(FileName: String);
       While i <= NumRead Do
         Begin
         If CommActive Then
-          While ((Not CommSendNw(Buffer[i])) and UserInfo^.Ok) Do
+          While ((Not SendText(Buffer[i])) and UserInfo^.Ok) Do
             Begin
             CheckInput;
             If CheckHot(' ') = ' ' Then
@@ -1228,7 +1332,7 @@ Function DoorUser.DisplayHotFile(FileName: String; HotStr: String): Char;
         While i <= NumRead Do
           Begin
           If CommActive Then
-            While ((Not CommSendNw(Buffer[i])) and UserInfo^.Ok) Do
+            While ((Not SendText(Buffer[i])) and UserInfo^.Ok) Do
               Begin
               CheckInput;
               End;

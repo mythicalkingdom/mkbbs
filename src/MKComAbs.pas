@@ -118,6 +118,7 @@ Type AbsComObj = Object
   Procedure SetBPS(Rate: LongInt); Virtual;
   Function  GetCommInfo: String; Virtual;       {Describes the session}
   Function  GetRemoteAddr: String; Virtual;     {Caller's address, if known}
+  Function  GetTermType: String; Virtual;       {Terminal type the caller reported (Telnet TTYPE, TERM), '' = unknown}
   Procedure SetRemoteAddr(Addr: String); Virtual; {Owner tells the address (listener, PROXY header)}
   Function  GetWindowSize(Var Cols, Rows: Word): Boolean; Virtual;
     {True when the caller's terminal has reported its size (Telnet NAWS ...)}
@@ -420,6 +421,12 @@ Procedure AbsComObj.SetBPS(Rate: LongInt);
 Function AbsComObj.GetCommInfo: String;
   Begin
   GetCommInfo := 'No session';
+  End;
+
+
+Function AbsComObj.GetTermType: String;
+  Begin
+  GetTermType := '';
   End;
 
 

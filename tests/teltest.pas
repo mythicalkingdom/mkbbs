@@ -85,6 +85,7 @@ begin
   Check('no data from sub-negotiation', T.InEmpty);
   Check('window size', (T.Cols = 80) and (T.Rows = 25));
   Check('terminal type', T.TermType = 'ANSI');
+  Check('the session reports it (GetTermType)', T.GetTermType = 'ANSI');
   Check('screen changed flag', T.ScreenChanged);
   Check('window size through the session', CommWindowSize(Ccols, Crows) and (Ccols = 80) and (Crows = 25));
   Check('window version counts reports', CommWindowVersion = 1);

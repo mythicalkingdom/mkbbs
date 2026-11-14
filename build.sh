@@ -44,7 +44,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodeidx src/MKNodeIdx.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
-for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
+for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
 done
 mkdir -p build/work
@@ -57,6 +57,7 @@ build/doortest build/work | grep -E 'FAIL|failures'
 build/opentest build/work | grep -E 'FAIL|failures'
 build/syntest selftest build/work | grep -E 'FAIL|failures'
 build/teltest | grep -E "FAIL|failures"
+(cd build/work && ../charsettest) | grep -E "FAIL|failures"
 build/wstest | grep -E "FAIL|failures"
 build/listentest build/mklisten build/fakemk build/work 2>&1 | grep -E "^(FAIL|failures)"
 mkdir -p build/work/mon
@@ -119,6 +120,10 @@ if [ -n "$PASCALFLAGS" ]; then
   if [ -f bbs/bbsc/ra/config.mk ]; then
     python3 tests/pascalmenutest.py build/work/pascalmenu | grep -E "^(FAIL|failures)"
   fi
+fi
+# CP437 -> UTF-8 by terminal type: real telnet callers with different terminal types and ports
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/charsetnettest.py build/work/charsetnet | grep -E "^(FAIL|failures)"
 fi
 # MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files
 if [ -f bbs/bbsc/ra/config.mk ]; then

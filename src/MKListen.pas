@@ -47,6 +47,9 @@ Program MKListen;
               "maxperip": 2,
               "config": "/bbs/mk",             same as "env": {"MK": "/bbs/mk"}
               "env":  { "NAME": "value" },     more environment
+              "charset": "auto",               text for the caller: "auto" (CP437 DOS characters as UTF-8
+                                               for terminals that show UTF-8: by the Telnet terminal
+                                               type; web sockets are UTF-8), "cp437" (as sent) or "utf8"
               "args": ["-L", "-X"],            extra words for the command line
               "proxy": true }                  PROXY header from stunnel comes
                                                first; needs "bind": "127.0.0.1"
@@ -96,6 +99,7 @@ Type
     Env: TStringList;
     Args: String;
     Proxy: Boolean;
+    Charset: String;                   {auto, cp437 or utf8}
     Sysop: Boolean;
     Password: String;
     Fd: LongInt;
@@ -237,6 +241,7 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   P.Env := TStringList.Create;
   P.Args := '';
   P.Proxy := False;
+  P.Charset := 'auto';
   P.Sysop := False;
   P.Password := '';
   P.Fd := -1;
@@ -269,6 +274,14 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
       P.Env.Add('MK=' + JStr(V, Where + '.config'))
     Else If Key = 'proxy' Then
       P.Proxy := JBool(V, Where + '.proxy')
+    Else If Key = 'charset' Then
+      Begin
+      P.Charset := LowerCase(JStr(V, Where + '.charset'));
+      If P.Charset = 'utf-8' Then
+        P.Charset := 'utf8';
+      If (P.Charset <> 'auto') And (P.Charset <> 'cp437') And (P.Charset <> 'utf8') Then
+        Die(Where + '.charset must be "auto", "cp437" or "utf8"');
+      End
     Else If Key = 'password' Then
       P.Password := JStr(V, Where + '.password')
     Else If Key = 'env' Then
@@ -697,6 +710,8 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     ArgS.Add('-B' + IntToStr(P.Baud));
   If P.Proxy Then
     ArgS.Add('-H');
+  If (Not P.Sysop) And (P.Charset <> 'auto') Then
+    ArgS.Add('-U' + UpperCase(P.Charset));
   ArgS.Add('-A' + Addr);
   W := Trim(P.Args);
   While W <> '' Do

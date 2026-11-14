@@ -73,6 +73,7 @@ Type WsComObj = Object(AbsComObj)
   Procedure SetBPS(Rate: LongInt); Virtual;
   Function  GetCommInfo: String; Virtual;
   Function  GetRemoteAddr: String; Virtual;
+  Function  GetTermType: String; Virtual;
   Procedure SetRemoteAddr(Addr: String); Virtual;
   Function  GetWindowSize(Var C, R: Word): Boolean; Virtual;
   Function  WindowVersion: Word; Virtual;
@@ -589,6 +590,12 @@ Procedure WsComObj.SetBPS(Rate: LongInt);
 Function WsComObj.GetCommInfo: String;
   Begin
   GetCommInfo := 'WebSocket over ' + Inner^.GetCommInfo;
+  End;
+
+
+Function WsComObj.GetTermType: String;
+  Begin
+  GetTermType := 'WEBSOCKET';           {a browser terminal: UTF-8}
   End;
 
 
