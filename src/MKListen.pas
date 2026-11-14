@@ -28,7 +28,8 @@ Program MKListen;
      of port objects that start from the global "nodes" and "maxperip":
 
         {
-          "mk":       "/usr/local/bin/mk",     program to start
+          "mk":       "/usr/local/bin/mk",     program to start (a name without a
+                                               slash is looked up in PATH)
           "user":     "mkbbs",                 drop to this user after binding
           "group":    "mkbbs",                 ... and this group
           "logfile":  "/var/log/mkbbs/listen.log",
@@ -306,11 +307,26 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
         ': a sysop port must have "bind": "127.0.0.1" (reach it with ssh port forwarding)');
     If P.Password = '' Then
       Die('port ' + IntToStr(P.Port) + ': a sysop port needs a "password"');
+    If P.Password = 'change-me' Then
+      Die('port ' + IntToStr(P.Port) + ': set a real sysop "password" (still the example one)');
     If P.MaxPerIp = 0 Then
       P.MaxPerIp := 2;
     End;
   SetLength(Ports, Length(Ports) + 1);
   Ports[High(Ports)] := P;
+  End;
+
+
+Function ResolveProg(Const Name: String): String;
+  {A name without a slash is looked up in PATH (execve does not do that)}
+  Begin
+  ResolveProg := Name;
+  If (Name <> '') And (Pos('/', Name) = 0) Then
+    Begin
+    ResolveProg := ExeSearch(Name, GetEnvironmentVariable('PATH'));
+    If ResolveProg = '' Then
+      ResolveProg := Name;
+    End;
   End;
 
 
@@ -377,8 +393,15 @@ Procedure LoadConfig;
     LoadPort(TJSONObject(V.Items[i]), i);
     End;
   Root.Free;
+  MkPath := ResolveProg(MkPath);
   If MonPath = '' Then
-    MonPath := ExtractFilePath(MkPath) + 'mkmon';
+    Begin
+    If Pos('/', MkPath) > 0 Then
+      MonPath := ExtractFilePath(MkPath) + 'mkmon'    {installed next to mk}
+    Else
+      MonPath := 'mkmon';
+    End;
+  MonPath := ResolveProg(MonPath);
   End;
 
 
@@ -843,6 +866,13 @@ Begin
   If TestOnly Then
     Begin
     WriteLn('mklisten: ', CfgFile, ' ok, ', Length(Ports), ' port(s)');
+    WriteLn('  mk:    ', MkPath, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MkPath)), 11));
+    For i := 0 To High(Ports) Do
+      If Ports[i].Sysop Then
+        Begin
+        WriteLn('  mkmon: ', MonPath, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MonPath)), 11));
+        Break;
+        End;
     Halt(0);
     End;
   If LogPath <> '' Then

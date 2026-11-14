@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build all converted MK units and run the tests.
-# Usage: ./build.sh   (objects go to ./build)
+# Usage: ./build.sh                 build everything and run the tests (objects go to ./build)
+#        ./build.sh --build-only    just the programs (what "make" does)
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
@@ -12,6 +13,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkread src/MKRead.pas
+if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
 done
