@@ -56,6 +56,12 @@ If Not ParseAddr(ParamStr(1), DAddr, Addr) Then
   End;
 Nodes.Init;
 Nodes.Load;
+If Nodes.GetError <> 0 Then
+  Begin
+  WriteLn(StdErr, 'Unable to load the nodelist index ' + Config^.GetNodeListPath + Config^.GetNodeIdxName +
+    ' (error ' + Long2Str(Nodes.GetError) + '): build it with mknodeidx');
+  Halt(2);
+  End;
 TmpStr := Nodes.NodeStr(Addr);
 Nodes.Done;
 Dispose(Config, Done);

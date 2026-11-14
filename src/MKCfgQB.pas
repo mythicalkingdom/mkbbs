@@ -26,6 +26,7 @@ Type QBCfgObj = Object(CfgObj)
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
+  Function  SaveFileNames: String; Virtual;
   Procedure QBSave; Virtual; {Normally internal to save Quickbbs config}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
@@ -596,6 +597,12 @@ Procedure QBCfgObj.Load;
 Procedure QBCfgObj.Save;
   Begin
   QBSave;
+  End;
+
+
+Function QBCfgObj.SaveFileNames: String;
+  Begin
+  SaveFileNames := 'QuickCfg.Dat|MsgCfg.Dat|FileCfg.Dat|EventCfg.Dat';
   End;
 
 

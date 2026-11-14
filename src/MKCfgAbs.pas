@@ -34,6 +34,7 @@ Type CfgObj = Object
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
+  Function  SaveFileNames: String; Virtual;   {Names of the files Save writes, separated by |}
   Function  FindBbsFile(FileName: String):String; Virtual; {Return path to bbs file}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
@@ -536,6 +537,12 @@ Procedure CfgObj.Allocate;
 Procedure CfgObj.Save;
   Begin
   End;
+
+Function CfgObj.SaveFileNames: String;
+  Begin
+  SaveFileNames := '';
+  End;
+
 
 Function CfgObj.SaveFileName(FN: String): String;
   Begin

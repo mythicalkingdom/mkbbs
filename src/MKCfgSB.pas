@@ -22,6 +22,7 @@ Type SBCfgObj = Object(CfgObj)
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
+  Function  SaveFileNames: String; Virtual;
   Procedure SBSave; Virtual; {Normally internal to save SuperBbs config}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
@@ -600,6 +601,12 @@ Procedure SBCfgObj.Load;
 Procedure SBCfgObj.Save;
   Begin
   SBSave;
+  End;
+
+
+Function SBCfgObj.SaveFileNames: String;
+  Begin
+  SaveFileNames := 'Config.Bbs|SConfig.Bbs|FlSearch.Bbs';
   End;
 
 

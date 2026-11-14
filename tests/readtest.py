@@ -5,37 +5,23 @@ usage: readtest.py <work dir>   (needs bbs/bbsc/ra, i.e. the sample BBS)"""
 import os, subprocess, sys, shutil
 
 here = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, here)
+import cfgpatch
 root = os.path.join(here, '..')
 work = os.path.abspath(sys.argv[1])
 src = os.path.join(root, 'bbs', 'bbsc', 'ra')
 if not os.path.isdir(src):
     print('skip: no sample BBS'); sys.exit(0)
-dst = os.path.join(work, 'ra')
-shutil.rmtree(dst, ignore_errors=True)       # a clean copy every time
-os.makedirs(dst, exist_ok=True)
-subprocess.check_call(['cp', '-a', src + '/.', dst + '/'])
+dst = cfgpatch.short_dir() + '/r'      # a short path: the configuration holds it in a fixed size field
+shutil.copytree(src, dst)
 # point the message base directory of the Hudson areas at the private copy and every other
 # directory of the sample BBS at a place that does not exist: the test must never write
 # into the real sample bases
 p = os.path.join(dst, 'config.mk')
-d = bytearray(open(p, 'rb').read())
 root = os.path.realpath(os.path.join(root, 'bbs')).encode() + b'/'
 ra = os.path.realpath(src).encode() + b'/'
 new = dst.encode() + b'/'
-i = 0
-changed = 0
-while i < len(d) - 3:
-    L = d[i]
-    s = bytes(d[i + 1:i + 1 + L])
-    if L > 0 and s.startswith(root):
-        rep = new if s == ra else b'/nonexistent/' + s[len(root):]
-        d[i] = len(rep)
-        d[i + 1:i + 1 + len(rep)] = rep
-        i += 1 + len(rep)
-        changed += 1
-    else:
-        i += 1
-open(p, 'wb').write(d)
+cfgpatch.patch(p, root, lambda s: new if s == ra else b'/nonexistent/' + s[len(root):])
 env = dict(os.environ, CFGPROG='mkread', CFGCWD=dst, CFGDIR=dst, CFGDELAY='0.8', CFGARGS='-A183')
 shot = os.path.join(here, 'cfgshot.py')
 

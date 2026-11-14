@@ -24,6 +24,7 @@ Type RACfgObj = Object(CfgObj)
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
+  Function  SaveFileNames: String; Virtual;
   Procedure RASave; Virtual; {Normally internal to save RA config}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
@@ -595,6 +596,12 @@ Procedure RACfgObj.Load;
 Procedure RACfgObj.Save;
   Begin
   RASave;
+  End;
+
+
+Function RACfgObj.SaveFileNames: String;
+  Begin
+  SaveFileNames := 'Config.RA|Messages.Ra|Files.Ra|Events.Ra';
   End;
 
 

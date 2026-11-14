@@ -3,7 +3,7 @@ Program MKCfgCvt;
 {$I MKB.Def}
 
 {
-     mkcfgcvt InputType OutputType
+     mkcfgcvt [-y] InputType OutputType
 
      Converts the BBS configuration from one program's format to another's.
      The types are
@@ -18,10 +18,14 @@ Program MKCfgCvt;
      have to be set (the output directory has to exist).  The output starts
      from the default settings, then everything the formats have in common is
      copied (CCvt).
+
+     Files of the output type that are already there are overwritten, so
+     the program lists them and asks first (answer y); -y answers yes for
+     scripts.  Without an answer (end of input) nothing is written.
 }
 
 Uses
-  Default, CCvt, MKCfgAbs, MKCfgMK, MKCfgRA, MKCfgQB, MKCfgSB, MKGlobT, MKString;
+  Default, CCvt, MKCfgAbs, MKCfgMK, MKCfgRA, MKCfgQB, MKCfgSB, MKGlobT, MKString, MKFile;
 
 
 Var
@@ -31,18 +35,38 @@ Var
   Code: Word;
   InType: Word;
   OutType: Word;
+  AssumeYes: Boolean;
+  Args: Array[1..2] Of String;
+  NumArgs: Word;
+  i: Word;
+  Names, Existing, TmpStr: String;
+  NumExisting: Word;
+  Answer: String;
 
 Begin
-If ParamCount <> 2 Then
-  ParamError := 1
-Else
-  ParamError := 0;
+AssumeYes := False;
+NumArgs := 0;
+ParamError := 0;
+For i := 1 To ParamCount Do
+  Begin
+  If (ParamStr(i) = '-y') Or (ParamStr(i) = '-Y') Then
+    AssumeYes := True
+  Else If NumArgs < 2 Then
+    Begin
+    Inc(NumArgs);
+    Args[NumArgs] := ParamStr(i);
+    End
+  Else
+    ParamError := 1;
+  End;
+If NumArgs <> 2 Then
+  ParamError := 1;
 If ParamError = 0 Then
   Begin
-  Val(ParamStr(1), InType, Code);
+  Val(Args[1], InType, Code);
   If Code <> 0 Then
     ParamError := 4;
-  Val(ParamStr(2), OutType, Code);
+  Val(Args[2], OutType, Code);
   If Code <> 0 Then
     ParamError := 4;
   If ((OutType < 1) or (OutType > 4) or (InType < 1) or (InType > 4)) Then
@@ -54,7 +78,7 @@ If ParamError <> 0 Then
   WriteLn('ERROR: Invalid Command Line');
   WriteLn;
   WriteLn('Proper Syntax is:');
-  WriteLn('MKCfgCvt InputType OutputType');
+  WriteLn('MKCfgCvt [-y] InputType OutputType');
   WriteLn;
   WriteLn('Where InputType and OutputType are');
   WriteLn;
@@ -64,6 +88,7 @@ If ParamError <> 0 Then
   WriteLn('      4 = SuperBbs           (SBBS)');
   WriteLn;
   WriteLn('The environment variable of each type names its configuration directory.');
+  WriteLn('Files of the output type that exist are only overwritten after a yes (-y: always).');
   WriteLn;
   Halt(3);
   End;
@@ -102,6 +127,40 @@ CvtCfg(InRec^, OutRec^);
 CvtMsg(InRec^, OutRec^);
 CvtFile(InRec^, OutRec^);
 CvtEcho(InRec^, OutRec^);
+{ the files that would be written, and which of them exist already }
+Names := OutRec^.SaveFileNames;
+Existing := '';
+NumExisting := 0;
+While Length(Names) > 0 Do
+  Begin
+  i := Pos('|', Names);
+  If i = 0 Then
+    i := Length(Names) + 1;
+  TmpStr := OutRec^.SaveFileName(Copy(Names, 1, i - 1));
+  If FileExist(TmpStr) Then
+    Begin
+    Existing := Existing + '   ' + ResolveCase(TmpStr) + #10;
+    Inc(NumExisting);
+    End;
+  Names := Copy(Names, i + 1, 255);
+  End;
+If (NumExisting > 0) And (Not AssumeYes) Then
+  Begin
+  WriteLn;
+  WriteLn('These files exist and would be overwritten:');
+  Write(Existing);
+  Write('Overwrite them (y/N)? ');
+  Answer := '';
+  If Not Eof(Input) Then
+    ReadLn(Answer);
+  Answer := Upper(StripBoth(Answer, ' '));
+  If (Answer <> 'Y') And (Answer <> 'YES') Then
+    Begin
+    WriteLn;
+    WriteLn('Nothing was written.');
+    Halt(4);
+    End;
+  End;
 WriteLn('Writing new config');
 OutRec^.Save;
 If OutRec^.GetError <> 0 Then

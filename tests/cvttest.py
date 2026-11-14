@@ -32,10 +32,10 @@ for d in (out, outq, outs):
     os.makedirs(d)
 
 
-def run(prog, *args, **env):
+def run(prog, *args, stdin='', **env):
     e = {'PATH': os.environ['PATH']}
     e.update(env)
-    return subprocess.run([os.path.join(build, prog)] + list(args), env=e, capture_output=True, text=True)
+    return subprocess.run([os.path.join(build, prog)] + list(args), env=e, capture_output=True, text=True, input=stdin)
 
 
 r = run('mkcfgcvt')
@@ -59,6 +59,25 @@ lm = open(mk, encoding='latin-1').read().split('\n')[:-1] if os.path.exists(mk) 
 check('converted MK configuration loads and lists %d areas' % (len(lm) // 3), r1.returncode == 0 and r2.returncode == 0 and len(lm) > 0)
 check('short names and names are the same as in the RA configuration',
       [l for i, l in enumerate(la) if i % 3] == [l for i, l in enumerate(lm) if i % 3])
+
+def hashes(d):
+    return {f: hashlib.md5(open(os.path.join(d, f), 'rb').read()).hexdigest() for f in os.listdir(d)}
+
+
+# converting again into the same directory: the files that exist are listed and need a yes
+h = hashes(out)
+os.utime(os.path.join(out, [f for f in os.listdir(out) if f.lower() == 'config.mk'][0]), (1, 1))   # a mark to see a rewrite
+r = run('mkcfgcvt', '2', '1', RA=inp, MK=out, stdin='n\n')
+check('existing files: listed and asked', r.returncode == 4 and 'would be overwritten' in r.stdout and 'Config.MK' in r.stdout
+      and 'Nothing was written' in r.stdout)
+check('answer n: nothing was written', os.path.getmtime(os.path.join(out, [f for f in os.listdir(out) if f.lower() == 'config.mk'][0])) == 1)
+r = run('mkcfgcvt', '2', '1', RA=inp, MK=out, stdin='')
+check('no answer (end of input) counts as no', r.returncode == 4)
+r = run('mkcfgcvt', '2', '1', RA=inp, MK=out, stdin='y\n')
+check('answer y: overwritten', r.returncode == 0 and 'Conversion completed' in r.stdout and hashes(out) == h)
+os.utime(os.path.join(out, [f for f in os.listdir(out) if f.lower() == 'config.mk'][0]), (1, 1))
+r = run('mkcfgcvt', '-y', '2', '1', RA=inp, MK=out)
+check('-y: no question', r.returncode == 0 and 'overwritten' not in r.stdout and 'Conversion completed' in r.stdout)
 
 r = run('mkcfgcvt', '2', '3', RA=inp, QUICK=outq)
 check('Remote Access to QuickBBS: files written', r.returncode == 0 and len(os.listdir(outq)) >= 3)

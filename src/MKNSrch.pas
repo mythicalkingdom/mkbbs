@@ -164,7 +164,7 @@ Procedure NodeListObj.Load;
       NI^.Error := 1000;
     If NI^.Error = 0 Then
       Begin
-      Assign(NI^.IdxFile, FN + Config^.GetNodeIdxName);
+      If Not shAssign(NI^.IdxFile, FN + Config^.GetNodeIdxName) Then NI^.Error := 1010;
       FileMode := fmReadOnly + fmDenyNone;
       If Not shReset(NI^.IdxFile, SizeOf(NodeIdxType)) Then
         NI^.Error := 1010;
@@ -181,7 +181,7 @@ Procedure NodeListObj.Load;
       NI^.Error := 1000;
     If NI^.Error = 0 Then
       Begin
-      Assign(NI^.IncFile, FN + Config^.GetNodeIncName);
+      If Not shAssign(NI^.IncFile, FN + Config^.GetNodeIncName) Then NI^.Error := 1010;
       FileMode := fmReadOnly + fmDenyNone;
       If Not shReset(NI^.IncFile, SizeOf(NodeIncType)) Then
         NI^.Error := 1010;
@@ -277,8 +277,14 @@ Function NodeListObj.GetOffset(Addr: AddrType): LongInt;
   CRegion := 0;
   CNet := 0;
   Finished := False;
+  GetOffset := -1;
   While Not Finished Do
     Begin
+    If i > NI^.NumIdx Then
+      Begin
+      Finished := True;                       {not in the index (it used to run on past the end)}
+      End
+    Else
     Case NI^.NodeIdx[i].NodeType of
       0: Begin                              {Zone}
          CZone := NI^.NodeIdx[i].Number;

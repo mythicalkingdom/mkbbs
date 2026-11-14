@@ -5,39 +5,21 @@ usage: chattest.py <work dir>   (needs bbs/bbsc/ra and build/mk, mklisten, mkmon
 import os, re, socket, subprocess, sys, shutil, json, time
 
 here = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, here)
+import cfgpatch
 repo = os.path.abspath(os.path.join(here, '..'))
 root = os.path.join(here, '..')
 work = os.path.abspath(sys.argv[1])
 src = os.path.join(root, 'bbs', 'bbsc', 'ra')
 if not os.path.isdir(src):
     print('skip: no sample BBS'); sys.exit(0)
-dst = os.path.join(work, 'ra')
-shutil.rmtree(dst, ignore_errors=True)       # a clean copy every time
-os.makedirs(dst, exist_ok=True)
-subprocess.check_call(['cp', '-a', src + '/.', dst + '/'])
-# point the BBS directory (users, logs ...) at the private copy
+dst = cfgpatch.short_dir() + '/r'      # a short path: the configuration holds it in a fixed size field
+shutil.copytree(src, dst)
 p = os.path.join(dst, 'config.mk')
-d = bytearray(open(p, 'rb').read())
 root = os.path.realpath(os.path.join(root, 'bbs')).encode() + b'/'
 ra = os.path.realpath(src).encode() + b'/'
 new = dst.encode() + b'/'
-i = 0
-changed = 0
-while i < len(d) - 3:
-    L = d[i]
-    s = bytes(d[i + 1:i + 1 + L])
-    if L > 0 and s.startswith(root):
-        if s == ra:                          # the user files and logs go to the private copy,
-            d[i] = len(new)                  # menus, texts and so on are only read
-            d[i + 1:i + 1 + len(s)] = new
-            i += 1 + len(new)
-            changed += 1
-        else:
-            i += 1
-    else:
-        i += 1
-
-open(p, 'wb').write(d)
+cfgpatch.patch(p, root, lambda s: new if s == ra else s)
 fails = 0
 
 

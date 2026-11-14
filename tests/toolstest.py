@@ -41,6 +41,6 @@ check('mknodelist: no address: syntax message', r.returncode == 1 and 'syntax' i
 r = subprocess.run([os.path.join(build, 'mknodelist'), 'not an address'], env=env, capture_output=True, text=True)
 check('mknodelist: bad address', r.returncode == 10 and 'Unable to parse' in r.stdout)
 r = subprocess.run([os.path.join(build, 'mknodelist'), '1:110/290'], env=env, capture_output=True, text=True)
-check('mknodelist: no node index: Address Not Found', r.returncode == 0 and 'Address Not Found' in r.stdout)
+check('mknodelist: the sample index names a nodelist that is not there', r.returncode == 0 and 'Unable to Open Nodelist' in r.stdout)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)
