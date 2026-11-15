@@ -12,6 +12,9 @@
 #             UNITDIR=/etc/systemd/system  SYSUSERSDIR=/usr/lib/sysusers.d
 #             SYSTEMD=auto|no    (no: no unit, no user)
 #             DESTDIR=           (staging directory for packagers)
+#             MKBINK=../mkbink   the binkp mailer project (a separate repository): when it is there, its
+#                                program is built and installed too (mklisten runs it, see "mailer" in
+#                                mklisten.example.json)
 #   e.g.  make && sudo make install
 #         make install PREFIX=$HOME/.local SYSCONFDIR=$HOME/.config/mkbbs
 
@@ -24,6 +27,7 @@ UNITDIR    ?= /etc/systemd/system
 SYSUSERSDIR ?= /usr/lib/sysusers.d
 SYSTEMD    ?= auto
 DESTDIR    ?=
+MKBINK     ?= ../mkbink
 
 # true when this install may touch the system: staging, or running as root
 PRIV = [ -n "$(DESTDIR)" ] || [ "$$(id -u)" = 0 ]
@@ -50,6 +54,12 @@ test:
 install: build/.built
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(SYSCONFDIR)
 	for p in $(PROGRAMS); do install -m 755 build/$$p $(DESTDIR)$(BINDIR)/$$p; done
+	@if [ -f $(MKBINK)/Makefile ]; then \
+	  $(MAKE) -s -C $(MKBINK) build/mkbink && install -m 755 $(MKBINK)/build/mkbink $(DESTDIR)$(BINDIR)/mkbink \
+	    && echo "installed mkbink from $(MKBINK)"; \
+	else \
+	  echo "mkbink (the binkp mailer) not found in $(MKBINK): the mailer is not installed (make install MKBINK=<its directory>)"; \
+	fi
 	install -m 644 mklisten.example.json $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
 	@if [ -e $(DESTDIR)$(SYSCONFDIR)/mklisten.json ]; then \
 	  echo "keeping $(DESTDIR)$(SYSCONFDIR)/mklisten.json"; \
@@ -89,7 +99,7 @@ install: build/.built
 	fi
 
 uninstall:
-	for p in $(PROGRAMS); do rm -f $(DESTDIR)$(BINDIR)/$$p; done
+	for p in $(PROGRAMS) mkbink; do rm -f $(DESTDIR)$(BINDIR)/$$p; done
 	rm -f $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
 	rm -f $(DESTDIR)$(UNITDIR)/mklisten.service $(DESTDIR)$(SYSUSERSDIR)/mkbbs.conf
 	@if [ -z "$(DESTDIR)" ] && [ "$$(id -u)" = 0 ] && command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi

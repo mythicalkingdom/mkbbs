@@ -4,6 +4,10 @@
   "logfile": "/var/log/mkbbs/mklisten.log",
   "workdir": "/bbs/ra",
   "nodes": "1-8",
+  "_note_mailer": "the binkp mailer (mkbink): mklisten makes its settings with mkbinkcfg from the BBS configuration (mkconfig: EchoMail > Mailer) and runs it while the mailer is switched on there; without this section nothing is run",
+  "mailer": {
+    "config": "/bbs/ra"
+  },
   "ports": [
     {
       "port": 2323,

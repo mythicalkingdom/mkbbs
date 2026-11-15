@@ -8,6 +8,7 @@ Type=simple
 User=@MKUSER@
 Group=@MKUSER@
 ExecStart=@BINDIR@/mklisten -f -c @SYSCONFDIR@/mklisten.json
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5
 
@@ -17,7 +18,9 @@ RuntimeDirectory=mkbbs
 LogsDirectory=mkbbs
 
 # Stopping or restarting the listener must not hang up the callers: they are
-# processes of their own (mk) and carry on until they log off.
+# processes of their own (mk) and carry on until they log off.  (The mailer, mkbink,
+# is stopped by the listener itself.)  systemctl reload makes the mailer read its
+# settings again.
 KillMode=process
 SendSIGKILL=no
 
