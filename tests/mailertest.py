@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Mailer settings: the mkconfig pages (Mailer, Mailer Links) save Mailer.Mk, and mkbinkcfg turns the configuration into
+the settings file of mkbink (checked with "mkbink check" when the mkbink project is built next to this one).
+usage: mailertest.py <work dir>"""
+import os, shutil, stat, subprocess, sys, time
+
+here = os.path.dirname(os.path.abspath(__file__))
+repo = os.path.realpath(os.path.join(here, '..'))
+work = os.path.abspath(sys.argv[1])
+src = os.path.join(repo, 'bbs', 'bbsc', 'ra')
+if not os.path.isdir(src):
+    print('skip: no sample BBS'); sys.exit(0)
+shutil.rmtree(work, ignore_errors=True)
+os.makedirs(work)
+cfg = os.path.join(work, 'ra')
+shutil.copytree(src, cfg)
+binkcfg = os.path.join(repo, 'build', 'mkbinkcfg')
+mkbink = os.environ.get('MKBINK', os.path.join(repo, '..', 'mkbink', 'build', 'mkbink'))
+env = dict(os.environ, MK=cfg)
+fails = 0
+
+# the record: Mailer.Mk is MailerCfgType, 1 KB of expansion at the end
+SIZE, LINKS, LINK = 12600, 184, 178
+
+
+def check(name, ok):
+    global fails
+    print(('ok   ' if ok else 'FAIL ') + 'mailer: ' + name)
+    if not ok:
+        fails += 1
+
+
+def tool(*args):
+    r = subprocess.run([binkcfg] + list(args), capture_output=True, text=True, env=env)
+    return r.returncode, r.stdout, r.stderr
+
+
+def screen(*keys):
+    e = dict(env, CFGDIR=cfg, CFGDELAY='0.25')
+    r = subprocess.run([sys.executable, os.path.join(here, 'cfgshot.py')] + list(keys), capture_output=True, text=True, env=e)
+    return r.stdout
+
+
+mailer = os.path.join(cfg, 'Mailer.Mk')
+mailer = [os.path.join(cfg, f) for f in os.listdir(cfg) if f.lower() == 'mailer.mk'] or [os.path.join(cfg, 'Mailer.Mk')]
+mailer = mailer[0]
+
+# ---- the echo paths (EchoMail Options): relative to the BBS directory
+check('the sample has no echo paths: mkbinkcfg refuses', tool('-n')[0] == 1)
+screen('\\x1bc', 'o', 'files/in', '\\t', 'mail/out', '\\r', '\\x1bx', 'y')
+
+# ---- no Mailer.Mk: defaults, mailer not enabled
+rc, out, err = tool('-n')
+check('no Mailer.Mk: the defaults (listen yes, port 24554, retry 60/3600)',
+      rc == 0 and 'listen yes' in out and 'port 24554' in out and 'retry-min 60' in out and 'retry-max 3600' in out)
+check('... the BBS address, name, sysop and the echo paths (relative ones from the BBS directory) come from the BBS configuration',
+      out.count('address ') >= 1 and 'sysname ' in out and 'sysop ' in out and
+      ('inbound %s/files/in' % cfg) in out and ('bso %s/mail/out' % cfg) in out)
+rc, out, err = tool()
+check('not enabled: exit 3, nothing written', rc == 3 and not os.path.exists(os.path.join(cfg, 'mkbink.conf')))
+
+# ---- mkconfig: enable the mailer, set two links, save
+s = screen('\x1bc'.encode().decode('latin-1') if False else '\\x1bc', 'm')
+check('EchoMail > Mailer shows the settings page', 'Mailer enabled' in s and 'Retry after' in s and 'Accept unknown' in s)
+s = screen('\\x1bc', 'l')
+check('EchoMail > Mailer Links shows 64 numbered entries', '(unused)' in s and 'Mailer Links' in s)
+keys = ['\\x1bc', 'm', ' ', '\\t' * 10, 'fidonet', '\\r',                       # enabled, domain
+        '\\x1bc', 'l', '\\r', '1', '\\t', '110', '\\t', '100', '\\t', '\\t', 'Test Hub', '\\t', '127.0.0.1', '\\t', '24602', '\\t', '15',
+        '\\t', '\\t', 'secret', '\\r',                                          # link 1
+        '\\x1b[B', '\\r', '1', '\\t', '110', '\\t', '200', '\\t', '\\t', 'Down Link', '\\t', '\\t', '\\t', '\\t', '\\t', 'p2', '\\t', ' ', '\\r',  # link 2: answer only
+        '\\x1b', '\\x1bx', 'y']
+screen(*keys)
+check('Mailer.Mk was written with the pinned size (%d: record + 1 KB expansion)' % SIZE,
+      os.path.exists(mailer) and os.path.getsize(mailer) == SIZE)
+d = open(mailer, 'rb').read()
+check('flags: enabled + listen; domain "fidonet"', d[2] & 3 == 3 and b'fidonet' in d[:LINKS])
+rc, out, err = tool('-n')
+check('mkbinkcfg -n: link 1 with host, port, password, poll', 'link 1:110/100' in out and 'host 127.0.0.1' in out and
+      'port 24602' in out and 'password secret' in out and 'poll 15' in out and 'name Test Hub' in out)
+check('... link 2 answers only (no host, no call)', 'link 1:110/200' in out and 'answer-only yes' in out and 'password p2' in out)
+check('... domain', 'domain fidonet' in out)
+
+# ---- the file
+rc, out, err = tool()
+conf = os.path.join(cfg, 'mkbink.conf')
+check('mkbinkcfg writes mkbink.conf (%s)' % out.strip().replace(cfg, '.'), rc == 0 and os.path.exists(conf))
+check('... mode 600 (it holds passwords)', os.path.exists(conf) and stat.S_IMODE(os.stat(conf).st_mode) == 0o600)
+m1 = os.stat(conf).st_mtime_ns
+time.sleep(0.05)
+rc, out, err = tool()
+check('a second run leaves it alone (up to date)', rc == 0 and 'up to date' in out and os.stat(conf).st_mtime_ns == m1)
+check('no .new file left', not os.path.exists(conf + '.new'))
+rc, out, err = tool('-q')
+check('-q says nothing', rc == 0 and out == '')
+if os.path.exists(mkbink):
+    r = subprocess.run([mkbink, 'check', '-f', conf], capture_output=True, text=True)
+    check('mkbink check accepts the file (%s)' % r.stdout.strip().splitlines()[-1] if r.stdout.strip() else 'no output',
+          r.returncode == 0 and 'ok: 2 link(s)' in r.stdout and 'warning' not in r.stdout)
+else:
+    print('skip mkbink check: %s not built' % mkbink)
+
+# ---- an older / shorter / foreign Mailer.Mk
+good = open(mailer, 'rb').read()
+open(mailer, 'wb').write(good[:LINKS + LINK])          # made by an older version: only the first link is in it
+rc, out, err = tool('-n')
+check('a shorter file: what is in it is used, the rest keeps its defaults', rc == 0 and 'link 1:110/100' in out and 'link 1:110/200' not in out and 'retry-min 60' in out)
+bad = bytearray(good); bad[0:2] = (99).to_bytes(2, 'little')
+open(mailer, 'wb').write(bad)
+rc, out, err = tool('-n')
+check('a version we do not know is not used (defaults)', rc == 0 and 'link 1:' not in out)
+
+
+def patched(fn):
+    d = bytearray(good)
+    fn(d)
+    open(mailer, 'wb').write(d)
+
+
+def put(d, off, text, size):
+    d[off:off + size] = bytes([len(text)]) + text.encode() + bytes(size - 1 - len(text))
+
+
+def addr(d, base, z, n, f, p=0):
+    d[base:base + 8] = b''.join(v.to_bytes(2, 'little') for v in (z, n, f, p))
+
+
+patched(lambda d: addr(d, LINKS + LINK, 1, 110, 100))
+before = open(conf, 'rb').read()
+rc2, out2, err2 = tool()
+check('two links with one address: error, nothing written (exit 1)', rc2 == 1 and 'same address' in err2 and open(conf, 'rb').read() == before
+      and not os.path.exists(conf + '.new'))
+patched(lambda d: put(d, LINKS + 8 + 31 + 61 + 2, 'bad #word', 31))
+rc, out, err = tool('-n')
+check('a password with " #" is refused', rc == 1 and 'password' in err)
+patched(lambda d: d.__setitem__(LINKS + 8 + 31 + 61 + 2 + 31 + 2 + 2, 7))
+rc, out, err = tool('-n')
+check('"our address" 7 that is not set is refused', rc == 1 and 'our address 7' in err)
+patched(lambda d: d.__setitem__(LINKS + 8 + 31 + 61 + 2 + 31, 2))   # link 1 flags: disabled
+rc, out, err = tool('-n')
+check('a disabled link is left out', rc == 0 and 'link 1:110/100' not in out and 'link 1:110/200' in out)
+
+print('failures: %d' % fails)
+sys.exit(1 if fails else 0)

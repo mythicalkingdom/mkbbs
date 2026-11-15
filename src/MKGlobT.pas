@@ -66,6 +66,67 @@ Const
   uoWait   =  9;
   uoLogIn  = 10;
 
+{ The binkp mailer (mkbink) settings: file Mailer.Mk, one record.  The mailer's own address, name, sysop and
+  location come from Config.Mk, its inbound / BSO outbound directories from EchoCfg.Mk (EchoMail Options).
+  Expansion is room for fields added later (the record keeps its size); the Req fields are for file requests. }
+
+Const
+  MaxMailLinks = 64;
+  MailerCfgVersion = 1;
+
+  mcEnabled       = 1;                 {the mailer runs (mklisten starts it)}
+  mcListen        = 2;                 {accept calls}
+  mcRequireCram   = 4;                 {refuse cleartext passwords}
+  mcPlz           = 8;                 {offer PLZ compression}
+  mcNr            = 16;                {ask for non-reliable mode}
+  mcAcceptUnknown = 32;                {let a system without a link call, with UnknownPwd}
+  mcFileReq       = 64;                {reserved: answer file requests}
+
+  mlAnswerOnly = 1;                    {never call this link, only answer its calls}
+  mlDisabled   = 2;                    {kept in the list but not used}
+  mlPlzOn      = 4;                    {PLZ for this link whatever the global setting}
+  mlPlzOff     = 8;
+  mlNrOn       = 16;                   {NR for this link}
+  mlNrOff      = 32;
+
+Type MailLinkType = Record
+  Addr: AddrType;                      {address of the link, Zone 0 = unused entry}
+  Name: String[30];                    {for the displays}
+  Host: String[60];                    {host name or address to call, blank = cannot be called}
+  Port: Word;                          {0 = the binkp port, 24554}
+  Password: String[30];                {session password, blank = none}
+  Flags: Word;                         {ml constants}
+  PollMin: Word;                       {call every N minutes, 0 = only when mail is waiting}
+  UseAka: Byte;                        {which of our addresses (1..10) is presented first, 0 = the main one}
+  ReqSec: SecType;                     {reserved: file request access of this link, Level 0 = the global one}
+  ReqAttr: Word;                       {reserved}
+  Expansion: Array[1..32] of Byte;
+  End;
+
+Type MailerCfgType = Record
+  Version: Word;                       {MailerCfgVersion}
+  Flags: Word;                         {mc constants}
+  Port: Word;                          {listen port}
+  Bind: String[40];                    {listen address, blank = all}
+  MaxSessions: Byte;                   {callers served at once}
+  MaxPolls: Byte;                      {calls made at once}
+  Timeout: Word;                       {seconds without activity}
+  RetryMin: Word;                      {seconds before the first retry of a failed call}
+  RetryMax: Word;                      {... doubled each time, up to this}
+  ScanInterval: Word;                  {seconds between looks at the outbound}
+  Domain: String[20];                  {network domain for addresses, e.g. fidonet}
+  UnknownPwd: String[30];              {password for systems without a link (mcAcceptUnknown)}
+  ReqSec: SecType;                     {reserved: access of the file request user (level and flags)}
+  ReqMagicFile: String[60];            {reserved: file with the magic names and their passwords}
+  ReqMaxFiles: Word;                   {reserved}
+  ReqMaxKb: LongInt;                   {reserved}
+  ReqAttr: Word;                       {reserved}
+  Links: Array[1..MaxMailLinks] of MailLinkType;
+  Expansion: Array[1..1024] of Byte;   {room for new settings}
+  End;
+
+Procedure MailerDefaults(Var M: MailerCfgType);
+
 Function  AddrStr(Addr: AddrType): String;
 Function  PointlessAddrStr(Var Addr: AddrType): String;
 Function  ParseAddr(AStr: String; CurrAddr: AddrType; Var DestAddr: AddrType): Boolean;
@@ -103,6 +164,21 @@ Const
 Implementation
 
 Uses MKString, Crc32, MKMisc;
+
+
+Procedure MailerDefaults(Var M: MailerCfgType);
+  Begin
+  FillChar(M, SizeOf(M), 0);
+  M.Version := MailerCfgVersion;
+  M.Flags := mcListen;
+  M.Port := 24554;
+  M.MaxSessions := 8;
+  M.MaxPolls := 1;
+  M.Timeout := 120;
+  M.RetryMin := 60;
+  M.RetryMax := 3600;
+  M.ScanInterval := 30;
+  End;
 
 
 {$I Compiled.Inc}

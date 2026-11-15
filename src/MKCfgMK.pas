@@ -18,9 +18,11 @@ Type MKCfgObj = Object(CfgObj)
   MKMsg:    ^MsgCfgType;
   MKFile: ^FileCfgType;
   MKEcho:   ^EchoCfgType;
+  MKMail:   ^MailerCfgType;
   Procedure Load; Virtual; {Loads Bbs config info}
   Procedure Unload; Virtual; {Not normally called direct - unloads config}
   Procedure MKLoad; Virtual;{Normally internal to load MK config}
+  Procedure MKMailLoad;
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
@@ -252,6 +254,9 @@ Type MKCfgObj = Object(CfgObj)
   Procedure SetEchoAreaTag(Area: Word; Tag: String); Virtual; {Set area tag name}
   Function  GetEchoMaxPkt: LongInt; Virtual; {Get maximum pkt size}
   Procedure SetEchoMaxPkt(MP: LongInt); Virtual; {Set maximum pkt size}
+  Function  HasMailer: Boolean; Virtual;
+  Procedure GetMailer(Var M: MailerCfgType); Virtual;
+  Procedure SetMailer(Var M: MailerCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
   Procedure SetEchoInPath(EP: String); Virtual; {Set inbound files path}
   Function  GetEchoOutPath: String; Virtual; {Get outbound files path}
@@ -559,12 +564,38 @@ Procedure MKCfgObj.SetBbsPath(BPath: String);      {Set main Bbs Directory}
   End;
 
 
+Procedure MKCfgObj.MKMailLoad;
+  {Mailer.Mk may be missing or shorter than the record (made by an older version): what is not in the file keeps
+   its default.  A file with a version we do not know is not used.}
+  Var
+    FN: String;
+    Tmp: ^MailerCfgType;
+
+  Begin
+  FN := FindBbsFile('Mailer.Mk') + 'Mailer.Mk';
+  If Not FileExist(FN) Then
+    Exit;
+  New(Tmp);
+  MailerDefaults(Tmp^);
+  If LoadFile(FN, Tmp^, SizeOf(Tmp^)) = 0 Then
+    Begin
+    If (Tmp^.Version >= 1) And (Tmp^.Version <= MailerCfgVersion) Then
+      MKMail^ := Tmp^;
+    End
+  Else
+    Error := 8889;
+  Dispose(Tmp);
+  End;
+
+
 Procedure MKCfgObj.MKLoad;
   Begin
   New(MKCfg);
   New(MKMsg);
   New(MKFile);
   New(MKEcho);
+  New(MKMail);
+  MailerDefaults(MKMail^);
   FileMode := fmReadWrite + fmDenyNone;
   Error := LoadFile(FindBbsFile('Config.Mk') + 'Config.Mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
@@ -574,6 +605,10 @@ Procedure MKCfgObj.MKLoad;
   If Error = 0 Then
     Error := LoadFile(FindBbsFile('EchoCfg.Mk') + 'EchoCfg.Mk', MKEcho^, SizeOf(MKEcho^));
   If Error = 0 Then
+    Begin                              {Mailer.Mk is optional (a shorter file keeps the defaults for the rest)}
+    MKMailLoad;
+    End;
+  If Error = 0 Then
     CfgInfo^.Loaded := True
   Else
     Begin
@@ -582,6 +617,7 @@ Procedure MKCfgObj.MKLoad;
     Dispose(MkMsg);
     Dispose(MkFile);
     Dispose(MKEcho);
+    Dispose(MKMail);
     End;
   End;
 
@@ -594,6 +630,8 @@ Procedure MKCfgObj.Allocate;
     New(MKMsg);
     New(MKFile);
     New(MKEcho);
+    New(MKMail);
+    MailerDefaults(MKMail^);
     FillChar(MKCfg^, SizeOf(MKCfg^), 0);
     FillChar(MKMsg^, SizeOf(MKMsg^), 0);
     FillChar(MKFile^, SizeOf(MKFile^), 0);
@@ -613,6 +651,7 @@ Procedure MKCfgObj.Unload;
     Dispose(MKMsg);
     Dispose(MKFile);
     Dispose(MKEcho);
+    Dispose(MKMail);
     CfgInfo^.Loaded := False;
     End;
   End;
@@ -661,7 +700,7 @@ Procedure MKCfgObj.Save;
 
 Function MKCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'Config.MK|Messages.Mk|Files.Mk|EchoCfg.Mk';
+  SaveFileNames := 'Config.MK|Messages.Mk|Files.Mk|EchoCfg.Mk|Mailer.Mk';
   End;
 
 
@@ -687,6 +726,8 @@ Procedure MKCfgObj.MKSave;
     Error := SaveFile(SaveFileName('Files.Mk'), MKFile^, SizeOf(MKFile^));
   If Error = 0 Then
     Error := SaveFile(SaveFileName('EchoCfg.Mk'), MKEcho^, SizeOf(MKEcho^));
+  If Error = 0 Then
+    Error := SaveFile(SaveFileName('Mailer.Mk'), MKMail^, SizeOf(MKMail^));
   End;
 
 
@@ -2497,6 +2538,25 @@ Function MKCfgObj.GetEchoMaxPkt: LongInt;
 Procedure MKCfgObj.SetEchoMaxPkt(MP: LongInt);
   Begin
   MKEcho^.MaxPktSize := MP;
+  End;
+
+
+Function MKCfgObj.HasMailer: Boolean;
+  Begin
+  HasMailer := True;
+  End;
+
+
+Procedure MKCfgObj.GetMailer(Var M: MailerCfgType);
+  Begin
+  M := MKMail^;
+  End;
+
+
+Procedure MKCfgObj.SetMailer(Var M: MailerCfgType);
+  Begin
+  MKMail^ := M;
+  MKMail^.Version := MailerCfgVersion;
   End;
 
 

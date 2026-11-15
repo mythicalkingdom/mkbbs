@@ -268,6 +268,9 @@ Type CfgObj = Object
   Procedure SetEchoAreaTag(Area: Word; Tag: String); Virtual; {Set area tag name}
   Function  GetEchoMaxPkt: LongInt; Virtual; {Get maximum pkt size}
   Procedure SetEchoMaxPkt(MP: LongInt); Virtual; {Set maximum pkt size}
+  Function  HasMailer: Boolean; Virtual; {The format keeps mailer (mkbink) settings}
+  Procedure GetMailer(Var M: MailerCfgType); Virtual; {Mailer settings, defaults if none}
+  Procedure SetMailer(Var M: MailerCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
   Procedure SetEchoInPath(EP: String); Virtual; {Set inbound files path}
   Function  GetEchoOutPath: String; Virtual; {Get outbound files path}
@@ -1488,6 +1491,20 @@ Function CfgObj.GetEchoMaxPkt: LongInt; {Get maximum pkt size}
   End;
 
 Procedure CfgObj.SetEchoMaxPkt(MP: LongInt); {Set maximum pkt size}
+  Begin
+  End;
+
+Function CfgObj.HasMailer: Boolean;
+  Begin
+  HasMailer := False;
+  End;
+
+Procedure CfgObj.GetMailer(Var M: MailerCfgType);
+  Begin
+  MailerDefaults(M);
+  End;
+
+Procedure CfgObj.SetMailer(Var M: MailerCfgType);
   Begin
   End;
 

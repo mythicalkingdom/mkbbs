@@ -49,7 +49,8 @@ r = run('mkcfgcvt', '2', '1', RA=inp, MK=out)
 check('Remote Access to MK completed', r.returncode == 0 and 'Conversion completed' in r.stdout)
 names = {os.path.basename(f).lower(): os.path.getsize(f) for f in glob.glob(os.path.join(out, '*'))}
 want = {n: os.path.getsize(os.path.join(sample, n)) for n in ('config.mk', 'echocfg.mk', 'files.mk', 'messages.mk')}
-check('the four MK files have the sizes of the real ones: %s' % names, names == want)
+want['mailer.mk'] = 12600            # new: the mailer settings, written with the defaults
+check('the four MK files have the sizes of the real ones, and Mailer.Mk the size of its record: %s' % names, names == want)
 ra = os.path.join(work, 'ra.txt')
 mk = os.path.join(work, 'mk.txt')
 r1 = run('mklist', ra, RA=inp)

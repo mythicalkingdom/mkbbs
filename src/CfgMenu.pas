@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea;
+  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail;
 
 Const
   cmGeneral = 1000;
@@ -62,6 +62,8 @@ Const
   cmEvents = 1039;
   cmEchoSys = 1040;
   cmEchoOpt = 1041;
+  cmMailer = 1043;
+  cmMailLinks = 1044;
   cmQuitCfg = 1042;
   cmQuitDlg = 2000;
 
@@ -145,6 +147,8 @@ Function CfgStatus.Hint(AHelpCtx: Word): String;
     cmEvents: Hint := 'Setup Events';
     cmEchoSys: Hint := 'Systems Exchanging EchoMail';
     cmEchoOpt: Hint := 'EchoMail Options';
+    cmMailer: Hint := 'Mailer (binkp) Settings';
+    cmMailLinks: Hint := 'Systems the Mailer Calls and Answers';
     cmQuitCfg: Hint := 'Quit and Save Changes';
     End;
   End;
@@ -224,7 +228,9 @@ Procedure CfgApp.InitMenuBar;
         NewMenu(
           NewItem('~S~ystems', '', kbNoKey, cmEchoSys, cmEchoSys,
             NewItem('~O~ptions', '', kbNoKey, cmEchoOpt, cmEchoOpt,
-            Nil))),
+            NewItem('~M~ailer', '', kbNoKey, cmMailer, cmMailer,
+            NewItem('Mailer ~L~inks', '', kbNoKey, cmMailLinks, cmMailLinks,
+            Nil))))),
         NewItem('~Q~uit', '', kbNoKey, cmQuitCfg, cmQuitCfg,
         Nil))))))
     )));
@@ -307,6 +313,8 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmEvents: DoCfgEvent;
       cmEchoSys: DoCfgPSys;
       cmEchoOpt: DoCfgEOpt;
+      cmMailer: DoCfgMailer;
+      cmMailLinks: DoCfgMailLinks;
       Else Exit;
       End;
     ClearEvent(Event);

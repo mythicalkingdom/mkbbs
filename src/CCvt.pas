@@ -25,8 +25,16 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     i: Word;
     j: Word;
     Addr: AddrType;
+    Mail: ^MailerCfgType;
 
   Begin
+  If IConfig.HasMailer And OConfig.HasMailer Then
+    Begin                              {the mailer settings, when both formats keep them}
+    New(Mail);
+    IConfig.GetMailer(Mail^);
+    OConfig.SetMailer(Mail^);
+    Dispose(Mail);
+    End;
   OConfig.SetEchoMaxPkt(IConfig.GetEchoMaxPkt);
   OConfig.SetEchoInPath(IConfig.GetEchoInPath);
   OConfig.SetEchoOutPath(IConfig.GetEchoOutPath);

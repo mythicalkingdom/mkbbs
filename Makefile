@@ -1,6 +1,6 @@
 # MK BBS (Free Pascal)
 #
-#   make                  build the programs (build/mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklist mknodelist mknodeidx mkcfgcvt)
+#   make                  build the programs (build/mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklist mknodelist mknodeidx mkcfgcvt mkbinkcfg)
 #   make test             build and run all the tests (./build.sh)
 #   make install          install into /usr/local/bin and /etc/mkbbs, create the log
 #                         directory, the mkbbs user and the systemd unit (as root)
@@ -30,7 +30,7 @@ PRIV = [ -n "$(DESTDIR)" ] || [ "$$(id -u)" = 0 ]
 # true when the systemd pieces (unit, user) are wanted
 WANTSD = [ "$(SYSTEMD)" != no ] && { [ -n "$(DESTDIR)" ] || { [ "$$(id -u)" = 0 ] && [ -d /run/systemd/system ]; }; }
 
-PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklist mknodelist mknodeidx mkcfgcvt
+PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklist mknodelist mknodeidx mkcfgcvt mkbinkcfg
 
 .PHONY: all test install uninstall clean lang
 

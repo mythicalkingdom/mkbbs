@@ -88,7 +88,10 @@ begin
   Check('ANSI-BBS: the bytes go out as they are', L.Outp = S);
   Begin_('xterm', 0); User.DisplayStr(S);
   Check('xterm: the box characters are UTF-8, the ESC sequence is not touched: ' + Hex(Copy(L.Outp, 1, 16)),
-    L.Outp = 'Box '#$E2#$95#$94#$E2#$95#$90#$E2#$95#$97' '#$E2#$96#$91' '#27'[1;31m'#$C3#$A9);
+    L.Outp = #27'[37;40mBox '#$E2#$95#$94#$E2#$95#$90#$E2#$95#$97' '#$E2#$96#$91' '#27'[1;31m'#$C3#$A9);
+  Begin_('xterm', 0); User.DisplayStr(#27'[0m'#27'[0;1;34m'#27'[0;42mx'#27'[m'#27'[1;31;44my');
+  Check('xterm: a colour reset gets light gray / black unless it sets them itself: ' + Hex(Copy(L.Outp, 1, 40)),
+    L.Outp = #27'[0m'#27'[37;40m'#27'[0;1;34m'#27'[40m'#27'[0;42m'#27'[37m'+'x'#27'[m'#27'[37;40m'#27'[1;31;44my');
   Begin_('xterm', 1); User.DisplayStr(S);
   Check('forced CP437 (-UCP437) on an xterm: as they are', L.Outp = S);
   Begin_('ANSI-BBS', 2); User.DisplayStr(S);
