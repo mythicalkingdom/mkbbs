@@ -883,6 +883,8 @@ Procedure StartMailer;
   ArgS.Add('run');
   ArgS.Add('-f');
   ArgS.Add(MailSettings);
+  ArgS.Add('-S');                            {the monitor (mkmon) finds it in the run directory}
+  ArgS.Add(RunDir + '/mailer.sock');
   SetLength(Argv, ArgS.Count + 1);
   For i := 0 To ArgS.Count - 1 Do
     Argv[i] := PChar(ArgS[i]);

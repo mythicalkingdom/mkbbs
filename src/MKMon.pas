@@ -20,7 +20,8 @@ Program MKMon;
      text, or "sha1:" and the hex digest).  Without that variable only the
      list (-l) works.
 
-     In the node list: a node number and Enter watch the node, the number and
+     In the node list: M shows the mailer (the binkp mailer mkbink that mklisten runs, see MKMonMail);
+     a node number and Enter watch the node, the number and
      K disconnect it, C chat with the caller (watches the node, the chat starts
      when the BBS is ready), + / - give / take 5 minutes.  While
      watching, everything is view only until typing is switched on; commands
@@ -37,7 +38,7 @@ Program MKMon;
 
 Uses
   BaseUnix, Sockets, Dos, sha1,
-  MKString, MKFile, MKGlobT, MKComAbs, MKSess, MKCfgAbs, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB;
+  MKString, MKFile, MKGlobT, MKComAbs, MKSess, MKMonMail, MKCfgAbs, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB;
 
 
 Type
@@ -372,17 +373,17 @@ Procedure ShowNodes(Typed: String);
 
   Begin
   LoadNodes;
-  Say(Esc + '[0m' + Esc + '[2J' + Esc + '[H');
-  SayLn(Esc + '[1;37mMK sysop monitor' + Esc + '[0m   ' + Long2Str(NumNodes) + ' node(s) in use');
+  Say(Esc + '[0;37;40m' + Esc + '[2J' + Esc + '[H');
+  SayLn(Esc + '[1;37;40mMK sysop monitor' + Esc + '[0;37;40m   ' + Long2Str(NumNodes) + ' node(s) in use');
   SayLn('');
-  SayLn(Esc + '[1;33m' + HeadLine + Esc + '[0m');
+  SayLn(Esc + '[1;33;40m' + HeadLine + Esc + '[0;37;40m');
   For i := 1 To NumNodes Do
     SayLn(NodeLine(Nodes[i]));
   If NumNodes = 0 Then
     SayLn('(nobody is online)');
   SayLn('');
   SayLn('Type a node number, then:  Enter watch   C chat   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
-  Say('R refresh, Q quit: ' + Typed);
+  Say('R refresh, M mailer, Q quit: ' + Typed);
   CommFlushOut;
   End;
 
@@ -997,6 +998,18 @@ Procedure Monitor;
         'R': Begin
              Typed := '';
              ShowNodes(Typed);
+             End;
+        'M': Begin
+             Typed := '';
+             Msg := MailerScreen(RunDir);       {the binkp mailer (mkbink), if mklisten runs it}
+             ShowNodes('');
+             If Msg <> '' Then
+               Begin
+               SayLn('');
+               SayLn(Msg);
+               CommFlushOut;
+               Msg := '';
+               End;
              End;
         'Q', #24, #3: Exit;
         'C': If Typed <> '' Then

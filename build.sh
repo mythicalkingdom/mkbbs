@@ -103,6 +103,9 @@ fi
 # mklisten runs the mailer (fake programs, then the real ones when mkbink is built next to this project)
 python3 tests/mailerlistentest.py build/mlwork | grep -E "^(ok|FAIL|skip)" | tee build/mlresult.txt
 if grep -q FAIL build/mlresult.txt; then exit 1; fi
+# the Mailer screen of mkmon (needs the real mkbink next to this project)
+python3 tests/mailmontest.py build/mmwork | grep -E "^(ok|FAIL|skip)" | tee build/mmresult.txt
+if grep -q FAIL build/mmresult.txt; then exit 1; fi
 # language compiler: the sample LC files must compile back to the same bytes; area list and nodelist tools
 mkdir -p build/work/lc build/work/tools
 python3 tests/lctest.py build/mklc build/work/lc | grep -E "^(FAIL|failures)"
