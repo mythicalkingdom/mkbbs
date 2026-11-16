@@ -185,6 +185,7 @@ Type JamMsgObj = Object (AbsMsgObj)
   Procedure SetReqAud(SS: Boolean); Virtual; {Set request audit status}
   Procedure SetRetRct(SS: Boolean); Virtual; {Set return receipt status}
   Procedure SetFileReq(SS: Boolean); Virtual; {Set file request status}
+  Procedure SetHold(HS: Boolean); Virtual; {Set hold for pickup status}
   Procedure DoString(Str: String); Virtual; {Add string to message text}
   Procedure DoChar(Ch: Char); Virtual; {Add character to message text}
   Procedure DoStringLn(Str: String); Virtual; {Add string and newline to msg text}
@@ -219,6 +220,7 @@ Type JamMsgObj = Object (AbsMsgObj)
   Function  IsReqAud: Boolean; Virtual; {Is current msg request audit}
   Function  IsRetRct: Boolean; Virtual; {Is current msg a return receipt}
   Function  IsFileReq: Boolean; Virtual; {Is current msg a file request}
+  Function  IsHold: Boolean; Virtual; {Is current msg held for pickup}
   Function  IsRcvd: Boolean; Virtual; {Is current msg received}
   Function  IsPriv: Boolean; Virtual; {Is current msg priviledged/private}
   Function  IsDeleted: Boolean; Virtual; {Is current msg deleted}
@@ -497,6 +499,12 @@ Procedure JamMsgObj.SetReqAud(SS: Boolean);
 
 Procedure JamMsgObj.SetRetRct(SS: Boolean);
   Begin
+  End;
+
+
+Procedure JamMsgObj.SetHold(HS: Boolean);
+  Begin
+  SetAttr1(Jam_Hold, HS);
   End;
 
 
@@ -1200,6 +1208,12 @@ Function JamMsgObj.IsReqAud: Boolean; {Is current msg request audit}
 Function JamMsgObj.IsRetRct: Boolean; {Is current msg a return receipt}
   Begin
   IsRetRct := False;
+  End;
+
+
+Function JamMsgObj.IsHold: Boolean; {Is current msg held for pickup}
+  Begin
+  IsHold := (MsgHdr^.JamHdr.Attr1 and Jam_Hold) <> 0;
   End;
 
 

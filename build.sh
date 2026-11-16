@@ -101,6 +101,20 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/mailertest.py build/mailwork | grep -E "^(ok|FAIL|skip)" | tee build/mailresult.txt
   if grep -q FAIL build/mailresult.txt; then exit 1; fi
 fi
+# hold in the abstract message object (False where a base has no such flag)
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/holdabstest tests/holdabstest.pas 2>&1 | grep -E "Error|Fatal" || true
+build/holdabstest | grep -E "^(ok|FAIL|failures)" | tee build/holdabsresult.txt
+if grep -q FAIL build/holdabsresult.txt; then exit 1; fi
+# hold in JAM, Squish and Merlin (written, read back, changed)
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/holdbasetest tests/holdbasetest.pas 2>&1 | grep -E "Error|Fatal" || true
+mkdir -p build/holdwork
+build/holdbasetest build/holdwork | grep -E "^(ok|FAIL|failures)" | tee build/holdbaseresult.txt
+if grep -q FAIL build/holdbaseresult.txt; then exit 1; fi
+# Fido *.msg: the hold flag
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/fidtest tests/fidtest.pas 2>&1 | grep -E "Error|Fatal" || true
+mkdir -p build/fidwork
+build/fidtest build/fidwork | grep -E "^(ok|FAIL|failures)" | tee build/fidresult.txt
+if grep -q FAIL build/fidresult.txt; then exit 1; fi
 # message packets: the unit's own tests and a comparison with javascript/MessagePacket.js (node)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
 python3 tests/pkttest.py build build/pktwork | grep -E "^(ok|FAIL|skip)" | tee build/pktresult.txt

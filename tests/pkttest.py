@@ -92,5 +92,11 @@ m1 = (j['messages'] + [{}])[0]
 check('a UTF-8 packet written by Pascal (CHRS: UTF-8 4) is read by JS: names, subject, text',
       m1.get('from') == 'José' and m1.get('subject') == 'Café ░' and 'café █ end' in m1.get('text', ''))
 
+# the hold flag written by Pascal is the attribute bit $0200 for MessagePacket.js too
+rc, out, err = node('read', os.path.join(work, 'hold.pkt'))
+j = json.loads(out) if rc == 0 and out.strip() else {'messages': []}
+m1 = (j['messages'] + [{}])[0]
+check('a message written with SetHold(True): attribute $0201 (private + hold) in MessagePacket.js', m1.get('attr') == 0x0201)
+
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

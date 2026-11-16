@@ -91,6 +91,7 @@ Type FidoMsgObj = Object (AbsMsgObj)
   Procedure SetReqAud(SS: Boolean); Virtual; {Set request audit status}
   Procedure SetRetRct(SS: Boolean); Virtual; {Set return receipt status}
   Procedure SetFileReq(SS: Boolean); Virtual; {Set file request status}
+  Procedure SetHold(HS: Boolean); Virtual; {Set hold for pickup status ($0200)}
   Procedure DoString(Str: String); Virtual; {Add string to message text}
   Procedure DoChar(Ch: Char); Virtual; {Add character to message text}
   Procedure DoStringLn(Str: String); Virtual; {Add string and newline to msg text}
@@ -132,6 +133,7 @@ Type FidoMsgObj = Object (AbsMsgObj)
   Function  IsReqAud: Boolean; Virtual; {Is current msg request audit}
   Function  IsRetRct: Boolean; Virtual; {Is current msg a return receipt}
   Function  IsFileReq: Boolean; Virtual; {Is current msg a file request}
+  Function  IsHold: Boolean; Virtual; {Is current msg held for pickup}
   Function  IsRcvd: Boolean; Virtual; {Is current msg received}
   Function  IsPriv: Boolean; Virtual; {Is current msg priviledged/private}
   Function  IsDeleted: Boolean; Virtual; {Is current msg deleted}
@@ -538,6 +540,15 @@ Procedure FidoMsgObj.SetFileReq(SS: Boolean);
     PutByte(GetByte(187) or 8, 187)
   Else
     PutByte(GetByte(187) and (not 8), 187);
+  End;
+
+
+Procedure FidoMsgObj.SetHold(HS: Boolean);
+  Begin
+  If HS Then
+    PutByte(GetByte(187) or 2, 187)
+  Else
+    PutByte(GetByte(187) and (not 2), 187);
   End;
 
 
@@ -1132,6 +1143,12 @@ Function FidoMsgObj.IsRetRct: Boolean; {Is current msg a return receipt}
 Function FidoMsgObj.IsFileReq: Boolean; {Is current msg a file request}
   Begin
   IsFileReq := ((GetByte(187) and 008) <> 0);
+  End;
+
+
+Function FidoMsgObj.IsHold: Boolean; {Is current msg held for pickup}
+  Begin
+  IsHold := ((GetByte(187) and 002) <> 0);
   End;
 
 

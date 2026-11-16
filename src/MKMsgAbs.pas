@@ -56,6 +56,7 @@ Type AbsMsgObj = Object
   Procedure SetReqAud(SS: Boolean); Virtual; {Set request audit status}
   Procedure SetRetRct(SS: Boolean); Virtual; {Set return receipt status}
   Procedure SetFileReq(SS: Boolean); Virtual; {Set file request status}
+  Procedure SetHold(HS: Boolean); Virtual; {Set hold for pickup status}
   Procedure DoString(Str: String); Virtual; {Add string to message text}
   Procedure DoChar(Ch: Char); Virtual; {Add character to message text}
   Procedure DoStringLn(Str: String); Virtual; {Add string and newline to msg text}
@@ -88,6 +89,7 @@ Type AbsMsgObj = Object
   Function  IsReqAud: Boolean; Virtual; {Is current msg request audit}
   Function  IsRetRct: Boolean; Virtual; {Is current msg a return receipt}
   Function  IsFileReq: Boolean; Virtual; {Is current msg a file request}
+  Function  IsHold: Boolean; Virtual; {Is current msg held for pickup (False when the base has no such flag)}
   Function  IsRcvd: Boolean; Virtual; {Is current msg received}
   Function  IsPriv: Boolean; Virtual; {Is current msg priviledged/private}
   Function  IsDeleted: Boolean; Virtual; {Is current msg deleted}
@@ -262,6 +264,11 @@ Procedure AbsMsgObj.SetRetRct(SS: Boolean);
 
 
 Procedure AbsMsgObj.SetFileReq(SS: Boolean);
+  Begin
+  End;
+
+
+Procedure AbsMsgObj.SetHold(HS: Boolean);
   Begin
   End;
 
@@ -507,6 +514,12 @@ Function AbsMsgObj.IsRetRct: Boolean;
 
 Function AbsMsgObj.IsFileReq: Boolean;
   Begin
+  End;
+
+
+Function AbsMsgObj.IsHold: Boolean;
+  Begin
+  IsHold := False;
   End;
 
 

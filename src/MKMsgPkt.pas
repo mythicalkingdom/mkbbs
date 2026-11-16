@@ -55,6 +55,10 @@ Unit MKMsgPkt;       {Fidonet style packet msg object}
      else processes (a new, uniquely named .pkt) and move them to the outbound
      when done.
 
+     Hold for pickup (attribute $0200): SetHold(True) before WriteMsg, or on the
+     current message and ReWriteHdr; IsHold reads it.  The unit only keeps the
+     bit; a mailer or tosser that makes the packet's mail ready to send acts on it.
+
      Errors (the result of OpenMsgBase, CreateMsgBase, WriteMsg; DOS errors
      are the usual numbers):
        1000 cannot open   1001 no such packet   1002 no packet name set
@@ -222,6 +226,8 @@ Type PktMsgObj = Object(AbsMsgObj)
   Procedure SetReqAud(SS: Boolean); Virtual; {Set request audit status}
   Procedure SetRetRct(SS: Boolean); Virtual; {Set return receipt status}
   Procedure SetFileReq(SS: Boolean); Virtual; {Set file request status}
+  Procedure SetHold(HS: Boolean); Virtual;   {hold for pickup (the mailer keeps it until the system calls)}
+  Function  IsHold: Boolean; Virtual;        {is current msg held for pickup}
   Procedure DoKludgeLn(Str: String); Virtual; {Add ^A kludge line to msg}
   Procedure DoChar(Ch: Char); Virtual; {Add character to message text}
   Function  WriteMsg: Word; Virtual; {Write msg to msg base}
@@ -318,6 +324,7 @@ Const
   atSent = $0008;
   atFAttach = $0010;
   atKillSent = $0080;
+  atHold = $0200;                  {hold for pickup}
   atLocal = $0100;
   atFileReq = $0800;
   atReqRct = $1000;
@@ -1163,6 +1170,12 @@ Procedure PktMsgObj.SetRetRct(SS: Boolean);
 Procedure PktMsgObj.SetFileReq(SS: Boolean);
   Begin
   PI^.Attr := FlagSet(PI^.Attr, atFileReq, SS);
+  End;
+
+
+Procedure PktMsgObj.SetHold(HS: Boolean);
+  Begin
+  PI^.Attr := FlagSet(PI^.Attr, atHold, HS);
   End;
 
 
@@ -2414,6 +2427,13 @@ Function PktMsgObj.IsPriv: Boolean;
   Begin
   Need(PI^);
   IsPriv := (PI^.Attr And atPrivate) <> 0;
+  End;
+
+
+Function PktMsgObj.IsHold: Boolean;
+  Begin
+  Need(PI^);
+  IsHold := (PI^.Attr And atHold) <> 0;
   End;
 
 

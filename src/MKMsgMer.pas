@@ -308,6 +308,7 @@ Type MerlinMsgObj = Object(AbsMsgObj)
   Procedure SetReqAud(SS: Boolean); Virtual; {Set request audit status}
   Procedure SetRetRct(SS: Boolean); Virtual; {Set return receipt status}
   Procedure SetFileReq(SS: Boolean); Virtual; {Set file request status}
+  Procedure SetHold(HS: Boolean); Virtual; {Set hold for pickup status}
   Procedure DoChar(Ch: Char); Virtual; {Add character to message text}
   Procedure DoKludgeLn(Str: String); Virtual; {Add ^A kludge line to msg}
   Function  WriteMsg: Word; Virtual; {Write msg to msg base}
@@ -335,6 +336,7 @@ Type MerlinMsgObj = Object(AbsMsgObj)
   Function  IsReqAud: Boolean; Virtual; {Is current msg request audit}
   Function  IsRetRct: Boolean; Virtual; {Is current msg a return receipt}
   Function  IsFileReq: Boolean; Virtual; {Is current msg a file request}
+  Function  IsHold: Boolean; Virtual; {Is current msg held for pickup}
   Function  IsRcvd: Boolean; Virtual; {Is current msg received}
   Function  IsPriv: Boolean; Virtual; {Is current msg priviledged/private}
   Function  IsDeleted: Boolean; Virtual; {Is current msg deleted}
@@ -3158,6 +3160,12 @@ Function MerlinMsgObj.IsRetRct: Boolean;
   End;
 
 
+Function MerlinMsgObj.IsHold: Boolean;
+  Begin
+  IsHold := (MInfo^.Hdr.Attr1 And ma1Hold) <> 0;
+  End;
+
+
 Function MerlinMsgObj.IsFileReq: Boolean;
   Begin
   IsFileReq := (MInfo^.Hdr.Attr1 And ma1Freq) <> 0;
@@ -3472,6 +3480,12 @@ Procedure MerlinMsgObj.SetReqAud(SS: Boolean);
 Procedure MerlinMsgObj.SetRetRct(SS: Boolean);
   Begin
   SetAttr1(SS, ma1RetRcpt);
+  End;
+
+
+Procedure MerlinMsgObj.SetHold(HS: Boolean);
+  Begin
+  SetAttr1(HS, ma1Hold);
   End;
 
 

@@ -234,6 +234,7 @@ Type SqMsgObj = Object(AbsMsgObj)
   Function  IsReqAud: Boolean; Virtual; {Is current msg request audit}
   Function  IsRetRct: Boolean; Virtual; {Is current msg a return receipt}
   Function  IsFileReq: Boolean; Virtual; {Is current msg a file request}
+  Function  IsHold: Boolean; Virtual; {Is current msg held for pickup}
   Function  IsRcvd: Boolean; Virtual; {Is current msg received}
   Function  IsPriv: Boolean; Virtual; {Is current msg priviledged/private}
   Function  IsDeleted: Boolean; Virtual; {Is current msg deleted}
@@ -249,6 +250,7 @@ Type SqMsgObj = Object(AbsMsgObj)
   Procedure SetReqAud(St: Boolean); Virtual; {Set request audit status}
   Procedure SetRetRct(St: Boolean); Virtual; {Set return receipt status}
   Procedure SetFileReq(St: Boolean); Virtual; {Set file request status}
+  Procedure SetHold(HS: Boolean); Virtual; {Set hold for pickup status}
   Procedure MsgStartUp; Virtual; {Set up message}
   Procedure MsgTxtStartUp; Virtual; {Set up for msg text}
   Procedure SetMailType(MT: MsgMailType); Virtual; {Set message base type}
@@ -1395,6 +1397,12 @@ Function SqMsgObj.IsRetRct: Boolean; {Is current msg a return receipt}
   End;
 
 
+Function SqMsgObj.IsHold: Boolean; {Is current msg held for pickup}
+  Begin
+  IsHold := ((SqInfo^.MsgHdr.Attr and SqMsgHold) <> 0);
+  End;
+
+
 Function SqMsgObj.IsFileReq: Boolean; {Is current msg a file request}
   Begin
   IsFileReq := ((SqInfo^.MsgHdr.Attr and SqMsgFreq) <> 0);
@@ -1521,6 +1529,12 @@ Procedure SqMsgObj.SetReqAud(St: Boolean); {Set request audit status}
 Procedure SqMsgObj.SetRetRct(St: Boolean); {Set return receipt status}
   Begin
   SetAttr(St, SqMsgCpt);
+  End;
+
+
+Procedure SqMsgObj.SetHold(HS: Boolean); {Set hold for pickup status}
+  Begin
+  SetAttr(HS, SqMsgHold);
   End;
 
 

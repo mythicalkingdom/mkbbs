@@ -154,6 +154,16 @@ begin
   Check('no from: 1013', M.WriteMsg = 1013);
   Check('nothing was added by those', M.NumberOfMsgs = 2);
 
+  { hold for pickup }
+  M.SeekFirst(2); M.MsgStartUp;
+  Check('hold is off on a message written without it', not M.IsHold);
+  M.SetHold(True); M.ReWriteHdr;
+  M.CloseMsgBase; M.OpenMsgBase; M.SeekFirst(2); M.MsgStartUp;
+  Check('SetHold + ReWriteHdr: hold is in the file, the other flags are kept (private, crash, local = $0303)', M.IsHold and M.IsPriv and M.IsCrash and (M.GetAttr = $0303));
+  M.SetHold(False); M.ReWriteHdr;
+  M.CloseMsgBase; M.OpenMsgBase; M.SeekFirst(2); M.MsgStartUp;
+  Check('SetHold(False) clears it again', (not M.IsHold) and M.IsPriv and M.IsCrash);
+
   { flags: ReWriteHdr }
   M.SeekFirst(1); M.MsgStartUp;
   M.SetRcvd(True); M.SetSent(True); M.ReWriteHdr;
@@ -165,6 +175,22 @@ begin
     M.IsRcvd and M.IsSent);
   M.SeekFirst(2); M.MsgStartUp;
   Check('... #2 unchanged', M.IsPriv and M.IsCrash and (not M.IsRcvd));
+
+  { a message written with the hold flag }
+  F2 := D + 'hold.pkt';
+  EraseFile(F2);
+  M.CloseMsgBase;
+  M.SetMsgPath(F2);
+  M.SetPacketInfo(Orig, Dest, '');
+  Orig.Point := 0; Dest.Zone := 2; Dest.Net := 250; Dest.Node := 1; Dest.Point := 0;
+  M.StartNewMsg; M.SetFrom('a'); M.SetTo('b'); M.SetSubj('held'); M.SetMailType(mmtNetMail);
+  M.SetOrig(Orig); M.SetDest(Dest); M.SetPriv(True); M.SetHold(True); M.DoStringLn('x');
+  Check('write a netmail with SetHold(True)', M.WriteMsg = 0);
+  M.OpenMsgBase; M.SeekFirst(1); M.MsgStartUp;
+  Check('... IsHold, IsPriv, attribute $0201', M.IsHold and M.IsPriv and (M.GetAttr = $0201));
+  M.CloseMsgBase;
+  M.SetMsgPath(F);
+  M.OpenMsgBase;
 
   { yours }
   M.StartNewMsg; M.SetFrom('Someone'); M.SetTo('mark may'); M.SetSubj('For you'); M.SetArea('MK.TEST'); M.DoStringLn('x');
