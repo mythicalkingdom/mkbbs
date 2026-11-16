@@ -810,7 +810,13 @@ Procedure MKCfgObj.SetAddr(Aka: Word; Addr: AddrType);
 Procedure MKCfgObj.GetMsgAddr(Area: Word; Var MA: AddrType);
   Begin
   If ((Area > 0) and (Area <= GetMaxMsgAreas)) Then
-    MA := MKCfg^.Addr[MKMsg^[Area].Addr]
+    Begin
+    {an area that has no AKA chosen (0) uses the main address}
+    If MKMsg^[Area].Addr = 0 Then
+      MA := MKCfg^.Addr[1]
+    Else
+      MA := MKCfg^.Addr[MKMsg^[Area].Addr];
+    End
   Else
     Begin
     MA.Zone := 0;
@@ -2381,7 +2387,7 @@ Function MKCfgObj.GetEchoToMailType(ES: Word): Byte;
 Procedure MKCfgObj.SetEchoToMailType(ES: Word; MT: Byte);
   Begin
   If ((ES > 0) and (ES < 33)) Then
-    MKEcho^.EchoSys[ES].Attr := (MKEcho^.EchoSys[ES].Attr and 7) or (Mt and 7);
+    MKEcho^.EchoSys[ES].Attr := (MKEcho^.EchoSys[ES].Attr and Not 7) or (Mt and 7);
   End;
 
 

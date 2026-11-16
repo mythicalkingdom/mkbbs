@@ -518,8 +518,8 @@ Function HudsonMsgObj.IsDeleted: Boolean;
 
 Function HudsonMsgObj.IsEchoed: Boolean;
   Begin
-  IsEchoed := MsgRec^.Echo;
-{  IsEchoed := ((MsgRec^.MsgHdr.MsgAttr and maUnmovedEcho) <> 0); }
+  {the flag of a message being written, or the "unexported echomail" bit of one that was read}
+  IsEchoed := MsgRec^.Echo Or ((MsgRec^.MsgHdr.MsgAttr and maUnmovedEcho) <> 0);
 {  IsUnmovedNet := ((MsgRec^.MsgHdr.MsgAttr and maUnmovedNet) <> 0);}
   End;
 
@@ -643,6 +643,16 @@ Procedure HudsonMsgObj.StartNewMsg;  {Initialize message}
 Procedure HudsonMsgObj.SetEcho(ES: Boolean); {Set echo status}
   Begin
   MsgRec^.Echo := ES;
+  {a message that was read keeps the state in its attribute word (ReWriteHdr writes it; WriteMsg sets it again)}
+  If ES Then
+    Begin
+    If (MsgRec^.MsgHdr.MsgAttr and maNetMail) <> 0 Then
+      MsgRec^.MsgHdr.MsgAttr := MsgRec^.MsgHdr.MsgAttr or maUnmovedNet
+    Else
+      MsgRec^.MsgHdr.MsgAttr := MsgRec^.MsgHdr.MsgAttr or maUnmovedEcho;
+    End
+  Else
+    MsgRec^.MsgHdr.MsgAttr := MsgRec^.MsgHdr.MsgAttr and Not(maUnmovedEcho + maUnmovedNet);
   End;
 
 

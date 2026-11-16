@@ -45,6 +45,8 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodeidx src/MKNodeIdx.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbinkcfg src/MKBinkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omktoss src/MKToss.pas
+for t in tosssetup tossdump tossmake; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -110,11 +112,21 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/holdbasetest tests/holdbasetest.pas
 mkdir -p build/holdwork
 build/holdbasetest build/holdwork | grep -E "^(ok|FAIL|failures)" | tee build/holdbaseresult.txt
 if grep -q FAIL build/holdbaseresult.txt; then exit 1; fi
+# what the scanner of mktoss reads from a message (local, echo, sent) in JAM, Squish and Merlin
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/scanflagstest tests/scanflagstest.pas 2>&1 | grep -E "Error|Fatal" || true
+mkdir -p build/scanflagswork
+build/scanflagstest build/scanflagswork | grep -E "^(ok|FAIL|failures)" | tee build/scanflagsresult.txt
+if grep -q FAIL build/scanflagsresult.txt; then exit 1; fi
 # Fido *.msg: the hold flag
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/fidtest tests/fidtest.pas 2>&1 | grep -E "Error|Fatal" || true
 mkdir -p build/fidwork
 build/fidtest build/fidwork | grep -E "^(ok|FAIL|failures)" | tee build/fidresult.txt
 if grep -q FAIL build/fidresult.txt; then exit 1; fi
+# the tosser (mktoss) on a private copy of the sample BBS, with packets made by MessagePacket.js
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/tosstest.py build build/tosswork | grep -E "^(ok|FAIL|skip)" | tee build/tossresult.txt
+  if grep -q FAIL build/tossresult.txt; then exit 1; fi
+fi
 # message packets: the unit's own tests and a comparison with javascript/MessagePacket.js (node)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
 python3 tests/pkttest.py build build/pktwork | grep -E "^(ok|FAIL|skip)" | tee build/pktresult.txt

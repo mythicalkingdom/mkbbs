@@ -431,7 +431,7 @@ Const                                  {EchoArea.Attr values}
   eaHidePath = $02;                    {Hide path in message base}
   eaKeepSeen = $04;                    {Keep seen-by info}
   eaHideSeen = $08;                    {Hide seen-by in msg base}
-  eaPassThru = $16;                    {Pass-thru area}
+  eaPassThru = $10;                    {Pass-thru area (the original had $16, which also matched the hide path and keep seen-by bits)}
 
 
 Type EchoCfgType = Record

@@ -47,7 +47,9 @@ Unit MKMsgPkt;       {Fidonet style packet msg object}
                    origin lines, SEEN-BY and PATH are written (SetEchoTail(False) = not)
        Lines of the text that start with ^A are kludge lines; MSGID: and REPLY:
        among them are used as the message's ids, INTL, FMPT, TOPT and CHRS are
-       made by this unit.  ReWriteHdr writes the attribute word of the current
+       made by this unit.  With SetEchoTail(False) no tear, origin, SEEN-BY or PATH
+       line is made, but the SEEN-BY and PATH lines in the text are kept (a message
+       being forwarded).  ReWriteHdr writes the attribute word of the current
        message back.  DeleteMsg removes the message (the packet is written again).
 
      A packet has no record locking: calls in other programs that read or write
@@ -1806,6 +1808,14 @@ Function PktMsgObj.WriteMsg: Word;
         OutAdd(Tail, PathL.P^, PathL.Len)
       Else
         OutStr(Tail, #1 + 'PATH: ' + Long2Str(Org.Net) + '/' + Long2Str(Org.Node) + #13);
+      End
+    Else If Echo Then
+      Begin
+      {no tail of our own, but the SEEN-BY and PATH lines in the text stay (a message being forwarded)}
+      If HasSeen Then
+        OutAdd(Tail, SeenBy.P^, SeenBy.Len);
+      If HasPath Then
+        OutAdd(Tail, PathL.P^, PathL.Len);
       End;
 
     {the packed message}
