@@ -16,6 +16,7 @@ Type
     Archiver: Byte;
     MailType: Byte;
     Pwd: String[15];
+    PktPwd: String[8];
     End;
 
 Var
@@ -53,6 +54,7 @@ Procedure DoCfgESys(SysNum: Word);
   Var
     UR: ^UserRecord;
     F: CfgFormObj;
+    M: ^MailerCfgType;
 
   Begin
   New(UR);
@@ -61,8 +63,15 @@ Procedure DoCfgESys(SysNum: Word);
   UR^.Archiver := Config^.GetEchoToPacker(SysNum);
   UR^.Pwd := Config^.GetEchoToPwd(SysNum);
   UR^.MailType := Config^.GetEchoToMailType(SysNum);
+  UR^.PktPwd := '';
+  If Config^.HasMailer Then
+    Begin
+    New(M);
+    Config^.GetMailer(M^);
+    UR^.PktPwd := M^.PktPwd[SysNum];
+    End;
   F.Init('System ' + Long2Str(SysNum));
-  F.Window(11, 7, 65, 13);
+  F.Window(11, 7, 65, 15);
   F.At(2, 3, 2, 9);
   F.AddNumber('Zone:', UR^.Addr.Zone, 2, 0, 65535, 'Zone of the system');
   F.At(2, 16, 2, 21);
@@ -71,9 +80,9 @@ Procedure DoCfgESys(SysNum: Word);
   F.AddNumber('Node:', UR^.Addr.Node, 2, 0, 65535, 'Node of the system');
   F.At(2, 41, 2, 48);
   F.AddNumber('Point:', UR^.Addr.Point, 2, 0, 65535, 'Point of the system');
-  F.At(4, 3, 4, 13);
-  F.AddString('Password:', UR^.Pwd, 15, 'Packet password for the system');
-  F.At(4, 31, 4, 39);
+  F.At(4, 3, 4, 16);
+  F.AddString('Areafix pwd:', UR^.Pwd, 15, 'Password for Areafix requests');
+  F.At(4, 34, 4, 42);
   F.AddChoice('Packer:', UR^.Archiver, 1, 0, 'None|LZH|ZIP|ARC|ZOO|DWC|ARJ|HYP',
     'Archiver used for the mail (Space or arrows change it)');
   F.At(6, 3, 6, 3);
@@ -83,13 +92,25 @@ Procedure DoCfgESys(SysNum: Word);
   F.At(6, 47, 6, 58);
   F.AddChoice('Mail Type:', UR^.MailType, 1, 0, 'IMMED|CRASH|NORMAL|HOLD',
     'How the mail is sent (Space or arrows change it)');
+  If Config^.HasMailer Then
+    Begin
+    F.At(8, 3, 8, 16);
+    F.AddString('Packet pwd:', UR^.PktPwd, 8, 'Packet password, 8 characters at most');
+    End;
   If F.Execute Then
     Begin
+    If Config^.HasMailer Then
+      Begin
+      M^.PktPwd[SysNum] := UR^.PktPwd;
+      Config^.SetMailer(M^);
+      End;
     Config^.SetEchoToAddr(SysNum, UR^.Addr);
     Config^.SetEchoToPacker(SysNum, UR^.Archiver);
     Config^.SetEchoToPwd(SysNum, UR^.Pwd);
     Config^.SetEchoToMailType(SysNum, UR^.MailType);
     End;
+  If Config^.HasMailer Then
+    Dispose(M);
   Dispose(UR);
   End;
 

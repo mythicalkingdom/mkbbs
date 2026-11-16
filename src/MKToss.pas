@@ -17,7 +17,7 @@ Program MKToss;
      - netmail for one of our addresses goes to the first netmail area; netmail for another address is
        stored there too (not sent, not for us: the scanner sends it on)
      - what cannot be tossed (unknown system, unknown area, system not linked to the area, damaged
-       packet) goes to bad.pkt in the inbound directory, a bad packet is renamed .bad
+       packet) goes to bad/bad.pkt in the inbound directory, a bad packet is renamed .bad
      - what was tossed is deleted
      - echomail that other systems are linked to is passed on (SEEN-BY and PATH brought up to date), and what the
        BBS wrote itself (local, unexported messages of the echo areas) is scanned and sent; netmail that is not
@@ -27,6 +27,15 @@ Program MKToss;
 
        -t   only toss (and pass on), no scan       -s   only scan (and pack), no toss
        -b   the mkbink program (default: next to mktoss, else in the path)
+
+     - packet passwords: when an echo system has one (EchoMail > Systems > Packet pwd, kept in Mailer.Mk), its packets
+       must carry it (else the packet is refused and renamed .bad) and ours carry it
+     - areafix: netmail for us to Areafix / AreaMgr from an echo system, with the system's areafix password as the
+       subject; commands %LIST %QUERY %UNLINKED %HELP, +AREA, -AREA (* and ? work, a bare AREA links it), nothing after
+       a --- line; the links go into echocfg.mk and the answer is a netmail back.  An area that comes from our hub
+       (the area's Hub) is asked for from the hub when the first system takes it, and given up when the last one goes
+       (pass-through areas).  A wrong password gets an answer saying so; a request from a sender that is not a system
+       of ours is left in the netmail area for the sysop.
 
      Mail in the unsecure inbound (callers without a password) is not tossed, only counted.
 
@@ -54,6 +63,9 @@ Var
   Forwarded, Scanned, NetSent: LongInt;
   LastSerial: LongInt;
   DoToss, DoScan: Boolean;
+  MailCfg: ^MailerCfgType;
+  HaveMail: Boolean;
+  Areafixes: LongInt;
 
 
 {---------------------------------------------------------------- log}
@@ -90,6 +102,16 @@ Procedure Log(S: String);
 
 
 {---------------------------------------------------------------- addresses and areas}
+
+Function PktPwdOf(Sys: Word): String;
+  {the packet password of the echo system (Mailer.Mk), '' = none}
+  Begin
+  If HaveMail And (Sys >= 1) And (Sys <= 32) Then
+    PktPwdOf := StripBoth(MailCfg^.PktPwd[Sys], ' ')
+  Else
+    PktPwdOf := '';
+  End;
+
 
 Function SameAddr(Var A, B: AddrType): Boolean;
   Begin
@@ -186,7 +208,7 @@ Function IsDupe(Tag, MsgId, From, ToN, Subj, Date, Time: String): Boolean;
 {---------------------------------------------------------------- bad mail}
 
 Procedure BadMessage(Var Src: PktMsgObj; Why: String);
-  {the message is kept in bad.pkt in the inbound directory}
+  {the message is kept in bad/bad.pkt in the inbound directory}
   Var
     B: PktMsgObj;
     PO, PD: AddrType;
@@ -756,7 +778,7 @@ Function WriteOut(Sys: Word; Flav: Char; Var C: MsgCopy; Area: Word; Echo: Boole
   OurAka(Area, Us);
   P.Init;
   P.SetMsgPath(CurrentSpool(Sys, Flav, AkaNum(Area)));
-  P.SetPacketInfo(Us, SA, '');
+  P.SetPacketInfo(Us, SA, PktPwdOf(Sys));
   P.StartNewMsg;
   P.SetFrom(C.From);
   P.SetTo(C.ToN);
@@ -920,6 +942,466 @@ Procedure ForwardEcho(Var Src: PktMsgObj; Area: Word; FromSys: Word);
   End;
 
 
+
+{---------------------------------------------------------------- areafix}
+
+Const
+  MaxRep = 1500;
+
+Type
+  RepArr = Array[1..MaxRep] Of String[100];
+  HubBuf = Record
+    N: Word;
+    L: Array[1..60] Of String[60];
+    End;
+
+Var
+  Rep: ^RepArr;
+  NumRep: Word;
+  HubReq: Array[1..32] Of ^HubBuf;
+  EchoChanged: Boolean;
+
+
+Procedure AddRep(S: String);
+  Begin
+  If NumRep < MaxRep Then
+    Begin
+    Inc(NumRep);
+    Rep^[NumRep] := Copy(S, 1, 100);
+    End
+  Else If NumRep = MaxRep Then
+    Begin
+    Inc(NumRep);
+    End;
+  End;
+
+
+Function BytesToString(P: PktBytePtr; From, Count: LongInt): String;
+  Var
+    S: String;
+    i: LongInt;
+
+  Begin
+  S := '';
+  For i := From To From + Count - 1 Do
+    If Length(S) < 255 Then
+      S := S + Chr(P^[i]);
+  BytesToString := S;
+  End;
+
+
+Function IsAreafixName(Name: String): Boolean;
+  Var
+    U: String;
+    i: Word;
+    R: String;
+
+  Begin
+  U := Upper(Name);
+  R := '';
+  For i := 1 To Length(U) Do
+    If U[i] <> ' ' Then
+      R := R + U[i];
+  IsAreafixName := (R = 'AREAFIX') Or (R = 'AREAMGR') Or (R = 'AREAMANAGER');
+  End;
+
+
+Function MatchPat(P, N: String): Boolean;
+  {* and ?, not case sensitive}
+  Begin
+  If P = '' Then
+    MatchPat := (N = '')
+  Else If P[1] = '*' Then
+    Begin
+    If MatchPat(Copy(P, 2, 255), N) Then
+      MatchPat := True
+    Else If N = '' Then
+      MatchPat := False
+    Else
+      MatchPat := MatchPat(P, Copy(N, 2, 255));
+    End
+  Else If N = '' Then
+    MatchPat := False
+  Else If (P[1] = '?') Or (UpCase(P[1]) = UpCase(N[1])) Then
+    MatchPat := MatchPat(Copy(P, 2, 255), Copy(N, 2, 255))
+  Else
+    MatchPat := False;
+  End;
+
+
+Function AreaAvailable(Sys: Word; Area: Word): Boolean;
+  {an echo area of ours that the system may link to: it has a tag, it does not come from that system, and, when the area
+   is restricted to networks (Message Areas > Networks), the system has one of them (Network Security)}
+  Var
+    nt: Word;
+    AreaNets, Share: Boolean;
+
+  Begin
+  AreaAvailable := False;
+  If (Config^.GetMsgName(Area) = '') Or (Config^.GetMsgType(Area) <> EchoMail) Then
+    Exit;
+  If StripBoth(Config^.GetEchoAreaTag(Area), ' ') = '' Then
+    Exit;
+  If Config^.GetEchoToHub(Area) = Sys Then
+    Exit;
+  AreaNets := False;
+  Share := False;
+  For nt := 1 To 32 Do
+    If Config^.GetMsgNetwork(Area, nt) Then
+      Begin
+      AreaNets := True;
+      If Config^.GetEchoToNetwork(Sys, nt) Then
+        Share := True;
+      End;
+  AreaAvailable := (Not AreaNets) Or Share;
+  End;
+
+
+Procedure AddHubReq(Hub: Word; Line: String);
+  Begin
+  If HubReq[Hub] = Nil Then
+    Begin
+    New(HubReq[Hub]);
+    HubReq[Hub]^.N := 0;
+    End;
+  If HubReq[Hub]^.N < 60 Then
+    Begin
+    Inc(HubReq[Hub]^.N);
+    HubReq[Hub]^.L[HubReq[Hub]^.N] := Line;
+    End;
+  End;
+
+
+Procedure AfterChange(Area: Word);
+  {an area that downlinks take from our hub: the hub is asked for it when the first downlink comes, and (for a
+   pass-through area, which nobody reads here) told to stop when the last one goes}
+  Var
+    H, S, Downs: Word;
+    A: AddrType;
+    Tag: String;
+
+  Begin
+  H := Config^.GetEchoToHub(Area);
+  If (H < 1) Or (H > 32) Then
+    Exit;
+  Config^.GetEchoToAddr(H, A);
+  If A.Zone = 0 Then
+    Exit;
+  Tag := StripBoth(Config^.GetEchoAreaTag(Area), ' ');
+  Downs := 0;
+  For S := 1 To 32 Do
+    If (S <> H) And Config^.GetEchoToArea(S, Area) Then
+      Inc(Downs);
+  If (Downs > 0) And (Not Config^.GetEchoToArea(H, Area)) Then
+    Begin
+    Config^.SetEchoToArea(H, Area, True);
+    AddHubReq(H, '+' + Tag);
+    Log('area ' + Tag + ' is asked for from the hub ' + AddrStr(A));
+    End
+  Else If (Downs = 0) And Config^.GetEchoToArea(H, Area) And Config^.GetEchoAreaPassThru(Area) Then
+    Begin
+    Config^.SetEchoToArea(H, Area, False);
+    AddHubReq(H, '-' + Tag);
+    Log('area ' + Tag + ' is no longer needed: the hub ' + AddrStr(A) + ' is told to stop it');
+    End;
+  End;
+
+
+Procedure PostNetmail(FromName, ToName, Subj: String; Var Orig, Dest: AddrType; Lines: Word; Hub: Word);
+  {a netmail from the tosser into the netmail area, for the scanner to send: the text is Rep (Lines of it) or, for
+   a request to a hub, the lines of HubReq[Hub]}
+  Var
+    Area, i: Word;
+    M: AbsMsgPtr;
+    Y, Mo, D, Dow, H, Mi, Se, Hs: Word;
+    Res: Word;
+
+  Begin
+  Area := FindNetmailArea;
+  If Area = 0 Then
+    Begin
+    Log('there is no netmail area: the netmail "' + Subj + '" to ' + AddrStr(Dest) + ' cannot be written');
+    Problems := True;
+    Exit;
+    End;
+  If Not OpenMsgArea(M, Config^.GetMsgAreaId(Area)) Then
+    Begin
+    Log('cannot open the netmail area ' + Long2Str(Area));
+    Problems := True;
+    Exit;
+    End;
+  GetDate(Y, Mo, D, Dow);
+  GetTime(H, Mi, Se, Hs);
+  M^.SetMailType(mmtNetMail);
+  M^.StartNewMsg;
+  M^.SetOrig(Orig);
+  M^.SetDest(Dest);
+  M^.SetFrom(FromName);
+  M^.SetTo(ToName);
+  M^.SetSubj(Subj);
+  M^.SetDate(Z2(Mo) + '-' + Z2(D) + '-' + Z2(Y Mod 100));
+  M^.SetTime(Z2(H) + ':' + Z2(Mi));
+  M^.SetPriv(True);
+  M^.SetKillSent(True);
+  M^.SetLocal(True);
+  M^.SetSent(False);
+  M^.SetRcvd(False);
+  M^.SetEcho(False);
+  If Hub = 0 Then
+    Begin
+    For i := 1 To Lines Do
+      M^.DoStringLn(Rep^[i]);
+    If NumRep > MaxRep Then
+      M^.DoStringLn('(the answer was cut short)');
+    End
+  Else
+    For i := 1 To HubReq[Hub]^.N Do
+      M^.DoStringLn(HubReq[Hub]^.L[i]);
+  Res := M^.WriteMsg;
+  If Res <> 0 Then
+    Begin
+    Log('cannot write the netmail "' + Subj + '" (error ' + Long2Str(Res) + ')');
+    Problems := True;
+    End;
+  If Not CloseMsgArea(M) Then;
+  End;
+
+
+Procedure RepList(Sys: Word; Mode: Char);
+  {%LIST (all available), %QUERY (linked), %UNLINKED (available, not linked)}
+  Var
+    i, n: Word;
+    Linked: Boolean;
+    Tag: String;
+
+  Begin
+  n := 0;
+  For i := 1 To Config^.GetMaxMsgAreas Do
+    If AreaAvailable(Sys, i) Or ((Mode = 'Q') And Config^.GetEchoToArea(Sys, i) And
+      (StripBoth(Config^.GetEchoAreaTag(i), ' ') <> '')) Then
+      Begin
+      Linked := Config^.GetEchoToArea(Sys, i);
+      If ((Mode = 'Q') And Not Linked) Or ((Mode = 'U') And Linked) Then
+        Continue;
+      Tag := StripBoth(Config^.GetEchoAreaTag(i), ' ');
+      If Linked Then
+        AddRep('* ' + PadRight(Tag, ' ', 28) + Copy(Config^.GetMsgName(i), 1, 60))
+      Else
+        AddRep('  ' + PadRight(Tag, ' ', 28) + Copy(Config^.GetMsgName(i), 1, 60));
+      Inc(n);
+      End;
+  If n = 0 Then
+    AddRep('(none)');
+  If Mode = 'L' Then
+    AddRep('(* = linked)');
+  End;
+
+
+Procedure DoSubscribe(Sys: Word; Pat: String; Link: Boolean);
+  Var
+    i, n: Word;
+    Tag: String;
+    Linked: Boolean;
+    Seen: Boolean;
+
+  Begin
+  n := 0;
+  Seen := False;
+  For i := 1 To Config^.GetMaxMsgAreas Do
+    Begin
+    Tag := StripBoth(Config^.GetEchoAreaTag(i), ' ');
+    If (Tag = '') Or (Config^.GetMsgType(i) <> EchoMail) Or (Config^.GetMsgName(i) = '') Then
+      Continue;
+    If Not MatchPat(Pat, Tag) Then
+      Continue;
+    Seen := True;
+    Linked := Config^.GetEchoToArea(Sys, i);
+    If Link Then
+      Begin
+      If Not AreaAvailable(Sys, i) Then
+        Begin
+        If Pos('*', Pat) + Pos('?', Pat) = 0 Then
+          AddRep('+' + Tag + ': not available to you');
+        Continue;
+        End;
+      If Linked Then
+        Begin
+        If Pos('*', Pat) + Pos('?', Pat) = 0 Then
+          AddRep('+' + Tag + ': already linked');
+        End
+      Else
+        Begin
+        Config^.SetEchoToArea(Sys, i, True);
+        EchoChanged := True;
+        AfterChange(i);
+        AddRep('+' + Tag + ': linked');
+        Inc(n);
+        End;
+      End
+    Else
+      Begin
+      If Linked Then
+        Begin
+        Config^.SetEchoToArea(Sys, i, False);
+        EchoChanged := True;
+        AfterChange(i);
+        AddRep('-' + Tag + ': unlinked');
+        Inc(n);
+        End
+      Else If Pos('*', Pat) + Pos('?', Pat) = 0 Then
+        AddRep('-' + Tag + ': was not linked');
+      End;
+    End;
+  If Not Seen Then
+    Begin
+    If Link Then
+      AddRep('+' + Pat + ': no such area')
+    Else
+      AddRep('-' + Pat + ': no such area');
+    End
+  Else If (n = 0) And ((Pos('*', Pat) + Pos('?', Pat)) > 0) Then
+    AddRep(Copy('+-', 2 - Ord(Link), 1) + Pat + ': nothing to change');
+  End;
+
+
+Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
+  {A netmail for Areafix: True = it was dealt with (answered, not stored); False = not ours to answer (the sender is
+   not a system of ours), the message is stored for the sysop.}
+  Var
+    C: MsgCopy;
+    Sender, Boss: AddrType;
+    Sys, i, Cmds: Word;
+    Pwd, Line, Cmd, SenderName: String;
+    p: LongInt;
+    LStart: LongInt;
+    Stop: Boolean;
+    Subj: String;
+    FromAddr: AddrType;
+
+  Procedure DoLine(L: String);
+    Begin
+    L := StripBoth(L, ' ');
+    If (L = '') Or (L[1] = #1) Then
+      Exit;
+    If Copy(L, 1, 3) = '---' Then
+      Begin
+      Stop := True;
+      Exit;
+      End;
+    If Copy(L, 1, 3) = ' * ' Then
+      Exit;
+    Inc(Cmds);
+    Cmd := Upper(ExtractWord(L, 1));
+    If Cmd = '%LIST' Then
+      Begin
+      AddRep('Areas you can have:');
+      RepList(Sys, 'L');
+      End
+    Else If Cmd = '%QUERY' Then
+      Begin
+      AddRep('Areas you have:');
+      RepList(Sys, 'Q');
+      End
+    Else If Cmd = '%UNLINKED' Then
+      Begin
+      AddRep('Areas you can have and do not:');
+      RepList(Sys, 'U');
+      End
+    Else If Cmd = '%HELP' Then
+      Begin
+      AddRep('Areafix: a netmail to Areafix, your password as the subject, one command to a line:');
+      AddRep('  %LIST       the areas you can have          %QUERY     the areas you have');
+      AddRep('  %UNLINKED   the areas you can have and do not   %HELP   this text');
+      AddRep('  +AREA       link the area                   -AREA      unlink the area');
+      AddRep('  (a bare AREA links it; * and ? stand for characters: +* all, -* none)');
+      End
+    Else If L[1] = '%' Then
+      AddRep(Cmd + ': not a command that is known (%HELP)')
+    Else If L[1] = '-' Then
+      DoSubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), False)
+    Else If L[1] = '+' Then
+      DoSubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), True)
+    Else If L[1] In ['A'..'Z', 'a'..'z', '0'..'9', '_'] Then
+      DoSubscribe(Sys, Upper(ExtractWord(L, 1)), True)
+    Else
+      AddRep(L + ': not understood (%HELP)');
+    End;
+
+  Begin
+  ProcessAreafix := False;
+  Pkt.GetOrig(Sender);
+  Sys := FindSystem(Sender);
+  If Sys = 0 Then
+    Begin
+    Boss := Sender;
+    Boss.Point := 0;
+    Sys := FindSystem(Boss);
+    End;
+  If Sys = 0 Then
+    Begin
+    Log('areafix request from ' + AddrStr(Sender) + ', which is not a system of ours: stored for the sysop');
+    Exit;
+    End;
+  ProcessAreafix := True;
+  Pkt.GetOrig(FromAddr);
+  SenderName := Pkt.GetFrom;
+  New(Rep);
+  NumRep := 0;
+  EchoChanged := False;
+  For i := 1 To 32 Do
+    HubReq[i] := Nil;
+  Subj := 'Areafix';
+  Pwd := Upper(StripBoth(Pkt.GetSubj, ' '));
+  If (Config^.GetEchoToPwd(Sys) = '') Or (Pwd <> Upper(StripBoth(Config^.GetEchoToPwd(Sys), ' '))) Then
+    Begin
+    Log('areafix request from ' + AddrStr(Sender) + ': wrong password');
+    AddRep('Your request was not carried out: the password in the subject is not right.');
+    AddRep('(%HELP tells what Areafix does)');
+    Subj := 'Areafix: password error';
+    End
+  Else
+    Begin
+    CopyInit(C);
+    CopyLoad(Pkt, C);
+    Cmds := 0;
+    Stop := False;
+    p := 0;
+    While (p < C.TxtLen) And Not Stop Do
+      Begin
+      LStart := p;
+      While (p < C.TxtLen) And (C.Txt^[p] <> 13) Do
+        Inc(p);
+      Line := BytesToString(C.Txt, LStart, p - LStart);
+      Inc(p);
+      DoLine(Line);
+      End;
+    CopyFree(C);
+    If Cmds = 0 Then
+      AddRep('There was no command in your message (%HELP).');
+    Subj := 'Areafix response';
+    Log('areafix request from ' + AddrStr(Sender) + ': ' + Long2Str(Cmds) + ' command(s)');
+    End;
+  If EchoChanged Then
+    Begin
+    If MKCfgObjPtr(Config)^.SaveEchoCfg <> 0 Then
+      Begin
+      Log('cannot save echocfg.mk');
+      Problems := True;
+      End;
+    End;
+  PostNetmail('Areafix', SenderName, Subj, Dst, FromAddr, NumRep, 0);
+  For i := 1 To 32 Do
+    If HubReq[i] <> Nil Then
+      Begin
+      Config^.GetEchoToAddr(i, Boss);
+      PostNetmail('Areafix', 'Areafix', StripBoth(Config^.GetEchoToPwd(i), ' '), Dst, Boss, 0, i);
+      Dispose(HubReq[i]);
+      HubReq[i] := Nil;
+      End;
+  Dispose(Rep);
+  End;
+
+
 {---------------------------------------------------------------- tossing a packet}
 
 Procedure TossEcho(Var Pkt: PktMsgObj; Sys: Word);
@@ -976,6 +1458,12 @@ Procedure TossNetmail(Var Pkt: PktMsgObj; Sys: Word);
   Begin
   Pkt.GetDest(Dst);
   ForUs := IsOurs(Dst);
+  If ForUs And IsAreafixName(Pkt.GetTo) Then
+    If ProcessAreafix(Pkt, Dst) Then
+      Begin
+      Inc(Areafixes);
+      Exit;
+      End;
   Area := FindNetmailArea;
   If Area = 0 Then
     Begin
@@ -1026,6 +1514,15 @@ Function TossPacket(Path: String): Boolean;
     Pkt.Done;
     Exit;
     End;
+  If PktPwdOf(Sys) <> '' Then
+    If Upper(StripBoth(Pkt.GetPktPassword, ' ')) <> Upper(PktPwdOf(Sys)) Then
+      Begin
+      Log('packet ' + Path + ' from ' + AddrStr(PO) + ' has the wrong packet password');
+      Problems := True;
+      Pkt.CloseMsgBase;
+      Pkt.Done;
+      Exit;
+      End;
   If Not Pkt.PktClean Then
     Log('warning: ' + Path + ' is damaged, what can be read is tossed');
   Pkt.SeekFirst(1);
@@ -1727,9 +2224,11 @@ If OutDir = '' Then
 If OutDir[Length(OutDir)] <> '/' Then
   OutDir := OutDir + '/';
 SpoolDir := OutDir + 'mktoss/';
-BadName := InDir + 'bad.pkt';
+BadName := InDir + 'bad/bad.pkt';
 {$I-}
 MkDir(Copy(WorkDir, 1, Length(WorkDir) - 1));
+If IoResult <> 0 Then;
+MkDir(Copy(InDir, 1, Length(InDir)) + 'bad');
 If IoResult <> 0 Then;
 MkDir(Copy(OutDir, 1, Length(OutDir) - 1));
 If IoResult <> 0 Then;
@@ -1746,7 +2245,14 @@ For i := 1 To 10 Do
     Ours[NumOurs] := A;
     End;
   End;
-Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0;
+HaveMail := Config^.HasMailer;
+MailCfg := Nil;
+If HaveMail Then
+  Begin
+  New(MailCfg);
+  Config^.GetMailer(MailCfg^);
+  End;
+Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0; Areafixes := 0;
 LastSerial := 0;
 Problems := False;
 Dupes.Init;
@@ -1765,7 +2271,8 @@ Dupes.CloseFile;
 Dupes.Done;
 Log('mktoss done: ' + Long2Str(Tossed) + ' tossed, ' + Long2Str(Netmails) + ' netmail, ' + Long2Str(Passed) +
   ' passed through, ' + Long2Str(Dups) + ' duplicates, ' + Long2Str(Bad) + ' bad; ' + Long2Str(Forwarded) +
-  ' passed on, ' + Long2Str(Scanned) + ' scanned, ' + Long2Str(NetSent) + ' netmail sent');
+  ' passed on, ' + Long2Str(Scanned) + ' scanned, ' + Long2Str(NetSent) + ' netmail sent, ' + Long2Str(Areafixes) +
+  ' areafix');
 If Problems Then
   Halt(2);
 End.

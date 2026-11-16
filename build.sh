@@ -46,7 +46,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbinkcfg src/MKBinkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omktoss src/MKToss.pas
-for t in tosssetup tossdump tossmake; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas

@@ -28,6 +28,7 @@ Type MKCfgObj = Object(CfgObj)
   Function  SaveFileName(FN: String): String; Virtual;
   Function  SaveFileNames: String; Virtual;
   Procedure MKSave; Virtual; {Normally internal to save MK config}
+  Function  SaveEchoCfg: Word; {Save only echocfg.mk (what the tosser changes: which system gets which area)}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
   Function  GetMsgPath(BaseNo: Word): String; Virtual; {Get directory for msg base}
@@ -714,6 +715,12 @@ Function MKCfgObj.SaveFileName(FN: String): String;
     SaveFileName := TmpStr + FN
   Else
     SaveFileName := GetBbsPath + FN;
+  End;
+
+
+Function MKCfgObj.SaveEchoCfg: Word;
+  Begin
+  SaveEchoCfg := SaveFile(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
   End;
 
 

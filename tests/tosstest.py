@@ -98,8 +98,8 @@ check('the log lines: duplicate, unknown area, not linked, unknown system, damag
 check('tossed packets are gone, the stranger and the not-a-packet are renamed .bad, a text file is left alone',
       not os.path.exists(inb + '/0001aaaa.pkt') and not os.path.exists(inb + '/0003cccc.pkt')
       and os.path.exists(inb + '/0002bbbb.pkt.bad') and os.path.exists(inb + '/0004dddd.pkt.bad') and os.path.exists(inb + '/notmail.txt'))
-check('bad mail is kept in bad.pkt (unknown area, unlinked area), readable as a packet', os.path.exists(inb + '/bad.pkt'))
-rb = subprocess.run([os.path.join(build, 'pkttest'), 'dump', inb + '/bad.pkt'], capture_output=True, text=True, encoding='latin-1').stdout
+check('bad mail is kept in bad/bad.pkt (unknown area, unlinked area), readable as a packet', os.path.exists(inb + '/bad/bad.pkt'))
+rb = subprocess.run([os.path.join(build, 'pkttest'), 'dump', inb + '/bad/bad.pkt'], capture_output=True, text=True, encoding='latin-1').stdout
 check('... 2 messages in it (NOSUCHAREA, LINUX)', 'n=2' in rb and 'area=NOSUCHAREA' in rb and 'area=LINUX' in rb)
 check('the unsecure inbound is not tossed, only mentioned', os.path.exists(unsec + '/0005eeee.pkt') and 'unsecure inbound' in out)
 
@@ -201,6 +201,65 @@ if shutil.which('unzip'):
     check('another bundle: the duplicates are found again by the dupe file', 'duplicate in MK' in r.stdout and not os.path.exists(inb + '/00aabbdd.TU2'))
 else:
     print('skip: no unzip')
+
+# ---- phase 3: areafix and packet passwords
+def cfgmatrix():
+    return run('tosscfg').stdout.split('\n')[:2]
+
+
+if have_mkbink:
+    check('before the requests: system 1 has areas 6 9 10, system 2 has 6 9',
+          cfgmatrix() == ['sys1: 6=Y 9=Y 10=Y 11=n 12=n 15=n', 'sys2: 6=Y 9=Y 10=n 11=n 12=n 15=n'])
+    old_flo = {f: open(os.path.join(outb, f)).read().split() for f in os.listdir(outb) if f.endswith('lo')}
+    r = subprocess.run(['node', os.path.join(here, 'tossareafix.mjs'), inb], capture_output=True, text=True)
+    check('MessagePacket.js made the areafix requests (%s)' % r.stderr.strip()[:60], r.returncode == 0)
+    r = run('mktoss', '-b', mkbink)
+    out = r.stdout
+    print(out)
+    check('3 areafix requests were answered (2 from system 2, 1 from system 1); the one from an unknown sender was stored',
+          '3 areafix' in out and 'areafix request from 5:5/5, which is not a system of ours' in out)
+    check('the packet with the wrong packet password is refused and renamed .bad', 'has the wrong packet password' in out and os.path.exists(inb + '/0010ccc1.pkt.bad'))
+    check('a wrong areafix password: logged, nothing changed', 'areafix request from 1:110/200: wrong password' in out)
+    check('areas linked / unlinked as asked (system 2: -MK +BBS +DAYTON_SYSOP -MKBETA day*_newsys; system 1: +LINUX -MK; the request after the --- line and the wrong password / packet password did nothing)',
+          cfgmatrix() == ['sys1: 6=n 9=n 10=Y 11=Y 12=n 15=Y', 'sys2: 6=n 9=n 10=Y 11=Y 12=Y 15=n'])
+    check('the hub is asked for DAYTON_SYSOP (system 1 is linked to it now) and told to stop MKBETA (pass-through, nobody takes it from us any more)',
+          'area DAYTON_SYSOP is asked for from the hub 1:110/100' in out and 'area MKBETA is no longer needed' in out)
+    new = {}
+    for f in os.listdir(outb):
+        if f.endswith('lo'):
+            cur = open(os.path.join(outb, f)).read().split()
+            new[f] = [x for x in cur if x not in old_flo.get(f, [])]
+    newpk = {}
+    for f, v in new.items():
+        for x in v:
+            q = x[1:]
+            if f == '006e00c8.flo':
+                newpk.setdefault(f, []).extend(msgs(pktdump(q)))
+            else:
+                newpk.setdefault(f, []).extend(m for pz in unzip(q, 'af' + os.path.basename(q)) for m in msgs(pktdump(pz)))
+    to2 = newpk.get('006e00c8.flo', [])
+    resp = [m for m in to2 if 'subj=Areafix response' in m[0]]
+    pwerr = [m for m in to2 if 'subj=Areafix: password error' in m[0]]
+    check('system 2 gets two answers: the response and the password error (flavour normal, from Areafix to the name that asked)',
+          len(to2) == 2 and len(resp) == 1 and len(pwerr) == 1 and 'from=Areafix to=Remote Sysop' in resp[0][0] and 'dest=1:110/200' in resp[0][0])
+    t = resp[0][1]
+    check('... %QUERY shows the areas it had before the changes (* = linked), then every command is answered',
+          'Areas you have:|* MK ' in t and '* MKBETA ' in t and '-MK: unlinked|' in t and '+BBS: linked|' in t and '+NOSUCH: no such area|' in t
+          and '+DAYTON_SYSOP: linked|' in t and '-MKBETA: unlinked|' in t and '+DAYTON_NEWSYS: linked|' in t
+          and '%FROB: not a command that is known (%HELP)|' in t)
+    check('... nothing after the --- line is done (no answer about +LINUX)', 'LINUX' not in t)
+    check('... the password error says so', 'the password in the subject is not right' in pwerr[0][1])
+    to1 = [m for f in newpk if f.startswith('006e0064') for m in newpk[f]]
+    r1 = [m for m in to1 if 'subj=Areafix response' in m[0]]
+    hubreq = [m for m in to1 if 'to=Areafix' in m[0] and 'subj=secret' in m[0]]
+    check('system 1 gets its answer (%LIST, +LINUX, -MK) and the request for DAYTON_SYSOP / MKBETA, with its areafix password as the subject',
+          len(r1) == 1 and 'Areas you can have:|' in r1[0][1] and '+LINUX: linked|' in r1[0][1] and '-MK: unlinked|' in r1[0][1] and '(* = linked)|' in r1[0][1]
+          and len(hubreq) == 1 and '+DAYTON_SYSOP|-MKBETA|' in hubreq[0][1])
+    check('the unknown sender\'s request is in the netmail area for the sysop; the answers are gone from it (kill after sent)',
+          re.search(r'to=Areafix .*orig=5:5/5', run('tossdump', '4').stdout) is not None and 'from=Areafix' not in run('tossdump', '4').stdout)
+    check('the spool is empty again', not [f for f in os.listdir(outb + '/mktoss') if f.startswith('s')])
+else:
+    print('skip: no mkbink, the areafix answers are not checked')
 
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

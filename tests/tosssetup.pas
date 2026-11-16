@@ -26,9 +26,11 @@ begin
   Config^.SetEchoToPwd(2, 'pw2');
   Config^.SetEchoToArea(2, 6, True);
   Config^.SetEchoToArea(2, 9, True);
+  Config^.SetEchoToHub(9, 1);          { area 9: the hub is system 1 (a pass-through area, system 2 takes it from us) }
   Config^.SetEchoLog('');
   New(M); Config^.GetMailer(M^);
   M^.UnsecureIn := ParamStr(3);
+  M^.PktPwd[2] := 'pktpw2';
   Config^.SetMailer(M^); Dispose(M);
   Config^.Save;
 end.

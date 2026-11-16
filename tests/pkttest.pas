@@ -1,5 +1,6 @@
 program pkttest;
 {$mode tp}
+{$H+}
 { pkttest write <file>   the messages pkttest.py also makes with MessagePacket.js
   pkttest dump <file>    every message of a packet, one field per line
   pkttest self <dir>     round trips, ReWriteHdr, DeleteMsg, yours, errors, UTF-8 }

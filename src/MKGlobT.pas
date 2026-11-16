@@ -126,7 +126,8 @@ Type MailerCfgType = Record
   UnsecureIn: String[60];              {inbound directory for callers without a password, blank = the same as the inbound}
   OnInbound: String[100];              {command run after a session that received files (a tosser), blank = none}
   HookTimeout: Word;                   {seconds before that command is killed, 0 = 300}
-  Expansion: Array[1..860] of Byte;    {room for new settings}
+  PktPwd: Array[1..32] of String[8];   {packet password of each echo system (EchoCfg.EchoSys), blank = none}
+  Expansion: Array[1..572] of Byte;    {room for new settings}
   End;
 
 Procedure MailerDefaults(Var M: MailerCfgType);

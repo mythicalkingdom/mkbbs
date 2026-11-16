@@ -51,16 +51,34 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    -F <flavour> -x`).  Options: `-t` toss only, `-s` scan only, `-b mkbink`.  Tests: `tests/tosstest.py` (outbound checked
    with a built ../mkbink), `tests/scanflagstest.pas` (the flags the scanner reads in JAM, Squish, Merlin).
    Not done: a high-water mark (every run reads every message of every echo area), packet passwords, `.req`.
-3. **Areafix**: netmail to Areafix / AreaMgr (our address) with the system's password (`EchoSys.PWD`) as subject.
+3. **Areafix and packet passwords (done)**: netmail to Areafix / AreaMgr (our address) with the system's password (`EchoSys.PWD`) as subject.
    Commands `%LIST %QUERY %UNLINKED %HELP +TAG -TAG` (see original/AREAFIX.TXT), changes `EchoTo` bits in EchoCfg.Mk,
    answer is a netmail back.  Which areas a system may see: `Networks` bitmap against the area's net status.  Requests
    to the hub for areas we do not have yet (the `Hub` field).
+   As built: `ProcessAreafix` (called from `TossNetmail` for netmail to us with the name Areafix, AreaMgr or AreaManager,
+   the request is consumed, the answer is `PostNetmail` into the netmail area: private, kill/sent, local, so `ScanNetArea`
+   sends it in the same run).  Sender = the system of the netmail's origin (or the boss of a point); the subject must be the
+   system's areafix password (`EchoSys.PWD`, now labelled "Areafix pwd" in mkconfig).  Commands `%LIST %QUERY %UNLINKED
+   %HELP`, `+AREA`, `-AREA`, a bare `AREA` (links), `*` and `?` in names, processing stops at a `---` line.  An area is
+   available to a system when it has a tag, does not come from that system (its Hub), and, if the area is restricted to
+   networks (Message Areas > Networks), the system has one of them (Network Security).  `AfterChange`: for an area with a
+   Hub, the hub is linked and sent `+TAG` when the first other system takes the area, and for a pass-through area
+   unlinked and sent `-TAG` when the last one leaves (the request is a netmail to Areafix at the hub with the hub's
+   password).  The changes are saved with `MKCfgObj.SaveEchoCfg` (echocfg.mk only).
+   Packet passwords: `Mailer.Mk` `PktPwd[1..32]` (8 characters each, from the expansion room; mkconfig: EchoMail > Systems >
+   a system > "Packet pwd").  A system that has one must send it in the packet header (else the packet is renamed .bad),
+   our packets to it carry it.  Systems without one: no check.
+   Tests: `tests/tosstest.py` (areafix requests from MessagePacket.js: right and wrong password, a sender that is not ours,
+   a wrong packet password, links changed, the answers and the hub request read from the real outbound),
+   `tests/mailertest.py` (the mkconfig page saves the packet password).
 4. **Integration**: mkbinkcfg sets `on-inbound` to mktoss when the tosser is enabled; mkmon shows the last toss; a
    setting in mkconfig for the tosser; RESCAN after a scan.
 5. Later: netmail routing, file echoes (TIC), `%PAUSE`, `%RESCAN`.
 
 ## Known fixes made on the way
 
+* The tosser's own `bad.pkt` was in the inbound directory, so the next run tossed it again (and made the same bad mail
+  again); it is `bad/bad.pkt` now.
 * `SetEchoToMailType` or-ed the new flavour into the old one (`and 7`, should be `and Not 7`), so a system could never go
   from Hold to a lower flavour in mkconfig (and `Default.pas` makes every system Hold).  Fixed in `MKCfgMK`.
 * `GetMsgAddr` read `Addr[0]` for an area without an AKA chosen; it uses the main address now.

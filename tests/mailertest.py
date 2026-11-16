@@ -95,6 +95,14 @@ check('mkbinkcfg -n: link 1 with host, port, password, poll', 'link 1:110/100' i
 check('... link 2 answers only (no host, no call)', 'link 1:110/200' in out and 'answer-only yes' in out and 'password p2' in out)
 check('... domain', 'domain fidonet' in out)
 
+# the packet password of an echo system (EchoMail > Systems > a system), kept in mailer.mk after the hook fields
+s = screen('\\x1bc', '\\r', '\\r')
+check('EchoMail > Systems > System 1 has "Areafix pwd:" and "Packet pwd:"', 'Areafix pwd:' in s and 'Packet pwd:' in s)
+screen('\\x1bc', '\\r', '\\r', '\\t' * 9, 'abc', '\\r', '\\x1b', '\\x1bx', 'y')
+d = open(mailer, 'rb').read()
+check('the packet password of system 1 is saved in mailer.mk (after the hook fields), the file keeps its size',
+      d[LINKS + 64 * LINK + 164:LINKS + 64 * LINK + 168] == b'\x03abc' and len(d) == SIZE)
+
 # ---- the file
 rc, out, err = tool()
 conf = os.path.join(cfg, 'mkbink.conf')
