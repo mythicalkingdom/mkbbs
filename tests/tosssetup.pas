@@ -8,6 +8,7 @@ begin
   Config := New(MKCfgObjPtr, Init); Config^.Load;
   Config^.SetEchoInPath(ParamStr(1));
   Config^.SetEchoOutPath(ParamStr(2));
+  Config^.SetEchoToMailType(1, esHold);   { system 1 gets hold mail in the tests (the sample's own setting may be anything) }
   Config^.SetEchoToArea(1, 6, True);
   Config^.SetEchoToArea(1, 9, True);
   Config^.SetEchoToArea(1, 10, True);

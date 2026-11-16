@@ -117,6 +117,10 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/scanflagstest tests/scanflagstest.p
 mkdir -p build/scanflagswork
 build/scanflagstest build/scanflagswork | grep -E "^(ok|FAIL|failures)" | tee build/scanflagsresult.txt
 if grep -q FAIL build/scanflagsresult.txt; then exit 1; fi
+# the defaults of a new configuration
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/defaultstest tests/defaultstest.pas 2>&1 | grep -E "Error|Fatal" || true
+build/defaultstest | tee build/defaultsresult.txt
+if grep -q FAIL build/defaultsresult.txt; then exit 1; fi
 # Fido *.msg: the hold flag
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/fidtest tests/fidtest.pas 2>&1 | grep -E "Error|Fatal" || true
 mkdir -p build/fidwork

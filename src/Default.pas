@@ -39,7 +39,7 @@ Procedure SetEchoDefaults(Var DConfig: CfgObj);
     Begin
     DConfig.SetEchoToAddr(i, Addr);
     DConfig.SetEchoToPacker(i, 1);
-    DConfig.SetEchoToMailType(i, esHold);
+    DConfig.SetEchoToMailType(i, esNormal);   {Normal: Hold mail is only sent when the other system calls us}
     DConfig.SetEchoToPwd(i, '');
     For j := 1 to 32 Do
       DConfig.SetEchoToNetwork(i, j, False);
