@@ -160,6 +160,11 @@ Procedure Generate;
   If OutDir = '' Then
     Fail('no OutBound path (EchoMail Options)');
   W('inbound ' + InDir);
+  If M^.UnsecureIn <> '' Then
+    W('inbound-unsecure ' + AbsPath(M^.UnsecureIn));
+  WTxt('on-inbound', M^.OnInbound);
+  If M^.HookTimeout > 0 Then
+    W('hook-timeout ' + Long2Str(M^.HookTimeout));
   W('bso ' + OutDir);
   W('listen ' + YesNo((M^.Flags And mcListen) <> 0));
   W('port ' + Long2Str(M^.Port));

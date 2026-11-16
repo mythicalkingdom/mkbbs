@@ -43,7 +43,7 @@ Procedure DoCfgMailer;
   Nr := (M^.Flags And mcNr) <> 0;
   Unknown := (M^.Flags And mcAcceptUnknown) <> 0;
   F.Init('Mailer');
-  F.Window(3, 4, 76, 17);
+  F.Window(3, 4, 76, 19);
   F.At(2, 3, 2, 24);
   F.AddYesNo('Mailer enabled:', Enabled, 'Start the mailer (mkbink) with mklisten');
   F.At(2, 40, 2, 56);
@@ -76,6 +76,12 @@ Procedure DoCfgMailer;
   F.AddYesNo('Accept unknown:', Unknown, 'Let a system that is not in the links list call us');
   F.At(11, 3, 11, 24);
   F.AddString('Its password:', M^.UnknownPwd, 30, 'Password for those systems');
+  F.At(12, 3, 12, 24);
+  F.AddString('No-password in:', M^.UnsecureIn, 60, 'Inbound directory for callers without a password, blank = the normal inbound');
+  F.At(13, 3, 13, 24);
+  F.AddString('After mail comes:', M^.OnInbound, 100, 'Command run with the received files as arguments (a tosser), blank = none');
+  F.At(14, 3, 14, 24);
+  F.AddNumber('Command limit (s):', M^.HookTimeout, 2, 0, 65535, 'Seconds before that command is stopped, 0 = 300');
   If F.Execute Then
     Begin
     M^.Flags := M^.Flags And Not (mcEnabled Or mcListen Or mcRequireCram Or mcPlz Or mcNr Or mcAcceptUnknown);

@@ -122,7 +122,11 @@ Type MailerCfgType = Record
   ReqMaxKb: LongInt;                   {reserved}
   ReqAttr: Word;                       {reserved}
   Links: Array[1..MaxMailLinks] of MailLinkType;
-  Expansion: Array[1..1024] of Byte;   {room for new settings}
+  {taken from the expansion room, so the record and the offsets above are unchanged}
+  UnsecureIn: String[60];              {inbound directory for callers without a password, blank = the same as the inbound}
+  OnInbound: String[100];              {command run after a session that received files (a tosser), blank = none}
+  HookTimeout: Word;                   {seconds before that command is killed, 0 = 300}
+  Expansion: Array[1..860] of Byte;    {room for new settings}
   End;
 
 Procedure MailerDefaults(Var M: MailerCfgType);

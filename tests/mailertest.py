@@ -154,6 +154,17 @@ patched(lambda d: d.__setitem__(LINKS + 8 + 31 + 61 + 2 + 31, 2))   # link 1 fla
 rc, out, err = tool('-n')
 check('a disabled link is left out', rc == 0 and 'link 1:110/100' not in out and 'link 1:110/200' in out)
 
+# ---- phase 5: the no-password inbound and the command after mail comes (in the room taken from the expansion)
+patched(lambda d: d.__setitem__(LINKS + 8 + 31 + 61 + 2 + 31, 0))   # link 1 enabled again
+HOOK = LINKS + 64 * LINK                                             # UnsecureIn, OnInbound, HookTimeout follow the links
+rc, out, err = tool('-n')
+check('no hook set: no inbound-unsecure / on-inbound / hook-timeout lines', rc == 0 and 'inbound-unsecure' not in out and 'on-inbound' not in out and 'hook-timeout' not in out)
+patched(lambda d: (put(d, HOOK, 'files/unsec', 61), put(d, HOOK + 61, '/usr/bin/toss -x', 101), d.__setitem__(slice(HOOK + 162, HOOK + 164), (45).to_bytes(2, 'little'))))
+rc, out, err = tool('-n')
+check('inbound-unsecure (relative to the BBS directory), on-inbound and hook-timeout are written',
+      rc == 0 and ('inbound-unsecure %s/files/unsec' % cfg) in out and 'on-inbound /usr/bin/toss -x' in out and 'hook-timeout 45' in out)
+check('the file stays the size it was', os.path.getsize(mailer) == SIZE)
+
 check('the sample BBS itself was not touched', guard == {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in guard})
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)
