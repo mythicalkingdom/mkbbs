@@ -158,7 +158,7 @@ Procedure EditLink(Item: Word);
   F.At(4, 3, 4, 9);
   F.AddString('Name:', L^.Name, 30, 'Name of the system, for the displays');
   F.At(5, 3, 5, 9);
-  F.AddString('Host:', L^.Host, 60, 'Host name or IP address to call, blank = we cannot call it');
+  F.AddString('Host:', L^.Host, 60, 'Host name or IP address to call, blank = the nodelist (IBN / INA flags) says, else we cannot call it');
   F.At(6, 3, 6, 9);
   F.AddNumber('Port:', L^.Port, 2, 1, 65535, 'Port to call (binkp is 24554)');
   F.At(6, 20, 6, 38);

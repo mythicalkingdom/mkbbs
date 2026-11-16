@@ -11,6 +11,7 @@ Program MKBinkCfg;
         our addresses, domain, name, sysop, location    General (Config.Mk), Mailer (Mailer.Mk)
         inbound directory, BSO outbound directory       EchoMail Options (EchoCfg.Mk)
         listening, retry times, links ...               Mailer, Mailer Links (Mailer.Mk)
+        host of a link that has none                    the nodelist index (mknodeidx): IBN / INA flags
 
      Relative directories are taken from the BBS directory.  The file is made with mode 600 (it holds the link
      passwords), is replaced all at once, and is left alone when nothing in it would change, so a program that
@@ -25,7 +26,7 @@ Program MKBinkCfg;
 }
 
 Uses
-  BaseUnix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK;
+  BaseUnix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKNSrch;
 
 
 Const
@@ -43,6 +44,8 @@ Var
   Addrs: Array[1..10] Of AddrType;
   Enabled: Boolean;
   Res: Word;
+  Nodes: NodeListObj;
+  NodesTried, NodesOk: Boolean;
 
 
 Procedure Fail(Msg: String);
@@ -55,6 +58,84 @@ Procedure Fail(Msg: String);
 Function FmtAddr(Var A: AddrType): String;
   Begin
   FmtAddr := AddrStr(A);
+  End;
+
+
+Function NodelistHost(Var A: AddrType; Var Host: String; Var Port: Word): Boolean;
+  {The internet address of a node from its nodelist line: the flags IBN (binkp), IBN:port, IBN:host, IBN:host:port
+   and INA:host.  False when the nodelist has no index, no such node or no host name for it.}
+  Var
+    Line, Flag, Up, P1, P2, P3, INA: String;
+    k, p: Word;
+    HasIbn: Boolean;
+    V: LongInt;
+
+  Begin
+  NodelistHost := False;
+  Host := '';
+  Port := 0;
+  If A.Point <> 0 Then
+    Exit;
+  If Not NodesTried Then
+    Begin
+    NodesTried := True;
+    Nodes.Init;
+    Nodes.Load;
+    NodesOk := Nodes.GetError = 0;
+    If Not NodesOk Then
+      WriteLn(StdErr, 'mkbinkcfg: note: no nodelist index (' + Config^.GetNodeListPath + Config^.GetNodeIdxName +
+        '), links without a host are not looked up (mknodeidx builds it)');
+    End;
+  If Not NodesOk Then
+    Exit;
+  Line := Nodes.NodeStr(A);
+  If Pos('Address Not Found', Line) > 0 Then
+    Exit;
+  HasIbn := False;
+  INA := '';
+  k := 7;
+  Repeat
+    Flag := GetNodeSection(Line, k);
+    Inc(k);
+    If Flag = '' Then
+      Continue;
+    Up := Upper(Flag);
+    p := Pos(':', Up);
+    If p = 0 Then
+      Begin
+      If Up = 'IBN' Then
+        HasIbn := True;
+      Continue;
+      End;
+    P1 := Copy(Up, 1, p - 1);
+    P2 := Copy(Flag, p + 1, 255);
+    P3 := '';
+    p := Pos(':', P2);
+    If p > 0 Then
+      Begin
+      P3 := Copy(P2, p + 1, 255);
+      P2 := Copy(P2, 1, p - 1);
+      End;
+    If P1 = 'INA' Then
+      INA := P2
+    Else If P1 = 'IBN' Then
+      Begin
+      HasIbn := True;
+      Val(P2, V, p);
+      If (p = 0) And (V > 0) And (V < 65536) Then
+        Port := V
+      Else If P2 <> '' Then
+        Begin
+        Host := P2;
+        Val(P3, V, p);
+        If (p = 0) And (V > 0) And (V < 65536) Then
+          Port := V;
+        End;
+      End;
+  Until (Flag = '') Or (k > 60);
+  If Host = '' Then
+    Host := INA;
+  NodelistHost := HasIbn And (Host <> '') And (Pos(' ', Host) = 0) And (Pos('#', Host) = 0);
   End;
 
 
@@ -140,7 +221,8 @@ Procedure Generate;
     n, k, First: Word;
     A: AddrType;
     S, InDir, OutDir: String;
-    Skip: Boolean;
+    Skip, FromList: Boolean;
+    Pt, NPort: Word;
 
   Begin
   W('# Settings of the binkp mailer, made by mkbinkcfg from the BBS configuration.');
@@ -205,11 +287,27 @@ Procedure Generate;
     If S <> '' Then
       W('  name ' + S);
     S := Clean(M^.Links[n].Host);
+    Pt := M^.Links[n].Port;
+    FromList := False;
+    If (S = '') And ((M^.Links[n].Flags And mlAnswerOnly) = 0) Then
+      Begin
+      If NodelistHost(A, S, NPort) Then
+        Begin
+        FromList := True;
+        If Pt = 0 Then
+          Pt := NPort;
+        End
+      Else
+        S := '';
+      End;
     If S <> '' Then
       Begin
-      W('  host ' + S);
-      If (M^.Links[n].Port <> 0) And (M^.Links[n].Port <> 24554) Then
-        W('  port ' + Long2Str(M^.Links[n].Port));
+      If FromList Then
+        W('  host ' + S + '   # from the nodelist')
+      Else
+        W('  host ' + S);
+      If (Pt <> 0) And (Pt <> 24554) Then
+        W('  port ' + Long2Str(Pt));
       End;
     If M^.Links[n].Password <> '' Then
       W('  password ' + M^.Links[n].Password);
@@ -272,6 +370,8 @@ Function SameFile(A, B: String): Boolean;
 
 Begin
 Errors := 0;
+NodesTried := False;
+NodesOk := False;
 OutName := '';
 ToScreen := False;
 Force := False;

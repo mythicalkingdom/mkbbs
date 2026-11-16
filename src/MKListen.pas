@@ -747,6 +747,8 @@ Function ConfigSig: String;
     Until FindNext(SR) <> 0;
     FindClose(SR);
     End;
+  {a new nodelist changes the hosts mkbinkcfg finds: look again every hour (it leaves an unchanged file alone)}
+  ConfigSig := ConfigSig + 'h' + IntToStr(Trunc(Now * 24));
   End;
 
 
