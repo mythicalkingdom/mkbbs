@@ -101,6 +101,10 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/mailertest.py build/mailwork | grep -E "^(ok|FAIL|skip)" | tee build/mailresult.txt
   if grep -q FAIL build/mailresult.txt; then exit 1; fi
 fi
+# message packets: the unit's own tests and a comparison with javascript/MessagePacket.js (node)
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
+python3 tests/pkttest.py build build/pktwork | grep -E "^(ok|FAIL|skip)" | tee build/pktresult.txt
+if grep -q FAIL build/pktresult.txt; then exit 1; fi
 # links without a host: looked up in the nodelist
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/nlhosttest.py build build/nlwork | grep -E "^(ok|FAIL|skip)" | tee build/nlresult.txt
