@@ -127,6 +127,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/tosstest.py build build/tosswork | grep -E "^(ok|FAIL|skip)" | tee build/tossresult.txt
   if grep -q FAIL build/tossresult.txt; then exit 1; fi
 fi
+# the way in: a mkbink calls the mkbink of the BBS, the on-inbound command (mktoss) tosses the packet
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/tosshooktest.py build build/hookwork | grep -E "^(ok|FAIL|skip)" | tee build/hookresult.txt
+  if grep -q FAIL build/hookresult.txt; then exit 1; fi
+fi
 # message packets: the unit's own tests and a comparison with javascript/MessagePacket.js (node)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
 python3 tests/pkttest.py build build/pktwork | grep -E "^(ok|FAIL|skip)" | tee build/pktresult.txt

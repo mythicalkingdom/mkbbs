@@ -3,7 +3,7 @@ Program MKToss;
 {$I MKB.Def}
 
 {
-     mktoss [-q] [-t | -s] [-b mkbink]
+     mktoss [-q] [-t | -s] [-f] [-b mkbink] [file ...]
 
      The mail tosser: takes the mail that came in (the inbound directory of EchoMail Options) into
      the message areas of the BBS.  Which BBS it works for comes from the environment variable MK, as
@@ -27,6 +27,11 @@ Program MKToss;
 
        -t   only toss (and pass on), no scan       -s   only scan (and pack), no toss
        -b   the mkbink program (default: next to mktoss, else in the path)
+       -f   run although the tosser is not switched on (EchoMail > Mailer > Tosser); without it mktoss does nothing then
+            and says so (exit status 3), so a cron job or the mailer's hook can call it all the time
+
+     File names given (as the mailer's on-inbound hook does) are ignored: the whole inbound is tossed.  Runs one at a
+     time: a second mktoss waits until the first is done (lock file mktoss.lock in the inbound directory).
 
      - packet passwords: when an echo system has one (EchoMail > Systems > Packet pwd, kept in Mailer.Mk), its packets
        must carry it (else the packet is refused and renamed .bad) and ours carry it
@@ -39,7 +44,8 @@ Program MKToss;
 
      Mail in the unsecure inbound (callers without a password) is not tossed, only counted.
 
-     Exit status: 0 = done, 1 = could not start (no configuration), 2 = some mail could not be tossed or sent.
+     Exit status: 0 = done, 1 = could not start (no configuration), 2 = some mail could not be tossed or sent,
+     3 = the tosser is not switched on.
 }
 
 Uses
@@ -66,6 +72,7 @@ Var
   MailCfg: ^MailerCfgType;
   HaveMail: Boolean;
   Areafixes: LongInt;
+  Force: Boolean;
 
 
 {---------------------------------------------------------------- log}
@@ -2161,6 +2168,21 @@ Procedure PackAll;
   End;
 
 
+{---------------------------------------------------------------- one at a time}
+
+Procedure LockInbound;
+  {Waits for the lock of the inbound directory: a second mktoss (the mailer's hook, a scan, cron) does not work on the
+   same mail at the same time.  The lock goes when the program ends.}
+  Var
+    Fd: LongInt;
+
+  Begin
+  Fd := fpOpen(InDir + 'mktoss.lock', O_WRONLY Or O_CREAT, $1B6);
+  If Fd >= 0 Then
+    fpFlock(Fd, LOCK_EX);
+  End;
+
+
 {---------------------------------------------------------------- main}
 
 Var
@@ -2171,6 +2193,7 @@ Begin
 Quiet := False;
 DoToss := True;
 DoScan := True;
+Force := False;
 BinkProg := '';
 i := 1;
 While i <= ParamCount Do
@@ -2181,14 +2204,18 @@ While i <= ParamCount Do
     DoScan := False
   Else If ParamStr(i) = '-s' Then
     DoToss := False
+  Else If ParamStr(i) = '-f' Then
+    Force := True
   Else If ParamStr(i) = '-b' Then
     Begin
     Inc(i);
     BinkProg := ParamStr(i);
     End
+  Else If (ParamStr(i) <> '') And (ParamStr(i)[1] <> '-') Then
+    {a file name, as the mailer's hook passes them: the whole inbound is tossed}
   Else
     Begin
-    WriteLn(StdErr, 'Usage: mktoss [-q] [-t | -s] [-b mkbink]');
+    WriteLn(StdErr, 'Usage: mktoss [-q] [-t | -s] [-f] [-b mkbink] [file ...]');
     Halt(1);
     End;
   Inc(i);
@@ -2252,6 +2279,13 @@ If HaveMail Then
   New(MailCfg);
   Config^.GetMailer(MailCfg^);
   End;
+If (Not Force) And HaveMail And ((MailCfg^.Flags And mcTosser) = 0) Then
+  Begin
+  If Not Quiet Then
+    WriteLn('The tosser is not switched on in the configuration (EchoMail > Mailer > Tosser); nothing done (-f runs it anyway)');
+  Halt(3);
+  End;
+LockInbound;
 Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0; Areafixes := 0;
 LastSerial := 0;
 Problems := False;

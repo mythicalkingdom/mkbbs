@@ -90,6 +90,10 @@ Program MKListen;
                       "mkbinkcfg": "/usr/local/bin/mkbinkcfg", (default: next to mk)
                       "settings": "/bbs/ra/mkbink.conf",       (default: mkbink.conf in "config")
                       "logfile": "/var/log/mkbbs/mkbink.log",  (default: the listener's log)
+                      "mktoss": "/usr/local/bin/mktoss",       (default: next to mk)
+                      "scan": 300,                     seconds between runs of "mktoss -s" (messages the BBS wrote are
+                                                       packed and given to the mailer); 0 = never.  mktoss does
+                                                       nothing unless the tosser is switched on (Mailer > Tosser)
                       "interval": 30,                  seconds between looks for a changed configuration
                       "restart": 5 }                   seconds before a mailer that died is started again
                                                        (doubled while it keeps dying, at most 300)
@@ -98,6 +102,8 @@ Program MKListen;
      SIGHUP arrives).  When the mailer is switched on in the configuration it starts mkbink (run -f settings);
      when the settings changed it sends mkbink SIGHUP (it reads them again, no call is cut off); when the
      mailer is switched off, or the listener stops, mkbink is stopped.  A mailer that dies is started again.
+     mkbink is started with MK = the BBS configuration in its environment, so the command it runs after mail
+     arrives (mkbinkcfg makes it "mktoss" when Mailer > Tosser is on) finds the configuration.
      Whatever happens to the listener (even SIGKILL) takes mkbink with it.
 
      SIGTERM / SIGINT stop the listener (and the mailer); callers already connected keep running.
@@ -157,7 +163,10 @@ Var
   Stopping: Boolean = False;
   { the mailer }
   MailerOn: Boolean = False;           {a "mailer" section is in the configuration}
-  MailBink, MailCfgTool, MailConfig, MailSettings, MailLogPath: String;
+  MailBink, MailCfgTool, MailConfig, MailSettings, MailLogPath, MailToss: String;
+  MailScan: Integer = 0;               {seconds between runs of mktoss -s (scan and pack local mail), 0 = not}
+  ScanPid: TPid = 0;
+  NextScan: LongInt = 0;
   MailInterval: Integer = 30;
   MailRestart: Integer = 5;
   MailLogFd: LongInt = -1;
@@ -171,6 +180,10 @@ Var
   MailerSig: String = '#';
   NextSync: LongInt = 0;
   SyncNow: Boolean = True;             {SIGHUP, and the start}
+
+
+Type
+  TPCharArr = Array Of PChar;
 
 
 Procedure Log(Msg: String);
@@ -416,6 +429,8 @@ Procedure LoadMailer(O: TJSONObject);
     Else If Key = 'mkbinkcfg' Then MailCfgTool := JStr(V, 'mailer.mkbinkcfg')
     Else If Key = 'settings' Then MailSettings := JStr(V, 'mailer.settings')
     Else If Key = 'logfile' Then MailLogPath := JStr(V, 'mailer.logfile')
+    Else If Key = 'mktoss' Then MailToss := JStr(V, 'mailer.mktoss')
+    Else If Key = 'scan' Then MailScan := JInt(V, 'mailer.scan', 0, 86400)
     Else If Key = 'interval' Then MailInterval := JInt(V, 'mailer.interval', 1, 86400)
     Else If Key = 'restart' Then MailRestart := JInt(V, 'mailer.restart', 1, 300)
     Else If Key = 'enabled' Then On_ := JBool(V, 'mailer.enabled')
@@ -514,6 +529,9 @@ Procedure LoadConfig;
       MailCfgTool := NextToMk('mkbinkcfg');
     MailBink := ResolveProg(MailBink);
     MailCfgTool := ResolveProg(MailCfgTool);
+    If MailToss = '' Then
+      MailToss := NextToMk('mktoss');
+    MailToss := ResolveProg(MailToss);
     If MailSettings = '' Then
       MailSettings := WithSlash(MailConfig) + 'mkbink.conf';
     End;
@@ -831,11 +849,37 @@ Function RunTool(Const Prog: String; Parm: Array Of String; Secs: Integer): Inte
   End;
 
 
+Procedure BuildMailEnv(Var EnvS: TStringList; Var Envv: TPCharArr);
+  {the environment of what the listener starts for the mailer: its own, with MK = the BBS configuration (mkbink's hook
+   and mktoss need it)}
+  Var
+    i: Integer;
+    W: String;
+
+  Begin
+  EnvS := TStringList.Create;
+  i := 0;
+  While envp[i] <> Nil Do
+    Begin
+    W := StrPas(envp[i]);
+    If Copy(W, 1, 3) <> 'MK=' Then
+      EnvS.Add(W);
+    Inc(i);
+    End;
+  EnvS.Add('MK=' + MailConfig);
+  SetLength(Envv, EnvS.Count + 1);
+  For i := 0 To EnvS.Count - 1 Do
+    Envv[i] := PChar(EnvS[i]);
+  Envv[EnvS.Count] := Nil;
+  End;
+
+
 Procedure StartMailer;
   Var
     Pid: TPid;
     Argv: Array Of PChar;
-    ArgS: TStringList;
+    Envv: TPCharArr;
+    ArgS, EnvS: TStringList;
     i: Integer;
     W: String;
 
@@ -891,8 +935,71 @@ Procedure StartMailer;
   For i := 0 To ArgS.Count - 1 Do
     Argv[i] := PChar(ArgS[i]);
   Argv[ArgS.Count] := Nil;
-  fpExecve(MailBink, PPChar(@Argv[0]), PPChar(envp));
+  BuildMailEnv(EnvS, Envv);
+  fpExecve(MailBink, PPChar(@Argv[0]), PPChar(@Envv[0]));
   W := 'mklisten: cannot start ' + MailBink + ' (error ' + IntToStr(fpGetErrno) + ')' + #10;
+  fpWrite(2, W[1], Length(W));
+  fpExit(127);
+  End;
+
+
+Procedure StartScan;
+  {mktoss -s -q in the background: the messages the BBS wrote since the last time are packed and given to the mailer.
+   It does nothing (exit status 3) when the tosser is not switched on in the configuration.}
+  Var
+    Pid: TPid;
+    Argv: Array Of PChar;
+    Envv: TPCharArr;
+    ArgS, EnvS: TStringList;
+    i: Integer;
+    W: String;
+
+  Begin
+  Pid := fpFork;
+  If Pid < 0 Then
+    Begin
+    Log('mailer: fork failed for the scan, error ' + IntToStr(fpGetErrno));
+    Exit;
+    End;
+  If Pid > 0 Then
+    Begin
+    ScanPid := Pid;
+    Exit;
+    End;
+  c_prctl(1, SIGTERM);
+  If fpGetPPid = 1 Then
+    fpExit(1);
+  For i := 0 To High(Ports) Do
+    If Ports[i].Fd >= 0 Then
+      fpClose(Ports[i].Fd);
+  fpSetsid;
+  If MailLogFd >= 0 Then
+    Begin
+    fpDup2(MailLogFd, 1);
+    fpDup2(MailLogFd, 2);
+    End
+  Else If LogFd >= 0 Then
+    Begin
+    fpDup2(LogFd, 1);
+    fpDup2(LogFd, 2);
+    End;
+  If WorkDir <> '' Then
+    fpChdir(WorkDir);
+  fpSignal(SIGTERM, SignalHandler(SIG_DFL));
+  fpSignal(SIGINT, SignalHandler(SIG_DFL));
+  fpSignal(SIGHUP, SignalHandler(SIG_DFL));
+  fpSignal(SIGCHLD, SignalHandler(SIG_DFL));
+  ArgS := TStringList.Create;
+  ArgS.Add(MailToss);
+  ArgS.Add('-s');
+  ArgS.Add('-q');
+  SetLength(Argv, ArgS.Count + 1);
+  For i := 0 To ArgS.Count - 1 Do
+    Argv[i] := PChar(ArgS[i]);
+  Argv[ArgS.Count] := Nil;
+  BuildMailEnv(EnvS, Envv);
+  fpExecve(MailToss, PPChar(@Argv[0]), PPChar(@Envv[0]));
+  W := 'mklisten: cannot start ' + MailToss + ' (error ' + IntToStr(fpGetErrno) + ')' + #10;
   fpWrite(2, W[1], Length(W));
   fpExit(127);
   End;
@@ -992,6 +1099,11 @@ Procedure MailerTick;
     End;
   If MailerWanted And (MailerPid = 0) And (T >= MailerRestartAt) Then
     StartMailer;
+  If (MailScan > 0) And MailerWanted And (MailerPid > 0) And (ScanPid = 0) And (T >= NextScan) Then
+    Begin
+    NextScan := T + MailScan;
+    StartScan;
+    End;
   If (Not MailerWanted) And (MailerPid > 0) Then
     Begin
     If MailerTermAt = 0 Then
@@ -1050,6 +1162,11 @@ Procedure ReapChildren;
     Pid := fpWaitPid(-1, @Status, WNOHANG);
     If Pid <= 0 Then
       Exit;
+    If (Pid = ScanPid) And (ScanPid > 0) Then
+      Begin
+      ScanPid := 0;
+      Continue;
+      End;
     If (Pid = MailerPid) And (MailerPid > 0) Then
       Begin
       If wifexited(Status) Then
@@ -1341,6 +1458,8 @@ Begin
       WriteLn('  mailer: ', MailBink, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MailBink)), 11));
       WriteLn('          ', MailCfgTool, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MailCfgTool)), 11));
       WriteLn('          settings ', MailSettings, ' (made from ', MailConfig, ')');
+      If MailScan > 0 Then
+        WriteLn('          tosser scan every ', MailScan, ' s: ', MailToss, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MailToss)), 11));
       End;
     Halt(0);
     End;

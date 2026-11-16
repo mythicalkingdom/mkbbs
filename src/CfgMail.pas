@@ -25,7 +25,7 @@ Var
 Procedure DoCfgMailer;
   Var
     F: CfgFormObj;
-    Enabled, Listen, Cram, Plz, Nr, Unknown: Boolean;
+    Enabled, Listen, Cram, Plz, Nr, Unknown, Tosser: Boolean;
     M: ^MailerCfgType;
 
   Begin
@@ -42,8 +42,9 @@ Procedure DoCfgMailer;
   Plz := (M^.Flags And mcPlz) <> 0;
   Nr := (M^.Flags And mcNr) <> 0;
   Unknown := (M^.Flags And mcAcceptUnknown) <> 0;
+  Tosser := (M^.Flags And mcTosser) <> 0;
   F.Init('Mailer');
-  F.Window(3, 4, 76, 19);
+  F.Window(3, 4, 76, 21);
   F.At(2, 3, 2, 24);
   F.AddYesNo('Mailer enabled:', Enabled, 'Start the mailer (mkbink) with mklisten');
   F.At(2, 40, 2, 56);
@@ -82,15 +83,18 @@ Procedure DoCfgMailer;
   F.AddString('After mail comes:', M^.OnInbound, 100, 'Command run with the received files as arguments (a tosser), blank = none');
   F.At(14, 3, 14, 24);
   F.AddNumber('Command limit (s):', M^.HookTimeout, 2, 0, 65535, 'Seconds before that command is stopped, 0 = 300');
+  F.At(15, 3, 15, 24);
+  F.AddYesNo('Tosser:', Tosser, 'Run mktoss: after mail arrives (when the command above is blank) and from mklisten''s scan');
   If F.Execute Then
     Begin
-    M^.Flags := M^.Flags And Not (mcEnabled Or mcListen Or mcRequireCram Or mcPlz Or mcNr Or mcAcceptUnknown);
+    M^.Flags := M^.Flags And Not (mcEnabled Or mcListen Or mcRequireCram Or mcPlz Or mcNr Or mcAcceptUnknown Or mcTosser);
     If Enabled Then M^.Flags := M^.Flags Or mcEnabled;
     If Listen Then M^.Flags := M^.Flags Or mcListen;
     If Cram Then M^.Flags := M^.Flags Or mcRequireCram;
     If Plz Then M^.Flags := M^.Flags Or mcPlz;
     If Nr Then M^.Flags := M^.Flags Or mcNr;
     If Unknown Then M^.Flags := M^.Flags Or mcAcceptUnknown;
+    If Tosser Then M^.Flags := M^.Flags Or mcTosser;
     If M^.RetryMax < M^.RetryMin Then
       M^.RetryMax := M^.RetryMin;
     Config^.SetMailer(M^);

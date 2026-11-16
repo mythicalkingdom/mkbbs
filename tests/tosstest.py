@@ -46,6 +46,35 @@ r = run('tossdump', '6', '9', '10', '4')
 before = {a: int(l.split('n=')[1]) for l in r.stdout.splitlines() if l.startswith('area') for a in [l.split()[1]]}
 check('the sample areas open (%s)' % before, set(before) == {'6', '9', '10', '4'})
 
+# ---- how mktoss is called: the switch, file names (the mailer's hook), one at a time
+import fcntl, time
+mailer_mk = cfg + '/mailer.mk'
+flags = bytearray(open(mailer_mk, 'rb').read())
+flags[2] &= ~128
+open(mailer_mk, 'wb').write(flags)
+r = run('mktoss', '-t')
+check('the tosser switched off in the configuration: mktoss does nothing, says so, exit 3', r.returncode == 3 and 'not switched on' in r.stdout)
+r = run('mktoss', '-t', '-q')
+check('... quietly with -q', r.returncode == 3 and r.stdout == '')
+r = run('mktoss', '-t', '-f')
+check('-f runs it anyway', r.returncode == 0 and 'mktoss done' in r.stdout)
+flags[2] |= 128
+open(mailer_mk, 'wb').write(flags)
+r = run('mktoss', '-t', '-q', inb + '/0001aaaa.pkt', inb + '/0002bbbb.mo1')
+check('file names (as the mailer\'s hook passes them) are accepted and ignored', r.returncode == 0)
+lockf = open(inb + '/mktoss.lock', 'a')
+fcntl.flock(lockf, fcntl.LOCK_EX)
+p1 = subprocess.Popen([os.path.join(build, 'mktoss'), '-t', '-q'], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+time.sleep(1.5)
+waited = p1.poll() is None
+fcntl.flock(lockf, fcntl.LOCK_UN)
+try:
+    p1.wait(10)
+except subprocess.TimeoutExpired:
+    p1.kill()
+check('a second mktoss waits while another holds the lock (mktoss.lock), then runs', waited and p1.returncode == 0)
+lockf.close()
+
 r = subprocess.run(['node', os.path.join(here, 'tosspkts.mjs'), inb], capture_output=True, text=True)
 check('MessagePacket.js made the packets (%s)' % r.stderr.strip()[:80], r.returncode == 0 and os.path.exists(inb + '/0001aaaa.pkt'))
 open(unsec + '/0005eeee.pkt', 'wb').write(open(inb + '/0003cccc.pkt', 'rb').read())

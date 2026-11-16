@@ -57,8 +57,16 @@ cfglog = os.path.join(work, 'cfg.log')
 settings = os.path.join(cfgdir, 'mkbink.conf')
 fakebink = os.path.join(work, 'mkbink')
 fakecfg = os.path.join(work, 'mkbinkcfg')
+faketoss = os.path.join(work, 'mktoss')
+tosslog = os.path.join(work, 'toss.log')
+open(faketoss, 'w').write('''#!/bin/sh
+echo "toss MK=$MK $*" >> "$FAKELOG/toss.log"
+exit 3
+''')
+os.chmod(faketoss, 0o755)
 open(fakebink, 'w').write('''#!/bin/sh
 echo "start $$ $*" >> "$FAKELOG/bink.log"
+echo "env MK=$MK" >> "$FAKELOG/bink.log"
 trap 'echo HUP >> "$FAKELOG/bink.log"' HUP
 trap 'echo TERM >> "$FAKELOG/bink.log"; exit 0' TERM
 while true; do sleep 0.1; done
@@ -96,11 +104,12 @@ def count(text, word):
     return text.count(word)
 
 
-mailer = {'config': cfgdir, 'mkbink': fakebink, 'mkbinkcfg': fakecfg, 'interval': 1, 'restart': 1}
+mailer = {'config': cfgdir, 'mkbink': fakebink, 'mkbinkcfg': fakecfg, 'mktoss': faketoss, 'scan': 1, 'interval': 1, 'restart': 1}
 c = config('l1', mailer, 24681)
 r = subprocess.run([mklisten, '-t', '-c', c], capture_output=True, text=True)
-check('-t shows the mailer programs and the settings file', r.returncode == 0 and 'mailer:' in r.stdout and
-      fakebink in r.stdout and fakecfg in r.stdout and settings in r.stdout and 'NOT FOUND' not in r.stdout)
+check('-t shows the mailer programs, the settings file and the tosser scan', r.returncode == 0 and 'mailer:' in r.stdout and
+      fakebink in r.stdout and fakecfg in r.stdout and settings in r.stdout and 'NOT FOUND' not in r.stdout
+      and 'tosser scan every 1 s: %s' % faketoss in r.stdout)
 bad = config('bad', {'mkbink': fakebink}, 24682)
 r = subprocess.run([mklisten, '-t', '-c', bad], capture_output=True, text=True)
 check('a mailer section without "config" is an error', r.returncode == 2 and '"config"' in r.stderr)
@@ -129,6 +138,10 @@ check('SIGHUP + mailer on: mkbink started with "run -f <settings>"',
       wait(lambda: 'run -f %s' % settings in read(binklog)) and 'mailer started' in read(ll))
 pid1 = int(read(binklog).split()[1])
 check('... settings file made', read(settings) == read(setf))
+check('... mkbink has MK = the BBS configuration in its environment (its hook and mktoss need it)', 'env MK=%s' % cfgdir in read(binklog))
+check('the tosser scan: "mktoss -s -q" is run while the mailer runs, with MK set (it says "not switched on", exit 3: no complaint)',
+      wait(lambda: 'toss MK=%s -s -q' % cfgdir in read(tosslog)))
+check('... and again, every second', wait(lambda: count(read(tosslog), 'toss ') >= 3))
 
 # ---- changed configuration: HUP
 open(setf, 'w').write('version 1\naddress 1:1/1\nlink 1:2/2\n')
@@ -168,6 +181,10 @@ check('the mailer switched off: mkbink is told to stop (TERM) and is gone',
 n = count(read(binklog), 'start ')
 time.sleep(3)
 check('... and not started again', count(read(binklog), 'start ') == n)
+
+n_toss = count(read(tosslog), 'toss ')
+time.sleep(2.5)
+check('the scan does not run while the mailer is off', count(read(tosslog), 'toss ') <= n_toss + 1)
 
 # ---- on again, then mklisten stops: mkbink stops with it
 open(ctl, 'w').write('on')

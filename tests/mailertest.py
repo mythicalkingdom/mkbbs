@@ -95,6 +95,16 @@ check('mkbinkcfg -n: link 1 with host, port, password, poll', 'link 1:110/100' i
 check('... link 2 answers only (no host, no call)', 'link 1:110/200' in out and 'answer-only yes' in out and 'password p2' in out)
 check('... domain', 'domain fidonet' in out)
 
+# the tosser switch on the Mailer page (the 20th field), and what mkbinkcfg does with it
+s = screen('\\x1bc', 'm')
+check('the Mailer page has "Tosser:"', 'Tosser:' in s)
+screen('\\x1bc', 'm', '\\t' * 19, ' ', '\\r', '\\x1bx', 'y')
+d = open(mailer, 'rb').read()
+check('switching it on in mkconfig sets the tosser flag (128) in mailer.mk', d[2] & 128 == 128 and d[2] & 3 == 3 and len(d) == SIZE)
+d = bytearray(d)
+d[2] &= ~128                                  # the tests that follow start with the tosser off
+open(mailer, 'wb').write(d)
+
 # the packet password of an echo system (EchoMail > Systems > a system), kept in mailer.mk after the hook fields
 s = screen('\\x1bc', '\\r', '\\r')
 check('EchoMail > Systems > System 1 has "Areafix pwd:" and "Packet pwd:"', 'Areafix pwd:' in s and 'Packet pwd:' in s)
@@ -172,6 +182,17 @@ rc, out, err = tool('-n')
 check('inbound-unsecure (relative to the BBS directory), on-inbound and hook-timeout are written',
       rc == 0 and ('inbound-unsecure %s/files/unsec' % cfg) in out and 'on-inbound /usr/bin/toss -x' in out and 'hook-timeout 45' in out)
 check('the file stays the size it was', os.path.getsize(mailer) == SIZE)
+
+# ---- the tosser as the command mkbink runs after mail arrives
+patched(lambda d: d.__setitem__(2, d[2] | 128))
+rc, out, err = tool('-n')
+check('tosser on, no command: on-inbound is mktoss (next to mkbinkcfg)', rc == 0 and ('on-inbound %s' % os.path.join(repo, 'build', 'mktoss')) in out)
+patched(lambda d: (d.__setitem__(2, d[2] | 128), put(d, HOOK + 61, '/usr/bin/mytosser -x', 101)))
+rc, out, err = tool('-n')
+check('tosser on and a command set: the command wins', rc == 0 and 'on-inbound /usr/bin/mytosser -x' in out and 'mktoss' not in out)
+patched(lambda d: d.__setitem__(2, d[2] & ~128))
+rc, out, err = tool('-n')
+check('tosser off: no on-inbound', rc == 0 and 'on-inbound' not in out)
 
 check('the sample BBS itself was not touched', guard == {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in guard})
 print('failures: %d' % fails)

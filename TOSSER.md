@@ -71,8 +71,20 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    Tests: `tests/tosstest.py` (areafix requests from MessagePacket.js: right and wrong password, a sender that is not ours,
    a wrong packet password, links changed, the answers and the hub request read from the real outbound),
    `tests/mailertest.py` (the mkconfig page saves the packet password).
-4. **Integration**: mkbinkcfg sets `on-inbound` to mktoss when the tosser is enabled; mkmon shows the last toss; a
-   setting in mkconfig for the tosser; RESCAN after a scan.
+4. **Integration (done)**:
+   * `Mailer > Tosser` (mkconfig, flag `mcTosser` = 128 in `Mailer.Mk`) switches the tosser on.  `mktoss` does nothing (exit 3,
+     says so unless `-q`) while it is off, `-f` overrides; so cron, the mailer's hook and mklisten's scan can call it all the time.
+   * `mkbinkcfg` writes `on-inbound <mktoss>` (the one next to mkbinkcfg) when the tosser is on and "After mail comes" is blank;
+     a command set there wins.  mkbink runs it after every session that received files (its output, the summary line included,
+     is in the mailer's log, so it shows in mkmon's mailer screen).  mktoss ignores the file names the hook passes and tosses
+     the whole (secure) inbound.
+   * mklisten starts mkbink with `MK=<the BBS configuration>` in its environment (the hook and mktoss need it) and, with
+     `"scan": <seconds>` in the `"mailer"` section, runs `mktoss -s -q` that often while the mailer runs (the messages the BBS
+     wrote are packed and queued; mkbink sees them at its next look at the outbound).  `"mktoss"` names the program.
+   * One mktoss at a time: a lock on `mktoss.lock` in the inbound (the second waits).
+   * Tests: `tests/tosshooktest.py` (a real mkbink calls the mkbink of the BBS, the hook tosses the packet into the area),
+     `tests/mailerlistentest.py` (scan, MK in the environment), `tests/mailertest.py` (the switch, on-inbound), `tests/tosstest.py`
+     (switch, file names, lock).
 5. Later: netmail routing, file echoes (TIC), `%PAUSE`, `%RESCAN`.
 
 ## Known fixes made on the way

@@ -11,6 +11,7 @@ Program MKBinkCfg;
         our addresses, domain, name, sysop, location    General (Config.Mk), Mailer (Mailer.Mk)
         inbound directory, BSO outbound directory       EchoMail Options (EchoCfg.Mk)
         listening, retry times, links ...               Mailer, Mailer Links (Mailer.Mk)
+        the tosser (mktoss) as on-inbound command       Mailer > Tosser, when the command is blank
         host of a link that has none                    the nodelist index (mknodeidx): IBN / INA flags
 
      Relative directories are taken from the BBS directory.  The file is made with mode 600 (it holds the link
@@ -58,6 +59,24 @@ Procedure Fail(Msg: String);
 Function FmtAddr(Var A: AddrType): String;
   Begin
   FmtAddr := AddrStr(A);
+  End;
+
+
+Function TosserProg: String;
+  {mktoss next to this program, else left to the path}
+  Var
+    Me: String;
+    p: Word;
+
+  Begin
+  Me := ParamStr(0);
+  p := Length(Me);
+  While (p > 0) And (Me[p] <> '/') Do
+    Dec(p);
+  If (p > 0) And FileExist(Copy(Me, 1, p) + 'mktoss') Then
+    TosserProg := Copy(Me, 1, p) + 'mktoss'
+  Else
+    TosserProg := 'mktoss';
   End;
 
 
@@ -244,7 +263,10 @@ Procedure Generate;
   W('inbound ' + InDir);
   If M^.UnsecureIn <> '' Then
     W('inbound-unsecure ' + AbsPath(M^.UnsecureIn));
-  WTxt('on-inbound', M^.OnInbound);
+  If (StripBoth(M^.OnInbound, ' ') = '') And ((M^.Flags And mcTosser) <> 0) Then
+    W('on-inbound ' + TosserProg)             {the tosser, the mailer runs it after mail arrived}
+  Else
+    WTxt('on-inbound', M^.OnInbound);
   If M^.HookTimeout > 0 Then
     W('hook-timeout ' + Long2Str(M^.HookTimeout));
   W('bso ' + OutDir);

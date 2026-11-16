@@ -81,6 +81,7 @@ Const
   mcNr            = 16;                {ask for non-reliable mode}
   mcAcceptUnknown = 32;                {let a system without a link call, with UnknownPwd}
   mcFileReq       = 64;                {reserved: answer file requests}
+  mcTosser        = 128;               {the tosser (mktoss) runs: after mail arrives (on-inbound) and from mklisten's scan}
 
   mlAnswerOnly = 1;                    {never call this link, only answer its calls}
   mlDisabled   = 2;                    {kept in the list but not used}
