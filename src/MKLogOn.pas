@@ -82,8 +82,8 @@ Procedure DoSysInfo;
     NumRead: Word;
 
   Begin
-  SysPath := Config^.FindBbsFile('SysInfo.Bbs') + 'SysInfo.Bbs';
-  Assign(SysFile, ResolveCase(SysPath));
+  SysPath := Config^.FindBbsFile('sysinfo.bbs') + 'sysinfo.bbs';
+  Assign(SysFile, SysPath);
   FileMode := fmReadWrite + fmDenyWrite;
   If shReset(SysFile, SizeOf(SysInfo)) Then
     Begin
@@ -115,8 +115,8 @@ Procedure LogOffSysInfo;
                                           day of week out from the other three}
 
   Begin
-  SysPath := Config^.FindBbsFile('SysInfo.Bbs') + 'SysInfo.Bbs';
-  Assign(SysFile, ResolveCase(SysPath));
+  SysPath := Config^.FindBbsFile('sysinfo.bbs') + 'sysinfo.bbs';
+  Assign(SysFile, SysPath);
   FileMode := fmReadWrite + fmDenyWrite;
   If shReset(SysFile, SizeOf(SysInfo)) Then
     Begin
@@ -129,7 +129,7 @@ Procedure LogOffSysInfo;
       End;
     Close(SysFile);
     End;
-  SysPath := Config^.FindBbsFile('TimeLog.Bbs') + 'TimeLog.Bbs';
+  SysPath := Config^.FindBbsFile('timelog.bbs') + 'timelog.bbs';
   If Not FileExist(SysPath) Then
     Begin
     For i := 0 to 6 Do
@@ -137,7 +137,7 @@ Procedure LogOffSysInfo;
     For i := 0 to 23 Do
       TL.BusyPerHour[i] := 0;
     TL.StartDate := DateStr(GetDosDate);
-    If SaveFile('TimeLog.Bbs', TL, SizeOf(TL)) = 0 Then;
+    If SaveFile('timelog.bbs', TL, SizeOf(TL)) = 0 Then;
     End;
   If LoadFile(SysPath, TL, SizeOf(TL)) = 0 Then
     Begin
@@ -179,25 +179,25 @@ Procedure LogOnUser;
     End;
   User.SetUserDLLimit(GetKFromLimit(TmpStr, UserBaud));
   User.SetStartTime;
-  If BbsDisplay.DisplayBbsFile('WELCOME', '') = '' Then;
-  If BbsDisplay.DisplayBbsFile('WELCOME1', '') = '' Then;
+  If BbsDisplay.DisplayBbsFile('welcome', '') = '' Then;
+  If BbsDisplay.DisplayBbsFile('welcome1', '') = '' Then;
   LDate := LongDate(User.GetUserLastDate);
   TmpStr := BBSDisplay.ScreenFileExpand('OnceOnly');
   If DateFile(TmpStr) >= LDate Then
-    If BBSDisplay.DisplayBbsFile('OnceOnly', '') = '' Then;
+    If BBSDisplay.DisplayBbsFile('onceonly', '') = '' Then;
   TmpStr := BBSDisplay.ScreenFileExpand('OnceOnl2');
   If DateFile(TmpStr) >= LDate Then
-    If BBSDisplay.DisplayBbsFile('OnceOnl2', '') = '' Then;
+    If BBSDisplay.DisplayBbsFile('onceonl2', '') = '' Then;
   User.GetUserSec(Sec);
-  If BbsDisplay.DisplayBbsFile('SEC' + Long2Str(Sec.Level), '') = '' Then;
+  If BbsDisplay.DisplayBbsFile('sec' + Long2Str(Sec.Level), '') = '' Then;
   CheckYourMail;
-  If BbsDisplay.DisplayBbsFile('NEWS','') = '' Then;
+  If BbsDisplay.DisplayBbsFile('news','') = '' Then;
   TmpStr := User.GetUserBirthDate;
   TodayStr := DateStr(GetDosDate);
   If (Copy(TodayStr, 1, 2) = Copy(TmpStr, 1, 2)) And
   (Copy(TodayStr, 4, 2) = Copy(TmpStr, 4, 2)) Then
     Begin
-    If BbsDisplay.DisplayBbsFile('BIRTHDAY', '') = '' Then;
+    If BbsDisplay.DisplayBbsFile('birthday', '') = '' Then;
     End;
   End;
 
@@ -292,7 +292,7 @@ Procedure GetNewUserPassword;
     While ((User.Ok) and (Not POK)) Do
       Begin
       User.DisplayNewLine;
-      If BbsDisplay.DisplayBbsFile('PASSWORD', '') = '' Then;
+      If BbsDisplay.DisplayBbsFile('password', '') = '' Then;
       User.DisplayNewLine;
       User.DisplayStr(Prompts.GetString(036) + ' ');
       TmpStr := Upper(User.InputPwd(15));
@@ -503,10 +503,10 @@ Procedure ProcessNewUser;
     User.DisplayNewLine;
     User.AskYN(Prompts.GetString(062), AllCorrect);
     End;
-  If BbsDisplay.DisplayBbsFile('NEWUSER1', '') = '' Then;
-  If BbsDisplay.DisplayBbsFile('NEWUSER2', '') = '' Then;
+  If BbsDisplay.DisplayBbsFile('newuser1', '') = '' Then;
+  If BbsDisplay.DisplayBbsFile('newuser2', '') = '' Then;
   If User.Ok Then
-    DoQuest('NEWUSER');
+    DoQuest('newuser');
   If User.Ok Then
     Begin
     User.AddUser;
@@ -780,7 +780,7 @@ Function AskName: String;
       End;
     If NameOk Then
       Begin
-      If TrashName(TempName, 'TrashCan.Ctl') Then
+      If TrashName(TempName, 'trashcan.ctl') Then
         Begin
         User.DisplayNewLine;
         User.DisplayAttr(Config^.GetSystemColor(1));
@@ -790,7 +790,7 @@ Function AskName: String;
         NameTries := MaxTries + 1;
         AskName := '';
         NewUser := False;
-        LogEntry.WriteEntry('Trashcan.Ctl name used of ' + TempName);
+        LogEntry.WriteEntry('trashcan.ctl name used of ' + TempName);
         LogEntry.WriteEntry('Access Denied');
         End;
       End;
@@ -900,7 +900,7 @@ Function GetLimits(Level: Word): String;
   BestMatch := 0;
   LFile.Init;
   GetLimits := '';
-  If LFile.OpenTextFile(Config^.FindBbsFile('Limits.Ctl') + 'Limits.Ctl') Then
+  If LFile.OpenTextFile(Config^.FindBbsFile('limits.ctl') + 'limits.ctl') Then
     Begin
     TStr := LFile.GetString;
     While LFile.StringFound Do
@@ -960,8 +960,8 @@ Procedure DoLanguage;
     User.DisplayNewLine;
     If LangChr = #13 Then
       Begin
-      Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.LC') +
-        Config^.GetLangFile(1) + '.LC');
+      Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.lc') +
+        Config^.GetLangFile(1) + '.lc');
       User.SetUserLanguage(1);
       End
     Else
@@ -969,8 +969,8 @@ Procedure DoLanguage;
       i := Ord(LangChr) - Ord('A') + 1;
       If ((i > 0) and (i < 11)) Then
         Begin
-        Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(i) + '.LC') +
-          Config^.GetLangFile(i) + '.LC');
+        Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(i) + '.lc') +
+          Config^.GetLangFile(i) + '.lc');
         User.SetUserLanguage(i);
         End;
       End;

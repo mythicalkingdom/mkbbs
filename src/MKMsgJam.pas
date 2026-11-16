@@ -538,7 +538,7 @@ Procedure JamMsgObj.DoChar(Ch: Char);
       Begin
       GetDir(0, TmpStr);
       TmpStr := GetTempName(TmpStr);
-      Assign(JM^.BufFile, ResolveCase(TmpStr));
+      Assign(JM^.BufFile, TmpStr);
       FileMode := fmReadWrite + fmDenyNone;
       ReWrite(JM^.BufFile, 1);
       End;
@@ -1396,7 +1396,7 @@ Procedure JamMsgObj.StartNewMsg;
 
 Function JamMsgObj.MsgBaseExists: Boolean;
   Begin
-  MsgBaseExists := (FileExist(JM^.MsgPath + '.JHR'));
+  MsgBaseExists := (FileExist(JM^.MsgPath + '.jhr'));
   End;
 
 
@@ -1425,9 +1425,9 @@ Function JamMsgObj.OpenMsgBase: Word;
   Begin
   OpenError := 0;
   JM^.LockCount := 0;
-  Assign(JM^.HdrFile, ResolveCase(JM^.MsgPath + '.JHR'));
-  Assign(JM^.TxtFile, ResolveCase(JM^.MsgPath + '.JDT'));
-  Assign(JM^.IdxFile, ResolveCase(JM^.MsgPath + '.JDX'));
+  Assign(JM^.HdrFile, JM^.MsgPath + '.jhr');
+  Assign(JM^.TxtFile, JM^.MsgPath + '.jdt');
+  Assign(JM^.IdxFile, JM^.MsgPath + '.jdx');
   FileMode := fmReadWrite + fmDenyNone;
   Reset(JM^.HdrFile, 1);
   OpenError := IoResult;
@@ -1500,14 +1500,14 @@ Function JamMsgObj.CreateMsgBase(MaxMsg: Word; MaxDays: Word): Word;
     TmpHdr^.BaseMsgNum := 1;
     TmpHdr^.Created := ToUnixDate(GetDosDate);
     TmpHdr^.PwdCrc := -1;
-    CreateError := SaveFile(JM^.MsgPath + '.JHR', TmpHdr^, SizeOf(TmpHdr^));
+    CreateError := SaveFile(JM^.MsgPath + '.jhr', TmpHdr^, SizeOf(TmpHdr^));
     Dispose(TmpHdr);
     If CreateError = 0 Then
-      CreateError := SaveFile(JM^.MsgPath + '.JLR', CreateError, 0);
+      CreateError := SaveFile(JM^.MsgPath + '.jlr', CreateError, 0);
     If CreateError = 0 Then
-      CreateError := SaveFile(JM^.MsgPath + '.JDT', CreateError, 0);
+      CreateError := SaveFile(JM^.MsgPath + '.jdt', CreateError, 0);
     If CreateError = 0 Then
-      CreateError := SaveFile(JM^.MsgPath + '.JDX', CreateError , 0);
+      CreateError := SaveFile(JM^.MsgPath + '.jdx', CreateError , 0);
     If IoResult <> 0 Then;
     End;
   CreateMsgBase := CreateError;
@@ -1633,7 +1633,7 @@ Function JamMsgObj.GetLastRead(UNum: LongInt): LongInt;
     TmpLast: JamLastType;
 
   Begin
-  Assign(LastFile, ResolveCase(JM^.MsgPath + '.JLR'));
+  Assign(LastFile, JM^.MsgPath + '.jlr');
   FileMode := fmReadWrite + fmDenyNone;
   Reset(LastFile, SizeOf(JamLastType));
   Error := IoResult;
@@ -1662,7 +1662,7 @@ Procedure JamMsgObj.SetLastRead(UNum: LongInt; LR: LongInt);
     TmpLast: JamLastType;
 
   Begin
-  Assign(LastFile, ResolveCase(JM^.MsgPath + '.JLR'));
+  Assign(LastFile, JM^.MsgPath + '.jlr');
   FileMode := fmReadWrite + fmDenyNone;
   Reset(LastFile, SizeOf(JamLastType));
   Error := IoResult;

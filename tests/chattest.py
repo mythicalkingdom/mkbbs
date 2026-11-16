@@ -14,7 +14,8 @@ src = os.path.join(root, 'bbs', 'bbsc', 'ra')
 if not os.path.isdir(src):
     print('skip: no sample BBS'); sys.exit(0)
 dst = cfgpatch.short_dir() + '/r'      # a short path: the configuration holds it in a fixed size field
-shutil.copytree(src, dst)
+shutil.copytree(src, dst, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(dst)
 p = os.path.join(dst, 'config.mk')
 root = os.path.realpath(os.path.join(root, 'bbs')).encode() + b'/'
 ra = os.path.realpath(src).encode() + b'/'

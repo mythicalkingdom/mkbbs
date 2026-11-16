@@ -216,7 +216,7 @@ Procedure FidoMsgObj.RemoveTmp;
 
   Begin
   If FM^.MsgFile.CloseFile Then;
-  Assign(TmpFile, ResolveCase(FM^.TmpName));
+  Assign(TmpFile, FM^.TmpName);
   Erase(TmpFile);
   If IoResult <> 0 Then;
   FM^.TmpOpen := False;
@@ -590,7 +590,7 @@ Function  FidoMsgObj.WriteMsg: Word;
   PackTime(TmpDT, TmpDate);
   PutLong(TmpDate, 176);
   NetNum := GetHighMsgNum + 1;
-  If FileExist(FM^.NetMailPath + Long2Str(NetNum) + '.Msg') Then
+  If FileExist(FM^.NetMailPath + Long2Str(NetNum) + '.msg') Then
     Begin
     Rescan;
     NetNum := GetHighMsgNum + 1;
@@ -601,8 +601,8 @@ Function  FidoMsgObj.WriteMsg: Word;
     Begin
     If FM^.MsgFile.CloseFile Then
       Begin
-      Assign(TmpFile, ResolveCase(FM^.TmpName));
-      Rename(TmpFile, FM^.NetMailPath + Long2Str(NetNum) + '.Msg')
+      Assign(TmpFile, FM^.TmpName);
+      Rename(TmpFile, FM^.NetMailPath + Long2Str(NetNum) + '.msg')
       End;
     End;
   WriteMsg := IoResult;
@@ -826,14 +826,14 @@ Procedure FidoMsgObj.MsgStartUp;
   If FM^.TmpOpen Then
     RemoveTmp;
   LastSoft := False;
-  If FileExist (FM^.NetMailPath + Long2Str(FM^.CurrMsg) + '.MSG') Then
+  If FileExist (FM^.NetMailPath + Long2Str(FM^.CurrMsg) + '.msg') Then
     FM^.Error := 0
   Else
     FM^.Error := 200;
   If FM^.Error = 0 Then
     Begin
     If Not FM^.MsgFile.OpenFile(FM^.NetMailPath + Long2Str(FM^.CurrMsg) +
-    '.Msg',  fmReadWrite + fmDenyNone) Then FM^.Error := 1000;
+    '.msg',  fmReadWrite + fmDenyNone) Then FM^.Error := 1000;
     End;
   If FM^.Error = 0 Then
     FM^.MsgOpen := True;
@@ -1149,7 +1149,7 @@ Function FidoMsgObj.IsPriv: Boolean; {Is current msg priviledged/private}
 
 Function FidoMsgObj.IsDeleted: Boolean; {Is current msg deleted}
   Begin
-  IsDeleted := Not FileExist (FM^.NetMailPath + Long2Str(FM^.CurrMsg) + '.MSG');
+  IsDeleted := Not FileExist (FM^.NetMailPath + Long2Str(FM^.CurrMsg) + '.msg');
   End;
 
 
@@ -1329,7 +1329,7 @@ Procedure FidoMsgObj.DeleteMsg;
   If FM^.MsgOpen Then
     If FM^.MsgFile.CloseFile Then
       FM^.MsgOpen := False;
-  Assign(TmpFile, ResolveCase(FM^.NetMailPath + Long2Str(FM^.CurrMsg) + '.MSG'));
+  Assign(TmpFile, FM^.NetMailPath + Long2Str(FM^.CurrMsg) + '.msg');
   Erase(TmpFile);
   Code := FM^.CurrMsg shr 3; {div by 8 to get byte position}
   FM^.MsgPresent[Code] := FM^.MsgPresent[Code] and
@@ -1440,7 +1440,7 @@ Procedure FidoMsgObj.Rescan;
 
   Begin
   FillChar(FM^.MsgPresent, SizeOf(FM^.MsgPresent), 0);
-  FindFirst(FM^.NetMailPath + '*.MSG', ReadOnly + Archive, SR);
+  FindFirst(FM^.NetMailPath + '*.msg', ReadOnly + Archive, SR);
   While DosError = 0 Do
     Begin
     TmpName := SR.Name;

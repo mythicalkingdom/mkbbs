@@ -29,7 +29,7 @@ Function WriteDorInfo: Word;
 
   Begin
   Error := 0;
-  Assign(DorFile, ResolveCase('DORINFO1.DEF'));
+  Assign(DorFile, 'dorinfo1.def');
   ReWrite(DorFile);
   Error := IoResult;
   If Error = 0 Then
@@ -118,7 +118,7 @@ Function WriteDoorSys: Word;
 
   Begin
   Error := 0;
-  Assign(DorFile, ResolveCase('DOOR.SYS'));
+  Assign(DorFile, 'door.sys');
   ReWrite(DorFile);
   Error := IoResult;
   If Error = 0 Then
@@ -298,7 +298,7 @@ Function WriteCallInfo: Word;
 
   Begin
   Error := 0;
-  Assign(DorFile, ResolveCase('CALLINFO.BBS'));
+  Assign(DorFile, 'callinfo.bbs');
   ReWrite(DorFile);
   Error := IoResult;
   If Error = 0 Then

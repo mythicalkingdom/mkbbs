@@ -922,7 +922,7 @@ Function SynMsgObj.OpenMsgBase: Word;
       Name: String;
 
     Begin
-    Name := ResolveCase(MInfo^.BasePath + '.' + Ext);
+    Name := MInfo^.BasePath + '.' + Ext;
     Assign(F, Name);
     FileMode := fmReadWrite + fmDenyNone;
     Reset(F, 1);

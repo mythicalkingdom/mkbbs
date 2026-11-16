@@ -38,7 +38,7 @@ Procedure UsageStats;
   User.SetMore(True);
   User.DisplayNewLine;
   User.ResetLines(1);
-  TmpStr := Config^.FindBbsFile('TimeLog.Bbs') + 'TimeLog.BBS';
+  TmpStr := Config^.FindBbsFile('timelog.bbs') + 'timelog.bbs';
   If FileExist(TmpStr) Then
     Begin
     If LoadFile(TmpStr, TL, SizeOf(TL)) = 0 Then
@@ -372,9 +372,9 @@ Procedure ListNodes;
   User.DisplayAttr(Config^.GetSystemColor(1));
   User.DisplayStrLn(Prompts.GetString(329));
   User.DisplaystrLn(Prompts.GetString(330));
-  If FileExist(Config^.GetBBSPath + 'UserOn.Bbs') Then
+  If FileExist(Config^.GetBBSPath + 'useron.bbs') Then
     Begin
-    Assign(UOFile, ResolveCase(Config^.GetBBSPath + 'UserOn.BBS'));
+    Assign(UOFile, Config^.GetBBSPath + 'useron.bbs');
     Filemode := fmreadonly + fmdenynone;
     Reset(UOFile, Sizeof(UserOnType));
     If IoResult = 0 Then

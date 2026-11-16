@@ -153,7 +153,7 @@ Procedure DoPage;
     PageStr := Config^.FindBbsFile('PAGE.' + Long2Str(PageTune)) + 'PAGE.' +
       Long2Str(PageTune);
     If ((Not FileExist(PageStr)) And (PageTune <> 0)) Then
-      PageStr := Config^.FindBbsFile('PAGE.MK') + 'PAGE.MK';
+      PageStr := Config^.FindBbsFile('page.mk') + 'page.mk';
     If FileExist(PageStr) Then
       PagePlay(PageStr)
     Else

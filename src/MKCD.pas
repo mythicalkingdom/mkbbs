@@ -88,14 +88,14 @@ Function CDFirst(Name: String; Var CDI: CDInfo): Boolean;
 Function DirFileExpand(FileName: String): String;
   Begin
   If ((User.GetUserAvatar) And
-  (FileExist(FileName + '.AVT'))) Then
-    DirFileExpand := FileName + '.AVT'
+  (FileExist(FileName + '.avt'))) Then
+    DirFileExpand := FileName + '.avt'
   Else If ((User.GetUserAnsi) And
-  (FileExist(FileName + '.ANS'))) Then
-    DirFileExpand := FileName + '.ANS'
+  (FileExist(FileName + '.ans'))) Then
+    DirFileExpand := FileName + '.ans'
   Else If
-  (FileExist(FileName + '.ASC')) Then
-    DirFileExpand := FileName + '.ASC'
+  (FileExist(FileName + '.asc')) Then
+    DirFileExpand := FileName + '.asc'
   Else
     DirFileExpand := FileName;
   End;
@@ -319,14 +319,14 @@ Procedure DoCDRom(CtlName: String; DirPath: String);
   Begin
   Finished := False;
   AddBackSlash(DirPath);
-  Assign(OFile, ResolveCase(DirPath + CtlName + '.DAT'));
+  Assign(OFile, DirPath + CtlName + '.dat');
   FileMode := fmReadOnly + fmDenyNone;
   If shReset(Ofile, SizeOf(NameRec)) Then;
-  Assign(CFile, ResolveCase(DirPath + CtlName + '.CTL'));
+  Assign(CFile, DirPath + CtlName + '.ctl');
   FileMode := fmReadOnly + fmDenyNone;
   If shReset(CFile, SizeOf(CtlRec)) Then;
   User.DisplayAttr(Config^.GetSystemColor(1));
-  If BbsDisplay.DisplayBbsFile(DirFileExpand(DirPath + 'DIR'), ' ') = ' ' Then;
+  If BbsDisplay.DisplayBbsFile(DirFileExpand(DirPath + 'dir'), ' ') = ' ' Then;
   While ((Not Finished) and (User.Ok)) Do
     Begin
     User.DisplayAttr(Config^.GetSystemColor(1));
@@ -356,7 +356,7 @@ Procedure DoCDRom(CtlName: String; DirPath: String);
                End;
             2: Begin
                User.DisplayAttr(Config^.GetSystemColor(1));
-               If BbsDisplay.DisplayBbsFile(DirFileExpand(DirPath + 'DIR'), ' ') = ' ' Then;
+               If BbsDisplay.DisplayBbsFile(DirFileExpand(DirPath + 'dir'), ' ') = ' ' Then;
                End;
             3: Begin
                TmpStr := '';
@@ -373,11 +373,11 @@ Procedure DoCDRom(CtlName: String; DirPath: String);
           Begin
           If Length(CurrStr) > 0 Then
             Begin
-            If FileExist(DirPath + 'DIR' + CurrStr) Then
+            If FileExist(DirPath + 'dir' + CurrStr) Then
               Begin
               User.DisplayAttr(Config^.GetSystemColor(1));
               User.DisplayStrLn(Prompts.GetString(321) + ' ' + CurrStr);
-              DisplayDirFile(DirPath + 'DIR' + CurrStr);
+              DisplayDirFile(DirPath + 'dir' + CurrStr);
               End;
             End
           End;

@@ -133,8 +133,9 @@ class Term:
 
 try:
     real = os.path.join(work, 'real')
-    shutil.copytree(sample, real)
-    ec = [os.path.join(real, f) for f in os.listdir(real) if f.lower() == 'echocfg.mk'][0]
+    shutil.copytree(sample, real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(real)
+    ec = os.path.join(real, 'echocfg.mk')
     d = bytearray(open(ec, 'rb').read())
     for off, text in ((0, 'files/in'), (51, 'mail/out')):
         d[off:off + 51] = bytes([len(text)]) + text.encode() + bytes(50 - len(text))
@@ -154,7 +155,7 @@ try:
     pstr(39, '127.0.0.1', 61)
     h[L + 100:L + 102] = (24842).to_bytes(2, 'little')
     pstr(102, 'secret', 31)
-    open(os.path.join(real, 'Mailer.Mk'), 'wb').write(h)
+    open(os.path.join(real, 'mailer.mk'), 'wb').write(h)
 
     # the other mailer: 1:110/100, answers 1:110/290
     bdir = os.path.join(work, 'b')

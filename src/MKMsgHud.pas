@@ -877,8 +877,8 @@ Function HudsonMsgObj.WriteMsg: Word;
   If WriteError = 0 Then
     Begin
     Case MsgRec^.MT of
-      mmtEchoMail: FN := 'ECHOMAIL.BBS';
-      mmtNetMail: FN := 'NETMAIL.BBS';
+      mmtEchoMail: FN := 'echomail.bbs';
+      mmtNetMail: FN := 'netmail.bbs';
       Else
         FN := '';
       End; {Case MsgType}
@@ -931,11 +931,11 @@ Procedure HudsonMsgObj.SetMsgPath(MP: String);
   MsgRec^.Area := Str2Long(Copy(MP,1,3));
   MsgRec^.MsgPath := Copy(MP,4,60);
   AddBackSlash(MsgRec^.MsgPath);
-  shAssign(MsgRec^.MsgIdxFile, MsgRec^.MsgPath + 'MSGIDX.BBS');
-  shAssign(MsgRec^.MsgToIdxFile, MsgRec^.MsgPath + 'MSGTOIDX.BBS');
-  shAssign(MsgRec^.MsgHdrFile, MsgRec^.MsgPath + 'MSGHDR.BBS');
-  shAssign(MsgRec^.MsgTxtFile, MsgRec^.MsgPath + 'MSGTXT.BBS');
-  shAssign(MsgRec^.MsgInfoFile, MsgRec^.MsgPath + 'MSGINFO.BBS');
+  shAssign(MsgRec^.MsgIdxFile, MsgRec^.MsgPath + 'msgidx.bbs');
+  shAssign(MsgRec^.MsgToIdxFile, MsgRec^.MsgPath + 'msgtoidx.bbs');
+  shAssign(MsgRec^.MsgHdrFile, MsgRec^.MsgPath + 'msghdr.bbs');
+  shAssign(MsgRec^.MsgTxtFile, MsgRec^.MsgPath + 'msgtxt.bbs');
+  shAssign(MsgRec^.MsgInfoFile, MsgRec^.MsgPath + 'msginfo.bbs');
   End;
 
 
@@ -1072,9 +1072,9 @@ Function HudsonMsgObj.Check: Word;          {Check if msg base is Ok}
 
   Begin
   Status := 0;
-  If (Not FileExist(MsgRec^.MsgPath + 'MSGINFO.BBS'))  Then
+  If (Not FileExist(MsgRec^.MsgPath + 'msginfo.bbs'))  Then
     Status := 1;
-  If (Not FileExist(MsgRec^.MsgPath + 'MSGHDR.BBS'))  Then
+  If (Not FileExist(MsgRec^.MsgPath + 'msghdr.bbs'))  Then
     Begin
     If Status = 0 Then
       Status := 2;
@@ -1084,7 +1084,7 @@ Function HudsonMsgObj.Check: Word;          {Check if msg base is Ok}
     If Status = 1 Then
       Status := 2;
     End;
-  If (Not FileExist(MsgRec^.MsgPath + 'MSGTXT.BBS'))  Then
+  If (Not FileExist(MsgRec^.MsgPath + 'msgtxt.bbs'))  Then
     Begin
     If Status = 0 Then
       Status := 2;
@@ -1094,7 +1094,7 @@ Function HudsonMsgObj.Check: Word;          {Check if msg base is Ok}
     If Status = 1 Then
       Status := 2;
     End;
-  If (Not FileExist(MsgRec^.MsgPath + 'MSGIDX.BBS')) Then
+  If (Not FileExist(MsgRec^.MsgPath + 'msgidx.bbs')) Then
     Begin
     If Status = 0 Then
       Status := 2;
@@ -1104,7 +1104,7 @@ Function HudsonMsgObj.Check: Word;          {Check if msg base is Ok}
     If Status = 1 Then
       Status := 2;
     End;
-  If (Not FileExist(MsgRec^.MsgPath + 'MSGTOIDX.BBS'))  Then
+  If (Not FileExist(MsgRec^.MsgPath + 'msgtoidx.bbs'))  Then
     Begin
     If Status = 0 Then
       Status := 2;
@@ -1116,15 +1116,15 @@ Function HudsonMsgObj.Check: Word;          {Check if msg base is Ok}
     End;
   If Status = 0 Then
     Begin
-    If SizeFile(MsgRec^.MsgPath + 'MSGINFO.BBS') <> SizeOf(MsgInfoType) Then
+    If SizeFile(MsgRec^.MsgPath + 'msginfo.bbs') <> SizeOf(MsgInfoType) Then
       Status := 2;
     End;
   If Status = 0 Then
     Begin
-    BaseSize := SizeFile(MsgRec^.MsgPath + 'MSGHDR.BBS') Div SizeOf(MsgHdrType);
-    If BaseSize <> (SizeFile(MsgRec^.MsgPath + 'MSGIDX.BBS') Div SizeOf(MsgIdxType)) Then
+    BaseSize := SizeFile(MsgRec^.MsgPath + 'msghdr.bbs') Div SizeOf(MsgHdrType);
+    If BaseSize <> (SizeFile(MsgRec^.MsgPath + 'msgidx.bbs') Div SizeOf(MsgIdxType)) Then
       Status := 2;
-    If BaseSize <> (SizeFile(MsgRec^.MsgPath + 'MSGTOIDX.BBS') Div SizeOf(MsgToIdxType)) Then
+    If BaseSize <> (SizeFile(MsgRec^.MsgPath + 'msgtoidx.bbs') Div SizeOf(MsgToIdxType)) Then
       Status := 2;
     End;
   Check := Status;
@@ -1524,7 +1524,7 @@ Function HudsonMsgObj.NumberOfMsgs: LongInt;
     TmpInfo: MsgInfoType;
 
   Begin
-  If LoadFile(MsgRec^.MsgPath + 'MsgInfo.Bbs', TmpInfo, SizeOf(TmpInfo)) = 0 Then
+  If LoadFile(MsgRec^.MsgPath + 'msginfo.bbs', TmpInfo, SizeOf(TmpInfo)) = 0 Then
     NumberOfMsgs := TmpInfo.AreaActive[MsgRec^.Area]
   Else
     NumberOfMsgs := 0;
@@ -1537,9 +1537,9 @@ Procedure HudsonMsgObj.GetAllLastRead(UNum: LongInt; Var LR: LastReadType);
 
   Begin
   If Length(HudsonLast) > 0 Then
-    LastName := WithBackSlash(HudsonLast) + 'LastRead.Bbs'
+    LastName := WithBackSlash(HudsonLast) + 'lastread.bbs'
   Else
-    LastName := MsgRec^.MsgPath + 'LastRead.Bbs';
+    LastName := MsgRec^.MsgPath + 'lastread.bbs';
   FillChar(LR, SizeOf(LR), 0);
   If ((UNum + 1) * SizeOf(LastReadType)) <=
   SizeFile(LastName) Then
@@ -1559,9 +1559,9 @@ Function HudsonMsgObj.GetLastRead(UNum: LongInt): LongInt;
 
   Begin
   If Length(HudsonLast) > 0 Then
-    LastName := WithBackSlash(HudsonLast) + 'LastRead.Bbs'
+    LastName := WithBackSlash(HudsonLast) + 'lastread.bbs'
   Else
-    LastName := MsgRec^.MsgPath + 'LastRead.Bbs';
+    LastName := MsgRec^.MsgPath + 'lastread.bbs';
   If ((UNum + 1) * SizeOf(LastReadType)) >
   SizeFile(LastName) Then
     GetLastRead := 0
@@ -1584,9 +1584,9 @@ Procedure HudsonMsgObj.SetLastRead(UNum: LongInt; LR: LongInt);
 
   Begin
   If Length(HudsonLast) > 0 Then
-    LastName := WithBackSlash(HudsonLast) + 'LastRead.Bbs'
+    LastName := WithBackSlash(HudsonLast) + 'lastread.bbs'
   Else
-    LastName := MsgRec^.MsgPath + 'LastRead.Bbs';
+    LastName := MsgRec^.MsgPath + 'lastread.bbs';
   If ((UNum + 1) * SizeOf(LastReadType)) >  SizeFile(LastName) Then
     Begin
     Status := ExtendFile(LastName,(UNum + 1) * SizeOf(LastReadType));
@@ -1611,7 +1611,7 @@ Procedure HudsonMsgObj.GetHighest(Var LR: LastReadType);
   New(MIdx);
   For i := 1 to 200 Do
     LR[i] := 0;
-  Assign(IdxFile, ResolveCase(MsgRec^.MsgPath + 'MsgIdx.Bbs'));
+  Assign(IdxFile, MsgRec^.MsgPath + 'msgidx.bbs');
   FileMode := fmReadOnly + fmDenyNone;
   If shReset(IdxFile, SizeOf(MsgIdxType)) Then;
   While Not(Eof(IdxFile)) Do

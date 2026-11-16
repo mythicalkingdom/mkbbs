@@ -16,14 +16,15 @@ if not os.path.isdir(src):
 shutil.rmtree(work, ignore_errors=True)
 os.makedirs(work)
 ra = cfgpatch.short_dir() + '/r'
-shutil.copytree(src, ra)
+shutil.copytree(src, ra, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(ra)
 srcmenus = os.path.join(repo, 'bbs', 'bbsc', 'myth', 'menus')
 menus = ra.rsplit('/', 1)[0] + '/m'
-shutil.copytree(srcmenus, menus)
+shutil.copytree(srcmenus, menus, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 maps = {(src + '/').encode(): (ra + '/').encode(), (srcmenus + '/').encode(): (menus + '/').encode()}
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: maps.get(s, s))
 # the top menu gets an item of type 171 (toggle UTF-8 / CP437), in a free slot
-path = [os.path.join(menus, f) for f in os.listdir(menus) if f.lower() == 'realtop.mnu'][0]
+path = os.path.join(menus, 'realtop.mnu')
 d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}

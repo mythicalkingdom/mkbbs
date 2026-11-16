@@ -181,7 +181,7 @@ If Not FileExist(InputName) Then
   Fail('Input File: ' + InputName + ' Does not exist', 10);
 FSplit(InputName, D, N, E);
 If E = Upper(E) Then
-  OutputName := D + N + '.LC'
+  OutputName := D + N + '.lc'
 Else
   OutputName := D + N + '.lc';
 If Upper(InputName) = Upper(OutputName) Then

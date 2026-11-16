@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Mailer settings: the mkconfig pages (Mailer, Mailer Links) save Mailer.Mk, and mkbinkcfg turns the configuration into
+"""Mailer settings: the mkconfig pages (Mailer, Mailer Links) save mailer.mk, and mkbinkcfg turns the configuration into
 the settings file of mkbink (checked with "mkbink check" when the mkbink project is built next to this one).
 usage: mailertest.py <work dir>"""
 import os, shutil, stat, subprocess, sys, time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cfgpatch
 
 here = os.path.dirname(os.path.abspath(__file__))
 repo = os.path.realpath(os.path.join(here, '..'))
@@ -12,14 +15,28 @@ if not os.path.isdir(src):
     print('skip: no sample BBS'); sys.exit(0)
 shutil.rmtree(work, ignore_errors=True)
 os.makedirs(work)
-cfg = os.path.join(work, 'ra')
-shutil.copytree(src, cfg)
+cfg = cfgpatch.short_dir() + '/r'
+shutil.copytree(src, cfg, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(cfg)
+# the paths in config.mk lead to the sample: point them at the copy, or a file that is only in the sample (a
+# mailer.mk made by hand there) would be found, and saved over, through them
+cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),
+               lambda p: (cfg + '/').encode() + p[len((src + '/').encode()):] if p.startswith((src + '/').encode()) else p)
+guard = {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in os.listdir(src) if f.lower() in ('mailer.mk', 'mkbink.conf', 'echocfg.mk', 'config.mk')}
+# the sample may have been configured by hand (mailer on, echo paths): start from one without
+for f in os.listdir(cfg):
+    if f.lower() in ('mailer.mk', 'mkbink.conf'):
+        os.remove(os.path.join(cfg, f))
+    if f.lower() == 'echocfg.mk':
+        d = bytearray(open(os.path.join(cfg, f), 'rb').read())
+        d[0:102] = bytes(102)                      # InBoundFiles, OutBoundFiles: String[50] each
+        open(os.path.join(cfg, f), 'wb').write(d)
 binkcfg = os.path.join(repo, 'build', 'mkbinkcfg')
 mkbink = os.environ.get('MKBINK', os.path.join(repo, '..', 'mkbink', 'build', 'mkbink'))
 env = dict(os.environ, MK=cfg)
 fails = 0
 
-# the record: Mailer.Mk is MailerCfgType, 1 KB of expansion at the end
+# the record: mailer.mk is MailerCfgType, 1 KB of expansion at the end
 SIZE, LINKS, LINK = 12600, 184, 178
 
 
@@ -41,17 +58,15 @@ def screen(*keys):
     return r.stdout
 
 
-mailer = os.path.join(cfg, 'Mailer.Mk')
-mailer = [os.path.join(cfg, f) for f in os.listdir(cfg) if f.lower() == 'mailer.mk'] or [os.path.join(cfg, 'Mailer.Mk')]
-mailer = mailer[0]
+mailer = os.path.join(cfg, 'mailer.mk')
 
 # ---- the echo paths (EchoMail Options): relative to the BBS directory
 check('the sample has no echo paths: mkbinkcfg refuses', tool('-n')[0] == 1)
 screen('\\x1bc', 'o', 'files/in', '\\t', 'mail/out', '\\r', '\\x1bx', 'y')
 
-# ---- no Mailer.Mk: defaults, mailer not enabled
+# ---- no mailer.mk: defaults, mailer not enabled
 rc, out, err = tool('-n')
-check('no Mailer.Mk: the defaults (listen yes, port 24554, retry 60/3600)',
+check('no mailer.mk: the defaults (listen yes, port 24554, retry 60/3600)',
       rc == 0 and 'listen yes' in out and 'port 24554' in out and 'retry-min 60' in out and 'retry-max 3600' in out)
 check('... the BBS address, name, sysop and the echo paths (relative ones from the BBS directory) come from the BBS configuration',
       out.count('address ') >= 1 and 'sysname ' in out and 'sysop ' in out and
@@ -70,7 +85,7 @@ keys = ['\\x1bc', 'm', ' ', '\\t' * 10, 'fidonet', '\\r',                       
         '\\x1b[B', '\\r', '1', '\\t', '110', '\\t', '200', '\\t', '\\t', 'Down Link', '\\t', '\\t', '\\t', '\\t', '\\t', 'p2', '\\t', ' ', '\\r',  # link 2: answer only
         '\\x1b', '\\x1bx', 'y']
 screen(*keys)
-check('Mailer.Mk was written with the pinned size (%d: record + 1 KB expansion)' % SIZE,
+check('mailer.mk was written with the pinned size (%d: record + 1 KB expansion)' % SIZE,
       os.path.exists(mailer) and os.path.getsize(mailer) == SIZE)
 d = open(mailer, 'rb').read()
 check('flags: enabled + listen; domain "fidonet"', d[2] & 3 == 3 and b'fidonet' in d[:LINKS])
@@ -99,7 +114,7 @@ if os.path.exists(mkbink):
 else:
     print('skip mkbink check: %s not built' % mkbink)
 
-# ---- an older / shorter / foreign Mailer.Mk
+# ---- an older / shorter / foreign mailer.mk
 good = open(mailer, 'rb').read()
 open(mailer, 'wb').write(good[:LINKS + LINK])          # made by an older version: only the first link is in it
 rc, out, err = tool('-n')
@@ -139,5 +154,6 @@ patched(lambda d: d.__setitem__(LINKS + 8 + 31 + 61 + 2 + 31, 2))   # link 1 fla
 rc, out, err = tool('-n')
 check('a disabled link is left out', rc == 0 and 'link 1:110/100' not in out and 'link 1:110/200' in out)
 
+check('the sample BBS itself was not touched', guard == {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in guard})
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

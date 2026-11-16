@@ -89,7 +89,7 @@ Function AbsPath(P: String): String;
     End;
   If P[1] <> '/' Then
     P := BbsPath + P;
-  P := ResolvePathCase(FExpand(P));
+  P := FExpand(P);
   While (Length(P) > 1) And (P[Length(P)] = '/') Do
     Dec(P[0]);
   AbsPath := P;

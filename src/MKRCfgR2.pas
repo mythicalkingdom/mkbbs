@@ -236,7 +236,7 @@ Function R2RCfgObj.ValidMsgArea(Area: Word): Word;
         MsgLoaded := 1;
       FP := MsgLoaded - 1;
       FP := FP * SizeOf(RaMessageRecord);
-      If LoadFilePos(FindBbsFile('Messages.RA') + 'Messages.RA', RAMsg^, SizeOf(RAMsg^),
+      If LoadFilePos(FindBbsFile('messages.ra') + 'messages.ra', RAMsg^, SizeOf(RAMsg^),
       FP) = 0 Then;
       End;
     ValidMsgArea := Area  + 1 - MsgLoaded;
@@ -261,7 +261,7 @@ Function R2RCfgObj.ValidFileArea(Area: Word): Word;
         FileLoaded := 1;
       FP := FileLoaded - 1;
       FP := FP * SizeOf(RAFilesRecord);
-      If LoadFilePos(FindBbsFile('Files.RA') + 'Files.RA', RAFile^, SizeOf(RAFile^),
+      If LoadFilePos(FindBbsFile('files.ra') + 'files.ra', RAFile^, SizeOf(RAFile^),
       FP) = 0 Then;
       End;
     ValidFileArea := Area  + 1 - FileLoaded;
@@ -356,16 +356,16 @@ Procedure R2RCfgObj.RALoad;
   New(RaFile);
   New(RaEvent);
   New(RaModem);
-  Error := LoadFile(FindBbsFile('Config.Ra') + 'Config.Ra', RaCfg^, SizeOf(RaCfg^));
+  Error := LoadFile(FindBbsFile('config.ra') + 'config.ra', RaCfg^, SizeOf(RaCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Messages.Ra') + 'Messages.Ra', RaMsg^, SizeOf(RaMsg^));
+    Error := LoadFile(FindBbsFile('messages.ra') + 'messages.ra', RaMsg^, SizeOf(RaMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Files.Ra') + 'Files.Ra', RaFile^, SizeOf(RaFile^));
+    Error := LoadFile(FindBbsFile('files.ra') + 'files.ra', RaFile^, SizeOf(RaFile^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Events.Ra') + 'Events.Ra', RaEvent^, SizeOf(RaEvent^));
+    Error := LoadFile(FindBbsFile('events.ra') + 'events.ra', RaEvent^, SizeOf(RaEvent^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Modem.Ra') + 'Modem.Ra', RaModem^, SizeOf(RaModem^));
-  NumMsgAreas := SizeFile(FindBbsFile('Messages.Ra') + 'Messages.RA');
+    Error := LoadFile(FindBbsFile('modem.ra') + 'modem.ra', RaModem^, SizeOf(RaModem^));
+  NumMsgAreas := SizeFile(FindBbsFile('messages.ra') + 'messages.ra');
   NumMsgAreas := NumMsgAreas Div SizeOf(RaMessageRecord);
   FileLoaded := 1;
   MsgLoaded := 1;
@@ -1166,7 +1166,7 @@ Function R2RCfgObj.GetFileListPath(Area: Word): String; {Get file area path}
       Begin
       TmpStr := RAFile^[FA].FilePath;
       AddBackSlash(TmpStr);
-      TmpStr := TmpStr + 'FILES.BBS';
+      TmpStr := TmpStr + 'files.bbs';
       End;
     GetFileListPath := TmpStr;
     End
@@ -1352,7 +1352,7 @@ Function R2RCfgObj.GetLangName(LNum: Word): String;
 
 Function R2RCfgObj.GetLangFile(LNum: Word): String;
   Begin
-  GetLangFile := 'PROMPTS';
+  GetLangFile := 'prompts';
   End;
 
 
@@ -1895,13 +1895,13 @@ Function R2RCfgObj.GetDefaultPort: Word; {Get default comm port}
 
 Function R2RCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Ra';
+  GetNodeIdxName := 'nodeidx.ra';
   End;
 
 
 Function R2RCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Ra';
+  GetNodeIncName := 'nodeinc.ra';
   End;
 
 

@@ -201,12 +201,12 @@ Function MenuApp.SaveMenuFile: Boolean;
   If Pos('/', TmpStr) = 0 Then
     TmpStr := MenuDir(CurrFile) + TmpStr;  {no directory: next to the file being edited}
   Dest := TmpStr;
-  If FileExist(Dest) And (ResolveCase(Dest) <> ResolveCase(CurrFile)) Then
+  If FileExist(Dest) And (Dest <> CurrFile) Then
     If DoYesNo('[ Overwrite File ]', True) <> 1 Then
       Exit;
   If MenuSave(Dest) Then
     Begin
-    CurrFile := ResolveCase(Dest);
+    CurrFile := Dest;
     SaveMenuFile := True;
     Redraw;
     End
@@ -234,7 +234,7 @@ Procedure MenuApp.LoadFile;
   Begin
   If Not SaveChanges Then
     Exit;
-  TmpName := MenuDir(CurrFile) + '*.MNU';
+  TmpName := MenuDir(CurrFile) + '*.mnu';
   If AskFileName('FileName: ', TmpName) Then
     Begin
     TmpName := StripBoth(TmpName, ' ');
@@ -249,7 +249,7 @@ Procedure MenuApp.LoadFile;
       Begin
       If FileExist(TmpName) Then
         Begin
-        CurrFile := ResolveCase(TmpName);
+        CurrFile := TmpName;
         If Not MenuLoad(CurrFile) Then
           MsgBox('Error reading ' + CurrFile);
         End
@@ -273,13 +273,13 @@ Procedure MenuApp.StartFile;
     If Not HasExt(CurrFile) Then
       CurrFile := CurrFile + '.mnu';
     If FileExist(CurrFile) Then
-      CurrFile := ResolveCase(FExpand(CurrFile))
+      CurrFile := FExpand(CurrFile)
     Else If Pos('/', CurrFile) = 0 Then
       CurrFile := MenuPath + CurrFile;
     End
   Else
     Begin
-    TmpStr := MenuPath + '*.MNU';
+    TmpStr := MenuPath + '*.mnu';
     If Not PickMenuFile(TmpStr, CurrFile) Then
       CurrFile := MenuPath + 'new.mnu';      {nothing chosen: a new menu}
     End;
@@ -336,7 +336,7 @@ Procedure MenuApp.DoCommand(Cmd: Word);
       If SaveChanges Then
         Begin
         FillChar(MA, SizeOf(MA), 0);
-        CurrFile := MenuPath + '*.MNU';
+        CurrFile := MenuPath + '*.mnu';
         Modified := False;
         Redraw;
         End;

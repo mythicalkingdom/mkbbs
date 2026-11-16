@@ -1285,7 +1285,7 @@ Procedure CfgObj.SetLangName(LNum: Word; Name: String); {Set language name}
 Function CfgObj.GetLangFile(LNum: Word): String;  {Get language file name}
   Begin
   If LNum = 1 Then
-    GetLangFile := 'ENGLISH'
+    GetLangFile := 'english'
   Else
     GetLangFile := '';
   End;
@@ -2146,7 +2146,7 @@ Procedure CfgObj.SetOffBulls(BN: Word; Bull: String);
 
 Function CfgObj.GetUserFileName: String;
   Begin
-  GetUserFileName := WithBackSlash(GetMsgPath(1)) + 'Users.BBS';
+  GetUserFileName := WithBackSlash(GetMsgPath(1)) + 'users.bbs';
   End;
 
 End.

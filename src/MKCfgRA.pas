@@ -520,13 +520,13 @@ Procedure RACfgObj.RALoad;
   New(RaMsg);
   New(RaFile);
   New(RaEvent);
-  Error := LoadFile(FindBbsFile('Config.Ra') + 'Config.Ra', RaCfg^, SizeOf(RaCfg^));
+  Error := LoadFile(FindBbsFile('config.ra') + 'config.ra', RaCfg^, SizeOf(RaCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Messages.Ra') + 'Messages.Ra', RaMsg^, SizeOf(RaMsg^));
+    Error := LoadFile(FindBbsFile('messages.ra') + 'messages.ra', RaMsg^, SizeOf(RaMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Files.Ra') + 'Files.Ra', RaFile^, SizeOf(RaFile^));
+    Error := LoadFile(FindBbsFile('files.ra') + 'files.ra', RaFile^, SizeOf(RaFile^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Events.Ra') + 'Events.Ra', RaEvent^, SizeOf(RaEvent^));
+    Error := LoadFile(FindBbsFile('events.ra') + 'events.ra', RaEvent^, SizeOf(RaEvent^));
   If Error = 0 Then
     CfgInfo^.Loaded := True
   Else
@@ -601,7 +601,7 @@ Procedure RACfgObj.Save;
 
 Function RACfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'Config.RA|Messages.Ra|Files.Ra|Events.Ra';
+  SaveFileNames := 'config.ra|messages.ra|files.ra|events.ra';
   End;
 
 
@@ -620,13 +620,13 @@ Function RACfgObj.SaveFileName(FN: String): String;
 
 Procedure RACfgObj.RASave;
   Begin
-  Error := SaveFile(SaveFileName('Config.RA'), RACfg^, SizeOf(RACfg^));
+  Error := SaveFile(SaveFileName('config.ra'), RACfg^, SizeOf(RACfg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('Messages.Ra'), RaMsg^, SizeOf(RaMsg^));
+    Error := SaveFile(SaveFileName('messages.ra'), RaMsg^, SizeOf(RaMsg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('Files.Ra'), RaFile^, SizeOf(RaFile^));
+    Error := SaveFile(SaveFileName('files.ra'), RaFile^, SizeOf(RaFile^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('Events.Ra'), RaEvent^, SizeOf(RaEvent^));
+    Error := SaveFile(SaveFileName('events.ra'), RaEvent^, SizeOf(RaEvent^));
   End;
 
 
@@ -1699,7 +1699,7 @@ Function RACfgObj.GetFileListPath(Area: Word): String; {Get file area path}
       Begin
       TmpStr := RAFile^[Area].FilePath;
       AddBackSlash(TmpStr);
-      TmpStr := TmpStr + 'FILES.BBS';
+      TmpStr := TmpStr + 'files.bbs';
       End;
     GetFileListPath := TmpStr;
     End
@@ -2922,13 +2922,13 @@ Procedure RaCfgObj.SetDefaultPort(DP: Word); {Set default comm port}
 
 Function RaCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Ra';
+  GetNodeIdxName := 'nodeidx.ra';
   End;
 
 
 Function RaCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Ra';
+  GetNodeIncName := 'nodeinc.ra';
   End;
 
 

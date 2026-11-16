@@ -206,14 +206,14 @@ Procedure BwvOffObj.SetPath(MP: String);
 
 Function BwvOffObj.StartPacket: Word;
   Begin
-  Assign(BI^.MixFile, ResolveCase(BI^.MsgPath + BI^.BBSID + '.MIX'));
+  Assign(BI^.MixFile, BI^.MsgPath + BI^.BBSID + '.mix');
   ReWrite(BI^.MixFile);
-  Assign(BI^.MFile, ResolveCase(BI^.MsgPath + BI^.BBSID + '.DAT'));
+  Assign(BI^.MFile, BI^.MsgPath + BI^.BBSID + '.dat');
   ReWrite(BI^.MFile, 1);
   BI^.MsgsPerArea := 0;
   BI^.PersPerArea := 0;
   BI^.CurrArea := $ffff;
-  Assign(BI^.FTIFile, ResolveCase(BI^.MsgPath + BI^.BBSID + '.FTI'));
+  Assign(BI^.FTIFile, BI^.MsgPath + BI^.BBSID + '.fti');
   ReWrite(BI^.FTIFile, SizeOf(BWFTIType));
   BI^.CurrFTI := 0;
   StartPacket := IoResult;
@@ -307,7 +307,7 @@ Procedure BwvOffObj.DoInf;
   Config^.GetCrashNMSec(RSec);
   If Access(Sec, RSec) Then
     Inc(Inf^.NMFlags, NMFlagCrash);
-  Assign(IFile, ResolveCase(BI^.MsgPath + BI^.BBSId + '.INF'));
+  Assign(IFile, BI^.MsgPath + BI^.BBSId + '.inf');
   Rewrite(IFile, 1);
   BlockWrite(IFile, Inf^, SizeOf(Inf^));
   Dispose(Inf);
@@ -461,7 +461,7 @@ Function BwvOffObj.AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boole
 
 Function BwvOffObj.GetArchiveName(Packer: Word): String;
   Begin
-  GetArchiveName := BI^.BBSID + '.MO1';
+  GetArchiveName := BI^.BBSID + '.mo1';
   End;
 
 

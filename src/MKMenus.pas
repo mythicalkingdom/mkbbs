@@ -101,7 +101,7 @@ Procedure MenuObj.Load(FN: String);          {Load file name}
     FN := Copy(FN, 1, Pos('.', FN) - 1);
   MenuInfo^.Error := 0;
   MenuInfo^.Name := Copy(FN,1,8);
-  FN := FN + '.MNU';
+  FN := FN + '.mnu';
   MenuPath := '';
   If FileExist(Config^.GetMnuPath(User.GetUserLanguage) + FN) Then
     MenuPath := Config^.GetMnuPath(User.GetUserLanguage);
@@ -112,7 +112,7 @@ Procedure MenuObj.Load(FN: String);          {Load file name}
     MenuInfo^.Error := 1000;
   If MenuInfo^.Error = 0 Then
     Begin
-    Assign(F, ResolveCase(MenuPath + FN));
+    Assign(F, MenuPath + FN);
     FileMode := fmReadOnly + fmDenyNone;
     If Not shReset(F, SizeOf(MenuType)) Then
       MenuInfo^.Error := 1010;
@@ -141,7 +141,7 @@ Procedure MenuObj.GlobalLoad(FN: String);
   Error := 0;
   If Pos('.',FN) > 0 Then
     FN := Copy(FN, 1, Pos('.', FN) - 1);
-  FN := FN + '.MNU';
+  FN := FN + '.mnu';
   MenuPath := '';
   If FileExist(Config^.GetMnuPath(User.GetUserLanguage) + FN) Then
     MenuPath := Config^.GetMnuPath(User.GetUserLanguage);
@@ -152,7 +152,7 @@ Procedure MenuObj.GlobalLoad(FN: String);
     Error := 1000;
   If Error = 0 Then
     Begin
-    Assign(F, ResolveCase(MenuPath + FN));
+    Assign(F, MenuPath + FN);
     FileMode := fmReadOnly + fmDenyNone;
     If Not shReset(F, SizeOf(MenuType)) Then
       Error := 1010;

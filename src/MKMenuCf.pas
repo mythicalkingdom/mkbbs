@@ -86,7 +86,7 @@ Procedure InitMenuEditor;
     End;
   BBSPath := Config^.GetBBSPath;
   MenuPath := Config^.GetMnuPath(1);
-  TmpStr := Config^.FindBbsFile('MKMenu.LC') + 'MKMenu.LC';
+  TmpStr := Config^.FindBbsFile('mkmenu.lc') + 'mkmenu.lc';
   Dispose(Config, Done);
   Config := Nil;
   Prompts.Init;
@@ -176,7 +176,6 @@ Function MenuSave(FN: String): Boolean;
     LastItem: Word;
 
   Begin
-  FN := ResolveCase(FN);               {keep the spelling of a file that is there}
   LastItem := MaxMenuItems;
   While ((LastItem > 0) And (MA[LastItem].Typ = 0)) Do
     Dec(LastItem);

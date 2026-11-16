@@ -122,7 +122,7 @@ Function FFileObj.OpenFile(FName: String; FMode: Word): Boolean;
     End;
   If DoneOk Then
     Begin                    {open file}
-    Assign(BufFile, ResolveCase(FName));
+    Assign(BufFile, FName);
     FileMode := FMode;
     If DoneOk Then
       DoneOk := shReset(BufFile, 1);

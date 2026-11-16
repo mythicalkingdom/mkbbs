@@ -41,7 +41,7 @@ for f in files:
         t.write(b'; ' + name.encode() + b'\r\n')                   # a comment line is ignored
         for n, text in lines:
             t.write(str(n).encode() + b' ' + text + b'\r\n')
-    out = os.path.join(work, name + '.LC')
+    out = os.path.join(work, name + '.lc')
     if os.path.exists(out):
         os.remove(out)
     r = subprocess.run([mklc, src], capture_output=True, text=True)
@@ -59,7 +59,7 @@ for f in files:
     os.makedirs(d2, exist_ok=True)
     shutil.copy(txt, d2)
     r = subprocess.run([mklc, os.path.join(d2, name + '.TXT')], capture_output=True, text=True)
-    out = os.path.join(d2, name + '.LC')
+    out = os.path.join(d2, name + '.lc')
     check('%s.TXT (his source) compiles to his %s.LC' % (name, name),
           r.returncode == 0 and os.path.exists(out) and open(out, 'rb').read() == open(f, 'rb').read())
 for name in ('MKUPACK', 'VT100'):                      # sources without a compiled file here

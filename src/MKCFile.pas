@@ -383,6 +383,19 @@ Procedure DoPackView(Var Sec: SecType);
   End;
 
 
+Function FixDirPath(P: String): String;
+  {A directory from a menu item or the configuration: the slashes are those of this system, the letters are taken as written}
+  Var
+    i: Word;
+
+  Begin
+  For i := 1 To Length(P) Do
+    If P[i] = '\' Then
+      P[i] := '/';
+  FixDirPath := P;
+  End;
+
+
 Procedure DoDirList(PathStr: String);
   Var
     SR2: SearchRec;
@@ -416,6 +429,7 @@ Procedure DoDirList(PathStr: String);
     User.CheckInput;
     End;
   User.SetMore(True);
+  PathStr := FixDirPath(PathStr);
   AddBackSlash(PathStr);
   User.SetStopMore(False);
   FindFirst(PathStr + FileSpec, Archive + ReadOnly, SR2);
@@ -468,10 +482,11 @@ Procedure DoFileList(PathStr: String);
   User.ResetLines(1);
   User.DisplayNewLine;
   TF.Init;
+  PathStr := FixDirPath(PathStr);
   AddBackSlash(PathStr);
-  If FileExist(PathStr + 'Files.Bbs') Then
+  If FileExist(PathStr + 'files.bbs') Then
     Begin
-    If TF.OpenTextFile(PathStr + 'Files.Bbs') Then
+    If TF.OpenTextFile(PathStr + 'files.bbs') Then
       Begin
       DisplayStopMsg;
       FilesThisArea := 0;
@@ -499,7 +514,7 @@ Procedure DoFileList(PathStr: String);
           User.DisplayStrLn(TmpStr)
         Else
           Begin
-          FileName := Upper(Copy(ExtractWord(TmpStr,1),1,13));
+          FileName := Copy(ExtractWord(TmpStr,1),1,13);
           J := 0;
           Match := False;
           While ((j < FilesThisArea) and (Not Match)) Do
@@ -531,10 +546,13 @@ Procedure DoFileList(PathStr: String);
       If TF.CloseTextFile Then;
       End
     Else
-      User.DisplayStrLn('Unable to open Files.Bbs');
+      User.DisplayStrLn('Unable to open files.bbs');
     End
   Else
-    User.DisplayStrLn('Missing Files.Bbs');
+    Begin
+    User.DisplayStrLn('Missing files.bbs');
+    User.DisplayStrLn(PathStr + 'files.bbs');
+    End;
   TF.Done;
   User.DisplayNewLine;
   User.DisplayAttr(Config^.GetSystemColor(1));
@@ -555,7 +573,7 @@ Procedure OneFileLine(TmpStr: String; FPath: String);
   FF.Init;
   LF.Init;
   TmpStr := StripBoth(TmpStr, ' ');
-  FileName := Upper(Copy(ExtractWord(TmpStr,1),1,13));
+  FileName := Copy(ExtractWord(TmpStr,1),1,13);
   FF.FFirst(FPath + FileName);
   While ((FF.Found) and (User.OK)) Do
     Begin

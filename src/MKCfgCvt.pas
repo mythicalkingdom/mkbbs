@@ -139,7 +139,7 @@ While Length(Names) > 0 Do
   TmpStr := OutRec^.SaveFileName(Copy(Names, 1, i - 1));
   If FileExist(TmpStr) Then
     Begin
-    Existing := Existing + '   ' + ResolveCase(TmpStr) + #10;
+    Existing := Existing + '   ' + TmpStr + #10;
     Inc(NumExisting);
     End;
   Names := Copy(Names, i + 1, 255);

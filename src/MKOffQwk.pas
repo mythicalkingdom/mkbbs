@@ -404,7 +404,7 @@ Function QwkOffObj.AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boole
 
 Function QwkOffObj.GetArchiveName(Packer: Word): String;
   Begin
-  GetArchiveName := QI^.BBSID + '.QWK';
+  GetArchiveName := QI^.BBSID + '.qwk';
   End;
 
 
@@ -418,7 +418,7 @@ Procedure QwkOffObj.PersIdx;
     Begin
     For i := 1 to QI^.PersExported Do
       Pers^[i].QwkPtr := Lng2Bas(Pers^[i].QwkPtr + 1);
-    Assign(PersFile, ResolveCase(QI^.MsgPath + 'PERSONAL.NDX'));
+    Assign(PersFile, QI^.MsgPath + 'personal.ndx');
     ReWrite(PersFile, 5);
     BlockWrite(PersFile, Pers^, QI^.PersExported);
     Close(PersFile);
@@ -437,7 +437,7 @@ Procedure QwkOffObj.WriteDoorId;
 
   Begin
   If IoResult <> 0 Then;
-  Assign (CFile, ResolveCase(QI^.MsgPath + 'DOOR.ID'));
+  Assign (CFile, QI^.MsgPath + 'door.id');
   ReWrite(CFile);
   WriteLn(CFile, 'DOOR = MKQwk');
   WriteLn(CFile, 'VERSION = 1.1');
@@ -464,7 +464,7 @@ Procedure QwkOffObj.DoControl;
   Begin
   If IoResult <> 0 Then;
   FileMode := fmReadWrite + fmDenyNone;
-  Assign(CF, ResolveCase(QI^.MsgPath + 'Control.Dat'));
+  Assign(CF, QI^.MsgPath + 'control.dat');
   ReWrite(CF);
   If IoResult <> 0 Then;
   WriteLn(CF, Config^.GetBBSName);
@@ -495,9 +495,9 @@ Procedure QwkOffObj.DoControl;
       WriteLn(CF, Config^.GetMsgShortName(i));
       End;
     End;
-  WriteLn(CF, 'Welcome.Ans');
-  WriteLn(CF, 'News.Ans');
-  WriteLn(CF, 'GoodBye.Ans');
+  WriteLn(CF, 'welcome.ans');
+  WriteLn(CF, 'news.ans');
+  WriteLn(CF, 'goodbye.ans');
   WriteLn(CF, '0');
   WriteLn(CF, User^.GetUserScrLength);
   WriteLn(CF, Upper(User^.GetUserName));
@@ -536,8 +536,8 @@ Procedure QwkOffObj.DoIdx;
       If QI^.ConfExported[i] > 0 Then
         Begin
         IdxPointer := 0;
-        FileStr := ConCat(QI^.MsgPath, PadLeft(Long2Str(i),'0',3),'.NDX');
-        Assign(IdxFile, ResolveCase(FileStr));
+        FileStr := ConCat(QI^.MsgPath, PadLeft(Long2Str(i),'0',3),'.ndx');
+        Assign(IdxFile, FileStr);
         ReWrite(IdxFile,SizeOf(QwkIdxType));
         For OrgPointer := 1 to QI^.NumExported Do
           Begin
@@ -576,7 +576,7 @@ Function QwkOffObj.StartPacket: Word;
   IF QError = 0 Then
     Begin
     QI^.PersExported := 0;
-    Assign(QI^.QwkFile, ResolveCase(QI^.MsgPath + 'Messages.Dat'));
+    Assign(QI^.QwkFile, QI^.MsgPath + 'messages.dat');
     ReWrite(QI^.QwkFile, 128);
     If IoResult <> 0 Then
       QError := 1001;
@@ -617,13 +617,13 @@ Function QwkOffObj.ClosePacket: Word;
 
 Function QwkOffObj.GetReplyName: String;
   Begin
-  GetReplyName := QI^.BBSID + '.REP';
+  GetReplyName := QI^.BBSID + '.rep';
   End;
 
 
 Function QwkOffObj.GetExtractSpec: String;
   Begin
-  GetExtractSpec := QI^.BBSID + '.MSG';
+  GetExtractSpec := QI^.BBSID + '.msg';
   End;
 
 

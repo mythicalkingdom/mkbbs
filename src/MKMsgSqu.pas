@@ -364,7 +364,7 @@ Function SqMsgObj.SqdOpen: Word;
   Begin
   If Not SqInfo^.SqdOpened Then
     Begin
-    Assign(SqInfo^.SqdFile, ResolveCase(SqInfo^.FN + '.SQD'));
+    Assign(SqInfo^.SqdFile, SqInfo^.FN + '.sqd');
     FileMode := fmReadWrite + fmDenyNone;
     If Not shReset(SqInfo^.SqdFile, 1) Then
       SqdOpen := MKFileError
@@ -397,7 +397,7 @@ Function SqMsgObj.SqiOpen: Word;
   Begin
   If Not SqInfo^.SqiOpened Then
     Begin
-    Assign(SqInfo^.SqiFile, ResolveCase(SqInfo^.FN + '.SQI'));
+    Assign(SqInfo^.SqiFile, SqInfo^.FN + '.sqi');
     FileMode := fmReadWrite + fmDenyNone;
     If Not shReset(SqInfo^.SqiFile, SizeOf(SqIdxType)) Then
       SqiOpen := MKFileError
@@ -442,9 +442,9 @@ Function SqMsgObj.CreateMsgBase(MaxMsg: Word; MaxDays: Word): Word;
     SqInfo^.SqBase.MaxMsg := MaxMsg;
     SqInfo^.SqBase.KeepDays := MaxDays;
     SqInfo^.SqBase.EndFrame := SqInfo^.SqBase.Len;
-    CreateMsgBase := SaveFile(SqInfo^.FN + '.SQD', SqInfo^.SqBase, SqInfo^.SqBase.Len);
-    If SaveFile(SqInfo^.FN + '.SQI', SqInfo^.SqBase, 0) = 0 Then;
-    If SaveFile(SqInfo^.FN + '.SQL', SqInfo^.SqBase, 0) = 0 Then;
+    CreateMsgBase := SaveFile(SqInfo^.FN + '.sqd', SqInfo^.SqBase, SqInfo^.SqBase.Len);
+    If SaveFile(SqInfo^.FN + '.sqi', SqInfo^.SqBase, 0) = 0 Then;
+    If SaveFile(SqInfo^.FN + '.sql', SqInfo^.SqBase, 0) = 0 Then;
     End
   Else
     CreateMsgBase := 176;
@@ -453,7 +453,7 @@ Function SqMsgObj.CreateMsgBase(MaxMsg: Word; MaxDays: Word): Word;
 
 Function SqMsgObj.MsgBaseExists: Boolean;
   Begin
-  MsgBaseExists :=  FileExist(SqInfo^.FN + '.SQD');
+  MsgBaseExists :=  FileExist(SqInfo^.FN + '.sqd');
   End;
 
 
@@ -1597,7 +1597,7 @@ Function SqMsgObj.NumberOfMsgs: LongInt;
     TmpBase: SqBaseType;
 
   Begin
-  If LoadFile(SqInfo^.FN + '.Sqd', TmpBase, SizeOf(TmpBase)) = 0 Then
+  If LoadFile(SqInfo^.FN + '.sqd', TmpBase, SizeOf(TmpBase)) = 0 Then
     NumberOfMsgs := TmpBase.NumMsg
   Else
     NumberOfMsgs := 0;
@@ -1610,11 +1610,11 @@ Function SqMsgObj.GetLastRead(UNum: LongInt): LongInt;
 
   Begin
   If ((UNum + 1) * SizeOf(LRec)) >
-  SizeFile(SqInfo^.FN + '.Sql') Then
+  SizeFile(SqInfo^.FN + '.sql') Then
     GetLastRead := 0
   Else
     Begin
-    If LoadFilePos(SqInfo^.FN + '.Sql', LRec, SizeOf(LRec),
+    If LoadFilePos(SqInfo^.FN + '.sql', LRec, SizeOf(LRec),
     UNum * SizeOf(LRec)) = 0 Then
       GetLastRead := LRec
     Else
@@ -1631,13 +1631,13 @@ Procedure SqMsgObj.SetLastRead(UNum: LongInt; LR: LongInt);
   Begin
   Status := 0;
   If ((UNum + 1) * SizeOf(LRec)) >
-  SizeFile(SqInfo^.FN + '.Sql') Then
+  SizeFile(SqInfo^.FN + '.sql') Then
     Begin
-    Status := ExtendFile(SqInfo^.FN + '.Sql', (UNum + 1) * SizeOf(LRec));
+    Status := ExtendFile(SqInfo^.FN + '.sql', (UNum + 1) * SizeOf(LRec));
     End;
   LRec := LR;
   If Status = 0 Then
-    Status := SaveFilePos(SqInfo^.FN + '.Sql', LRec, SizeOf(LRec),
+    Status := SaveFilePos(SqInfo^.FN + '.sql', LRec, SizeOf(LRec),
       UNum * SizeOf(LRec));
   End;
 

@@ -178,8 +178,8 @@ If LogToPrinter Then
   LogEntry.SetPrnName(Config^.GetPrnName);
 ClrScr;
 Prompts.Init;
-Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.LC') +
-  Config^.GetLangFile(1) + '.LC');
+Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.lc') +
+  Config^.GetLangFile(1) + '.lc');
 CommaChar := Prompts.GetChar(320);
 SysStats.Load;
 If Not LocalMode Then
@@ -230,7 +230,7 @@ Else
   User.DisplayStrLn(Copyright);
   User.DisplayNewLine;
   DoLanguage;
-  BbsDisplay.DisplayBbsFile('LOGO', '');
+  BbsDisplay.DisplayBbsFile('logo', '');
   StartUpUser;
   AskName;
   End;
@@ -243,7 +243,7 @@ User.SetMore(True);
 If IoResult <> 0 Then;
 Menu.Init;
 Menu.SetSecurity(Sec);
-Menu.Load('TOP');
+Menu.Load('top');
 Menu.GlobalLoad('GLOBAL');
 If Menu.GetError <> 0 Then
   Begin

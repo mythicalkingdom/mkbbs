@@ -16,7 +16,8 @@ if not (os.path.isdir(cfg) and os.path.exists(menu)):
 os.makedirs(work, exist_ok=True)
 # the language file of the editor: MKMENU.LC is compiled from lang/MKMENU.TXT (it has the BASIC command 169)
 tmpcfg = cfgpatch.short_dir() + '/r'
-shutil.copytree(cfg, tmpcfg)
+shutil.copytree(cfg, tmpcfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(tmpcfg)
 for f in os.listdir(tmpcfg):
     if f.lower() == 'mkmenu.lc':
         os.remove(os.path.join(tmpcfg, f))

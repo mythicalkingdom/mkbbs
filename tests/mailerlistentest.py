@@ -48,7 +48,7 @@ def alive(pid):
 # ---------------------------------------------------------------- the fakes
 cfgdir = os.path.join(work, 'bbs')
 os.makedirs(cfgdir)
-for n in ('config.mk', 'echocfg.mk', 'Mailer.Mk'):
+for n in ('config.mk', 'echocfg.mk', 'mailer.mk'):
     open(os.path.join(cfgdir, n), 'w').write('x')
 ctl = os.path.join(work, 'ctl')           # on | off | fail
 setf = os.path.join(work, 'settings.txt')  # what the fake mkbinkcfg writes
@@ -132,11 +132,11 @@ check('... settings file made', read(settings) == read(setf))
 
 # ---- changed configuration: HUP
 open(setf, 'w').write('version 1\naddress 1:1/1\nlink 1:2/2\n')
-touch('Mailer.Mk', 'xx')
-check('a changed Mailer.Mk: mkbinkcfg run, mkbink told (HUP)', wait(lambda: count(read(binklog), 'HUP') == 1) and 'settings changed' in read(ll))
+touch('mailer.mk', 'xx')
+check('a changed mailer.mk: mkbinkcfg run, mkbink told (HUP)', wait(lambda: count(read(binklog), 'HUP') == 1) and 'settings changed' in read(ll))
 time.sleep(2.5)
 check('... only once while nothing else changes', count(read(binklog), 'HUP') == 1)
-touch('Mailer.Mk', 'xx')            # rewritten with the same text: mkbinkcfg finds nothing to change
+touch('mailer.mk', 'xx')            # rewritten with the same text: mkbinkcfg finds nothing to change
 time.sleep(0.1)
 touch('echocfg.mk', 'yyy')
 time.sleep(2.5)
@@ -203,8 +203,9 @@ binkcfg = os.path.join(repo, 'build', 'mkbinkcfg')
 sample = os.path.join(repo, 'bbs', 'bbsc', 'ra')
 if os.path.exists(mkbink) and os.path.exists(binkcfg) and os.path.isdir(sample):
     real = os.path.join(work, 'real')
-    shutil.copytree(sample, real)
-    ec = [os.path.join(real, f) for f in os.listdir(real) if f.lower() == 'echocfg.mk'][0]
+    shutil.copytree(sample, real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(real)
+    ec = os.path.join(real, 'echocfg.mk')
     d = bytearray(open(ec, 'rb').read())
     for off, text in ((0, 'files/in'), (51, 'mail/out')):          # InBoundFiles, OutBoundFiles: String[50]
         d[off:off + 51] = bytes([len(text)]) + text.encode() + bytes(50 - len(text))
@@ -216,7 +217,7 @@ if os.path.exists(mkbink) and os.path.exists(binkcfg) and os.path.isdir(sample):
         h[47] = 8; h[48] = 1
         for off, v in ((49, 120), (51, 60), (53, 3600), (55, 30)):
             h[off:off + 2] = v.to_bytes(2, 'little')
-        p = os.path.join(real, 'Mailer.Mk')
+        p = os.path.join(real, 'mailer.mk')
         open(p, 'wb').write(h)
         os.utime(p, (time.time() + 5, time.time() + 5))      # newer than anything else: the change is seen
 

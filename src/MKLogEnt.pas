@@ -71,7 +71,7 @@ Procedure LogObj.WriteEntry(Entry: String);
 
   Begin
     FileMode := fmReadWrite + fmDenyNone;
-    Assign(LogFile, ResolveCase(LI^.LogName));
+    Assign(LogFile, LI^.LogName);
     If IoResult <> 0 Then;
     If FileExist(LI^.LogName) Then
       Begin
@@ -100,7 +100,7 @@ Procedure LogObj.WriteEntry(Entry: String);
     If IoResult <> 0 Then;
     If Length(LI^.PrnName) > 0 Then
       Begin
-      Assign(PFile, ResolveCase(LI^.PrnName));
+      Assign(PFile, LI^.PrnName);
       Append(PFile);
       If IoResult <> 0 Then;
       Write(PFile, LogStr);
@@ -124,7 +124,7 @@ Procedure LogObj.BlankLine;
 
   Begin
     FileMode := fmReadWrite + fmDenyNone;
-    Assign(LogFile, ResolveCase(LI^.LogName));
+    Assign(LogFile, LI^.LogName);
     If IoResult <> 0 Then;
     If FileExist(LI^.LogName) Then
       Begin

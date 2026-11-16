@@ -572,7 +572,7 @@ Procedure MKCfgObj.MKMailLoad;
     Tmp: ^MailerCfgType;
 
   Begin
-  FN := FindBbsFile('Mailer.Mk') + 'Mailer.Mk';
+  FN := FindBbsFile('mailer.mk') + 'mailer.mk';
   If Not FileExist(FN) Then
     Exit;
   New(Tmp);
@@ -597,13 +597,13 @@ Procedure MKCfgObj.MKLoad;
   New(MKMail);
   MailerDefaults(MKMail^);
   FileMode := fmReadWrite + fmDenyNone;
-  Error := LoadFile(FindBbsFile('Config.Mk') + 'Config.Mk', MkCfg^, SizeOf(MkCfg^));
+  Error := LoadFile(FindBbsFile('config.mk') + 'config.mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Messages.Mk') + 'Messages.Mk', MKMsg^, SizeOf(MKMsg^));
+    Error := LoadFile(FindBbsFile('messages.mk') + 'messages.mk', MKMsg^, SizeOf(MKMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Files.Mk') + 'Files.Mk', MKFile^, SizeOf(MkFile^));
+    Error := LoadFile(FindBbsFile('files.mk') + 'files.mk', MKFile^, SizeOf(MkFile^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('EchoCfg.Mk') + 'EchoCfg.Mk', MKEcho^, SizeOf(MKEcho^));
+    Error := LoadFile(FindBbsFile('echocfg.mk') + 'echocfg.mk', MKEcho^, SizeOf(MKEcho^));
   If Error = 0 Then
     Begin                              {Mailer.Mk is optional (a shorter file keeps the defaults for the rest)}
     MKMailLoad;
@@ -700,7 +700,7 @@ Procedure MKCfgObj.Save;
 
 Function MKCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'Config.MK|Messages.Mk|Files.Mk|EchoCfg.Mk|Mailer.Mk';
+  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk';
   End;
 
 
@@ -719,15 +719,15 @@ Function MKCfgObj.SaveFileName(FN: String): String;
 
 Procedure MKCfgObj.MKSave;
   Begin
-  Error := SaveFile(SaveFileName('Config.MK'), MKCfg^, SizeOf(MKCfg^));
+  Error := SaveFile(SaveFileName('config.mk'), MKCfg^, SizeOf(MKCfg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('Messages.Mk'), MKMsg^, SizeOf(MKMsg^));
+    Error := SaveFile(SaveFileName('messages.mk'), MKMsg^, SizeOf(MKMsg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('Files.Mk'), MKFile^, SizeOf(MKFile^));
+    Error := SaveFile(SaveFileName('files.mk'), MKFile^, SizeOf(MKFile^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('EchoCfg.Mk'), MKEcho^, SizeOf(MKEcho^));
+    Error := SaveFile(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('Mailer.Mk'), MKMail^, SizeOf(MKMail^));
+    Error := SaveFile(SaveFileName('mailer.mk'), MKMail^, SizeOf(MKMail^));
   End;
 
 
@@ -1834,7 +1834,7 @@ Function MKCfgObj.GetFileListPath(Area: Word): String; {Get file area path}
     Begin
     TmpStr := MKFile^[Area].FilePath;
     AddBackSlash(TmpStr);
-    TmpStr := TmpStr + 'FILES.BBS';
+    TmpStr := TmpStr + 'files.bbs';
     GetFileListPath := TmpStr;
     End
   Else
@@ -2109,7 +2109,7 @@ Function MKCfgObj.GetLangFile(LNum: Word): String;
   If ((LNum > 0) and (LNum < 11)) Then
     GetLangFile := MKCfg^.LangFile[LNum]
   Else
-    GetLangFile := 'PROMPTS';
+    GetLangFile := 'prompts';
   End;
 
 
@@ -3432,13 +3432,13 @@ Function MKCfgObj.GetMsgAreaId(Area: Word): String;
 
 Function MKCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Mk';
+  GetNodeIdxName := 'nodeidx.mk';
   End;
 
 
 Function MKCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Mk';
+  GetNodeIncName := 'nodeinc.mk';
   End;
 
 

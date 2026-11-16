@@ -68,7 +68,7 @@ Procedure TxtOffObj.SetPath(MP: String);
 
 Function TxtOffObj.StartPacket: Word;
   Begin
-  Assign(TI^.TF, ResolveCase(TI^.MsgPath + 'Message.Txt'));
+  Assign(TI^.TF, TI^.MsgPath + 'message.txt');
   ReWrite(TI^.TF);
   StartPacket := IoResult;
   End;

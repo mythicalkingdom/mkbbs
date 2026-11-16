@@ -334,14 +334,14 @@ Procedure RunLog(Const S: String);
 
 
 Function FindProgramFile(Name: String): String;
-  {as typed, or in the BBS directory; every part of the path matches in any case}
+  {as typed, or in the BBS directory; the name is taken as it is written}
   Begin
   Result := '';
-  If MKFile.FileExist(MKFile.ResolvePathCase(Name)) Then
-    Result := MKFile.ResolvePathCase(Name)
+  If FileExist(Name) Then
+    Result := Name
   Else If (Name <> '') And (Name[1] <> '/') And
-          MKFile.FileExist(MKFile.ResolvePathCase(Config^.GetBbsPath + Name)) Then
-    Result := MKFile.ResolvePathCase(Config^.GetBbsPath + Name);
+          FileExist(Config^.GetBbsPath + Name) Then
+    Result := Config^.GetBbsPath + Name;
   End;
 
 

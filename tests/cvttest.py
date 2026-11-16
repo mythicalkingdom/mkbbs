@@ -20,14 +20,15 @@ def check(name, ok):
 
 
 def snapshot():
-    return {f: hashlib.md5(open(f, 'rb').read()).hexdigest() for f in glob.glob(os.path.join(sample, '*')) if os.path.isfile(f)}
+    return {f: hashlib.md5(open(f, 'rb').read()).hexdigest() for f in glob.glob(os.path.join(sample, '*')) if os.path.isfile(f) and os.access(f, os.R_OK)}
 
 
 before = snapshot()
 shutil.rmtree(work, ignore_errors=True)
 inp, out, outq, outs = [os.path.join(work, d) for d in ('in', 'out', 'quick', 'sbbs')]
 os.makedirs(work)
-shutil.copytree(sample, inp)
+shutil.copytree(sample, inp, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(inp)
 for d in (out, outq, outs):
     os.makedirs(d)
 
@@ -50,7 +51,7 @@ check('Remote Access to MK completed', r.returncode == 0 and 'Conversion complet
 names = {os.path.basename(f).lower(): os.path.getsize(f) for f in glob.glob(os.path.join(out, '*'))}
 want = {n: os.path.getsize(os.path.join(sample, n)) for n in ('config.mk', 'echocfg.mk', 'files.mk', 'messages.mk')}
 want['mailer.mk'] = 12600            # new: the mailer settings, written with the defaults
-check('the four MK files have the sizes of the real ones, and Mailer.Mk the size of its record: %s' % names, names == want)
+check('the four MK files have the sizes of the real ones, and mailer.mk the size of its record: %s' % names, names == want)
 ra = os.path.join(work, 'ra.txt')
 mk = os.path.join(work, 'mk.txt')
 r1 = run('mklist', ra, RA=inp)
@@ -67,16 +68,16 @@ def hashes(d):
 
 # converting again into the same directory: the files that exist are listed and need a yes
 h = hashes(out)
-os.utime(os.path.join(out, [f for f in os.listdir(out) if f.lower() == 'config.mk'][0]), (1, 1))   # a mark to see a rewrite
+os.utime(os.path.join(out, 'config.mk'), (1, 1))   # a mark to see a rewrite
 r = run('mkcfgcvt', '2', '1', RA=inp, MK=out, stdin='n\n')
-check('existing files: listed and asked', r.returncode == 4 and 'would be overwritten' in r.stdout and 'Config.MK' in r.stdout
+check('existing files: listed and asked', r.returncode == 4 and 'would be overwritten' in r.stdout and 'config.mk' in r.stdout
       and 'Nothing was written' in r.stdout)
-check('answer n: nothing was written', os.path.getmtime(os.path.join(out, [f for f in os.listdir(out) if f.lower() == 'config.mk'][0])) == 1)
+check('answer n: nothing was written', os.path.getmtime(os.path.join(out, 'config.mk')) == 1)
 r = run('mkcfgcvt', '2', '1', RA=inp, MK=out, stdin='')
 check('no answer (end of input) counts as no', r.returncode == 4)
 r = run('mkcfgcvt', '2', '1', RA=inp, MK=out, stdin='y\n')
 check('answer y: overwritten', r.returncode == 0 and 'Conversion completed' in r.stdout and hashes(out) == h)
-os.utime(os.path.join(out, [f for f in os.listdir(out) if f.lower() == 'config.mk'][0]), (1, 1))
+os.utime(os.path.join(out, 'config.mk'), (1, 1))
 r = run('mkcfgcvt', '-y', '2', '1', RA=inp, MK=out)
 check('-y: no question', r.returncode == 0 and 'overwritten' not in r.stdout and 'Conversion completed' in r.stdout)
 

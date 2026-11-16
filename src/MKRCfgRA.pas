@@ -234,7 +234,7 @@ Function RARCfgObj.ValidMsgArea(Area: Word): Word;
         MsgLoaded := 1;
       FP := MsgLoaded - 1;
       FP := FP * SizeOf(RaMessageRecord);
-      If LoadFilePos(FindBbsFile('Messages.RA') + 'Messages.RA', RAMsg^, SizeOf(RAMsg^),
+      If LoadFilePos(FindBbsFile('messages.ra') + 'messages.ra', RAMsg^, SizeOf(RAMsg^),
       FP) = 0 Then;
       End;
     ValidMsgArea := Area  + 1 - MsgLoaded;
@@ -259,7 +259,7 @@ Function RARCfgObj.ValidFileArea(Area: Word): Word;
         FileLoaded := 1;
       FP := FileLoaded - 1;
       FP := FP * SizeOf(RAFilesRecord);
-      If LoadFilePos(FindBbsFile('Files.RA') + 'Files.RA', RAFile^, SizeOf(RAFile^),
+      If LoadFilePos(FindBbsFile('files.ra') + 'files.ra', RAFile^, SizeOf(RAFile^),
       FP) = 0 Then;
       End;
     ValidFileArea := Area  + 1 - FileLoaded;
@@ -353,13 +353,13 @@ Procedure RARCfgObj.RALoad;
   New(RaMsg);
   New(RaFile);
   New(RaEvent);
-  Error := LoadFile(FindBbsFile('Config.Ra') + 'Config.Ra', RaCfg^, SizeOf(RaCfg^));
+  Error := LoadFile(FindBbsFile('config.ra') + 'config.ra', RaCfg^, SizeOf(RaCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Messages.Ra') + 'Messages.Ra', RaMsg^, SizeOf(RaMsg^));
+    Error := LoadFile(FindBbsFile('messages.ra') + 'messages.ra', RaMsg^, SizeOf(RaMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Files.Ra') + 'Files.Ra', RaFile^, SizeOf(RaFile^));
+    Error := LoadFile(FindBbsFile('files.ra') + 'files.ra', RaFile^, SizeOf(RaFile^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Events.Ra') + 'Events.Ra', RaEvent^, SizeOf(RaEvent^));
+    Error := LoadFile(FindBbsFile('events.ra') + 'events.ra', RaEvent^, SizeOf(RaEvent^));
   FileLoaded := 1;
   MsgLoaded := 1;
   If Error = 0 Then
@@ -1130,7 +1130,7 @@ Function RARCfgObj.GetFileListPath(Area: Word): String; {Get file area path}
       Begin
       TmpStr := RAFile^[FA].FilePath;
       AddBackSlash(TmpStr);
-      TmpStr := TmpStr + 'FILES.BBS';
+      TmpStr := TmpStr + 'files.bbs';
       End;
     GetFileListPath := TmpStr;
     End
@@ -1316,7 +1316,7 @@ Function RARCfgObj.GetLangName(LNum: Word): String;
 
 Function RARCfgObj.GetLangFile(LNum: Word): String;
   Begin
-  GetLangFile := 'PROMPTS';
+  GetLangFile := 'prompts';
   End;
 
 
@@ -1859,13 +1859,13 @@ Function RARCfgObj.GetDefaultPort: Word; {Get default comm port}
 
 Function RARCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Ra';
+  GetNodeIdxName := 'nodeidx.ra';
   End;
 
 
 Function RARCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Ra';
+  GetNodeIncName := 'nodeinc.ra';
   End;
 
 

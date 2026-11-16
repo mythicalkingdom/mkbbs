@@ -20,7 +20,8 @@ tmp = cfgpatch.short_dir()
 dst = os.path.join(tmp, 'r')
 nl = os.path.join(tmp, 'n')
 os.makedirs(nl)
-shutil.copytree(srcra, dst)
+shutil.copytree(srcra, dst, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(dst)
 for f in ('nodelist.262', 'techlist.346', 'icdmlist.353'):
     shutil.copy2(os.path.join(srcnl, f), nl)             # keeps the file dates (they go into the index)
 
@@ -53,10 +54,10 @@ check('mknodelist without an index says so', r.returncode == 2 and 'mknodeidx' i
 # 2. build it
 r = run('mknodeidx', 'nodelist.262', 'techlist.346', 'icdmlist.353')
 check('mknodeidx: built the index: ' + r.stdout.strip().splitlines()[-1] if r.stdout.strip() else 'mknodeidx', r.returncode == 0 and 'Wrote' in r.stdout)
-mine = open(os.path.join(nl, 'NodeIdx.Mk'), 'rb').read() if os.path.exists(os.path.join(nl, 'NodeIdx.Mk')) else b''
+mine = open(os.path.join(nl, 'nodeidx.mk'), 'rb').read() if os.path.exists(os.path.join(nl, 'nodeidx.mk')) else b''
 real = open(os.path.join(srcnl, 'nodeidx.ra'), 'rb').read()
 check('index = the real nodeidx.ra byte for byte (%d entries)' % (len(real) // 10), mine == real)
-inc = open(os.path.join(nl, 'NodeInc.Mk'), 'rb').read() if os.path.exists(os.path.join(nl, 'NodeInc.Mk')) else b''
+inc = open(os.path.join(nl, 'nodeinc.mk'), 'rb').read() if os.path.exists(os.path.join(nl, 'nodeinc.mk')) else b''
 rinc = open(os.path.join(srcnl, 'nodeinc.ra'), 'rb').read()
 
 
@@ -95,14 +96,14 @@ r = run('mknodelist', '77:1/1')
 check('a zone that is not there: Address Not Found (and no endless loop)', 'Address Not Found' in r.stdout)
 
 # 4. again without names (the lists of the index), and with a mask
-before = open(os.path.join(nl, 'NodeIdx.Mk'), 'rb').read()
-os.remove(os.path.join(nl, 'NodeIdx.Mk'))
+before = open(os.path.join(nl, 'nodeidx.mk'), 'rb').read()
+os.remove(os.path.join(nl, 'nodeidx.mk'))
 r = run('mknodeidx')
 check('without names: the lists of the include file are indexed again',
-      r.returncode == 0 and open(os.path.join(nl, 'NodeIdx.Mk'), 'rb').read() == before)
-os.remove(os.path.join(nl, 'NodeIdx.Mk'))
+      r.returncode == 0 and open(os.path.join(nl, 'nodeidx.mk'), 'rb').read() == before)
+os.remove(os.path.join(nl, 'nodeidx.mk'))
 r = run('mknodeidx', 'NODELIST.*', 'techlist.346', 'icdmlist.353')
-check('NODELIST.* takes the newest file', r.returncode == 0 and open(os.path.join(nl, 'NodeIdx.Mk'), 'rb').read() == before)
+check('NODELIST.* takes the newest file', r.returncode == 0 and open(os.path.join(nl, 'nodeidx.mk'), 'rb').read() == before)
 
 # 5. errors
 r = run('mknodeidx', 'nothere.123')
@@ -110,6 +111,6 @@ check('missing nodelist', r.returncode == 2 and 'nothere.123' in r.stderr)
 open(os.path.join(work, 'notalist.txt'), 'w').write('hello\nthis is no nodelist\n')
 r = run('mknodeidx', os.path.join(work, 'notalist.txt'))
 check('a file without Zone/Region/Host lines is refused', r.returncode == 3)
-check('and the index was not damaged', open(os.path.join(nl, 'NodeIdx.Mk'), 'rb').read() == before)
+check('and the index was not damaged', open(os.path.join(nl, 'nodeidx.mk'), 'rb').read() == before)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

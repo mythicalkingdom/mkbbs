@@ -427,7 +427,7 @@ Procedure SBCfgObj.SetTempPath(TP: String);
 
 Function SBCfgObj.GetLogFileName: String;
   Begin
-  GetLogFileName := 'SYSTEM.LOG';
+  GetLogFileName := 'system.log';
   End;
 
 
@@ -519,11 +519,11 @@ Procedure SBCfgObj.SBLoad;
   New(SbFile);
   For i := 1 to 300 Do
     SBFile^[i].Name := '';
-  Error := LoadFile(FindBbsFile('Config.Bbs') + 'Config.Bbs', SbCfg^, SizeOf(SbCfg^));
+  Error := LoadFile(FindBbsFile('config.bbs') + 'config.bbs', SbCfg^, SizeOf(SbCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('SConfig.Bbs') + 'SConfig.Bbs', SbExtra^, SizeOf(SbExtra^));
+    Error := LoadFile(FindBbsFile('sconfig.bbs') + 'sconfig.bbs', SbExtra^, SizeOf(SbExtra^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('FlSearch.Bbs') + 'FlSearch.Bbs', SbFile^, SizeOf(SbFile^));
+    Error := LoadFile(FindBbsFile('flsearch.bbs') + 'flsearch.bbs', SbFile^, SizeOf(SbFile^));
   i := 300;
   While ((i > 0) and (SBFile^[i].Name = '')) Do
     Dec(i);
@@ -606,7 +606,7 @@ Procedure SBCfgObj.Save;
 
 Function SBCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'Config.Bbs|SConfig.Bbs|FlSearch.Bbs';
+  SaveFileNames := 'config.bbs|sconfig.bbs|flsearch.bbs';
   End;
 
 
@@ -625,11 +625,11 @@ Function SBCfgObj.SaveFileName(FN: String): String;
 
 Procedure SBCfgObj.SBSave;
   Begin
-  Error := SaveFile(SaveFileName('Config.Bbs'), SbCfg^, SizeOf(SbCfg^));
+  Error := SaveFile(SaveFileName('config.bbs'), SbCfg^, SizeOf(SbCfg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('SConfig.Bbs'), SbExtra^, SizeOf(SbExtra^));
+    Error := SaveFile(SaveFileName('sconfig.bbs'), SbExtra^, SizeOf(SbExtra^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('FlSearch.Bbs'), SbFile^, SizeOf(SbFile^));
+    Error := SaveFile(SaveFileName('flsearch.bbs'), SbFile^, SizeOf(SbFile^));
   End;
 
 
@@ -1669,7 +1669,7 @@ Function SBCfgObj.GetFileListPath(Area: Word): String; {Get file area path}
       Begin
       TmpStr := SBFile^[Area].Directory;
       AddBackSlash(TmpStr);
-      TmpStr := TmpStr + 'FILES.BBS';
+      TmpStr := TmpStr + 'files.bbs';
       End;
     GetFileListPath := TmpStr;
     End
@@ -2868,13 +2868,13 @@ Function SbCfgObj.GetMsgAreaId(Area: Word): String;
 
 Function SbCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Sbs';
+  GetNodeIdxName := 'nodeidx.sbs';
   End;
 
 
 Function SbCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Sbs';
+  GetNodeIncName := 'nodeinc.sbs';
   End;
 
 

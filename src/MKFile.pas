@@ -114,11 +114,6 @@ Procedure FlushFile(Var F); {Dupe file handle, close dupe handle}
 Function  shReset(Var F: File; RecSize: Word): Boolean;
 Function  shRead(Var F: File; Var Rec; ReadSize: Word; Var NumRead: Word): Boolean;
 Function  shWrite(Var F: File; Var Rec; ReadSize: Word): Boolean;
-Function  ResolveCase(FName: String): String;
-Function  ResolvePathCase(FName: String): String; {Every part of the path, not only the file name}
-  {The DOS files were named in either case; Unix cares.  Returns FName if it
-   exists, else the same path with the file name in lower case, else in upper
-   case, if one of those exists, else FName unchanged.}
 Function  shOpenFile(Var F: File; PathName: String): Boolean;
 Function  shMakeFile(Var F: File; PathName: String): Boolean;
 Procedure shCloseFile(Var F: File);
@@ -243,7 +238,7 @@ Function FindObj.Found: Boolean;
 
 Function shAssign(Var F: File; FName: String): Boolean;
   Begin
-  Assign(F, ResolveCase(FName));
+  Assign(F, FName);
   MKFileError := IoResult;
   shAssign := (MKFileError = 0);
   End;
@@ -396,7 +391,7 @@ Function SizeFile(FName: String): LongInt;
     SR: SearchRec;
 
   Begin
-  FindFirst(ResolveCase(FName), AnyFile, SR);
+  FindFirst(FName, AnyFile, SR);
   If DosError = 0 Then
     SizeFile := SR.Size
   Else
@@ -410,7 +405,7 @@ Function  DateFile(FName: String): LongInt;
     SR: SearchRec;
 
   Begin
-  FindFirst(ResolveCase(FName), AnyFile, SR);
+  FindFirst(FName, AnyFile, SR);
   If DosError = 0 Then
     DateFile := SR.Time
   Else
@@ -448,114 +443,10 @@ Function RawExists(FName: String): Boolean;
   End;
 
 
-Function ResolveCase(FName: String): String;
-  Var
-    D: DirStr;
-    N: NameStr;
-    E: ExtStr;
-    i: Word;
-    Alt: String;
-    SR: SearchRec;
-
-  Begin
-  ResolveCase := FName;
-  If (Length(FName) = 0) Or RawExists(FName) Then
-    Exit;
-  FSplit(FName, D, N, E);
-  Alt := N + E;
-  For i := 1 To Length(Alt) Do
-    Alt[i] := LoCase(Alt[i]);
-  If RawExists(D + Alt) Then
-    Begin
-    ResolveCase := D + Alt;
-    Exit;
-    End;
-  For i := 1 To Length(Alt) Do
-    Alt[i] := UpCase(Alt[i]);
-  If RawExists(D + Alt) Then
-    Begin
-    ResolveCase := D + Alt;
-    Exit;
-    End;
-  { any other spelling (Messages.Mk for Messages.MK ...): look through the directory }
-  If IoResult <> 0 Then;
-  If D = '' Then
-    FindFirst('*', ReadOnly + Hidden + Archive, SR)
-  Else
-    FindFirst(D + '*', ReadOnly + Hidden + Archive, SR);
-  While DosError = 0 Do
-    Begin
-    If Upper(SR.Name) = Alt Then
-      Begin
-      ResolveCase := D + SR.Name;
-      Break;
-      End;
-    FindNext(SR);
-    End;
-  FindClose(SR);
-  If IoResult <> 0 Then;
-  End;
-
-
-Function ResolvePathCase(FName: String): String;
-  {ResolveCase for every part of the path: GAMES/Loop.Bas finds games/loop.bas.  Parts that do
-   not exist are left as they are.}
-  Var
-    Cur, Rest, Part, Found: String;
-    p: Word;
-    SR: SearchRec;
-
-  Begin
-  ResolvePathCase := FName;
-  If (FName = '') Or RawExists(FName) Then
-    Exit;
-  Cur := '';
-  Rest := FName;
-  If Rest[1] = '/' Then
-    Begin
-    Cur := '/';
-    Delete(Rest, 1, 1);
-    End;
-  While Rest <> '' Do
-    Begin
-    p := Pos('/', Rest);
-    If p = 0 Then
-      Begin
-      ResolvePathCase := Cur + Copy(ResolveCase(Cur + Rest), Length(Cur) + 1, 255);   {the file}
-      Exit;
-      End;
-    Part := Copy(Rest, 1, p - 1);
-    Rest := Copy(Rest, p + 1, 255);
-    If Part <> '' Then
-      Begin
-      Found := Part;
-      If Not DirExist(Cur + Part) Then
-        Begin
-        If Cur = '' Then
-          FindFirst('*', Directory, SR)
-        Else
-          FindFirst(Cur + '*', Directory, SR);
-        While DosError = 0 Do
-          Begin
-          If ((SR.Attr And Directory) <> 0) And (Upper(SR.Name) = Upper(Part)) Then
-            Begin
-            Found := SR.Name;
-            Break;
-            End;
-          FindNext(SR);
-          End;
-        FindClose(SR);
-        End;
-      Cur := Cur + Found + '/';
-      End;
-    End;
-  ResolvePathCase := Cur;
-  End;
-
-
 Function FileExist(FName: String): Boolean;
+  {Names are taken exactly as written: nothing looks for another spelling}
   Begin
-  FileExist := RawExists(ResolveCase(FName));
+  FileExist := RawExists(FName);
   End;
 
 
@@ -779,7 +670,7 @@ Function TFile.StringFound: Boolean;
 
 Function  shOpenFile(Var F: File; PathName: String): Boolean;
   Begin
-  Assign(f, ResolveCase(pathname));
+  Assign(f, pathname);
   FileMode := fmReadWrite + fmDenyNone;
   shOpenFile := shReset(f,1);
   End;
@@ -841,7 +732,7 @@ Function IsDevice(FilePath: String): Boolean;
     F: File;
 
   Begin
-  Assign(F, ResolveCase(FilePath));
+  Assign(F, FilePath);
   Reset(F);
   If IoResult <> 0 Then
     IsDevice := False

@@ -73,16 +73,16 @@ begin
   TF.Init; Check('open text', TF.OpenTextFile(D + '/lines.txt'));
   Check('GetString handles LF, CRLF, CR', (TF.GetString = 'a') and (TF.GetString = 'b') and (TF.GetString = 'c') and (TF.GetString = 'd'));
   Check('CloseTextFile', TF.CloseTextFile); TF.Done;
-  { DOS file names come in either case }
+  { file names are taken exactly as written: no other spelling is looked for }
   Assign(T, D + '/lowername.dat'); Rewrite(T); writeln(T, 'x'); Close(T);
   Assign(T, D + '/UPPERNAME.DAT'); Rewrite(T); writeln(T, 'xy'); Close(T);
-  Check('ResolveCase finds the lower case file', ResolveCase(D + '/LowerName.Dat') = D + '/lowername.dat');
-  Check('ResolveCase finds the upper case file', ResolveCase(D + '/UpperName.Dat') = D + '/UPPERNAME.DAT');
-  Check('ResolveCase leaves a missing name alone', ResolveCase(D + '/Nothing.Dat') = D + '/Nothing.Dat');
-  Check('FileExist is case blind', FileExist(D + '/LOWERNAME.dat') and FileExist(D + '/upperName.DAT'));
-  Check('SizeFile is case blind', (SizeFile(D + '/LOWERNAME.dat') = 2) and (SizeFile(D + '/UpperName.Dat') = 3));
-  Check('shOpenFile is case blind', shOpenFile(Fl, D + '/UpperName.Dat'));
+  Check('FileExist finds the name as it is written', FileExist(D + '/lowername.dat') and FileExist(D + '/UPPERNAME.DAT'));
+  Check('FileExist does not look for another spelling', (Not FileExist(D + '/LOWERNAME.dat')) and (Not FileExist(D + '/uppername.dat')));
+  Check('SizeFile is exact too', (SizeFile(D + '/lowername.dat') = 2) and (SizeFile(D + '/UPPERNAME.DAT') = 3) and
+    (SizeFile(D + '/LowerName.Dat') = -1));
+  Check('shOpenFile is exact', shOpenFile(Fl, D + '/UPPERNAME.DAT') And (Not shOpenFile(Fl, D + '/UpperName.Dat')));
   shCloseFile(Fl);
+  EraseFile(D + '/lowername.dat'); EraseFile(D + '/UPPERNAME.DAT');
   CleanDir(D + '/');
   CleanDir(D + '/Merlin/');
   Check('CleanDir removed files', not FileExist(F) and not FileExist(D + '/b.txt'));

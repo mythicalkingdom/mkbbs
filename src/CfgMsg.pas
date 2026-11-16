@@ -304,7 +304,7 @@ Procedure DoCfgMsg(MsgNum: Word);
   F.AddChoice('Type:', UR^.TypeIdx, 1, 0, 'Normal|NetMail|EchoMail',
     'Kind of mail (Space or the arrow keys change it)');
   F.At(3, 53, 3, 61);
-  F.AddChoice('Format:', UR^.FormatIdx, 1, 0, 'Hudson|Squish|*.Msg|JAM|Merlin|Synchronet|Other',
+  F.AddChoice('Format:', UR^.FormatIdx, 1, 0, 'hudson|squish|*.msg|jam|merlin|synchronet|other',
     'Message base format (Other leaves the current one)');
   F.At(4, 3, 4, 14);
   F.AddNumber('Days Kept:', UR^.DaysKept, 2, 0, 65535, 'Days messages are kept');

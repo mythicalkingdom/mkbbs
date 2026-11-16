@@ -415,7 +415,7 @@ Function ParseMenuData(Item: Word): Boolean;
 Procedure NormalLogOff;
   Begin
   User.PostStatus(uoWait);
-  BbsDisplay.DisplayBbsFile('GOODBYE',' ');
+  BbsDisplay.DisplayBbsFile('goodbye',' ');
   MenuState := 0;
   LogEntry.WriteEntry('User requested to terminate the call');
   LowerDTR;
@@ -533,7 +533,7 @@ Procedure PostMsg(Cmd: String);
     End
   Else
     Begin
-    BbsDisplay.DisplayBbsFile('WriteSec', ' ');
+    BbsDisplay.DisplayBbsFile('writesec', ' ');
     If (BbsDisplay.GetError <> 0) Then
       User.DisplayStrLn(Prompts.GetString(073));
     User.PressEnter;
@@ -566,7 +566,7 @@ Procedure GoToMenu(Item: Word);        {Process type 1 or 4}
     Key := #0;
     Menu.Load(ExtractWord(Menu.GetData(Item), 1));
     If Menu.GetError <> 0 Then
-      Menu.Load('TOP');
+      Menu.Load('top');
     If Menu.GetError <> 0 Then
       MenuState := 0
     Else
@@ -580,7 +580,7 @@ Procedure ReturnMenu(Var MN: String);
   Menu.Load(MN);
   Key := #0;
   If Menu.GetError <> 0 Then
-    Menu.Load('TOP');
+    Menu.Load('top');
   If Menu.GetError <> 0 Then
     MenuState := 0
   Else
@@ -684,8 +684,8 @@ Procedure ProcessCmd(Item: Word);
     027: PostMsg(Menu.GetData(Item));       {Enter a message}
     028: SelectCombined;                    {Select combined areas}
     030: Begin                              {Directory List}
-         TmpStr := Upper(ExtractWord(Menu.GetData(Item),1));
-         If TmpStr = '/F' Then
+         TmpStr := ExtractWord(Menu.GetData(Item),1);      {a path: keep its case}
+         If Upper(TmpStr) = '/F' Then
            Begin
            If Config^.FileViewAccess(User.GetUserFileTemplate, Sec) Then
              DoDirList(Config^.GetFileAreaPath(User.GetUserFileTemplate));
@@ -695,8 +695,8 @@ Procedure ProcessCmd(Item: Word);
              DoDirList(TmpStr);
          End;
     031: Begin                              {List files}
-         TmpStr := Upper(ExtractWord(Menu.GetData(Item),1));
-         If TmpStr = '/F' Then
+         TmpStr := ExtractWord(Menu.GetData(Item),1);      {a path: keep its case}
+         If Upper(TmpStr) = '/F' Then
            Begin
            If Config^.FileViewAccess(User.GetUserFileTemplate, Sec) Then
              DoFileList(Config^.GetFileAreaPath(User.GetUserFileTemplate));

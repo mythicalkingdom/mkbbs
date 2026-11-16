@@ -22,8 +22,9 @@ os.makedirs(work)
 tmp = cfgpatch.short_dir()
 ra = tmp + '/r'
 menus = tmp + '/m'
-shutil.copytree(src, ra)
-shutil.copytree(srcmenus, menus)
+shutil.copytree(src, ra, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(ra)
+shutil.copytree(srcmenus, menus, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 maps = {(src + '/').encode(): (ra + '/').encode(), (srcmenus + '/').encode(): (menus + '/').encode()}
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: maps.get(s, s))
 
@@ -43,7 +44,7 @@ d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
 free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234' if k not in used]
-items = [('quiz.bas', 'QUIZ.BAS'), ('err.bas', 'ERR.BAS'), ('inp.bas', 'inp.bas'), ('loop.bas', 'GAMES\\LOOP.BAS'), ('missing', 'NOPE.BAS')]
+items = [('quiz.bas', 'quiz.bas'), ('err.bas', 'err.bas'), ('inp.bas', 'inp.bas'), ('loop.bas', 'games\\loop.bas'), ('missing', 'nope.bas')]
 keys = {}
 slot = 1
 for name, data in items:
@@ -170,7 +171,7 @@ try:
     # a program that does not exist
     c.sendall(keys['missing'].encode())
     b = until(c, b'ress', 6)
-    check('a missing program: Not Found', b'Error: NOPE.BAS Not Found' in b)
+    check('a missing program: Not Found', b'Error: nope.bas Not Found' in b)
     c.sendall(b'\r')
     check('... and the menu is back', b'Command >' in until(c, b'Command >', 6))
     time.sleep(0.5)
@@ -183,6 +184,6 @@ for f in os.listdir(ra):
     if f.lower() == 'ra.log':
         log = open(os.path.join(ra, f), encoding='latin-1').read()
 check('the log has the runs', 'BASIC program : ' in log and 'BASIC ended (end)' in log and 'BASIC ended (break)' in log
-      and 'BASIC ended (error)' in log and 'BASIC program not found : NOPE.BAS' in log)
+      and 'BASIC ended (error)' in log and 'BASIC program not found : nope.bas' in log)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

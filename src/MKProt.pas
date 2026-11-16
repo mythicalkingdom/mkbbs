@@ -2627,7 +2627,7 @@ Procedure ProtObj.GetNextSendFile;
     Begin
     Pwdw.ShowName(PI^.FN[PI^.CurrFile]);
     Pwdw.ShowSize(SizeFile(PI^.FN[PI^.CurrFile]));
-    Assign(PI^.PFile, ResolveCase(PI^.FN[PI^.CurrFile]));
+    Assign(PI^.PFile, PI^.FN[PI^.CurrFile]);
     FileMode := fmReadOnly + fmDenyNone;
     If Not shReset(PI^.PFile,1) Then
       Begin

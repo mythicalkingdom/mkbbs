@@ -626,7 +626,7 @@ Procedure QuestObj.Process(FN: String);      {Load Q-A file and execute}
   QI^.QF.Init;
   QI^.Finished := False;
   QI^.Name := Upper(StripBoth(FN,' '));
-  FilePath := Config^.FindBbsFile(FN + '.Q-A') + FN + '.Q-A';
+  FilePath := Config^.FindBbsFile(FN + '.q-a') + FN + '.q-a';
   If Not FileExist(FilePath) Then
     QI^.Error := 1000;
   If QI^.Error = 0 Then
@@ -651,10 +651,10 @@ Procedure QuestObj.Process(FN: String);      {Load Q-A file and execute}
   If ((QI^.Error = 0) And (QI^.OutLines > 0)) Then
     Begin
     If ((CurrentPort = 0) Or (CommCarrier)) Then
-      Extn := '.ASW'
+      Extn := '.asw'
     Else
-      Extn := '.ADC';
-    Assign(OutF, ResolveCase(Config^.GetBbsPath + FN + Extn));
+      Extn := '.adc';
+    Assign(OutF, Config^.GetBbsPath + FN + Extn);
     FileMode := fmReadWrite + fmDenyWrite;
     If FileExist(Config^.GetBbsPath + FN + Extn) Then
       Begin

@@ -75,7 +75,7 @@ Function SysStatObj.GetNumberOfMsgs: LongInt; {Get number of msgs on system}
 
 Function SysStatObj.GetNumUsers: Word;              {Get number of users}
   Begin
-  GetNumUsers := (SizeFile(Config^.FindBbsFile('Users.Bbs') + 'USERS.BBS') Div
+  GetNumUsers := (SizeFile(Config^.FindBbsFile('users.bbs') + 'users.bbs') Div
     SizeOf(UsersType));
   End;
 

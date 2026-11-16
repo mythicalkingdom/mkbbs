@@ -44,6 +44,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodeidx src/MKNodeIdx.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbinkcfg src/MKBinkCfg.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -71,14 +72,14 @@ fi
 [ "$(printf 'abc' | build/stdtest)" = 'ABC' ] && echo 'ok   MKComStd on a pipe' || { echo 'FAIL MKComStd on a pipe'; exit 1; }
 # configuration editor: edit a path on a copy of the sample config through a pseudo terminal, check the file
 if [ -f bbs/bbsc/ra/config.mk ]; then
-  mkdir -p build/cfgwork/ra; cp -a bbs/bbsc/ra/. build/cfgwork/ra/
+  mkdir -p build/cfgwork/ra; (cd bbs/bbsc/ra && tar cf - --exclude='mkbink.conf*' --exclude='Mailer.Mk' .) | tar xf - -C build/cfgwork/ra
   CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\x1b[B' '\r' '\t\t\t\t' '/x\\y' '\r' '\x1bx' 'y' > /dev/null 2>&1
   strings build/cfgwork/ra/config.mk | grep -q '^/x/y/' && echo 'ok   mkconfig: edited path saved with slashes' || { echo 'FAIL mkconfig: edit not saved'; exit 1; }
   # General screen (converted layout): replace the BBS id, save
   CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\r' '\t\t\t' 'ZZQ' '\r' '\x1bx' 'y' > /dev/null 2>&1
   strings build/cfgwork/ra/config.mk | grep -q 'ZZQ' && echo 'ok   mkconfig: General screen edit saved' || { echo 'FAIL mkconfig: General edit not saved'; exit 1; }
   # Events list -> event 1 -> Space changes the status choice -> OK, quit and save: the config file must change
-  mkdir -p build/cfgwork2/ra; cp -a bbs/bbsc/ra/. build/cfgwork2/ra/
+  mkdir -p build/cfgwork2/ra; (cd bbs/bbsc/ra && tar cf - --exclude='mkbink.conf*' --exclude='Mailer.Mk' .) | tar xf - -C build/cfgwork2/ra
   CFGDIR=$PWD/build/cfgwork2/ra python3 tests/cfgshot.py '\x1be' '\r' ' ' '\r' '\x1b' '\x1bx' 'y' > /dev/null 2>&1
   N=$(cmp -l bbs/bbsc/ra/config.mk build/cfgwork2/ra/config.mk | wc -l)
   [ "$N" -ge 1 ] && [ "$N" -le 4 ] && echo 'ok   mkconfig: event status choice saved' || { echo "FAIL mkconfig: event edit ($N bytes differ)"; exit 1; }
@@ -106,6 +107,9 @@ if grep -q FAIL build/mlresult.txt; then exit 1; fi
 # the Mailer screen of mkmon (needs the real mkbink next to this project)
 python3 tests/mailmontest.py build/mmwork | grep -E "^(ok|FAIL|skip)" | tee build/mmresult.txt
 if grep -q FAIL build/mmresult.txt; then exit 1; fi
+# mklower: references in mixed case made lower case (private copy of the sample BBS)
+python3 tests/lowertest.py build/mklower | grep -E "^(ok|FAIL|skip)" | tee build/lowerresult.txt
+if grep -q FAIL build/lowerresult.txt; then exit 1; fi
 # language compiler: the sample LC files must compile back to the same bytes; area list and nodelist tools
 mkdir -p build/work/lc build/work/tools
 python3 tests/lctest.py build/mklc build/work/lc | grep -E "^(FAIL|failures)"

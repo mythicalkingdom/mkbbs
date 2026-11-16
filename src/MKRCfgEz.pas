@@ -206,15 +206,15 @@ Procedure EzRCfgObj.EzLoad;
   New(EzConst);
   New(EzMsg);
   New(EzFile);
-  Error := LoadFile(FindBbsFile('Config.Ezy') + 'Config.Ezy', EzCfg^, SizeOf(EzCfg^));
+  Error := LoadFile(FindBbsFile('config.ezy') + 'config.ezy', EzCfg^, SizeOf(EzCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Messages.Ezy') + 'Messages.Ezy', EzMsg^, SizeOf(EzMsg^));
+    Error := LoadFile(FindBbsFile('messages.ezy') + 'messages.ezy', EzMsg^, SizeOf(EzMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Constant.Ezy') + 'Constant.Ezy', EzConst^, SizeOf(EzConst^));
+    Error := LoadFile(FindBbsFile('constant.ezy') + 'constant.ezy', EzConst^, SizeOf(EzConst^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Files.Ezy') + 'Files.Ezy', EzFile^, SizeOf(EzFile^));
-  Assign(EzMsgFile, ResolveCase(FindBbsFile('Messages.Ezy') + 'Messages.Ezy'));
-  Assign(EzFileFile, ResolveCase(FindBbsFile('Files.Ezy') + 'Files.Ezy'));
+    Error := LoadFile(FindBbsFile('files.ezy') + 'files.ezy', EzFile^, SizeOf(EzFile^));
+  Assign(EzMsgFile, FindBbsFile('messages.ezy') + 'messages.ezy');
+  Assign(EzFileFile, FindBbsFile('files.ezy') + 'files.ezy');
   FileMode := fmReadOnly + fmDenyNone;
   MsgLoaded := 1;
   FileLoaded := 1;
@@ -330,7 +330,7 @@ Function EzRCfgObj.ValidMsgArea(Area: Word): Word;
       Seek(EzMsgFile, FP);
       BlockRead(EzMsgFile, EzMsg^, SizeOf(EzMsg^), NumRead);
       If IoResult <> 0 Then;
-{      If LoadFilePos(FindBbsFile('Messages.Mk') + 'Messages.Mk', EzMsg^, SizeOf(EzMsg^),
+{      If LoadFilePos(FindBbsFile('messages.mk') + 'messages.mk', EzMsg^, SizeOf(EzMsg^),
       FP) = 0 Then;}
       End;
     ValidMsgArea := Area  + 1 - MsgLoaded;
@@ -359,7 +359,7 @@ Function EzRCfgObj.ValidFileArea(Area: Word): Word;
       Seek(EzFileFile, FP);
       BlockRead(EzFileFile, EzFile^, SizeOf(EzFile^), NumRead);
       If IoResult <> 0 Then;
-{      If LoadFilePos(FindBbsFile('Files.Mk') + 'Files.Mk', EzFile^, SizeOf(EzFile^),
+{      If LoadFilePos(FindBbsFile('files.mk') + 'files.mk', EzFile^, SizeOf(EzFile^),
       FP) = 0 Then;}
       End;
     ValidFileArea := Area  + 1 - FileLoaded;

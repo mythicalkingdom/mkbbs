@@ -226,7 +226,7 @@ Procedure NameObj.GoToPosition(GP: Word);
   Begin
   If Not User^.Opened Then
     Begin
-    If Not shAssign(User^.UsersFile, Config^.FindBbsFile('Users.Bbs') + 'Users.Bbs') Then;
+    If Not shAssign(User^.UsersFile, Config^.FindBbsFile('users.bbs') + 'users.bbs') Then;
     FileMode := fmReadWrite + fmDenyNone;
     If Not shReset(User^.UsersFile, SizeOf(UsersType)) Then;
     End;
@@ -244,7 +244,7 @@ Function NameObj.SearchFirst(Name: String): Boolean;
   User^.SearchName := Upper(Name);
   If Not User^.Opened Then
     Begin
-    If Not shAssign(User^.UsersFile, Config^.FindBbsFile('Users.Bbs') + 'Users.Bbs') Then;
+    If Not shAssign(User^.UsersFile, Config^.FindBbsFile('users.bbs') + 'users.bbs') Then;
     FileMode := fmReadWrite + fmDenyNone;
     If Not shReset(User^.UsersFile, SizeOf(UsersType)) Then;
     End
@@ -361,7 +361,7 @@ Procedure NameObj.SaveChanges; {Save changed user values}
     1,2: Begin
        Idx.NameCrc := NameCrcCode(GetName);
        Idx.HandleCrc := NameCrcCode(GetHandle);
-       If SaveFilePos(Config^.FindBBSFile('UsersIdx.Bbs') + 'UsersIdx.Bbs',
+       If SaveFilePos(Config^.FindBBSFile('usersidx.bbs') + 'usersidx.bbs',
          Idx, SizeOf(Idx), LongInt(GetPos) * SizeOf(Idx)) = 0 Then;
        End;
     End;
@@ -821,14 +821,14 @@ Procedure NameObj.LoadExtra;
        i := GetPos;
        i := i * SizeOf(ExtUserType);
        FillChar(User^.MKExtra^, SizeOf(ExtUserType),0);
-       If LoadFilePos(Config^.FindBbsFile('ExtUsers.Bbs') + 'ExtUsers.Bbs',
+       If LoadFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
          User^.MKExtra^, SizeOf(ExtUserType), i) = 0 Then;
        End;
     2: Begin
        i := RaUsersRecord(User^.UserBuffer[User^.CurrentPos]).XIRecord;
        i := i * SizeOf(RAUsersXIRecord);
        FillChar(User^.RAExtra^, SizeOf(RAUsersXIRecord), 0);
-       If LoadFilePos(Config^.FindBbsFile('UsersXi.Bbs') + 'UsersXi.Bbs',
+       If LoadFilePos(Config^.FindBbsFile('usersxi.bbs') + 'usersxi.bbs',
          User^.RaExtra^, SizeOf(RAUsersXIRecord), i) = 0 Then;
        User^.ExtraLoaded := True;
        End;
@@ -836,7 +836,7 @@ Procedure NameObj.LoadExtra;
        i := SbUserRecord(User^.UserBuffer[User^.CurrentPos]).ExtraUserRecPtr;
        i := i * SizeOf(SBExtraUserRec);
        FillChar(User^.SBExtra^, SizeOf(SBExtraUserRec), 0);
-       If LoadFilePos(Config^.FindBbsFile('SUsers.Bbs') + 'SUsers.Bbs',
+       If LoadFilePos(Config^.FindBbsFile('susers.bbs') + 'susers.bbs',
          User^.SBExtra^, SizeOf(SbExtraUserRec), i) = 0 Then;
        User^.ExtraLoaded := True;
        End;
@@ -855,19 +855,19 @@ Procedure NameObj.SaveExtra;
       1: Begin
          i := GetPos;
          i := i * SizeOf(ExtUserType);
-         If SaveFilePos(Config^.FindBbsFile('ExtUsers.Bbs') + 'ExtUsers.Bbs',
+         If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
            User^.MKExtra^, SizeOf(ExtUserType), i) = 0 Then;
          End;
       2: Begin
          i := RaUsersRecord(User^.UserBuffer[User^.CurrentPos]).XIRecord;
          i := i * SizeOf(RAUsersXIRecord);
-         If SaveFilePos(Config^.FindBbsFile('UsersXi.Bbs') + 'UsersXi.Bbs',
+         If SaveFilePos(Config^.FindBbsFile('usersxi.bbs') + 'usersxi.bbs',
            User^.RaExtra^, SizeOf(RAUsersXIRecord), i) = 0 Then;
          End;
       4: Begin
          i := SbUserRecord(User^.UserBuffer[User^.CurrentPos]).ExtraUserRecPtr;
          i := i * SizeOf(SBExtraUserRec);
-         If SaveFilePos(Config^.FindBbsFile('SUsers.Bbs') + 'SUsers.Bbs',
+         If SaveFilePos(Config^.FindBbsFile('susers.bbs') + 'susers.bbs',
            User^.SBExtra^, SizeOf(SbExtraUserRec), i) = 0 Then;
          End;
       End;

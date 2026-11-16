@@ -161,7 +161,7 @@ Procedure FindUserOnFile;
     Exit;
   Config^.Load;
   If Config^.GetError = 0 Then
-    UserOnPath := Config^.GetBbsPath + 'UserOn.BBS';
+    UserOnPath := Config^.GetBbsPath + 'useron.bbs';
   End;
 
 

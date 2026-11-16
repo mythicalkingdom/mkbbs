@@ -333,15 +333,15 @@ Procedure MKRCfgObj.MKLoad;
   New(MKMsg);
   New(MKFile);
   New(MKEcho);
-  Error := LoadFile(FindBbsFile('Config.Mk') + 'Config.Mk', MkCfg^, SizeOf(MkCfg^));
+  Error := LoadFile(FindBbsFile('config.mk') + 'config.mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Messages.Mk') + 'Messages.Mk', MKMsg^, SizeOf(MKMsg^));
+    Error := LoadFile(FindBbsFile('messages.mk') + 'messages.mk', MKMsg^, SizeOf(MKMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('Files.Mk') + 'Files.Mk', MKFile^, SizeOf(MkFile^));
+    Error := LoadFile(FindBbsFile('files.mk') + 'files.mk', MKFile^, SizeOf(MkFile^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('EchoCfg.Mk') + 'EchoCfg.Mk', MKEcho^, SizeOf(MKEcho^));
-  Assign(MKMsgFile, ResolveCase(FindBbsFile('Messages.MK') + 'Messages.MK'));
-  Assign(MKFileFile, ResolveCase(FindBbsFile('Files.MK') + 'Files.MK'));
+    Error := LoadFile(FindBbsFile('echocfg.mk') + 'echocfg.mk', MKEcho^, SizeOf(MKEcho^));
+  Assign(MKMsgFile, FindBbsFile('messages.mk') + 'messages.mk');
+  Assign(MKFileFile, FindBbsFile('files.mk') + 'files.mk');
   FileMode := fmReadOnly + fmDenyNone;
   MsgLoaded := 1;
   FileLoaded := 1;
@@ -1244,7 +1244,7 @@ Function MKRCfgObj.GetFileListPath(Area: Word): String; {Get file area path}
     Begin
     TmpStr := MKFile^[FA].FilePath;
     AddBackSlash(TmpStr);
-    TmpStr := TmpStr + 'FILES.BBS';
+    TmpStr := TmpStr + 'files.bbs';
     GetFileListPath := TmpStr;
     End
   Else
@@ -1457,7 +1457,7 @@ Function MKRCfgObj.GetLangFile(LNum: Word): String;
   If ((LNum > 0) and (LNum < 11)) Then
     GetLangFile := MKCfg^.LangFile[LNum]
   Else
-    GetLangFile := 'PROMPTS';
+    GetLangFile := 'prompts';
   End;
 
 
@@ -2141,13 +2141,13 @@ Function MKRCfgObj.GetMsgAreaId(Area: Word): String;
 
 Function MKRCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Mk';
+  GetNodeIdxName := 'nodeidx.mk';
   End;
 
 
 Function MKRCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Mk';
+  GetNodeIncName := 'nodeinc.mk';
   End;
 
 

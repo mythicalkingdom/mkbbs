@@ -20,8 +20,8 @@ Uses
   MKAvatar, MKRBan, MKReadO, MKKbd, CfgBox, CfgList;
 
 Const
-  TempName = 'MsgTmp.MK';
-  BackName = 'MsgTmp.Bak';
+  TempName = 'msgtmp.mk';
+  BackName = 'msgtmp.bak';
   NumTxtLines = 16;
 
 
@@ -2579,7 +2579,7 @@ Procedure LoadCfg;
 
   Begin
   If Length(CfgName) = 0 Then
-    CfgName := Config^.GetBbsPath + 'MKRead.Cfg';
+    CfgName := Config^.GetBbsPath + 'mkread.cfg';
   FillChar(CfgRec, SizeOf(CfgRec), 0);
   CfgRec.Colors[1] := $1E;             {yellow on blue, as the old window colours}
   CfgRec.Colors[2] := $1F;
@@ -2594,7 +2594,7 @@ Procedure LoadCfg;
     Dec(P);
   If (P > 0) And (LocalFile[P] = '.') Then
     LocalFile := Copy(LocalFile, 1, P - 1);
-  LocalFile := LocalFile + '.Lrd';
+  LocalFile := LocalFile + '.lrd';
   If FileExist(CfgName) Then
     Begin
     If SizeFile(CfgName) >= SizeOf(CfgRec) Then
@@ -3031,10 +3031,10 @@ Procedure MkrApp.Startup;
     End;
   GoToXy(54 - (Length(DStr) Div 2), 10);
   Write(VOut, DStr);
-  If FileExist('Taglines.MK') Then
-    LoadTags('Taglines.MK')
+  If FileExist('taglines.mk') Then
+    LoadTags('taglines.mk')
   Else
-    LoadTags(Config^.GetBbsPath + 'Taglines.MK');
+    LoadTags(Config^.GetBbsPath + 'taglines.mk');
   TextAttr := LightGreen;
   DStr := Long2Str(NumTags);
   GoToXy(11 - (Length(Dstr) Div 2), 20);
@@ -3082,7 +3082,7 @@ Var
 
 Begin
 DoingYours := False;
-SwapPath := FExpand('MKRead.Tmp');
+SwapPath := FExpand('mkread.tmp');
 InitNamePtr;
 If BbsType = 0 Then
   Begin
@@ -3094,10 +3094,10 @@ If BbsType = 0 Then
 Case BbsType Of
   1: Config := New(MKRCfgObjPtr, Init);
   2: Begin
-     If FileExist('Config.RA') Then
-       Status := SizeFile('Config.Ra')
+     If FileExist('config.ra') Then
+       Status := SizeFile('config.ra')
      Else
-       Status := SizeFile(WithBackSlash(GetEnv('RA')) + 'Config.Ra');
+       Status := SizeFile(WithBackSlash(GetEnv('RA')) + 'config.ra');
      If Status < 6300 Then
        Config := New(RARCfgObjPtr, Init)
      Else
@@ -3136,10 +3136,10 @@ CloseArea;
 If CfgRec.LocalLast Then
   SaveLocalLast;
 If SaveFile(CfgName, CfgRec, SizeOf(CfgRec)) = 0 Then;
-If FileExist('Taglines.MK') Then
-  SaveTags('Taglines.MK')
+If FileExist('taglines.mk') Then
+  SaveTags('taglines.mk')
 Else
-  SaveTags(Config^.GetBbsPath + 'Taglines.MK');
+  SaveTags(Config^.GetBbsPath + 'taglines.mk');
 FreeTags;
 Dispose(Config, Done);
 For i := 1 To MsgListSize Do

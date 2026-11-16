@@ -317,7 +317,9 @@ Function NodeListObj.GetOffset(Addr: AddrType): LongInt;
 
 Function NodeListObj.GetNLFileName: String;
   Begin
-  GetNLFileName := NI^.NodeInc[NI^.NodeIdx[NI^.SearchPos].FileNum].FileName;
+  {The include file keeps the names in upper case (the format of the DOS index files); the nodelists themselves
+   are lower case files, as mknodeidx was given them}
+  GetNLFileName := Lower(NI^.NodeInc[NI^.NodeIdx[NI^.SearchPos].FileNum].FileName);
   End;
 
 

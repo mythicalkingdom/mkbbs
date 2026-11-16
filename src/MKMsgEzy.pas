@@ -224,7 +224,7 @@ Procedure EzyMsgObj.SetMsgPath(St: String);
   AddBackSlash(EZM^.MsgPath);
   EZM^.MsgArea := Str2Long(Copy(St,1,4));
   ANum := ((EZM^.MsgArea - 1) Div 100) + 1;
-  Ezm^.MsgAreaPath := Ezm^.Msgpath + 'AREA' + Long2Str(ANum) +'\';
+  Ezm^.MsgAreaPath := Ezm^.Msgpath + 'area' + Long2Str(ANum) +'\';
   End;
 
 
@@ -233,8 +233,8 @@ Function EzyMsgObj.GetHighMsgNum: LongInt;
     ANum: Word;
 
   Begin
-  GetHighMsgNum := SizeFile(Ezm^.MsgAreaPath + 'MsgH' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS') Div SizeOf(EzMsgHdrType);
+  GetHighMsgNum := SizeFile(Ezm^.MsgAreaPath + 'msgh' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs') Div SizeOf(EzMsgHdrType);
   End;
 
 
@@ -483,7 +483,7 @@ Function  EzyMsgObj.WriteMsg: Word;
         MsgFast.CrcTo := UpDC32(Ord(UpCase(Ezm^.MsgHdr.MsgTo[i])), MsgFast.CrcTo);
       MsgFast.Area := Ezm^.MsgArea;
       MsgFast.MsgNum := Ezm^.CurrMsg;
-      Assign(MsgFastFile, ResolveCase(Ezm^.MsgPath + 'MsgFast.Bbs'));
+      Assign(MsgFastFile, Ezm^.MsgPath + 'msgfast.bbs');
       FileMode := fmReadWrite + fmDenyNone;
       If shReset(MsgFastFile, SizeOf(MsgFastAccessType)) Then
         Begin
@@ -497,7 +497,7 @@ Function  EzyMsgObj.WriteMsg: Word;
       End;
     If ((Ezm^.Error = 0) and (IsEchoed)) Then
       Begin
-      Assign(MsgExportFile, ResolveCase(Ezm^.MsgPath + 'MsgExprt.Bbs'));
+      Assign(MsgExportFile, Ezm^.MsgPath + 'msgexprt.bbs');
       FileMode := fmReadWrite + fmDenyNone;
       If shReset(MsgExportFile, SizeOf(MsgExport)) Then
         Begin
@@ -512,7 +512,7 @@ Function  EzyMsgObj.WriteMsg: Word;
       End;
     If Ezm^.Error = 0 Then
       Begin
-      Assign(MsgCountFile, ResolveCase(Ezm^.MsgPath + 'MsgCount.Bbs'));
+      Assign(MsgCountFile, Ezm^.MsgPath + 'msgcount.bbs');
       MsgCount := 0;
       If shReset(MsgCountFile, SizeOf(MsgCount)) Then
         Begin
@@ -885,15 +885,15 @@ Procedure EzyMsgObj.StartNewMsg;
 Function EzyMsgObj.OpenMsgBase: Word;
   Begin
   Ezm^.Error := 0;
-  If Not FileExist(Ezm^.MsgAreaPath + 'MsgH' +
-  PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS') Then
+  If Not FileExist(Ezm^.MsgAreaPath + 'msgh' +
+  PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs') Then
     If CreateMsgBase(0,0) = 0 Then;
-  Assign(Ezm^.MsgHdrFile, ResolveCase(Ezm^.MsgAreaPath + 'MsgH' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS'));
-  Assign(Ezm^.MsgTxtFile, ResolveCase(Ezm^.MsgAreaPath + 'MsgT' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS'));
-  Assign(Ezm^.MsgTxtWFile, ResolveCase(Ezm^.MsgAreaPath + 'MsgT' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS'));
+  Assign(Ezm^.MsgHdrFile, Ezm^.MsgAreaPath + 'msgh' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs');
+  Assign(Ezm^.MsgTxtFile, Ezm^.MsgAreaPath + 'msgt' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs');
+  Assign(Ezm^.MsgTxtWFile, Ezm^.MsgAreaPath + 'msgt' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs');
   FileMode := fmReadWrite + fmDenyNone;
   Reset(Ezm^.MsgHdrFile, SizeOf(Ezm^.MsgHdr));
   Ezm^.Error := IoResult;
@@ -938,10 +938,10 @@ Function EzyMsgObj.CreateMsgBase(MaxMsg: Word; MaxDays: Word): Word;
     MsgCount: MsgCountType;
 
   Begin
-  Assign(HdrFile, ResolveCase(Ezm^.MsgAreaPath + 'MsgH' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS'));
-  Assign(TxtFile, ResolveCase(Ezm^.MsgAreaPath + 'MsgT' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS'));
+  Assign(HdrFile, Ezm^.MsgAreaPath + 'msgh' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs');
+  Assign(TxtFile, Ezm^.MsgAreaPath + 'msgt' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs');
   ReWrite(HdrFile);
   Ezm^.Error := IoResult;
   If Ezm^.Error = 0 Then
@@ -953,18 +953,18 @@ Function EzyMsgObj.CreateMsgBase(MaxMsg: Word; MaxDays: Word): Word;
   If IoResult <> 0 Then;
   Close(TxtFile);
   If IoResult <> 0 Then;
-  If Not FileExist(Ezm^.MsgPath + 'MsgFast.Bbs') Then
+  If Not FileExist(Ezm^.MsgPath + 'msgfast.bbs') Then
     Begin
-    Assign(TempFile, ResolveCase(Ezm^.MsgPath + 'Msgfast.Bbs'));
+    Assign(TempFile, Ezm^.MsgPath + 'msgfast.bbs');
     ReWrite(TempFile);
     If IoResult <> 0 Then;
     Close(TempFile);
     If IoResult <> 0 Then;
     End;
-  If Not FileExist(Ezm^.MsgPath + 'MsgExprt.Bbs') Then
+  If Not FileExist(Ezm^.MsgPath + 'msgexprt.bbs') Then
     Begin
     FillChar(MsgExport, SizeOf(MsgExport), #0);
-    Assign(TempFile, ResolveCase(Ezm^.Msgpath + 'MsgExprt.Bbs'));
+    Assign(TempFile, Ezm^.Msgpath + 'msgexprt.bbs');
     ReWrite(TempFile, SizeOf(MsgExport));
     If IoResult <> 0 Then;
     BlockWrite(TempFile, MsgExport, 1);
@@ -972,10 +972,10 @@ Function EzyMsgObj.CreateMsgBase(MaxMsg: Word; MaxDays: Word): Word;
     Close(TempFile);
     If IoResult <> 0 Then;
     End;
-  If Not FileExist(Ezm^.MsgPath + 'MsgCount.Bbs') Then
+  If Not FileExist(Ezm^.MsgPath + 'msgcount.bbs') Then
     Begin
     FillChar(MsgCount, SizeOf(MsgCount), #0);
-    Assign(TempFile, ResolveCase(Ezm^.MsgPath + 'MsgCount.Bbs'));
+    Assign(TempFile, Ezm^.MsgPath + 'msgcount.bbs');
     ReWrite(TempFile, SizeOf(MsgCount));
     If IoResult <> 0 Then;
     BlockWrite(TempFile, MsgCount, 1);
@@ -1040,7 +1040,7 @@ Function EzyMsgObj.GetLastRead(UNum: LongInt): LongInt;
   Count := ((Ezm^.MsgArea - 1) Div 16) + 1; {number of combined info to skip}
   Inc(Count, (Ezm^.MsgArea - 1));  { point to current area}
   AddBackSlash(EzLastPath);
-  Assign(LFile, ResolveCase(EzLastPath + 'LastComb.Bbs'));
+  Assign(LFile, EzLastPath + 'lastcomb.bbs');
   FileMode := fmReadOnly + fmDenyNone;
   Reset(LFile, 1);
   If IoResult <> 0 Then;
@@ -1066,7 +1066,7 @@ Procedure EzyMsgObj.SetLastRead(UNum: LongInt; LR: LongInt);
   Count := ((Ezm^.MsgArea - 1) Div 16) + 1; {number of combined info to skip}
   Inc(Count, (Ezm^.MsgArea - 1));  { point to current area}
   AddBackSlash(EzLastPath);
-  Assign(LFile, ResolveCase(EzLastPath + 'LastComb.Bbs'));
+  Assign(LFile, EzLastPath + 'lastcomb.bbs');
   FileMode := fmReadWrite + fmDenyNone;
   Reset(LFile, 1);
   If IoResult <> 0 Then;
@@ -1095,8 +1095,8 @@ Procedure EzyMsgObj.SetTxtPos(TP: LongInt);
 
 Function EzyMsgObj.MsgBaseExists: Boolean;
   Begin
-  MsgBaseExists := FileExist(Ezm^.MsgAreaPath + 'MsgH' +
-    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.BBS');
+  MsgBaseExists := FileExist(Ezm^.MsgAreaPath + 'msgh' +
+    PadLeft(Long2Str(Ezm^.MsgArea),'0',3) + '.bbs');
   End;
 
 End.

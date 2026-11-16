@@ -38,13 +38,13 @@ Function LoadQwkCfg: Boolean;
     TmpStr: String;
 
   Begin
-  CfgPath := FindPath('Config.Mko');
+  CfgPath := FindPath('config.mko');
   If FileExist(CfgPath) Then
     LoadQwkCfg := (LoadFile(CfgPath, QCfg, SizeOf(QCfg)) = 0)
   Else
     Begin
     LoadQwkCfg := False;
-    CfgPath := 'Config.mko';
+    CfgPath := 'config.mko';
     End;
   End;
 
@@ -83,17 +83,17 @@ Procedure LoadUser(Name: String);
     NumUsers: LongInt;
 
   Begin
-  If Not FileExist(WithBackSlash(QCfg.UserPath) + 'Users.MKO') Then
+  If Not FileExist(WithBackSlash(QCfg.UserPath) + 'users.mko') Then
     Begin
     If IoResult <> 0 Then;
-    Assign(TUF, ResolveCase(WithBackSlash(QCfg.UserPath) + 'Users.MKO'));
+    Assign(TUF, WithBackSlash(QCfg.UserPath) + 'users.mko');
     ReWrite(TUF);
     Close(TUF);
     If IoResult <> 0 Then;
     End;
   UserFound := False;
   UFF.Init(15000);
-  If UFF.OpenFile(WithBackSlash(QCfg.UserPath) + 'Users.MKO',
+  If UFF.OpenFile(WithBackSlash(QCfg.UserPath) + 'users.mko',
     fmReadWrite + fmDenyNone) Then
     Begin
     SName := Upper(Name);
@@ -128,7 +128,7 @@ Procedure SaveUser;
   Begin
   Filemode := fmReadWrite + fmDenyNone;
   If QwkNumber >= 0 Then
-    If SaveFilePos(WithBackSlash(QCfg.UserPath) + 'Users.MKO', QwkUser,
+    If SaveFilePos(WithBackSlash(QCfg.UserPath) + 'users.mko', QwkUser,
       SizeOf(QwkUser), QwkNumber * SizeOf(QwkUser)) =0 Then;
   End;
 
@@ -144,13 +144,13 @@ Procedure LoadBbsCfg;
   Case BbsType Of
     1: Config := New(MKRCfgObjPtr, Init);
     2: Begin
-       If FileExist('Config.RA') Then
+       If FileExist('config.ra') Then
          Begin
-         Tmp := SizeFile('Config.Ra');
+         Tmp := SizeFile('config.ra');
          End
        Else
          Begin
-         Tmp := SizeFile(WithBackSlash(GetEnv('RA')) + 'Config.Ra');
+         Tmp := SizeFile(WithBackSlash(GetEnv('RA')) + 'config.ra');
          End;
        If Tmp < 6300 Then
          Config := New(RARCfgObjPtr, Init)

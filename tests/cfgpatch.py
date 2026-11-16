@@ -31,3 +31,12 @@ def patch(cfg_path, root, fn):
             i += 1
     open(cfg_path, 'wb').write(d)
     return n
+
+
+def fix_sample(cfg_dir):
+    """The sample BBS has DOS-era names inside config.mk: the language file is "PROMPTS".  Names that come from the
+    configuration are used exactly as written and the files are lower case, so a private copy gets the lower case name."""
+    import os
+    p = os.path.join(cfg_dir, 'config.mk')
+    if os.path.exists(p):
+        patch(p, b'PROMPTS', lambda s: s.lower())

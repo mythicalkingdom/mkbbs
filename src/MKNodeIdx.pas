@@ -133,9 +133,9 @@ Function ListPath(Name: String): String;
     Exit;
     End;
   If FileExist(Name) Then
-    ListPath := ResolveCase(Name)
+    ListPath := Name
   Else
-    ListPath := ResolveCase(ListDir + Name);
+    ListPath := ListDir + Name;
   End;
 
 
@@ -254,7 +254,7 @@ Procedure ReadInclude;
     FN: String;
 
   Begin
-  FN := ResolveCase(ListDir + Config^.GetNodeIncName);
+  FN := ListDir + Config^.GetNodeIncName;
   If Not FileExist(FN) Then
     Exit;
   Assign(F, FN);
@@ -270,7 +270,7 @@ Procedure ReadInclude;
     If Got = 1 Then
       Begin
       Inc(NumLists);
-      Lists[NumLists] := Rec.FileName;
+      Lists[NumLists] := Lower(Rec.FileName);      {stored in upper case, the files are lower case}
       End;
     End;
   Close(F);
@@ -334,9 +334,9 @@ For i := 1 To NumLists Do
   End;
 If NumIdx = 0 Then
   Fail('no Zone, Region or Host lines found: these are not nodelists', 3);
-If SaveFile(ResolveCase(ListDir + Config^.GetNodeIdxName), Idx^, NumIdx * SizeOf(NodeIdxType)) <> 0 Then
+If SaveFile(ListDir + Config^.GetNodeIdxName, Idx^, NumIdx * SizeOf(NodeIdxType)) <> 0 Then
   Fail('cannot write ' + ListDir + Config^.GetNodeIdxName, 4);
-If SaveFile(ResolveCase(ListDir + Config^.GetNodeIncName), Inc_^, NumInc * SizeOf(NodeIncType)) <> 0 Then
+If SaveFile(ListDir + Config^.GetNodeIncName, Inc_^, NumInc * SizeOf(NodeIncType)) <> 0 Then
   Fail('cannot write ' + ListDir + Config^.GetNodeIncName, 4);
 WriteLn('Wrote ', Config^.GetNodeIdxName, ' (', NumIdx, ' entries) and ', Config^.GetNodeIncName, ' (',
   NumInc, ' lists)');

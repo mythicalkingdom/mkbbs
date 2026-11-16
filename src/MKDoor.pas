@@ -1863,7 +1863,7 @@ Procedure DoorUser.ReadUser;
   i := UserInfo^.ExitInfo.UserRecNum;
   i := i * SizeOf(UsersType);
   UserInfo^.UserLoaded :=
-    (LoadFilePos(Config^.FindBbsFile('USERS.BBS') + 'USERS.BBS',
+    (LoadFilePos(Config^.FindBbsFile('users.bbs') + 'users.bbs',
     UserInfo^.ExitInfo.User, SizeOf(UsersType), i) = 0);
   For i := 1 To 4 Do
     Begin
@@ -1874,14 +1874,14 @@ Procedure DoorUser.ReadUser;
     1: Begin
        i := UserInfo^.ExitInfo.UserRecNum;
        i := i * SizeOf(ExtUserType);
-       If LoadFilePos(Config^.FindBbsFile('ExtUsers.Bbs') + 'ExtUsers.Bbs',
+       If LoadFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
          UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserType), i) = 0 Then;
        End;
     2: Begin
        RaExitPtr := @UserInfo^.ExitInfo;
        i := RaExitPtr^.UserInfo.XIRecord;
        i := i * SizeOf(RAUsersXIRecord);
-       If LoadFilePos(Config^.FindBbsFile('UsersXi.Bbs') + 'UsersXi.Bbs',
+       If LoadFilePos(Config^.FindBbsFile('usersxi.bbs') + 'usersxi.bbs',
          RaExitPtr^.UserXIInfo, SizeOf(RAUsersXIRecord), i) = 0 Then;
        End;
     End;
@@ -1904,7 +1904,7 @@ Procedure DoorUser.WriteUser;
       SetUserElapsed(GetUserSecondsOn Div 60);
     SetUserLastDate(DateStr(GetDosDate));
     SetUserLastTime(TimeStr(GetDosDate));
-    UPath := Config^.FindBbsFile('Users.Bbs') + 'USERS.BBS';
+    UPath := Config^.FindBbsFile('users.bbs') + 'users.bbs';
     UPos := UserInfo^.ExitInfo.UserRecNum;
     UPos := UPos * SizeOf(UsersType);
     If SaveFilePos(UPath, UserInfo^.ExitInfo.User, SizeOf(UsersType), UPos) = 0 Then;
@@ -1914,7 +1914,7 @@ Procedure DoorUser.WriteUser;
         NameIdx.HandleCrc := NameCrcCode(GetUserHandle);
         UPos := UserInfo^.ExitInfo.UserRecNum;
         UPos := UPos * SizeOf(UsersIdxType);
-        If SaveFilePos(Config^.FindBbsFile('UsersIdx.Bbs') + 'UsersIdx.Bbs',
+        If SaveFilePos(Config^.FindBbsFile('usersidx.bbs') + 'usersidx.bbs',
           NameIdx, SizeOf(NameIdx), UPos) = 0 Then;
         End;
       End;
@@ -1922,14 +1922,14 @@ Procedure DoorUser.WriteUser;
       1: Begin                    {Update ExtUsers.Bbs}
          UPos := UserInfo^.ExitInfo.UserRecNum;
          UPos := UPos * SizeOf(ExtUserType);
-         If SaveFilePos(Config^.FindBbsFile('ExtUsers.Bbs') + 'ExtUsers.Bbs',
+         If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
            UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserType), UPos) = 0 Then;
          End;
       2: Begin                    {Update UsersXi.Bbs}
          RaExitPtr := @UserInfo^.ExitInfo;
          UPos := RaExitPtr^.UserInfo.XIRecord;
          UPos := UPos * SizeOf(RAUsersXIRecord);
-         If SaveFilePos(Config^.FindBbsFile('UsersXi.Bbs') + 'UsersXi.Bbs',
+         If SaveFilePos(Config^.FindBbsFile('usersxi.bbs') + 'usersxi.bbs',
            RaExitPtr^.UserXIInfo, SizeOf(RAUsersXIRecord), UPos) = 0 Then;
          End;
       End;
@@ -1944,11 +1944,11 @@ Procedure DoorUser.AddUser;
     RAExitPtr: ^RAExitInfoRecord;
 
   Begin
-  USize := SizeFile(Config^.FindBbsFile('Users.Bbs') + 'Users.Bbs');
+  USize := SizeFile(Config^.FindBbsFile('users.bbs') + 'users.bbs');
   UserInfo^.ExitInfo.UserRecNum := USize Div SizeOf(UsersType);
   RaExitPtr := @UserInfo^.ExitInfo;
   RaExitPtr^.UserInfo.XIRecord :=
-    SizeFile(Config^.FindBbsFile('UsersXI.Bbs') + 'UsersXI.Bbs') Div
+    SizeFile(Config^.FindBbsFile('usersxi.bbs') + 'usersxi.bbs') Div
     SizeOf(RAUsersXIRecord);
   UserInfo^.UserLoaded := True;
   WriteUser;
@@ -1970,16 +1970,16 @@ Procedure DoorUser.GetUserPos(Name: String);
     TempName: String[35];
 
   Begin
-  If Not (FileExist(Config^.FindBbsFile('Users.Bbs') + 'Users.Bbs')) Then
+  If Not (FileExist(Config^.FindBbsFile('users.bbs') + 'users.bbs')) Then
     UserInfo^.ExitInfo.UserRecNum := $ffff
   Else
     Begin
     TempName := Upper(Name);
-    If Not shAssign(UsersFile, Config^.FindBbsFile('Users.Bbs') + 'Users.Bbs') Then
-      WriteLN('Error assigning Users.Bbs');
+    If Not shAssign(UsersFile, Config^.FindBbsFile('users.bbs') + 'users.bbs') Then
+      WriteLN('Error assigning users.bbs');
     FileMode := fmReadOnly + fmDenyNone;
     If Not shReset(UsersFile, SizeOf(UsersType)) Then
-      WriteLn(VOut, 'Error resetting Users.Bbs');
+      WriteLn(VOut, 'Error resetting users.bbs');
     Found := False;
     While Not Eof(UsersFile) And Not (Found) Do
       Begin
@@ -1995,7 +1995,7 @@ Procedure DoorUser.GetUserPos(Name: String);
       End;
     Close(UsersFile);
     If IoResult <> 0 Then
-      WriteLn(VOut, 'Error closing Users.Bbs');
+      WriteLn(VOut, 'Error closing users.bbs');
     If Found Then
       UserInfo^.ExitInfo.UserRecNum := UserFilePos + UserCnt - 1
     Else
@@ -2017,14 +2017,14 @@ Procedure DoorUser.ReadExit(EPath: String);
     i: Word;
 
   Begin
-  If Not shAssign(ExitInfoFile, EPath + 'ExitInfo.Bbs') Then;
+  If Not shAssign(ExitInfoFile, EPath + 'exitinfo.bbs') Then;
   FileMode := fmReadWrite + fmDenyNone;
   If Not shReset(ExitInfoFile, 1) Then
-    WriteLn(VOut, 'Error resetting ExitInfo.Bbs');
+    WriteLn(VOut, 'Error resetting exitinfo.bbs');
   BlockRead(ExitInfoFile,UserInfo^.ExitInfo, SizeOf(UserInfo^.ExitInfo)
     + SizeOf(UserInfo^.Extra), UserInfo^.ExitSize);
   If IoResult <> 0 Then
-    WriteLn(VOut, 'Error reading ExitInfo.Bbs');
+    WriteLn(VOut, 'Error reading exitinfo.bbs');
   Close(ExitInfoFile);
   If IoResult <> 0 Then
     WriteLn(VOut, 'Error closing exitinfo.bbs');
@@ -2049,9 +2049,9 @@ Procedure DoorUser.WriteExit(EPath: String);
     Else
       UserInfo^.ExitSize := SizeOf(ExitInfoType);
     End;
-  If Not shAssign(ExitInfoFile, EPath + 'ExitInfo.Bbs') Then;
+  If Not shAssign(ExitInfoFile, EPath + 'exitinfo.bbs') Then;
   FileMode := fmReadWrite + fmDenyNone;
-  If FileExist(EPath + 'ExitInfo.Bbs') Then
+  If FileExist(EPath + 'exitinfo.bbs') Then
     Begin
     If Not shReset(ExitInfoFile, 1) Then;
     End
@@ -2077,10 +2077,10 @@ Procedure DoorUser.ReadDorInfo(DPath: String);
 
   Begin
   DFile.Init;
-  If Not FileExist(DPath + 'DORINFO1.DEF') Then
-    WriteLn(VOut, 'Unable to find ' + DPath + 'DorInfo1.Def');
-  If Not DFile.OpenTextFile(DPath + 'DORINFO1.DEF') Then
-    WriteLn(VOut, 'Unable to open DorInfo1.Def');
+  If Not FileExist(DPath + 'dorinfo1.def') Then
+    WriteLn(VOut, 'Unable to find ' + DPath + 'dorinfo1.def');
+  If Not DFile.OpenTextFile(DPath + 'dorinfo1.def') Then
+    WriteLn(VOut, 'Unable to open dorinfo1.def');
   TmpStr := DFile.GetString;
   TmpStr := DFile.GetString;
   TmpStr := DFile.GetString;
@@ -2101,7 +2101,7 @@ Procedure DoorUser.ReadDorInfo(DPath: String);
   UserInfo^.StartDay := GetCurrentDay;
   UserInfo^.StartTime := CurrentTime;
   If Not DFile.CloseTextFile Then
-    WriteLn(VOut, 'Unable to close DorInfo1.Def');
+    WriteLn(VOut, 'Unable to close dorinfo1.def');
   DFile.Done;
   If DoorRemote Then
     CommInit;                            {the program attached ComSession before}
@@ -3777,8 +3777,8 @@ Procedure DoorUser.PostStatus(Status: Byte);
     UserOn.Baud := GetUserBaud;
     Tmp := UserOn.Node;
     Tmp := Tmp * SizeOf(UserOnType);
-    ExtendFile(Config^.GetBbsPath + 'UserOn.BBS', Tmp);
-    If SaveFilePos(Config^.GetBBSPath + 'UserOn.BBS', UserOn,
+    ExtendFile(Config^.GetBbsPath + 'useron.bbs', Tmp);
+    If SaveFilePos(Config^.GetBBSPath + 'useron.bbs', UserOn,
       SizeOf(UserOn), Tmp - SizeOf(UserOnType)) = 0 Then
     UserInfo^.LastStatus := Status;
     End;

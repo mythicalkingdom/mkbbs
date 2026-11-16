@@ -182,7 +182,7 @@ Var
   DI^.DupeSize := DupeSize;
   If FileExist(Name) Then
     Begin
-    Assign(DI^.DFile, ResolveCase(Name));
+    Assign(DI^.DFile, Name);
     FileMode := fmReadWrite or fmDenyNone;
     shReset(DI^.DFile, 1);
     End
@@ -193,7 +193,7 @@ Var
       DupeIPtr^[TempCnt].Date := 0;
       DupeIPtr^[TempCnt].Crc := 0;
       End;
-    Assign(DI^.DFile, ResolveCase(Name));
+    Assign(DI^.DFile, Name);
     ReWrite(DI^.DFile, 1);
     TempCnt := DI^.DupeSize;
     While TempCnt > 0 Do

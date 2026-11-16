@@ -82,7 +82,7 @@ Procedure LoadTwits;
 
   Begin
   NumTwits := 0;
-  TmpStr := Config^.FindBbsFile('Twit.Ctl') + 'Twit.Ctl';
+  TmpStr := Config^.FindBbsFile('twit.ctl') + 'twit.ctl';
   If FileExist(TmpStr) Then
     Begin
     TF.Init;

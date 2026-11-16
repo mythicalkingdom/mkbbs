@@ -118,15 +118,15 @@ Function YN(B: Boolean): String;
 Procedure LoadCfg;
   Begin
   FillChar(UserEdCfg, SizeOf(UserEdCfg), 0);
-  If FileExist(Config^.GetBbsPath + 'MKUserEd.Cfg') Then
-    If LoadFile(Config^.GetBbsPath + 'MKUserEd.Cfg', UserEdCfg, SizeOf(UserEdCfg)) <> 0 Then
+  If FileExist(Config^.GetBbsPath + 'mkusered.cfg') Then
+    If LoadFile(Config^.GetBbsPath + 'mkusered.cfg', UserEdCfg, SizeOf(UserEdCfg)) <> 0 Then
       FillChar(UserEdCfg, SizeOf(UserEdCfg), 0);
   End;
 
 
 Procedure SaveCfg;
   Begin
-  If SaveFile(Config^.GetBbsPath + 'MKUserEd.Cfg', UserEdCfg, SizeOf(UserEdCfg)) = 0 Then;
+  If SaveFile(Config^.GetBbsPath + 'mkusered.cfg', UserEdCfg, SizeOf(UserEdCfg)) = 0 Then;
   End;
 
 
@@ -760,7 +760,7 @@ Procedure LoadAnswers;
   AnswerCount := 0;
   T.Init;
   SearchStr := '*** ' + UR.Name + ' completed questionaire';
-  If T.OpenTextFile(Config^.GetBbsPath + 'NewUser.Asw') Then
+  If T.OpenTextFile(Config^.GetBbsPath + 'newuser.asw') Then
     Begin
     TmpStr := T.GetString;
     While ((T.StringFound) And (Pos(SearchStr, TmpStr) = 0)) Do

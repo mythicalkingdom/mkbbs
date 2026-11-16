@@ -573,37 +573,37 @@ Procedure GetPackPaths(Var Packers: PackInfoType);
   Packers.PackLine[5] := ' a ';
   Packers.PackLine[6] := ' a -y ';
   Packers.PackLine[7] := ' -a ';
-  Packers.UnPackPath[2] := FindPath('UNZIP.EXE');
+  Packers.UnPackPath[2] := FindPath('unzip.exe');
   If Not FileExist(Packers.UnPackPath[2]) Then
-    Packers.UnPackPath[2] := FindPath('PKUNZIP.EXE')
+    Packers.UnPackPath[2] := FindPath('pkunzip.exe')
   Else
     Packers.UnPackLine[2] := ' -xjn ';
-  Packers.PackPath[2] := FindPath('ZIP.EXE');
+  Packers.PackPath[2] := FindPath('zip.exe');
   If Not FileExist(Packers.PackPath[2]) Then
-    Packers.PackPath[2] := FindPath('PKZIP.EXE')
+    Packers.PackPath[2] := FindPath('pkzip.exe')
   Else
     Packers.PackLine[2] := ' -j ';
-  Packers.UnPackPath[3] := FindPath('PKUNPAK.EXE');
+  Packers.UnPackPath[3] := FindPath('pkunpak.exe');
   If Not FileExist(Packers.UnPackPath[3]) Then
-    Packers.UnPackPath[3] := FindPath('PKXARC.EXE');
+    Packers.UnPackPath[3] := FindPath('pkxarc.exe');
   If Not FileExist(Packers.UnPackPath[3]) Then
-    Packers.UnPackPath[3] := FindPath('ARC.EXE');
-  Packers.PackPath[3] := FindPath('PKPAK.EXE');
+    Packers.UnPackPath[3] := FindPath('arc.exe');
+  Packers.PackPath[3] := FindPath('pkpak.exe');
   If Not FileExist(Packers.PackPath[3]) Then
-    Packers.PackPath[3] := FindPath('PKARC.EXE');
+    Packers.PackPath[3] := FindPath('pkarc.exe');
   If Not FileExist(Packers.PackPath[3]) Then
-    Packers.PackPath[3] := FindPath('ARCE.EXE');
-  Packers.UnPackPath[1] := FindPath('LHA.EXE');
+    Packers.PackPath[3] := FindPath('arce.exe');
+  Packers.UnPackPath[1] := FindPath('lha.exe');
   If Not FileExist(Packers.UnPackPath[1]) Then
-    Packers.UnPackPath[1] := FindPath('LHARC.EXE');
+    Packers.UnPackPath[1] := FindPath('lharc.exe');
   Packers.PackPath[1] := Packers.UnPackPath[1];
-  Packers.UnPackPath[5] := FindPath('DWC.EXE');
+  Packers.UnPackPath[5] := FindPath('dwc.exe');
   Packers.PackPath[5] := Packers.UnPackPath[5];
-  Packers.UnPackPath[6] := FindPath('ARJ.EXE');
+  Packers.UnPackPath[6] := FindPath('arj.exe');
   Packers.PackPath[6] := Packers.UnPackPath[6];
-  Packers.UnPackPath[4] := FindPath('ZOO.EXE');
+  Packers.UnPackPath[4] := FindPath('zoo.exe');
   Packers.PackPath[4] := Packers.UnPackPath[4];
-  Packers.UnPackPath[7] := FindPath('HYPER.EXE');
+  Packers.UnPackPath[7] := FindPath('hyper.exe');
   Packers.PackPath[7] := Packers.UnPackPath[7];
   End;
 

@@ -137,7 +137,7 @@ Procedure XrsOffObj.CreateAreasXRS;
     Inc(Loc);
     CA^[Loc] := '|';
     End;
-  If SaveFile(XI^.MsgPath + 'AREAS1.XRS', CA^, Loc) = 0 Then;
+  If SaveFile(XI^.MsgPath + 'areas1.xrs', CA^, Loc) = 0 Then;
   Dispose(CA);
   End;
 
@@ -197,7 +197,7 @@ Procedure XRSOffObj.CreateAccessXrs;
     If Config^.GetMsgReaderOrig(Area) Then
       Inc(xs^[Area].Attr, 32);
     End;
-  If SaveFile(XI^.MsgPath + 'ACCESS1.XRS', xs^, SizeOf(xs^)) = 0 Then;
+  If SaveFile(XI^.MsgPath + 'access1.xrs', xs^, SizeOf(xs^)) = 0 Then;
   Dispose(xs);
   End;
 
@@ -248,7 +248,7 @@ Procedure XrsOffObj.CreateUserXrs;
   For i := 1 to 25 Do
     Inc(UserInfo.CrCCheck, Ord(UserInfo.Name[i]));
   UserInfo.CrcCheck := UserInfo.CrcCheck or 32768;
-  If SaveFile(XI^.MsgPath + 'USER1.XRS', UserInfo, SizeOf(UserInfo)) = 0 Then;
+  If SaveFile(XI^.MsgPath + 'user1.xrs', UserInfo, SizeOf(UserInfo)) = 0 Then;
   End;
 
 
@@ -260,7 +260,7 @@ Function XRSOffObj.StartPacket: Word;
   New(XI^.MailIdx);
   XI^.NumMsgs := 0;
   XI^.Error := 0;
-  Assign(XI^.MsgFile, ResolveCase(XI^.MsgPath + 'BAT1MAIL.XRS'));
+  Assign(XI^.MsgFile, XI^.MsgPath + 'bat1mail.xrs');
   ReWrite(XI^.MsgFile);
   WriteLn(XI^.MsgFile, '=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=');
   WriteLn(XI^.MsgFile, '= MK Offline Mail System - by Mark May - in XRS mode                          =');
@@ -285,7 +285,7 @@ Function XRSOffObj.ClosePacket: Word;
   ClosePacket := IoResult;
   IdxSize := XI^.NumMsgs;
   IdxSize := IdxSize * SizeOf(MailIdxType);
-  If SaveFile(XI^.MsgPath + 'MAIL1IDX.XRS', XI^.MailIdx^, IdxSize) = 0 Then;
+  If SaveFile(XI^.MsgPath + 'mail1idx.xrs', XI^.MailIdx^, IdxSize) = 0 Then;
   Dispose(XI^.MailIdx);
   End;
 

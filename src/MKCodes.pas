@@ -296,23 +296,23 @@ Function BbsDisplayObj.GetError: Word;
 Function BbsDisplayObj.ScreenFileExpand(FileName: String): String;
   Begin
   If ((User.GetUserAvatar) And
-  (FileExist(Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.AVT'))) Then
-    ScreenFileExpand := Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.AVT'
+  (FileExist(Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.avt'))) Then
+    ScreenFileExpand := Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.avt'
   Else If ((User.GetUserAvatar) And
-  (FileExist(Config^.GetTxtPath(1) + FileName + '.AVT'))) Then
-    ScreenFileExpand := Config^.GetTxtPath(1) + FileName + '.AVT'
+  (FileExist(Config^.GetTxtPath(1) + FileName + '.avt'))) Then
+    ScreenFileExpand := Config^.GetTxtPath(1) + FileName + '.avt'
   Else If ((User.GetUserAnsi) And
-  (FileExist(Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.ANS'))) Then
-    ScreenFileExpand := Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.ANS'
+  (FileExist(Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.ans'))) Then
+    ScreenFileExpand := Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.ans'
   Else If ((User.GetUserAnsi) And
-  (FileExist(Config^.GetTxtPath(1) + FileName + '.ANS'))) Then
-    ScreenFileExpand := Config^.GetTxtPath(1) + FileName + '.ANS'
+  (FileExist(Config^.GetTxtPath(1) + FileName + '.ans'))) Then
+    ScreenFileExpand := Config^.GetTxtPath(1) + FileName + '.ans'
   Else If
-  (FileExist(Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.ASC')) Then
-    ScreenFileExpand := Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.ASC'
+  (FileExist(Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.asc')) Then
+    ScreenFileExpand := Config^.GetTxtPath(User.GetUserLanguage) + FileName + '.asc'
   Else If
-  (FileExist(Config^.GetTxtPath(1) + FileName + '.ASC')) Then
-    ScreenFileExpand := Config^.GetTxtPath(1) + FileName + '.ASC'
+  (FileExist(Config^.GetTxtPath(1) + FileName + '.asc')) Then
+    ScreenFileExpand := Config^.GetTxtPath(1) + FileName + '.asc'
   Else
     ScreenFileExpand := FileName;
   End;
@@ -335,7 +335,7 @@ Function BbsDisplayObj.DisplayBbsFile(FileName: String; HotStr: String): Char;
     DInfo^.DisplayError := 3000;
   If DInfo^.DisplayError = 0 Then
     Begin
-    Assign(DInfo^.DFile, ResolveCase(DInfo^.FileName));
+    Assign(DInfo^.DFile, DInfo^.FileName);
     FileMode := fmReadOnly + fmDenyNone;
     If Not shReset(DInfo^.DFile, 1) Then
       DInfo^.DisplayError := 3010;

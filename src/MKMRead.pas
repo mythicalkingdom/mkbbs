@@ -570,7 +570,7 @@ Procedure CheckExport(Var MsgOut: AbsMsgPtr; Sec: SecType);
       Begin
       If ((Not FileExist(OutName)) and (Not IsDevice(OutName))) Then
         Begin
-        Assign(OutFile, ResolveCase(OutName));
+        Assign(OutFile, OutName);
         ReWrite(OutFile);
         If IoResult <> 0 Then;
         DoMsgExport(MsgOut, OutFile);
@@ -1126,14 +1126,14 @@ Procedure ReplyMsg(Var MsgOut: AbsMsgPtr);
     TF: TFile;
 
   Const
-    TempName = 'MsgTmp.Bbs';
+    TempName = 'msgtmp.bbs';
 
   Begin
   CurrPos := MsgOut^.GetMsgLoc;
   User.GetUserSec(Sec);
   If Config^.MsgWriteAccess(CurrArea, Sec) Then
     Begin
-    Assign(OutFile, ResolveCase(TempName));
+    Assign(OutFile, TempName);
     Erase(OutFile);
     If IoResult <> 0 Then;
     New(MsgEnt, Init);
@@ -1173,7 +1173,7 @@ Procedure ReplyMsg(Var MsgOut: AbsMsgPtr);
         End;
       i := 0;
       MsgOut^.MsgTxtStartUp;
-      Assign(OutFile, ResolveCase(TempName));
+      Assign(OutFile, TempName);
       ReWrite(OutFile);
       If IoResult <> 0 Then;
       QuoteStr := StripTrail(QuoteStr, ' ');
@@ -1275,7 +1275,7 @@ Procedure ReplyMsg(Var MsgOut: AbsMsgPtr);
       If TF.CloseTextFile Then;
       End;
     TF.Done;
-    Assign(OutFile, ResolveCase(TempName));
+    Assign(OutFile, TempName);
     Erase(OutFile);
     If IoResult <> 0 Then;
     MsgEnt^.GetText;

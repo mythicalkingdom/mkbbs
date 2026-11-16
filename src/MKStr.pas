@@ -74,7 +74,7 @@ Procedure StrObj.Load(FN: String);          {Load file name}
     StrInfo^.Error := 1000;
   If StrInfo^.Error = 0 Then
     Begin
-    Assign(StrF, ResolveCase(FN));
+    Assign(StrF, FN);
     FileMode := fmReadOnly + fmDenyNone;
     If Not shReset(StrF, 1) Then
       StrInfo^.Error := 1010;

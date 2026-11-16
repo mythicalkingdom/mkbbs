@@ -443,7 +443,7 @@ Procedure QBCfgObj.SetTempPath(TP: String);
 
 Function QBCfgObj.GetLogFileName: String;
   Begin
-  GetLogFileName := 'SYSTEM.LOG';
+  GetLogFileName := 'system.log';
   End;
 
 
@@ -517,13 +517,13 @@ Procedure QBCfgObj.QBLoad;
   New(QbMsg);
   New(QbFile);
   New(QbEvent);
-  Error := LoadFile(FindBbsFile('QuickCfg.Dat') + 'QuickCfg.Dat', QbCfg^, SizeOf(QbCfg^));
+  Error := LoadFile(FindBbsFile('quickcfg.dat') + 'quickcfg.dat', QbCfg^, SizeOf(QbCfg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('MsgCfg.Dat') + 'MsgCfg.Dat', QbMsg^, SizeOf(QbMsg^));
+    Error := LoadFile(FindBbsFile('msgcfg.dat') + 'msgcfg.dat', QbMsg^, SizeOf(QbMsg^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('FileCfg.Dat') + 'FileCfg.Dat', QbFile^, SizeOf(QbFile^));
+    Error := LoadFile(FindBbsFile('filecfg.dat') + 'filecfg.dat', QbFile^, SizeOf(QbFile^));
   If Error = 0 Then
-    Error := LoadFile(FindBbsFile('EventCfg.Dat') + 'EventCfg.Dat', QbEvent^, SizeOf(QbEvent^));
+    Error := LoadFile(FindBbsFile('eventcfg.dat') + 'eventcfg.dat', QbEvent^, SizeOf(QbEvent^));
   If Error = 0 Then
     CfgInfo^.Loaded := True
   Else
@@ -602,7 +602,7 @@ Procedure QBCfgObj.Save;
 
 Function QBCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'QuickCfg.Dat|MsgCfg.Dat|FileCfg.Dat|EventCfg.Dat';
+  SaveFileNames := 'quickcfg.dat|msgcfg.dat|filecfg.dat|eventcfg.dat';
   End;
 
 
@@ -621,13 +621,13 @@ Function QBCfgObj.SaveFileName(FN: String): String;
 
 Procedure QBCfgObj.QBSave;
   Begin
-  Error := SaveFile(SaveFileName('QuickCfg.Dat'), QbCfg^, SizeOf(QbCfg^));
+  Error := SaveFile(SaveFileName('quickcfg.dat'), QbCfg^, SizeOf(QbCfg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('MsgCfg.Dat'), QbMsg^, SizeOf(QbMsg^));
+    Error := SaveFile(SaveFileName('msgcfg.dat'), QbMsg^, SizeOf(QbMsg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('FileCfg.Dat'), QbFile^, SizeOf(QbFile^));
+    Error := SaveFile(SaveFileName('filecfg.dat'), QbFile^, SizeOf(QbFile^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('EventCfg.Dat'), QbEvent^, SizeOf(QbEvent^));
+    Error := SaveFile(SaveFileName('eventcfg.dat'), QbEvent^, SizeOf(QbEvent^));
   End;
 
 
@@ -1630,7 +1630,7 @@ Function QBCfgObj.GetFileListPath(Area: Word): String; {Get file area path}
       Begin
       TmpStr := QBFile^[Area].FilePath;
       AddBackSlash(TmpStr);
-      TmpStr := TmpStr + 'FILES.BBS';
+      TmpStr := TmpStr + 'files.bbs';
       End;
     GetFileListPath := TmpStr;
     End
@@ -2804,13 +2804,13 @@ Function QbCfgObj.GetMsgAreaId(Area: Word): String;
 
 Function QbCfgObj.GetNodeIdxName: String;
   Begin
-  GetNodeIdxName := 'NodeIdx.Dat';
+  GetNodeIdxName := 'nodeidx.dat';
   End;
 
 
 Function QbCfgObj.GetNodeIncName: String;
   Begin
-  GetNodeIncName := 'NodeInc.Dat';
+  GetNodeIncName := 'nodeinc.dat';
   End;
 
 
