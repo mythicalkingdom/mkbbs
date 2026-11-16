@@ -12,6 +12,7 @@ Interface
 
 Procedure DoCfgMailer;
 Procedure DoCfgMailLinks;
+Procedure DoCfgRoutes;
 
 Implementation
 
@@ -206,6 +207,76 @@ Procedure DoCfgMailLinks;
   New(Mail);
   Config^.GetMailer(Mail^);
   RunList('Mailer Links', MaxMailLinks, 64, LinkStr, EditLink);
+  Config^.SetMailer(Mail^);
+  Dispose(Mail);
+  Mail := Nil;
+  End;
+
+
+{------------------------------------------------------------ netmail routing}
+
+Const
+  FlavNames = 'As the message says|Immediate|Crash|Normal|Hold|Direct';
+
+Function RouteStr(Item: Word): String;
+  Var
+    S: String;
+
+  Begin
+  With Mail^.Routes[Item] Do
+    Begin
+    If Via = 0 Then
+      S := '(unused)'
+    Else
+      Begin
+      S := PadRight(Pat, ' ', 42) + 'via ' + Long2Str(Via);
+      If Flav <> rfDefault Then
+        Case Flav Of
+          rfImmediate: S := S + ' immediate';
+          rfCrash: S := S + ' crash';
+          rfNormal: S := S + ' normal';
+          rfHold: S := S + ' hold';
+          rfDirect: S := S + ' direct';
+          End;
+      End;
+    End;
+  RouteStr := PadRight(Long2Str(Item), ' ', 3) + S;
+  End;
+
+
+Procedure EditRoute(Item: Word);
+  Var
+    F: CfgFormObj;
+    R: ^RouteType;
+
+  Begin
+  New(R);
+  R^ := Mail^.Routes[Item];
+  F.Init('Route ' + Long2Str(Item));
+  F.Window(5, 6, 74, 15);
+  F.At(2, 3, 2, 14);
+  F.AddString('Addresses:', R^.Pat, 40, 'Zone:net/node.point with * for anything, blank separated, ! in front = not (2:*/* 1:110/*)');
+  F.At(4, 3, 4, 14);
+  F.AddNumber('Send via:', R^.Via, 1, 0, 32, 'Number of the echo system (EchoMail > Systems) that gets the mail; 0 = this route is not used');
+  F.At(6, 3, 6, 14);
+  F.AddChoice('Flavour:', R^.Flav, 1, 0, FlavNames, 'How it is sent (Space or arrows change it)');
+  If F.Execute Then
+    Mail^.Routes[Item] := R^;
+  Dispose(R);
+  End;
+
+
+Procedure DoCfgRoutes;
+  Begin
+  If Not Config^.HasMailer Then
+    Begin
+    MsgBox('The routing is kept by the MK configuration only');
+    Exit;
+    End;
+  New(Mail);
+  Config^.GetMailer(Mail^);
+  RunList('Netmail Routing',
+    MaxRoutes, 64, RouteStr, EditRoute);
   Config^.SetMailer(Mail^);
   Dispose(Mail);
   Mail := Nil;

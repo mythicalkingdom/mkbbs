@@ -21,7 +21,8 @@ Program MKToss;
      - what was tossed is deleted
      - echomail that other systems are linked to is passed on (SEEN-BY and PATH brought up to date), and what the
        BBS wrote itself (local, unexported messages of the echo areas) is scanned and sent; netmail that is not
-       sent and not for us is sent on (direct to a system in the list, else through the first system)
+       sent and not for us is sent on: direct to a system in the list, to the boss of a point, else by the first
+       route (EchoMail > Routing) that fits; with no route it stays where it is (logged)
      - the outgoing packets are packed with the archiver of the system and given to the mailer: mkbink queue puts
        them in the BSO outbound with the flavour of the system (crash, hold ... for netmail as the message says)
 
@@ -33,6 +34,11 @@ Program MKToss;
      File names given (as the mailer's on-inbound hook does) are ignored: the whole inbound is tossed.  Runs one at a
      time: a second mktoss waits until the first is done (lock file mktoss.lock in the inbound directory).
 
+     - file attach: a netmail with the file attach flag names its files in the subject (^ in front: delete after sent,
+       # : truncate; names without a path are in the file attach directory, General > Paths).  They are queued with
+       the netmail (mkbink queue), the packet carries the plain names.  Files that arrive with a file attach netmail are
+       moved from the inbound to the attach directory (the name in the subject, found without regard to case); for mail
+       that only passes through, the stored subject gets a ^ so the file is deleted once it was sent on.
      - packet passwords: when an echo system has one (EchoMail > Systems > Packet pwd, kept in Mailer.Mk), its packets
        must carry it (else the packet is refused and renamed .bad) and ours carry it
      - areafix: netmail for us to Areafix / AreaMgr from an echo system, with the system's areafix password as the
@@ -73,6 +79,7 @@ Var
   HaveMail: Boolean;
   Areafixes: LongInt;
   Force: Boolean;
+  BbsPath, AttachDir: String;
 
 
 {---------------------------------------------------------------- log}
@@ -102,7 +109,7 @@ Procedure Log(S: String);
       WriteLn(T, Stamp, '  ', S);
       Close(T);
       End;
-    {$I+}
+
     If IoResult <> 0 Then;
     End;
   End;
@@ -272,7 +279,7 @@ Procedure BadMessage(Var Src: PktMsgObj; Why: String);
 
 {---------------------------------------------------------------- storing a message}
 
-Function StoreMessage(Var Src: PktMsgObj; Area: Word; Echo: Boolean): Word;
+Function StoreMessage(Var Src: PktMsgObj; Area: Word; Echo: Boolean; Subj: String): Word;
   {Copies the current message of the packet into the message area.  0 = stored.}
   Var
     Dst: AbsMsgPtr;
@@ -350,7 +357,7 @@ Function StoreMessage(Var Src: PktMsgObj; Area: Word; Echo: Boolean): Word;
     End;
   Dst^.SetFrom(Src.GetFrom);
   Dst^.SetTo(Src.GetTo);
-  Dst^.SetSubj(Src.GetSubj);
+  Dst^.SetSubj(Subj);
   Dst^.SetDate(Src.GetDate);
   Dst^.SetTime(Src.GetTime);
   Dst^.SetCost(Src.GetCost);
@@ -680,6 +687,7 @@ Function HexStr(N: LongInt; Width: Word): String;
 
 
 Function NextSerial: LongInt;
+  {message ids and packet names: the time, and always more than the last one, also over runs (mktoss.ser)}
   Var
     T: TTime;
 
@@ -690,6 +698,41 @@ Function NextSerial: LongInt;
   Else
     LastSerial := T;
   NextSerial := LastSerial;
+  End;
+
+
+Procedure LoadSerial;
+  Var
+    F: File;
+    L: LongInt;
+    Got: Word;
+
+  Begin
+  Assign(F, InDir + 'mktoss.ser');
+  FileMode := fmReadOnly + fmDenyNone;
+  Reset(F, 4);
+  If IoResult <> 0 Then
+    Exit;
+  BlockRead(F, L, 1, Got);
+  If (IoResult = 0) And (Got = 1) And (L > LastSerial) Then
+    LastSerial := L;
+  Close(F);
+  If IoResult <> 0 Then;
+  End;
+
+
+Procedure SaveSerial;
+  Var
+    F: File;
+
+  Begin
+  Assign(F, InDir + 'mktoss.ser');
+  ReWrite(F, 4);
+  If IoResult <> 0 Then
+    Exit;
+  BlockWrite(F, LastSerial, 1);
+  Close(F);
+  If IoResult <> 0 Then;
   End;
 
 
@@ -1409,6 +1452,218 @@ Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
   End;
 
 
+Function MoveFile(From, ToName: String): Boolean;
+  {a rename, or a copy and delete when the directories are on different disks}
+  Var
+    F, G: File;
+    Buf: Array[1..8192] Of Byte;
+    Got, Put: Word;
+    Ok: Boolean;
+
+  Begin
+  Assign(F, From);
+  Rename(F, ToName);
+  If IoResult = 0 Then
+    Begin
+    MoveFile := True;
+    Exit;
+    End;
+  MoveFile := False;
+  Assign(F, From);
+  Assign(G, ToName);
+  FileMode := fmReadOnly + fmDenyNone;
+  Reset(F, 1);
+  If IoResult <> 0 Then
+    Exit;
+  ReWrite(G, 1);
+  If IoResult <> 0 Then
+    Begin
+    Close(F);
+    Exit;
+    End;
+  Ok := True;
+  Repeat
+    BlockRead(F, Buf, SizeOf(Buf), Got);
+    If IoResult <> 0 Then
+      Begin
+      Ok := False;
+      Break;
+      End;
+    If Got > 0 Then
+      Begin
+      BlockWrite(G, Buf, Got, Put);
+      If (IoResult <> 0) Or (Put <> Got) Then
+        Ok := False;
+      End;
+  Until (Got = 0) Or (Not Ok);
+  Close(F);
+  Close(G);
+  If IoResult <> 0 Then;
+  If Ok Then
+    Begin
+    Erase(F);
+    If IoResult <> 0 Then;
+    MoveFile := True;
+    End
+  Else
+    Begin
+    Erase(G);
+    If IoResult <> 0 Then;
+    End;
+  End;
+
+
+{---------------------------------------------------------------- file attach}
+
+Type
+  AttachList = Record
+    N: Word;
+    Name: Array[1..20] Of String[100];       {as written in the subject, without the ^ or #}
+    Act: Array[1..20] Of Char;               {^ delete after sent, # truncate, blank keep}
+    End;
+
+
+Procedure ParseAttach(Subj: String; Var L: AttachList);
+  {The subject of a file attach netmail names the files, blank or comma separated; ^ in front = delete the file after
+   it was sent, # = truncate it.}
+  Var
+    Tok: String;
+    p: Word;
+
+  Begin
+  L.N := 0;
+  Subj := StripBoth(Subj, ' ') + ' ';
+  While Length(Subj) > 0 Do
+    Begin
+    p := 1;
+    While (p <= Length(Subj)) And (Subj[p] <> ' ') And (Subj[p] <> ',') Do
+      Inc(p);
+    Tok := Copy(Subj, 1, p - 1);
+    Subj := StripBoth(Copy(Subj, p + 1, 255), ' ');
+    If Subj <> '' Then
+      Subj := Subj + ' ';
+    If Tok = '' Then
+      Continue;
+    If L.N >= 20 Then
+      Break;
+    Inc(L.N);
+    L.Act[L.N] := ' ';
+    If (Tok[1] = '^') Or (Tok[1] = '#') Then
+      Begin
+      L.Act[L.N] := Tok[1];
+      Tok := Copy(Tok, 2, 100);
+      End;
+    L.Name[L.N] := Tok;
+    End;
+  End;
+
+
+Function AttachPath(Name: String): String;
+  {where an attached file is: a full path as it is, else in the file attach directory (General > Paths)}
+  Begin
+  If (Name <> '') And (Name[1] = '/') Then
+    AttachPath := Name
+  Else
+    AttachPath := AttachDir + Name;
+  End;
+
+
+Function BaseName(Name: String): String;
+  Var
+    p: Word;
+
+  Begin
+  p := Length(Name);
+  While (p > 0) And (Name[p] <> '/') Do
+    Dec(p);
+  BaseName := Copy(Name, p + 1, 100);
+  End;
+
+
+Function FindInInbound(Name: String): String;
+  {a file of the inbound by that name: as written, else not case sensitive (a file comes as the sender named it)}
+  Var
+    SR: SearchRec;
+    U: String;
+
+  Begin
+  FindInInbound := '';
+  If FileExist(InDir + Name) Then
+    Begin
+    FindInInbound := InDir + Name;
+    Exit;
+    End;
+  U := Upper(Name);
+  FindFirst(InDir + '*', AnyFile, SR);
+  While DosError = 0 Do
+    Begin
+    If ((SR.Attr And Directory) = 0) And (Upper(SR.Name) = U) Then
+      Begin
+      FindInInbound := InDir + SR.Name;
+      Break;
+      End;
+    FindNext(SR);
+    End;
+  FindClose(SR);
+  End;
+
+
+Procedure TakeAttached(Var Pkt: PktMsgObj; Var Subj: String; ForUs: Boolean);
+  {The files that came with a file attach netmail are in the inbound (the mailer received them): they are moved to the
+   file attach directory under the name in the subject.  For mail that is only passing through the subject gets a ^ so
+   that the file is deleted once it was sent on.}
+  Var
+    L: AttachList;
+    i: Word;
+    Src, Dst, Name: String;
+    n: Word;
+    NewSubj: String;
+
+  Begin
+  ParseAttach(Pkt.GetSubj, L);
+  NewSubj := '';
+  For i := 1 To L.N Do
+    Begin
+    Name := BaseName(L.Name[i]);
+    If Name = '' Then
+      Continue;
+    Src := FindInInbound(Name);
+    If Src = '' Then
+      Log('the file ' + Name + ' attached to a netmail is not in the inbound (it may still be on its way)')
+    Else
+      Begin
+      MkDir(Copy(AttachDir, 1, Length(AttachDir) - 1));
+      If IoResult <> 0 Then;
+      Dst := AttachDir + Name;
+      n := 0;
+      While FileExist(Dst) And (n < 99) Do
+        Begin
+        Inc(n);
+        Dst := AttachDir + Name + '.' + Long2Str(n);
+        End;
+      If MoveFile(Src, Dst) Then
+        Log('attached file ' + Name + ' moved to ' + Dst)
+      Else
+        Begin
+        Log('cannot move ' + Src + ' to ' + Dst);
+        Problems := True;
+        End;
+      If Dst <> AttachDir + Name Then
+        Name := BaseName(Dst);
+      End;
+    If NewSubj <> '' Then
+      NewSubj := NewSubj + ' ';
+    If ForUs Then
+      NewSubj := NewSubj + Name
+    Else
+      NewSubj := NewSubj + '^' + Name;
+    End;
+  If NewSubj <> '' Then
+    Subj := NewSubj;
+  End;
+
+
+
 {---------------------------------------------------------------- tossing a packet}
 
 Procedure TossEcho(Var Pkt: PktMsgObj; Sys: Word);
@@ -1443,7 +1698,7 @@ Procedure TossEcho(Var Pkt: PktMsgObj; Sys: Word);
     ForwardEcho(Pkt, Area, Sys);
     Exit;
     End;
-  Res := StoreMessage(Pkt, Area, True);
+  Res := StoreMessage(Pkt, Area, True, Pkt.GetSubj);
   If Res = 0 Then
     Begin
     Inc(Tossed);
@@ -1461,10 +1716,12 @@ Procedure TossNetmail(Var Pkt: PktMsgObj; Sys: Word);
     Area: Word;
     Res: Word;
     ForUs: Boolean;
+    Subj: String;
 
   Begin
   Pkt.GetDest(Dst);
   ForUs := IsOurs(Dst);
+  Subj := Pkt.GetSubj;
   If ForUs And IsAreafixName(Pkt.GetTo) Then
     If ProcessAreafix(Pkt, Dst) Then
       Begin
@@ -1477,7 +1734,9 @@ Procedure TossNetmail(Var Pkt: PktMsgObj; Sys: Word);
     BadMessage(Pkt, 'there is no netmail area');
     Exit;
     End;
-  Res := StoreMessage(Pkt, Area, False);
+  If Pkt.IsFAttach Then
+    TakeAttached(Pkt, Subj, ForUs);
+  Res := StoreMessage(Pkt, Area, False, Subj);
   If Res = 0 Then
     Begin
     Inc(Netmails);
@@ -1839,6 +2098,52 @@ Procedure CountUnsecure;
 
 
 
+Function BinkPath: String;
+  Var
+    Me: String;
+    p: Word;
+
+  Begin
+  If BinkProg <> '' Then
+    Begin
+    BinkPath := BinkProg;
+    Exit;
+    End;
+  Me := ParamStr(0);
+  p := Length(Me);
+  While (p > 0) And (Me[p] <> '/') Do
+    Dec(p);
+  If (p > 0) And FileExist(Copy(Me, 1, p) + 'mkbink') Then
+    BinkPath := Copy(Me, 1, p) + 'mkbink'
+  Else
+    BinkPath := 'mkbink';
+  End;
+
+
+
+Function QueueFile(Sys: Word; Flav: Char; Path: String; Act: Char): Boolean;
+  {a file (not a packet) for the system: mkbink queue puts it in the BSO outbound; Act = ^ delete it after it was sent,
+   # truncate it, else leave it}
+  Var
+    A: AddrType;
+    Opt: String;
+    Rc: LongInt;
+
+  Begin
+  Config^.GetEchoToAddr(Sys, A);
+  Opt := '';
+  If Act = '^' Then
+    Opt := ' -x'
+  Else If Act = '#' Then
+    Opt := ' -T';
+  Rc := fpSystem(ShellQuote(BinkPath) + ' queue -O ' + ShellQuote(Copy(OutDir, 1, Length(OutDir) - 1)) + ' -Z ' +
+    Long2Str(Ours[1].Zone) + ' -t ' + AddrStr(A) + ' -F ' + Flav + Opt + ' ' + ShellQuote(Path) + ' >/dev/null 2>&1');
+  QueueFile := Rc = 0;
+  If Rc <> 0 Then
+    Log('mkbink queue failed (status ' + Long2Str(Rc) + ') for ' + Path + ' to ' + AddrStr(A));
+  End;
+
+
 {---------------------------------------------------------------- scanning the message areas}
 
 Procedure ScanEchoArea(Area: Word);
@@ -1898,14 +2203,108 @@ Procedure ScanEchoArea(Area: Word);
   End;
 
 
-Function RouteFor(Var D: AddrType): Word;
-  {the system a netmail for the address is sent to: the system itself, the boss of a point, else the first system}
+Function MatchPart(Pat: String; N: LongInt): Boolean;
   Var
-    B: AddrType;
-    S: Word;
-    R: Word;
+    V: LongInt;
+    Code: Integer;
 
   Begin
+  If (Pat = '') Or (Pat = '*') Then
+    MatchPart := True
+  Else
+    Begin
+    Val(Pat, V, Code);
+    MatchPart := (Code = 0) And (V = N);
+    End;
+  End;
+
+
+Function MatchAddrPat(Pat: String; Var D: AddrType): Boolean;
+  {zone:net/node.point, every part may be * or left out (a missing part is anything)}
+  Var
+    Z, Nt, Nd, Pt: String;
+    p: Word;
+
+  Begin
+  Z := '*'; Nt := '*'; Nd := '*'; Pt := '*';
+  p := Pos(':', Pat);
+  If p > 0 Then
+    Begin
+    Z := Copy(Pat, 1, p - 1);
+    Pat := Copy(Pat, p + 1, 40);
+    End;
+  p := Pos('/', Pat);
+  If p > 0 Then
+    Begin
+    Nt := Copy(Pat, 1, p - 1);
+    Pat := Copy(Pat, p + 1, 40);
+    End
+  Else If (Pat <> '') And (Pos(':', Pat) = 0) And (p = 0) And (Z = '*') Then
+    Begin
+    {a lone * or a number: anything / that zone}
+    Z := Pat;
+    Pat := '*';
+    End;
+  p := Pos('.', Pat);
+  If p > 0 Then
+    Begin
+    Nd := Copy(Pat, 1, p - 1);
+    Pt := Copy(Pat, p + 1, 10);
+    End
+  Else If Pat <> '' Then
+    Nd := Pat;
+  MatchAddrPat := MatchPart(Z, D.Zone) And MatchPart(Nt, D.Net) And MatchPart(Nd, D.Node) And MatchPart(Pt, D.Point);
+  End;
+
+
+Function RouteMatches(Pats: String; Var D: AddrType): Boolean;
+  {blank separated patterns; ! in front = not.  Fits when one of the positive ones does and no ! one, or when there
+   are only ! ones and none of them does.}
+  Var
+    Tok: String;
+    p: Word;
+    AnyPos, PosHit, NegHit: Boolean;
+
+  Begin
+  AnyPos := False;
+  PosHit := False;
+  NegHit := False;
+  Pats := StripBoth(Pats, ' ') + ' ';
+  While Length(Pats) > 0 Do
+    Begin
+    p := Pos(' ', Pats);
+    Tok := Copy(Pats, 1, p - 1);
+    Pats := StripBoth(Copy(Pats, p + 1, 255), ' ');
+    If Pats <> '' Then
+      Pats := Pats + ' ';
+    If Tok = '' Then
+      Continue;
+    If Tok[1] = '!' Then
+      Begin
+      If MatchAddrPat(Copy(Tok, 2, 40), D) Then
+        NegHit := True;
+      End
+    Else
+      Begin
+      AnyPos := True;
+      If MatchAddrPat(Tok, D) Then
+        PosHit := True;
+      End;
+    End;
+  RouteMatches := (Not NegHit) And (PosHit Or Not AnyPos);
+  End;
+
+
+Function RouteFor(Var D: AddrType; Var FlavOv: Byte): Word;
+  {The system a netmail for the address is sent to: the system itself (it is in the list), the boss of a point, else the
+   first route (Netmail Routing) that fits.  0 = no way to send it.  FlavOv: the flavour that route asks for.}
+  Var
+    B: AddrType;
+    R: Word;
+    i: Word;
+
+  Begin
+  FlavOv := rfDefault;
   R := FindSystem(D);
   If R = 0 Then
     Begin
@@ -1913,13 +2312,19 @@ Function RouteFor(Var D: AddrType): Word;
     B.Point := 0;
     R := FindSystem(B);
     End;
-  If R = 0 Then
-    For S := 32 DownTo 1 Do
-      Begin
-      Config^.GetEchoToAddr(S, B);
-      If B.Zone <> 0 Then
-        R := S;
-      End;
+  If (R = 0) And HaveMail Then
+    For i := 1 To MaxRoutes Do
+      If (MailCfg^.Routes[i].Via >= 1) And (MailCfg^.Routes[i].Via <= 32) And (StripBoth(MailCfg^.Routes[i].Pat, ' ') <> '') Then
+        If RouteMatches(MailCfg^.Routes[i].Pat, D) Then
+          Begin
+          Config^.GetEchoToAddr(MailCfg^.Routes[i].Via, B);
+          If B.Zone <> 0 Then
+            Begin
+            R := MailCfg^.Routes[i].Via;
+            FlavOv := MailCfg^.Routes[i].Flav;
+            Break;
+            End;
+          End;
   RouteFor := R;
   End;
 
@@ -1932,9 +2337,14 @@ Procedure ScanNetArea(Area: Word);
     D: AddrType;
     Sys: Word;
     Flav: Char;
+    FlavOv: Byte;
     Us: AddrType;
     Y, Mo, Dy, Dow, H, Mi, Se, Hs: Word;
     Via: String;
+    AL: AttachList;
+    i: Word;
+    FilesOk: Boolean;
+    NewSubj: String;
 
   Begin
   If Not OpenMsgArea(M, Config^.GetMsgAreaId(Area)) Then
@@ -1953,50 +2363,92 @@ Procedure ScanNetArea(Area: Word);
       D.Zone := Us.Zone;
     If (Not M^.IsSent) And (Not M^.IsDeleted) And (D.Net <> 0) And (Not IsOurs(D)) Then
       Begin
-      If M^.IsFAttach Then
-        Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ' has a file attached: not sent (file attach is not handled yet)')
+      Sys := RouteFor(D, FlavOv);
+      If Sys = 0 Then
+        Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ': no route (it is not for a system in the list and no route in Netmail Routing fits)')
       Else
         Begin
-        Sys := RouteFor(D);
-        If Sys = 0 Then
-          Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ': no system to send it to')
-        Else
-          Begin
-          CopyInit(C);
-          CopyLoad(M^, C);
-          If C.Dest.Zone = 0 Then
-            C.Dest.Zone := D.Zone;
-          If C.Dest.Net = 0 Then
-            C.Dest := D;
-          If C.Orig.Zone = 0 Then
-            C.Orig := Us;
-          If C.Crash Then
-            Flav := 'C'
-          Else If C.Hold Then
-            Flav := 'H'
+        CopyInit(C);
+        CopyLoad(M^, C);
+        If C.Dest.Zone = 0 Then
+          C.Dest.Zone := D.Zone;
+        If C.Dest.Net = 0 Then
+          C.Dest := D;
+        If C.Orig.Zone = 0 Then
+          C.Orig := Us;
+        Case FlavOv Of
+          rfImmediate: Flav := 'I';
+          rfCrash: Flav := 'C';
+          rfNormal: Flav := 'N';
+          rfHold: Flav := 'H';
+          rfDirect: Flav := 'D';
           Else
-            Flav := FlavourOf(Sys);
-          Via := '';
-          If Not M^.IsLocal Then
             Begin
-            {mail passing through: a Via line}
-            GetDate(Y, Mo, Dy, Dow);
-            GetTime(H, Mi, Se, Hs);
-            Via := 'Via ' + AddrStr(Us) + ' @' + Long2Str(Y) + Z2(Mo) + Z2(Dy) + '.' + Z2(H) + Z2(Mi) + Z2(Se) + '.UTC mktoss';
+            If C.Crash Then
+              Flav := 'C'
+            Else If C.Hold Then
+              Flav := 'H'
+            Else
+              Flav := FlavourOf(Sys);
             End;
-          If WriteOut(Sys, Flav, C, Area, False, False, Via) Then
+          End;
+        Via := '';
+        If Not M^.IsLocal Then
+          Begin
+          {mail passing through: a Via line}
+          GetDate(Y, Mo, Dy, Dow);
+          GetTime(H, Mi, Se, Hs);
+          Via := 'Via ' + AddrStr(Us) + ' @' + Long2Str(Y) + Z2(Mo) + Z2(Dy) + '.' + Z2(H) + Z2(Mi) + Z2(Se) + '.UTC mktoss';
+          End;
+        FilesOk := True;
+        AL.N := 0;
+        If C.FAttach Then
+          Begin
+          {the files: all there before anything is sent; the subject goes out as the plain names}
+          ParseAttach(C.Subj, AL);
+          NewSubj := '';
+          For i := 1 To AL.N Do
             Begin
-            Inc(NetSent);
-            Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ' goes to system ' + Long2Str(Sys) + ' (' + Flav + '): ' + C.Subj);
-            M^.SetSent(True);
-            M^.ReWriteHdr;
-            If C.KillSent Then
-              M^.DeleteMsg;
+            If Not FileExist(AttachPath(AL.Name[i])) Then
+              Begin
+              Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ': the attached file ' + AttachPath(AL.Name[i]) +
+                ' is not there, the netmail waits');
+              FilesOk := False;
+              End;
+            If NewSubj <> '' Then
+              NewSubj := NewSubj + ' ';
+            NewSubj := NewSubj + BaseName(AL.Name[i]);
+            End;
+          If AL.N = 0 Then
+            Begin
+            Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ' is marked file attach but names no file in the subject: sent without a file');
+            C.FAttach := False;
             End
           Else
-            Problems := True;
-          CopyFree(C);
+            C.Subj := NewSubj;
           End;
+        If FilesOk Then
+          Begin
+          For i := 1 To AL.N Do
+            If FilesOk Then
+              If Not QueueFile(Sys, Flav, AttachPath(AL.Name[i]), AL.Act[i]) Then
+                FilesOk := False;
+          End;
+        If Not FilesOk Then
+          Problems := True
+        Else If WriteOut(Sys, Flav, C, Area, False, False, Via) Then
+          Begin
+          Inc(NetSent);
+          Log('netmail #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ' goes to system ' + Long2Str(Sys) + ' (' + Flav + '): ' + C.Subj +
+            Copy(' with ' + Long2Str(AL.N) + ' file(s)', 1, 40 * Ord(AL.N > 0)));
+          M^.SetSent(True);
+          M^.ReWriteHdr;
+          If C.KillSent Then
+            M^.DeleteMsg;
+          End
+        Else
+          Problems := True;
+        CopyFree(C);
         End;
       End;
     M^.SeekNext;
@@ -2047,7 +2499,10 @@ Function BundleName(Sys: Word; Aka: Word; Raw: Boolean): String;
   Begin
   If Raw Then
     Begin
-    BundleName := SpoolDir + 'p' + HexStr(NextSerial, 7) + '.pkt';
+    Repeat
+      N := SpoolDir + 'p' + HexStr(NextSerial, 7) + '.pkt';
+    Until Not FileExist(N);
+    BundleName := N;
     Exit;
     End;
   Config^.GetEchoToAddr(Sys, A);
@@ -2063,28 +2518,6 @@ Function BundleName(Sys: Word; Aka: Word; Raw: Boolean): String;
       End;
     End;
   BundleName := SpoolDir + 'b' + HexStr(NextSerial, 7) + '.' + DowExt + '0';
-  End;
-
-
-Function BinkPath: String;
-  Var
-    Me: String;
-    p: Word;
-
-  Begin
-  If BinkProg <> '' Then
-    Begin
-    BinkPath := BinkProg;
-    Exit;
-    End;
-  Me := ParamStr(0);
-  p := Length(Me);
-  While (p > 0) And (Me[p] <> '/') Do
-    Dec(p);
-  If (p > 0) And FileExist(Copy(Me, 1, p) + 'mkbink') Then
-    BinkPath := Copy(Me, 1, p) + 'mkbink'
-  Else
-    BinkPath := 'mkbink';
   End;
 
 
@@ -2251,6 +2684,16 @@ If OutDir = '' Then
 If OutDir[Length(OutDir)] <> '/' Then
   OutDir := OutDir + '/';
 SpoolDir := OutDir + 'mktoss/';
+BbsPath := StripBoth(Config^.GetBbsPath, ' ');
+If (BbsPath <> '') And (BbsPath[Length(BbsPath)] <> '/') Then
+  BbsPath := BbsPath + '/';
+AttachDir := StripBoth(Config^.GetAttachPath, ' ');
+If AttachDir = '' Then
+  AttachDir := 'attach/';
+If AttachDir[1] <> '/' Then
+  AttachDir := BbsPath + AttachDir;
+If AttachDir[Length(AttachDir)] <> '/' Then
+  AttachDir := AttachDir + '/';
 BadName := InDir + 'bad/bad.pkt';
 {$I-}
 MkDir(Copy(WorkDir, 1, Length(WorkDir) - 1));
@@ -2261,7 +2704,7 @@ MkDir(Copy(OutDir, 1, Length(OutDir) - 1));
 If IoResult <> 0 Then;
 MkDir(Copy(SpoolDir, 1, Length(SpoolDir) - 1));
 If IoResult <> 0 Then;
-{$I+}
+
 NumOurs := 0;
 For i := 1 To 10 Do
   Begin
@@ -2286,8 +2729,9 @@ If (Not Force) And HaveMail And ((MailCfg^.Flags And mcTosser) = 0) Then
   Halt(3);
   End;
 LockInbound;
+LoadSerial;
 Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0; Areafixes := 0;
-LastSerial := 0;
+
 Problems := False;
 Dupes.Init;
 Dupes.Open(InDir + 'dupe.mk', 20000);
@@ -2301,6 +2745,7 @@ If DoToss Then
 If DoScan Then
   ScanAreas;
 PackAll;
+SaveSerial;
 Dupes.CloseFile;
 Dupes.Done;
 Log('mktoss done: ' + Long2Str(Tossed) + ' tossed, ' + Long2Str(Netmails) + ' netmail, ' + Long2Str(Passed) +

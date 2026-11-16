@@ -104,6 +104,22 @@ Type MailLinkType = Record
   Expansion: Array[1..32] of Byte;
   End;
 
+{Netmail routing: the first route whose patterns fit the address of a netmail decides which echo system gets it.}
+Const
+  MaxRoutes = 12;
+  rfDefault = 0;                       {Route.Flav: the flavour of the message / of the system}
+  rfImmediate = 1;
+  rfCrash = 2;
+  rfNormal = 3;
+  rfHold = 4;
+  rfDirect = 5;
+
+Type RouteType = Record
+  Pat: String[40];                     {address patterns, blank separated: 1:110/* 2:*/* !1:110/5 ; ! = not; * = anything}
+  Via: Byte;                           {the echo system (1..32) that gets the mail, 0 = this entry is not used}
+  Flav: Byte;                          {rf constants}
+  End;
+
 Type MailerCfgType = Record
   Version: Word;                       {MailerCfgVersion}
   Flags: Word;                         {mc constants}
@@ -128,7 +144,8 @@ Type MailerCfgType = Record
   OnInbound: String[100];              {command run after a session that received files (a tosser), blank = none}
   HookTimeout: Word;                   {seconds before that command is killed, 0 = 300}
   PktPwd: Array[1..32] of String[8];   {packet password of each echo system (EchoCfg.EchoSys), blank = none}
-  Expansion: Array[1..572] of Byte;    {room for new settings}
+  Routes: Array[1..MaxRoutes] of RouteType; {netmail routing, in order}
+  Expansion: Array[1..56] of Byte;     {room for new settings}
   End;
 
 Procedure MailerDefaults(Var M: MailerCfgType);

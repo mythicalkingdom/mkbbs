@@ -95,6 +95,15 @@ check('mkbinkcfg -n: link 1 with host, port, password, poll', 'link 1:110/100' i
 check('... link 2 answers only (no host, no call)', 'link 1:110/200' in out and 'answer-only yes' in out and 'password p2' in out)
 check('... domain', 'domain fidonet' in out)
 
+# netmail routing (EchoMail > Routing): the first route, saved after the packet passwords
+s = screen('\\x1bc', 'r')
+check('EchoMail > Routing shows the 12 routes', 'Netmail Routing' in s and s.count('(unused)') == 12)
+screen('\\x1bc', 'r', '\\r', '2:*/*', '\\t', '1', '\\t', ' ', '\\r', '\\x1b', '\\x1bx', 'y')
+d = open(mailer, 'rb').read()
+RT = LINKS + 64 * LINK + 164 + 32 * 9
+check('route 1 is saved in mailer.mk: addresses 2:*/*, via system 1, flavour Immediate (1); the file keeps its size',
+      d[RT:RT + 6] == b'\x052:*/*' and d[RT + 41] == 1 and d[RT + 42] == 1 and len(d) == SIZE)
+
 # the tosser switch on the Mailer page (the 20th field), and what mkbinkcfg does with it
 s = screen('\\x1bc', 'm')
 check('the Mailer page has "Tosser:"', 'Tosser:' in s)

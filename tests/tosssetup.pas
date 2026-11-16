@@ -2,7 +2,7 @@ program tosssetup;
 {$mode tp}
 { tosssetup <inbound> <outbound> <unsecure> [<mailer port>]: (with a port the mailer is switched on with one link, the hub) (system 2 = 1:110/200 is added for the forwarding tests) the sample configuration (MK=...) made ready for tests/tosstest.py:
   echo paths, system 1 linked to areas 6 (MK), 9 (MKBETA, pass-through) and 10 (BBS), unzip as the zip unpacker }
-uses MKString, MKGlobT, MKCfgAbs, MKCfgMK;
+uses Dos, MKString, MKGlobT, MKCfgAbs, MKCfgMK;
 var M: ^MailerCfgType; A: AddrType; Code: Integer;
 begin
   Config := New(MKCfgObjPtr, Init); Config^.Load;
@@ -28,9 +28,13 @@ begin
   Config^.SetEchoToArea(2, 9, True);
   Config^.SetEchoToHub(9, 1);          { area 9: the hub is system 1 (a pass-through area, system 2 takes it from us) }
   Config^.SetEchoLog('');
+  if GetEnv('TOSSATTACH') <> '' then Config^.SetAttachPath(GetEnv('TOSSATTACH') + '/');
   New(M); Config^.GetMailer(M^);
   M^.UnsecureIn := ParamStr(3);
   M^.PktPwd[2] := 'pktpw2';
+  { netmail routing: 2:*/* through system 1; 1:120/* except 1:120/9 through system 2 as hold mail }
+  M^.Routes[1].Pat := '2:*/*'; M^.Routes[1].Via := 1; M^.Routes[1].Flav := rfDefault;
+  M^.Routes[2].Pat := '1:120/* !1:120/9'; M^.Routes[2].Via := 2; M^.Routes[2].Flav := rfHold;
   M^.Flags := M^.Flags Or mcTosser;       { the tosser is switched on }
   if ParamCount >= 4 then begin
     { the mailer on, listening on the port, one link: the hub 1:110/100 that calls us with the password hubpw }

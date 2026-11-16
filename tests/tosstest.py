@@ -25,7 +25,9 @@ shutil.copy2(os.path.join(srcra, [f for f in os.listdir(srcra) if f.lower() == '
 cfgpatch.fix_sample(cfg)
 assert cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),
                       lambda s: (cfg + '/').encode() + s[len((srcra + '/').encode()):] if s.startswith((srcra + '/').encode()) else s) >= 1
-env = dict(os.environ, MK=cfg)
+attach = tmp + '/attach'
+os.makedirs(attach)
+env = dict(os.environ, MK=cfg, TOSSATTACH=attach)
 fails = 0
 
 
@@ -193,8 +195,8 @@ if have_mkbink:
     check('the netmail for 1:110/200 went direct (no Via: it is ours)', '^Via' not in [m for m in m2 if 'netmail to 1:110/200' in m[0]][0][1])
     d = run('tossdump', '6', '4').stdout
     check('local messages that were sent are marked sent and not to be exported; the one that was not marked is left alone',
-          re.search(r'subj=local echo message .*echo=FALSE sent=TRUE local=TRUE', d) is not None
-          and re.search(r'subj=local, not to be exported .*echo=FALSE sent=FALSE', d) is not None)
+          re.search(r'subj=local echo message .*echo=FALSE fattach=FALSE sent=TRUE local=TRUE', d) is not None
+          and re.search(r'subj=local, not to be exported .*echo=FALSE fattach=FALSE sent=FALSE', d) is not None)
     check('the netmails in area 4 are marked sent (the one that came in for 2:250/1 as well), the one for us is not',
           len(re.findall(r'subj=[^ ]*[^\n]*netmail[^\n]* sent=TRUE', d)) == 4 and re.search(r'subj=netmail for us .*sent=FALSE', d) is not None)
     names = lambda: sorted(os.listdir(outb))
@@ -289,6 +291,80 @@ if have_mkbink:
     check('the spool is empty again', not [f for f in os.listdir(outb + '/mktoss') if f.startswith('s')])
 else:
     print('skip: no mkbink, the areafix answers are not checked')
+
+# ---- phase 5: netmail routing and file attach
+if have_mkbink:
+    def flo_now():
+        return {f: open(os.path.join(outb, f)).read().split() for f in os.listdir(outb) if f.endswith('lo')}
+
+    def new_in(before, after):
+        return {f: [x for x in v if x not in before.get(f, [])] for f, v in after.items() if [x for x in v if x not in before.get(f, [])]}
+
+    def packets_of(entries):
+        out = []
+        for f, v in entries.items():
+            for x in v:
+                q = x[1:] if x[0] in '^#' else x
+                if not re.search(r'\.(pkt|(su|mo|tu|we|th|fr|sa)[0-9a-z])$', q):
+                    continue
+                if f.startswith('006e0064'):
+                    out += [m for pz in unzip(q, 'p5' + os.path.basename(q)) for m in msgs(pktdump(pz))]
+                else:
+                    out += msgs(pktdump(q))
+        return out
+
+    before = flo_now()
+    r = run('tossmake', 'route')
+    r = run('mktoss', '-b', mkbink)
+    out = r.stdout
+    print(out)
+    after = flo_now()
+    nw = new_in(before, after)
+    check('routing: 1:120/5 matches route 2 (1:120/* but not 1:120/9): sent to system 2 as hold mail (.hlo)',
+          'netmail #' in out and 'to 1:120/5 goes to system 2 (H): netmail to 1:120/5' in out and '006e00c8.hlo' in nw)
+    check('... 1:120/9 (excluded with !) and 3:3/3 (no route fits): not sent, and said so (no fallback to the first system)',
+          'netmail #' in out and out.count(': no route (') == 2 and 'to 1:120/9: no route' in out and 'to 3:3/3: no route' in out)
+    rm = [m for m in packets_of(nw) if 'subj=netmail to 1:120/5' in m[0]]
+    check('... the packet for system 2 holds it, destination 1:120/5', len(rm) == 1 and 'dest=1:120/5.0' in rm[0][0])
+    d4 = run('tossdump', '4').stdout
+    check('... the two without a route stay unsent in the netmail area, the routed one is sent',
+          re.search(r'subj=netmail to 1:120/5 .* sent=TRUE', d4) is not None and re.search(r'subj=netmail to 1:120/9 .* sent=FALSE', d4) is not None
+          and re.search(r'subj=netmail to 3:3/3 .* sent=FALSE', d4) is not None)
+
+    # file attach: local netmail with three files, one with a file that is not there; and attached files that arrive
+    before = flo_now()
+    run('tossmake', 'attach')
+    r = subprocess.run(['node', os.path.join(here, 'tossattach.mjs'), inb], capture_output=True, text=True)
+    open(inb + '/INCOMING.ZIP', 'wb').write(b'PK incoming')
+    open(inb + '/TRANSIT.BIN', 'wb').write(b'transit data')
+    r = run('mktoss', '-b', mkbink)
+    out = r.stdout
+    print(out)
+    after = flo_now()
+    nw = new_in(before, after)
+    flo2 = nw.get('006e00c8.flo', [])
+    check('file attach (local): the three files are queued for system 2 with their actions: ^ delete, # truncate, plain keep',
+          ['^' + attach + '/a1.txt', '#' + attach + '/a2.txt', attach + '/a3.txt'] == [x for x in flo2 if x.endswith(('a1.txt', 'a2.txt', 'a3.txt'))])
+    pk = [m for m in packets_of({'006e00c8.flo': [x for x in flo2 if x.endswith('.pkt')]}) if 'subj=a1.txt a2.txt a3.txt' in m[0]]
+    check('... the netmail goes with them: file attach flag, private, the subject is the plain names',
+          len(pk) == 1 and 'attr=17 ' in pk[0][0] and 'dest=1:110/200.0' in pk[0][0])
+    check('... the message with a file that is not there waits (logged), nothing of it was queued',
+          'the attached file %s/missing.zip is not there' % attach in out and not [x for x in flo2 if 'missing' in x]
+          and re.search(r'subj=missing.zip .* sent=FALSE', run('tossdump', '4').stdout) is not None)
+    d4 = run('tossdump', '4').stdout
+    check('attached files that arrived: moved from the inbound to the attach directory under the name in the subject (also when the case differs)',
+          os.path.exists(attach + '/incoming.zip') and not os.path.exists(inb + '/INCOMING.ZIP')
+          and os.path.exists(attach + '/transit.bin') and not os.path.exists(inb + '/TRANSIT.BIN')
+          and open(attach + '/incoming.zip', 'rb').read() == b'PK incoming')
+    check('... for us: the netmail is stored with the file attach flag and the subject incoming.zip; not sent on',
+          re.search(r'subj=incoming.zip .*fattach=TRUE sent=FALSE', d4) is not None)
+    check('... passing through (2:250/1): the file is sent on with the netmail through system 1 (hold), deleted after it was sent (^)',
+          re.search(r'subj=\^transit.bin .*fattach=TRUE sent=TRUE', d4) is not None and ('^' + attach + '/transit.bin') in nw.get('006e0064.hlo', []))
+    tp = [m for m in packets_of({'006e0064.hlo': [x for x in nw.get('006e0064.hlo', []) if x.startswith('^') and not x.endswith('transit.bin')]}) if 'transit' in m[0]]
+    check('... and its packet says transit.bin (no ^)', len(tp) == 1 and 'subj=transit.bin ' in tp[0][0])
+else:
+    print('skip: no mkbink, routing and file attach are not checked')
+
 
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

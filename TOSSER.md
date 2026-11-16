@@ -43,9 +43,8 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    a system already in SEEN-BY; SEEN-BY gets us and the destinations, PATH gets us), `ScanEchoArea` (a message is to be
    exported when it is local, echoed (`SetEcho(True)`) and not sent; afterwards `SetSent(True)` + `SetEcho(False)` +
    `ReWriteHdr`; tear / origin come from the BBS; a MSGID of ours is made and registered as a duplicate),
-   `ScanNetArea` (not sent, not for us: direct to the system, to the boss of a point, else through the first system;
-   crash / hold as the message says, else the system's flavour; a Via line when it only passes through; file attach is
-   not handled yet), `PackAll` (the packets of the spool, `out/mktoss/s<system><flavour><aka>_<n>.pkt`, one per system,
+   `ScanNetArea` (not sent, not for us: direct to the system, to the boss of a point, else by netmail routing (below);
+   crash / hold as the message says, else the system's flavour, or the route's; a Via line when it only passes through), `PackAll` (the packets of the spool, `out/mktoss/s<system><flavour><aka>_<n>.pkt`, one per system,
    flavour and AKA of the area, a new one over the maximum packet size, packed with the system's archiver into
    `<hex of the address difference>.<day><n>`, or kept as a packet; then `mkbink queue -O <outbound> -Z <zone> -t <addr>
    -F <flavour> -x`).  Options: `-t` toss only, `-s` scan only, `-b mkbink`.  Tests: `tests/tosstest.py` (outbound checked
@@ -85,7 +84,22 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    * Tests: `tests/tosshooktest.py` (a real mkbink calls the mkbink of the BBS, the hook tosses the packet into the area),
      `tests/mailerlistentest.py` (scan, MK in the environment), `tests/mailertest.py` (the switch, on-inbound), `tests/tosstest.py`
      (switch, file names, lock).
-5. Later: netmail routing, file echoes (TIC), `%PAUSE`, `%RESCAN`.
+5. **Netmail routing and file attach (done)**:
+   * `Mailer.Mk` `Routes[1..12]` (`RouteType`: patterns, via system, flavour; from the expansion room, 56 bytes left; mkconfig:
+     EchoMail > Routing).  The first route whose patterns fit wins; patterns are blank separated `zone:net/node.point`, every
+     part `*` or left out, `!` in front = not (`1:120/* !1:120/9`); a system in the echo systems list (or its point) is always
+     sent to directly first.  No route: the message stays unsent and `mktoss` says so (there is no fallback to the first system
+     any more).  A route's flavour (immediate, crash, normal, hold, direct) overrides the message's.
+   * File attach: the subject names the files (blank / comma separated; `^` delete after sent, `#` truncate, else keep; no path =
+     the file attach directory).  All files must be there (else the netmail waits, logged); they are queued with `mkbink queue
+     [-x | -T]` (new `-T` in mkbink: `#file` in the flow file), the packet's subject is the plain names.  Incoming: the files the
+     mailer received are moved from the inbound to the attach directory under the subject's name (case-insensitive match, a number
+     is added when the name is taken); transit mail gets `^` in the stored subject so the file is removed after it was sent on.
+   * Fixes made on the way: mktoss.ser (message ids and raw packet names never repeat, also between runs in the same second;
+     the old names could collide); `{$I+}` in `Log` had switched I/O checking on for the rest of the program.
+   * Tests: `tests/tosstest.py` (routes, no route, `!`; three attached files with their actions, a missing file, files that
+     arrive, transit), `tests/mailertest.py` (the Routing page saves).
+6. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` file requests.
 
 ## Known fixes made on the way
 

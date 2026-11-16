@@ -228,6 +228,8 @@ if os.path.exists(mkbink) and os.path.exists(binkcfg) and os.path.isdir(sample):
         d[off:off + 51] = bytes([len(text)]) + text.encode() + bytes(50 - len(text))
     open(ec, 'wb').write(d)
 
+    stamp = [0]
+
     def mailer_mk(enabled, port):
         h = bytearray(184 + 64 * 178 + 1024)
         h[0:2] = (1).to_bytes(2, 'little'); h[2:4] = (3 if enabled else 2).to_bytes(2, 'little'); h[4:6] = port.to_bytes(2, 'little')
@@ -236,7 +238,9 @@ if os.path.exists(mkbink) and os.path.exists(binkcfg) and os.path.isdir(sample):
             h[off:off + 2] = v.to_bytes(2, 'little')
         p = os.path.join(real, 'mailer.mk')
         open(p, 'wb').write(h)
-        os.utime(p, (time.time() + 5, time.time() + 5))      # newer than anything else: the change is seen
+        stamp[0] += 10                                         # every change gets its own time (the listener compares size and
+        t = time.time() + 5 + stamp[0]                         # time, with the 2 second resolution of a DOS time: all the files have
+        os.utime(p, (t, t))                                    # the same size here), and one that is newer than anything else
 
     mailer_mk(False, 24691)
     rc = config('real', {'config': real, 'mkbink': mkbink, 'mkbinkcfg': binkcfg, 'interval': 1, 'restart': 1,

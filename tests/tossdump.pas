@@ -14,7 +14,7 @@ begin
       P^.MsgStartUp;
       P^.GetOrig(O); P^.GetDest(D);
       writeln('msg ', P^.GetMsgNum, ' from=', P^.GetFrom, ' to=', P^.GetTo, ' subj=', P^.GetSubj, ' date=', P^.GetDate, ' time=', P^.GetTime,
-        ' echo=', P^.IsEchoed, ' sent=', P^.IsSent, ' local=', P^.IsLocal, ' priv=', P^.IsPriv, ' orig=', AddrStr(O), ' dest=', AddrStr(D));
+        ' echo=', P^.IsEchoed, ' fattach=', P^.IsFAttach, ' sent=', P^.IsSent, ' local=', P^.IsLocal, ' priv=', P^.IsPriv, ' orig=', AddrStr(O), ' dest=', AddrStr(D));
       P^.MsgTxtStartUp; T := ''; C := P^.GetChar;
       while not P^.EOM do begin if C = #13 then T := T + '|' else if C = #1 then T := T + '^' else if C >= ' ' then T := T + C; C := P^.GetChar; end;
       writeln('text ', T);
