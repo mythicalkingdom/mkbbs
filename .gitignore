@@ -4,3 +4,4 @@ javascript/
 RA.LOG
 ExitInfo.Bbs
 lang/*.LC
+__pycache__/
