@@ -183,6 +183,8 @@ log = ''
 for f in os.listdir(ra):
     if f.lower() == 'ra.log':
         log = open(os.path.join(ra, f), encoding='latin-1').read()
+if os.path.exists(cfgpatch.log_file(ra)):                  # the log goes next to the private copy (cfgpatch.fix_sample)
+    log = open(cfgpatch.log_file(ra), encoding='latin-1').read()
 check('the log has the runs', 'BASIC program : ' in log and 'BASIC ended (end)' in log and 'BASIC ended (break)' in log
       and 'BASIC ended (error)' in log and 'BASIC program not found : nope.bas' in log)
 print('failures: %d' % fails)

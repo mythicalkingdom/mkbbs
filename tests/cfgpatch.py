@@ -40,3 +40,13 @@ def fix_sample(cfg_dir):
     p = os.path.join(cfg_dir, 'config.mk')
     if os.path.exists(p):
         patch(p, b'PROMPTS', lambda s: s.lower())
+        # the log of a real system is somewhere else (/var/log/...): a private copy logs next to its directory, in <parent>/l
+        # (when that path fits in the field; read it with log_file())
+        newlog = log_file(cfg_dir).encode()
+        patch(p, b'/var/log/', lambda s: newlog if len(newlog) <= len(s) else s)
+
+
+def log_file(cfg_dir):
+    """Where the BBS log of the private copy in cfg_dir is written (see fix_sample)"""
+    import os
+    return os.path.join(os.path.dirname(os.path.abspath(cfg_dir)), 'l')

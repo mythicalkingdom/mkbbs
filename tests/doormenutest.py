@@ -259,6 +259,8 @@ log = ''
 for f in os.listdir(ra):
     if f.lower() == 'ra.log':
         log = open(os.path.join(ra, f), encoding='latin-1').read()
+if os.path.exists(cfgpatch.log_file(ra)):                  # the log goes next to the private copy (cfgpatch.fix_sample)
+    log = open(cfgpatch.log_file(ra), encoding='latin-1').read()
 check('the log has the runs and the one that failed', 'DOS shell : echo hello-bare' in log and 'DOS shell : games\\door2.sh' in log
       and 'DOS shell failed (2) : nope-door-xyz' in log)
 print('failures: %d' % fails)

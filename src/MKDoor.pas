@@ -299,7 +299,7 @@ Implementation
 Uses
     MKVCrt,
     MKScrn,
-  MKString, MKFile, MKAvatar, MKComAbs, MKCfgAbs, MKMisc, MKDos, MKCp437;
+  MKString, MKFile, MKAvatar, MKComAbs, MKCfgAbs, MKMisc, MKDos, MKCp437, MKSgr;
 
 
 Type
@@ -334,10 +334,8 @@ Function CallerUtf8: Boolean;
 
 
 Var
-  BgInit: Boolean;                     {the black background was set for this caller}
-  SgrState: Byte;                      {0 text, 1 after ESC, 2 inside ESC [ ...}
-  SgrNum: Integer;                     {the number being read, -1 = none yet}
-  SgrReset, SgrBg, SgrFg: Boolean;     {this sequence resets / sets a background / sets a foreground}
+  Guard: SgrGuardObj;                  {keeps the DOS colours on a terminal with its own (MKSgr)}
+  GuardInit: Boolean;
 
 
 Procedure SendRaw(Const S: String);
@@ -352,67 +350,16 @@ Procedure SendRaw(Const S: String);
   End;
 
 
-Procedure SgrNumber;
-  Begin
-  If SgrNum < 0 Then
-    SgrNum := 0;                       {an empty parameter means 0}
-  If SgrNum = 0 Then
-    SgrReset := True;
-  If ((SgrNum >= 40) And (SgrNum <= 48)) Or ((SgrNum >= 100) And (SgrNum <= 107)) Then
-    SgrBg := True;
-  If ((SgrNum >= 30) And (SgrNum <= 39)) Or ((SgrNum >= 90) And (SgrNum <= 97)) Then
-    SgrFg := True;
-  SgrNum := -1;
-  End;
-
-
 Procedure TrackSgr(Ch: Char);
   {Watch the text going out: after an ANSI colour reset that sets no foreground or background, add light gray / black.
    The art is drawn for a DOS screen and a themed terminal's default colours are not those.}
+  Var
+    Extra: String;
+
   Begin
-  Case SgrState Of
-    0: If Ch = #27 Then
-         SgrState := 1;
-    1: If Ch = '[' Then
-         Begin
-         SgrState := 2;
-         SgrNum := -1;
-         SgrReset := False;
-         SgrBg := False;
-         SgrFg := False;
-         End
-       Else
-         SgrState := 0;
-    Else
-      If Ch In ['0'..'9'] Then
-        Begin
-        If SgrNum < 0 Then
-          SgrNum := 0;
-        If SgrNum < 1000 Then
-          SgrNum := SgrNum * 10 + Ord(Ch) - 48;
-        End
-      Else If Ch = ';' Then
-        SgrNumber
-      Else If (Ch >= #64) And (Ch <= #126) Then
-        Begin
-        SgrState := 0;
-        If Ch = 'm' Then
-          Begin
-          SgrNumber;
-          If SgrReset And Not (SgrBg And SgrFg) Then
-            Begin                      {the DOS defaults: light gray on black}
-            If SgrFg Then
-              SendRaw(#27'[40m')
-            Else If SgrBg Then
-              SendRaw(#27'[37m')
-            Else
-              SendRaw(#27'[37;40m');
-            End;
-          End;
-        End
-      Else If Not (Ch In [#32..#63]) Then
-        SgrState := 0;
-    End;
+  Extra := Guard.Feed(Ch);
+  If Extra <> '' Then
+    SendRaw(Extra);
   End;
 
 
@@ -420,7 +367,7 @@ Function SendText(Ch: Char): Boolean;
   {One character of text for the caller: as it is, or as the UTF-8 of its CP437 meaning.  False =
    nothing was sent (the line is full), try again; a character of several bytes is sent whole.}
   Var
-    S: String;
+    S, Extra: String;
     i: Word;
     Sent: Boolean;
 
@@ -430,11 +377,14 @@ Function SendText(Ch: Char): Boolean;
     SendText := CommSendNw(Ch);
     Exit;
     End;
-  If (Not BgInit) And (SgrState = 0) Then
+  If Not GuardInit Then
     Begin
-    BgInit := True;
-    SendRaw(#27'[37;40m');
+    Guard.Init;
+    GuardInit := True;
     End;
+  Extra := Guard.First;
+  If Extra <> '' Then
+    SendRaw(Extra);
   If Ch < #128 Then
     Begin
     Sent := CommSendNw(Ch);
