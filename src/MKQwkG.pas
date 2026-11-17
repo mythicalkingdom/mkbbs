@@ -25,7 +25,7 @@ Procedure SaveUser;
 
 Implementation
 
-Uses MKFFile, MKMisc, MKCfgAbs, MKRCfgR2, MKRCfgRA, MKRCfgMK,
+Uses MKFFile, MKMisc, MKCfgAbs, MKRCfgR2, MKRCfgRA, MKRCfgMK, MKCfgNew,
   MKOffAbs, MKOffTxt, MKDos,
   MKFile, MKString, Dos,  MKCfgQB, MKCfgSB, MKRCfgEz;
 

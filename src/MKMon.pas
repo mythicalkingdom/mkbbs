@@ -38,7 +38,7 @@ Program MKMon;
 
 Uses
   BaseUnix, Sockets, Dos, sha1,
-  MKString, MKFile, MKGlobT, MKComAbs, MKSess, MKMonMail, MKCfgAbs, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB;
+  MKString, MKFile, MKGlobT, MKComAbs, MKSess, MKMonMail, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB;
 
 
 Type
@@ -152,7 +152,7 @@ Procedure FindUserOnFile;
   Config := Nil;
   BbsType := DetectBbsType;
   Case BbsType Of
-    1: Config := New(MKRCfgObjPtr, Init);
+    1: Config := NewMKConfig(True);
     2: Config := New(RARCfgObjPtr, Init);
     3: Config := New(QBCfgObjPtr, Init);
     4: Config := New(SBCfgObjPtr, Init);

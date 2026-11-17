@@ -198,6 +198,7 @@ Uses
 Constructor HudsonMsgObj.Init;
   Begin
   New(MsgRec);
+  MsgRec^.Echo := False;
   New(MsgChars);
   New(SeekArray);
   New(YourInfo);
@@ -306,6 +307,7 @@ Procedure HudsonMsgObj.MsgStartUp;
     NumRead: Word;
 
   Begin
+  MsgRec^.Echo := False;               {a message that is read has its state in the attribute word (this field was never set after New)}
   MsgRec^.Error := SeekMsgBasePos(MsgRec^.MsgPos);
   MsgRec^.OrigPoint := 0;
   MsgRec^.DestPoint := 0;

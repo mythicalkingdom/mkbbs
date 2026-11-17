@@ -28,7 +28,8 @@ Type MKCfgObj = Object(CfgObj)
   Function  SaveFileName(FN: String): String; Virtual;
   Function  SaveFileNames: String; Virtual;
   Procedure MKSave; Virtual; {Normally internal to save MK config}
-  Function  SaveEchoCfg: Word; {Save only echocfg.mk (what the tosser changes: which system gets which area)}
+  Function  EnvBbsPath: String; Virtual; {The main directory before the config is read (the MK environment variable)}
+  Function  SaveEchoCfg: Word; Virtual; {Save only echocfg.mk (what the tosser changes: which system gets which area)}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
   Function  GetMsgPath(BaseNo: Word): String; Virtual; {Get directory for msg base}
@@ -552,6 +553,12 @@ Procedure MKCfgObj.SetBbsType(BT: Word);           {Set type of Bbs}
 
 
 
+Function MKCfgObj.EnvBbsPath: String;
+  Begin
+  EnvBbsPath := GetEnv('MK');
+  End;
+
+
 Function MKCfgObj.GetBbsPath: String;
   Begin
   GetBbsPath := CfgInfo^.BbsPath;
@@ -637,7 +644,7 @@ Procedure MKCfgObj.Allocate;
     FillChar(MKMsg^, SizeOf(MKMsg^), 0);
     FillChar(MKFile^, SizeOf(MKFile^), 0);
     FillChar(MKEcho^, SizeOf(MKEcho^), 0);
-    CfgInfo^.BbsPath := GetEnv('MK');
+    CfgInfo^.BbsPath := EnvBbsPath;
     AddBackSlash(CfgInfo^.BbsPath);
     CfgInfo^.Loaded := True;
     End;
@@ -665,7 +672,7 @@ Procedure MKCfgObj.Load;
 
   Begin
   CPath := GetCurrentPath;
-  CfgInfo^.BbsPath := GetEnv('MK');
+  CfgInfo^.BbsPath := EnvBbsPath;
   AddBackSlash(CfgInfo^.BbsPath);
   MKLoad;
   If CfgInfo^.BbsPath = '' Then
@@ -710,6 +717,11 @@ Function MKCfgObj.SaveFileName(FN: String): String;
     TmpStr: String;
 
   Begin
+  If CfgInfo^.SaveDir <> '' Then
+    Begin
+    SaveFileName := CfgInfo^.SaveDir + FN;
+    Exit;
+    End;
   TmpStr := FindBbsFile(FN);
   If Length(TmpStr) > 0 Then
     SaveFileName := TmpStr + FN

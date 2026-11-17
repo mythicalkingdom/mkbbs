@@ -98,7 +98,7 @@ Program MKListen;
                       "restart": 5 }                   seconds before a mailer that died is started again
                                                        (doubled while it keeps dying, at most 300)
 
-     The listener runs mkbinkcfg at the start and whenever config.mk, echocfg.mk or mailer.mk changed (or
+     The listener runs mkbinkcfg at the start and whenever config.mk, echocfg.mk, mailer.mk or bbsconfig.json changed (or
      SIGHUP arrives).  When the mailer is switched on in the configuration it starts mkbink (run -f settings);
      when the settings changed it sends mkbink SIGHUP (it reads them again, no call is cut off); when the
      mailer is switched off, or the listener stops, mkbink is stopped.  A mailer that dies is started again.
@@ -760,7 +760,7 @@ Function ConfigSig: String;
     Begin
     Repeat
       N := SR.Name;
-      If (N = 'config.mk') Or (N = 'echocfg.mk') Or (N = 'mailer.mk') Then
+      If (N = 'config.mk') Or (N = 'echocfg.mk') Or (N = 'mailer.mk') Or (N = 'bbsconfig.json') Then
         ConfigSig := ConfigSig + N + ':' + IntToStr(SR.Size) + ':' + IntToStr(SR.Time) + ' ';
     Until FindNext(SR) <> 0;
     FindClose(SR);

@@ -55,7 +55,7 @@ Program MKToss;
 }
 
 Uses
-  BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKMsgAbs, MKMsgPkt, MKOpen, MKDupe, Crc32;
+  BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKMsgAbs, MKMsgPkt, MKOpen, MKDupe, Crc32;
 
 
 Type
@@ -2658,7 +2658,7 @@ If DetectBbsType <> 1 Then
   WriteLn(StdErr, 'mktoss: set MK to the BBS configuration directory');
   Halt(1);
   End;
-Config := New(MKCfgObjPtr, Init);
+Config := NewMKConfig(False);
 Config^.Load;
 If Config^.GetError <> 0 Then
   Begin

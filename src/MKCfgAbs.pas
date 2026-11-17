@@ -19,6 +19,7 @@ Type CfgInfoType = Record
                               {5=EZY, 6=PROBOARD }
   Loaded: Boolean;            {Config has been loaded}
   FileAreas: Word;            {Number of SBBS file areas}
+  SaveDir: String[128];       {Not empty: Save writes the config here and nowhere else (mkcfgcvt)}
   End;
 
 
@@ -434,7 +435,7 @@ Function DetectBbsType: Word;
     TmpStr: String;
 
   Begin
-  TmpStr := GetEnv('MK');
+  TmpStr := GetEnv('MK') + GetEnv('MKJSON');      {MKJSON: the MK configuration in one JSON file (MKCfgJs)}
   If Length(TmpStr) > 0 Then
     DetectBbsType := 1
   Else
@@ -477,6 +478,7 @@ Constructor CfgObj.Init;
   Error := 0;
   CfgInfo^.Loaded := False;
   CfgInfo^.BbsType := 0;
+  CfgInfo^.SaveDir := '';
   End;
 
 

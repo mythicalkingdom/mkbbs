@@ -27,7 +27,7 @@ Program MKBinkCfg;
 }
 
 Uses
-  BaseUnix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKNSrch;
+  BaseUnix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKNSrch;
 
 
 Const
@@ -426,7 +426,7 @@ If DetectBbsType <> 1 Then
   WriteLn(StdErr, 'mkbinkcfg: set MK to the BBS configuration directory (the mailer settings are kept by the MK configuration)');
   Halt(1);
   End;
-Config := New(MKCfgObjPtr, Init);
+Config := NewMKConfig(False);
 Config^.Load;
 If Config^.GetError <> 0 Then
   Begin

@@ -14,7 +14,7 @@ Program MKRead;
 
 Uses
   Dos, Objects, Drivers, Views, Dialogs, Menus, App, Editors, StdDlg,
-  MKVCrt, MKString, MKFile, MKCfgAbs, MKRCfgRA, MKCfgSB, MKCfgQB, MKRCfgMK,
+  MKVCrt, MKString, MKFile, MKCfgAbs, MKRCfgRA, MKCfgSB, MKCfgQB, MKRCfgMK, MKCfgNew,
   MKCfgTxt, MKGlobT, MKMsgAbs, MKOpen, MKRCfgEz, MKMsgHud, MKMsgEzy, MKMsgJam,
   MKRCfgR2, MKReadCf, MKMisc, MKDos, HdrEnt, MKEnter, QuoteCvt, MkTagLn,
   MKAvatar, MKRBan, MKReadO, MKKbd, CfgBox, CfgList;
@@ -3092,7 +3092,7 @@ If BbsType = 0 Then
     BbsType := DetectBbsType;
   End;
 Case BbsType Of
-  1: Config := New(MKRCfgObjPtr, Init);
+  1: Config := NewMKConfig(True);
   2: Begin
      If FileExist('config.ra') Then
        Status := SizeFile('config.ra')

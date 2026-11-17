@@ -20,7 +20,7 @@ Unit MKMenuCf;   {MKMenu: the menu file and its editing screens (Free Vision)}
 
 Interface
 
-Uses MKStr, MKGlobT, MKRCfgMK;
+Uses MKStr, MKGlobT, MKRCfgMK, MKCfgNew;
 
 Const
   MaxMenuItems = 50;
@@ -68,7 +68,7 @@ Procedure InitMenuEditor;
   BbsType := DetectBbsType;
   Config := Nil;
   Case BbsType Of
-    1: Config := New(MKRCfgObjPtr, Init);
+    1: Config := NewMKConfig(True);
     2: Config := New(RARCfgObjPtr, Init);
     3: Config := New(QBCfgObjPtr, Init);
     4: Config := New(SBCfgObjPtr, Init);

@@ -12,7 +12,7 @@ Program MKNodeList;
 }
 
 Uses
-  MKNSrch, MKCfgAbs, MKGlobT, MKString, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB, MKFile;
+  MKNSrch, MKCfgAbs, MKGlobT, MKString, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKFile;
 
 Var
   Nodes: NodeListObj;
@@ -32,7 +32,7 @@ Addr.Node := 1;
 Addr.Point := 0;
 Config := Nil;
 Case DetectBbsType Of
-  1: Config := New(MKRCfgObjPtr, Init);
+  1: Config := NewMKConfig(True);
   2: Config := New(RARCfgObjPtr, Init);
   3: Config := New(QBCfgObjPtr, Init);
   4: Config := New(SBCfgObjPtr, Init);

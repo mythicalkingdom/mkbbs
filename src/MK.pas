@@ -6,7 +6,7 @@ Program MK;
 Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
-MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB,
+MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
 MKLogOn, MKAvatar, MKSnoop, Dos
   ;
 
@@ -130,7 +130,7 @@ While i <= ParamCount Do
   End;
 BbsType := DetectBbsType;
 Case BbsType Of
-  1: Config := New(MKRCfgObjPtr, Init);
+  1: Config := NewMKConfig(True);
   2: Config := New(RARCfgObjPtr, Init);
   3: Config := New(QBCfgObjPtr, Init);
   4: Config := New(SBCfgObjPtr, Init);

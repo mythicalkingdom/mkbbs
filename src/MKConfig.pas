@@ -8,7 +8,7 @@ Program MKConfig;
 }
 
 Uses
-  MKString, MKCfgAbs, MKCfgMK, MKCfgSB, MKCfgQB, MKCfgRA, MKGlobT,
+  MKString, MKCfgAbs, MKCfgMK, MKCfgNew, MKCfgSB, MKCfgQB, MKCfgRA, MKGlobT,
   Default, CfgMenu, MKKbd;
 
 Var
@@ -18,7 +18,7 @@ Var
 Begin
 BbsType := DetectBbsType;
 Case BbsType Of
-  1: Config := New(MKCfgObjPtr, Init);
+  1: Config := NewMKConfig(False);
   2: Config := New(RACfgObjPtr, Init);
   3: Config := New(QBCfgObjPtr, Init);
   4: Config := New(SBCfgObjPtr, Init);

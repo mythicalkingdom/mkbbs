@@ -12,8 +12,11 @@ Program MKCfgCvt;
         2 = Remote Access       (RA)
         3 = QuickBbs            (QUICK)
         4 = SuperBbs            (SBBS)
+        5 = Mythical Kingdom, in one JSON file (bbsconfig.json: the environment
+            variable MKJSON names the file or its directory, else the MK directory)
 
-     The input configuration is read from the directory its variable names, the
+     Between 1 and 5 everything is copied as it is (all of the MK configuration,
+     also what the other formats have no place for).  The input configuration is read from the directory its variable names, the
      output is written to the directory of the output type's variable, so both
      have to be set (the output directory has to exist).  The output starts
      from the default settings, then everything the formats have in common is
@@ -25,7 +28,7 @@ Program MKCfgCvt;
 }
 
 Uses
-  Default, CCvt, MKCfgAbs, MKCfgMK, MKCfgRA, MKCfgQB, MKCfgSB, MKGlobT, MKString, MKFile;
+  Default, CCvt, MKCfgAbs, MKCfgMK, MKCfgJs, MKCfgRA, MKCfgQB, MKCfgSB, MKGlobT, MKString, MKFile;
 
 
 Var
@@ -69,7 +72,7 @@ If ParamError = 0 Then
   Val(Args[2], OutType, Code);
   If Code <> 0 Then
     ParamError := 4;
-  If ((OutType < 1) or (OutType > 4) or (InType < 1) or (InType > 4)) Then
+  If ((OutType < 1) or (OutType > 5) or (InType < 1) or (InType > 5)) Then
     ParamError := 5;
   End;
 If ParamError <> 0 Then
@@ -86,6 +89,7 @@ If ParamError <> 0 Then
   WriteLn('      2 = Remote Access      (RA)');
   WriteLn('      3 = QuickBbs           (QUICK)');
   WriteLn('      4 = SuperBbs           (SBBS)');
+  WriteLn('      5 = Mythical Kingdom   in one JSON file (MKJSON, bbsconfig.json)');
   WriteLn;
   WriteLn('The environment variable of each type names its configuration directory.');
   WriteLn('Files of the output type that exist are only overwritten after a yes (-y: always).');
@@ -99,15 +103,23 @@ Case InType Of
   2: InRec := New(RACfgObjPtr, Init);
   3: InRec := New(QBCfgObjPtr, Init);
   4: InRec := New(SBCfgObjPtr, Init);
+  5: InRec := New(MKJsonCfgObjPtr, Init);
   End;
 Case OutType Of
   1: OutRec := New(MKCfgObjPtr, Init);
   2: OutRec := New(RACfgObjPtr, Init);
   3: OutRec := New(QBCfgObjPtr, Init);
   4: OutRec := New(SBCfgObjPtr, Init);
+  5: OutRec := New(MKJsonCfgObjPtr, Init);
   End;
-InRec^.SetBbsType(InType);
-OutRec^.SetBbsType(OutType);
+If InType = 5 Then
+  InRec^.SetBbsType(1)
+Else
+  InRec^.SetBbsType(InType);
+If OutType = 5 Then
+  OutRec^.SetBbsType(1)
+Else
+  OutRec^.SetBbsType(OutType);
 WriteLn;
 WriteLn('Loading original config');
 InRec^.Load;
@@ -117,16 +129,30 @@ If InRec^.GetError <> 0 Then
   Halt(1);
   End;
 OutRec^.Allocate;
-WriteLn('Setting Defaults');
-SetCfgDefaults(OutRec^);
-SetMsgDefaults(OutRec^);
-SetEchoDefaults(OutRec^);
-SetFileDefaults(OutRec^);
-WriteLn('Converting');
-CvtCfg(InRec^, OutRec^);
-CvtMsg(InRec^, OutRec^);
-CvtFile(InRec^, OutRec^);
-CvtEcho(InRec^, OutRec^);
+If OutType = 1 Then
+  OutRec^.CfgInfo^.SaveDir := OutRec^.GetBbsPath;     {never a file of another configuration (its message path ...)}
+If ((InType = 1) Or (InType = 5)) And ((OutType = 1) Or (OutType = 5)) Then
+  Begin
+  WriteLn('Copying (MK to MK: everything)');
+  MKCfgObjPtr(OutRec)^.MKCfg^ := MKCfgObjPtr(InRec)^.MKCfg^;
+  MKCfgObjPtr(OutRec)^.MKMsg^ := MKCfgObjPtr(InRec)^.MKMsg^;
+  MKCfgObjPtr(OutRec)^.MKFile^ := MKCfgObjPtr(InRec)^.MKFile^;
+  MKCfgObjPtr(OutRec)^.MKEcho^ := MKCfgObjPtr(InRec)^.MKEcho^;
+  MKCfgObjPtr(OutRec)^.MKMail^ := MKCfgObjPtr(InRec)^.MKMail^;
+  End
+Else
+  Begin
+  WriteLn('Setting Defaults');
+  SetCfgDefaults(OutRec^);
+  SetMsgDefaults(OutRec^);
+  SetEchoDefaults(OutRec^);
+  SetFileDefaults(OutRec^);
+  WriteLn('Converting');
+  CvtCfg(InRec^, OutRec^);
+  CvtMsg(InRec^, OutRec^);
+  CvtFile(InRec^, OutRec^);
+  CvtEcho(InRec^, OutRec^);
+  End;
 { the files that would be written, and which of them exist already }
 Names := OutRec^.SaveFileNames;
 Existing := '';

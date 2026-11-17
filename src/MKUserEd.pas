@@ -19,7 +19,7 @@ Program MKUserEd;
 
 Uses
   Objects, Drivers, Views, Menus, Dialogs, App,
-  MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKRCfgRA, MKCfgQB, MKCfgSB,
+  MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
   MKName, MKUserFm, CfgBox, CfgPal, MKKbd;
 
 
@@ -507,7 +507,7 @@ Begin
 BbsType := DetectBbsType;
 Config := Nil;
 Case BbsType Of
-  1: Config := New(MKRCfgObjPtr, Init);
+  1: Config := NewMKConfig(True);
   2: Config := New(RARCfgObjPtr, Init);
   3: Config := New(QBCfgObjPtr, Init);
   4: Config := New(SBCfgObjPtr, Init);

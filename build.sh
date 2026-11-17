@@ -173,6 +173,8 @@ python3 tests/nodetest.py build build/work/nodetest | grep -E "^(FAIL|failures)"
 # configuration converter: Remote Access -> MK / QuickBBS / SuperBBS on a copy of the sample BBS
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/cvttest.py build build/work/cvt | grep -E "^(FAIL|failures)"
+  # the MK configuration in one JSON file (MKJSON, bbsconfig.json)
+  python3 tests/jsoncfgtest.py build build/work/jsoncfg | grep -E "^(FAIL|failures)"
 fi
 # menu command 169 (BASIC programs): unit test on a scripted session, then the real mk over telnet
 if [ -n "$BASICFLAGS" ]; then
