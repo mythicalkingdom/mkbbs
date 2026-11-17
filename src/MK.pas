@@ -224,6 +224,7 @@ Else
   User.DetectAnsi;
   User.DisplayStr(#13 + PadRight('',' ', Length(Prompts.GetString(344)) + 10) + #13);
   User.SetUserAnsi(User.WasAnsiDetected);
+  User.ClearScreen;                     {a clean screen for the version and copyright lines}
   User.DisplayAttr(Config^.GetSystemColor(1));
   User.DisplayStrLn(BbsVersion);
   User.DisplayAttr(Config^.GetSystemColor(2));

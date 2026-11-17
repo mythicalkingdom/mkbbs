@@ -121,7 +121,23 @@ def show(b):
 
 try:
     c = conn(24661)
-    until(c, b'language choice', 10); time.sleep(1.5); c.sendall(b'\r')
+    # what the caller gets first: the ANSI detection, then (the caller is ANSI) the screen is cleared, then the version lines
+    raw = b''
+    c.settimeout(0.2)
+    end = time.time() + 10
+    while time.time() < end and b'language choice' not in strip(raw):
+        try:
+            d = c.recv(4096)
+            if not d:
+                break
+            raw += d
+            if b'\x1b[6n' in d:
+                c.sendall(b'\x1b[1;1R')
+        except socket.timeout:
+            pass
+    ci, vi = raw.find(b'\x1b[2J'), raw.find(b'Version')
+    check('a clear screen comes before the version and copyright lines', ci >= 0 and vi > ci)
+    time.sleep(1.5); c.sendall(b'\r')
     until(c, b'last name: ', 10); time.sleep(2.5)
     c.sendall(b'Mark May\r'); until(c, b'assword'); time.sleep(0.5); c.sendall(b'windows\r')
     x = b''
