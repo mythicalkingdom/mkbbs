@@ -8,7 +8,7 @@ Unit MKDoor;
 
 Interface
 
-Uses MKGlobT, MKStr, MKSnoop, MKRCfgMK, MKRCfgRA, MKCfgSB, MKCfgQB, MKMsgHud,
+Uses MKGlobT, MKStr, MKSnoop, MKPty, MKRCfgMK, MKRCfgRA, MKCfgSB, MKCfgQB, MKMsgHud,
   Dos;
 
 
@@ -280,7 +280,9 @@ Var
 
 
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
+Function DoorPtyWanted: Boolean;       {a program is run on a pseudo terminal (a caller is connected, no *S, MK_NOPTY not set)}
 Var
+  DoorRaw: Boolean;                    {the next DoShell gives the program the caller's connection itself (TypeSeven *S), no terminal}
   ShellError: Word;                    {what DoShell could not do: 0 = it ran the program, 2 = no such program, else the DOS error}
   CharsetMode: Byte;                   {0 = by the terminal type, 1 = CP437 as it is, 2 = UTF-8 (mk -U, the menu command)}
   SysopChatWanted: Boolean;            {the sysop (mkmon) asked for a chat; DoChat starts at the next InputChr}
@@ -3732,13 +3734,25 @@ Function ShellProgram(Name: String): String;
   End;
 
 
+Function DoorPtyWanted: Boolean;
+  Begin
+  DoorPtyWanted := CommActive And (Not DoorRaw) And (GetEnv('MK_NOPTY') = '');
+  End;
+
+
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
   {Run a program (or a shell) and come back.  DoSwap / DoWindow were for the
-   DOS memory swapper and are ignored.  ShellError says whether it could be run.}
+   DOS memory swapper and are ignored.  ShellError says whether it could be run.
+   With a caller connected the program runs on a pseudo terminal (MKPty): echo, line ends, a terminal for curses; the
+   caller's connection stays in use, MKComAbs does the telnet part.  With TypeSeven's *S, without a caller (the console)
+   or when no terminal can be made, the program is started with the caller's connection as its standard input and output.}
   Var
     CDirStr: String;
     EName: String;
     CStr: String;
+    Code: LongInt;
+    R: Word;
+    Done: Boolean;
 
   Begin
   EName := ShellProgram(ExtractWord(Cmd, 1));
@@ -3749,8 +3763,23 @@ Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
     ShellError := 2
   Else
     Begin
-    Exec(EName, CStr);
-    ShellError := DosError;
+    Done := False;
+    If DoorPtyWanted Then
+      Begin
+      R := PtyRun(EName, CStr, ComSession^.GetTermType, Code);
+      If R = 0 Then
+        Done := True
+      Else If R = ptyNoExec Then
+        Begin
+        Done := True;
+        ShellError := 8;
+        End;
+      End;
+    If Not Done Then
+      Begin
+      Exec(EName, CStr);
+      ShellError := DosError;
+      End;
     End;
   ChDir(StripTrail(CDirStr, DirectorySeparator));
   If IoResult <> 0 Then;

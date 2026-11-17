@@ -31,8 +31,10 @@ def script(path, text):
     os.chmod(path, 0o755)
 script(ra + '/door.sh', 'echo "DOOR node=$1 baud=$2 user=$3"\nls dorinfo1.def door.sys 2>&1\nexit 0\n')
 script(ra + '/games/door2.sh', 'echo "DOOR2 here"\n')
-open(ra + '/door_in.sh', 'w').write('#!/bin/bash\nprintf "name? "\nIFS= read -r -d $\'\\r\' x\necho "got:$x"\n')
-os.chmod(ra + '/door_in.sh', 0o755)
+script(ra + '/lineread.sh', 'printf "name? "\nread x\necho "got:$x"\n')
+script(ra + '/rawkey.sh', 'stty raw -echo\nk=$(dd bs=1 count=1 2>/dev/null)\nstty sane\necho "key=$k"\n')
+script(ra + '/hang.sh', 'echo $$ > hang.pid\necho started\nexec sleep 60\n')
+script(ra + '/tty.sh', 'tty\necho "TERM=$TERM COLUMNS=$COLUMNS LINES=$LINES"\nstty size\n')
 
 
 # the top menu: items for the programs in free slots (167 byte records, record 0 is the header)
@@ -44,7 +46,7 @@ d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
 free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV' if k not in used]
-items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './door_in.sh'), ('missing', 'nope-door-xyz')]
+items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('missing', 'nope-door-xyz')]
 keys = {}
 slot = 1
 for name, data in items:
@@ -138,6 +140,7 @@ try:
 
     b = run_item('bare', b'hello-bare')
     check('a command without a path is found in the path (echo)', b'hello-bare' in b and b'Command >' in b)
+    check('the terminal ends lines the way a caller needs: CR LF (the program wrote a plain LF)', b'hello-bare\r\n' in b)
     b = run_item('abs', b'hello-abs')
     check('a full path', b'hello-abs' in b and b'Command >' in b)
     b = run_item('script', b'DOOR node=')
@@ -151,7 +154,46 @@ try:
     check('the program reads what the caller types', b'name?' in until(c, b'name?', 6))
     c.sendall(b'Zed\r')
     b = until(c, b'got:', 6) + until(c, b'Command >', 5)
-    check('... and its answer comes back, then the menu', b'got:Zed' in b and b'Command >' in b)
+    check('... a plain read gets the line (the caller\'s Enter is a CR), the typed text is echoed, the answer comes back, then the menu',
+          b'Zed\r\ngot:Zed' in b and b'Command >' in b)
+    c.sendall(bytes([255, 251, 31]))                                  # IAC WILL NAWS
+    time.sleep(0.3)
+    c.sendall(bytes([255, 250, 31, 0, 100, 0, 30, 255, 240]))         # IAC SB NAWS 100 30 IAC SE
+    time.sleep(0.5)
+    b = run_item('tty', b'TERM=')
+    check('the program has a terminal: tty names it, TERM, COLUMNS, LINES and the window size are set (the caller reported 100 x 30)', b'/dev/pts/' in b and b'TERM=' in b and b'COLUMNS=100 LINES=30' in b and b'30 100' in b)
+    b = run_item('raw', b'TERM=')
+    check('*S: no terminal, the program gets the caller\'s connection itself (not a tty)', b'not a tty' in b and b'/dev/pts/' not in b)
+    c.sendall(keys['rawkey'].encode())
+    time.sleep(1.0)
+    c.sendall(b'q')
+    b = until(c, b'key=', 5) + until(c, b'Command >', 5)
+    check('a program that sets the terminal to raw mode gets a key without Enter (and the terminal is sane again after it)', b'key=q' in b and b'Command >' in b)
+    c.sendall(keys['hang'].encode())
+    check('a program that waits', b'started' in until(c, b'started', 5))
+    time.sleep(0.5)
+    hp = ra + '/hang.pid'
+    pid = int(open(hp).read()) if os.path.exists(hp) else 0
+    c.close()
+    gone = False
+    for _ in range(80):
+        try:
+            os.kill(pid, 0)
+            time.sleep(0.1)
+        except OSError:
+            gone = True
+            break
+    check('the caller hangs up: the program is told (SIGHUP) and ends, it is not left running', pid > 0 and gone)
+    c = conn(24661)
+    until(c, b'language choice', 10); time.sleep(1.5); c.sendall(b'\r')
+    until(c, b'last name: ', 10); time.sleep(2.5)
+    c.sendall(b'Mark May\r'); until(c, b'assword'); time.sleep(0.5); c.sendall(b'windows\r')
+    for _ in range(8):
+        x = until(c, b'zzzz', 3)
+        if b'continue' in x or b'Enter' in x:
+            c.sendall(b'\r')
+        else:
+            break
     c.sendall(keys['missing'].encode())
     b = until(c, b'ress', 6)
     check('a program that does not exist: the caller is told, not left with nothing', b'Error: nope-door-xyz could not be run' in b)

@@ -7,6 +7,14 @@ Function WriteDorInfo: Word;
 Function WriteDoorSys: Word;
 Function WriteCallInfo: Word;
 Procedure TypeSeven(Cmd: String);
+  {Menu command 007, run a program: the command line, with these parameters (from the DOS original, a * and a letter):
+     *B baud  *C comspec  *D door.sys  *F first name  *L last name  *G ansi 1/0  *M (swap, ignored)  *N node  *P baud
+     *R user record  *T minutes left  *W callinfo.bbs  *! time stops while the program runs  *0 *1 templates  ** a star
+     *S  Linux: the program gets the caller's connection itself as standard input / output (no terminal); without it the
+         program runs on a pseudo terminal (MKPty: echo, CR LF, TERM / COLUMNS / LINES from the caller's terminal, raw mode
+         for curses; MK_NOPTY in the environment turns the terminal off for all)
+   The program name may have a DOS style path (backslashes), without a path it is looked for in the BBS directory, then in
+   the path.  One that cannot be run is reported to the caller and logged.}
 
 
 Implementation
@@ -521,9 +529,12 @@ Procedure TypeSeven(Cmd: String);
     DoorStart: LongInt;
     Tx, Ty: Byte;
     Failed: Word;
+    RawDoor: Boolean;
+    UsePty: Boolean;
 
   Begin
   Failed := 0;
+  RawDoor := False;
   User.PostStatus(uoDoor);
   FreezeTime := False;
   FossilHot := False;
@@ -560,6 +571,7 @@ Procedure TypeSeven(Cmd: String);
         'O':; {over ride baud}
         'P': CmdStr := CmdStr + Long2Str(User.GetUserBaud);
         'R': CmdStr := CmdStr + Long2Str(User.GetUserRecNum);
+        'S': RawDoor := True;           {the program gets the caller's connection itself, no pseudo terminal}
         'T': CmdStr := CmdStr + Long2Str(User.TimeRemain Div 60);
         'W': CallInfo := True;
         '!': FreezeTime := True;
@@ -586,7 +598,9 @@ Procedure TypeSeven(Cmd: String);
     Error := WriteCallInfo;
   If Error = 0 Then
     User.WriteExit('');
-  If Not FossilHot Then
+  DoorRaw := RawDoor;
+  UsePty := DoorPtyWanted;
+  If (Not FossilHot) And (Not UsePty) Then
     Begin
     CommRelease;
     End;
@@ -604,7 +618,8 @@ Procedure TypeSeven(Cmd: String);
       User.AdjustTime(User.CurrentTime - DoorStart);
     End;
   GoToXY(1,1);
-  If CurrentPort <> 0 Then
+  DoorRaw := False;
+  If (CurrentPort <> 0) And (Not UsePty) Then
     Begin
     CommInit;
     CommFlow(fcBoth);
