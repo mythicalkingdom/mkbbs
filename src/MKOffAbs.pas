@@ -17,15 +17,15 @@ Unit MKOffAbs;       {Abstract Offline mail Object}
 
 Interface
 
-Uses MKGlobT, MKMsgAbs, MKUsrAbs,
+Uses MKGlobT, MKMsgAbs, MKDoor,
   Dos;
 
 
 Type AbsOffObj = Object
-  User: AbsUsrObjPtr;
+  User: DoorUserPtr;                   {the caller (MKDoor.User unless SetUsrPtr says otherwise)}
   Constructor Init; {Initialize}
   Destructor Done; Virtual; {Done}
-  Procedure SetUsrPtr(Var U: AbsUsrObjPtr);
+  Procedure SetUsrPtr(Var U: DoorUserPtr);
   Procedure SetPath(MP: String); Virtual; {Set msg path/other info}
   Procedure SetBBSID(ID: String); Virtual; {Set BBS id/filename}
   Function  StartPacket: Word; Virtual; {Do Packet startup tasks}
@@ -46,6 +46,7 @@ Implementation
 
 Constructor AbsOffObj.Init;
   Begin
+  User := @MKDoor.User;
   End;
 
 
@@ -79,7 +80,7 @@ Function AbsOffObj.GetArchiveName(Packer: Word): String;
   End;
 
 
-Procedure AbsOffObj.SetUsrPtr(Var U: AbsUsrObjPtr);
+Procedure AbsOffObj.SetUsrPtr(Var U: DoorUserPtr);
   Begin
   User := U;
   End;

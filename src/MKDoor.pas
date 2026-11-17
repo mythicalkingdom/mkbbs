@@ -66,6 +66,8 @@ Type DoorUser = Object
   Procedure Done;                        {Done}
   Procedure ClrEOL;                      {Clear to eol if ansi on}
   Procedure ClearScreen;                 {Clear screen if ansi on}
+  Procedure DisplayXY(XL: Byte; YL: Byte); {Position the cursor (ansi / avatar callers)}
+  Function  GetUserSecLevel: LongInt;    {Security level of the user}
   Function  UserFound: Boolean;          {Returns user found?}
   Procedure SetMore(More: Boolean);      {This session ask more?}
   Function  GetMore: Boolean;            {Will more prompts be done?}
@@ -273,6 +275,8 @@ Type DoorUser = Object
   Function  GetUserNetStatus: LongInt;
   Procedure SetUserNetStatus(NS: LongInt);
   End;
+
+Type DoorUserPtr = ^DoorUser;
 
 Var
   Prompts: StrObj;
@@ -539,6 +543,25 @@ Procedure DoorUser.ResetLines(Ct: Word); {Reset more line count}
 Procedure DoorUser.SetStopMore(St: Boolean);
   Begin
   UserInfo^.StopMore := St;
+  End;
+
+
+Procedure DoorUser.DisplayXY(XL: Byte; YL: Byte);
+  Begin
+  If GetUserAvatar Then
+    DisplayStr(#22#8 + Chr(YL) + Chr(XL))
+  Else If GetUserAnsi Then
+    DisplayStr(#27'[' + Long2Str(YL) + ';' + Long2Str(XL) + 'f');
+  End;
+
+
+Function DoorUser.GetUserSecLevel: LongInt;
+  Var
+    Sec: SecType;
+
+  Begin
+  GetUserSec(Sec);
+  GetUserSecLevel := Sec.Level;
   End;
 
 
@@ -3707,6 +3730,121 @@ Procedure DoorUser.SetStartTime; {Set start time}
   UserInfo^.StartTime := CurrentTime;
   End;
 
+Function WildMatch(P, N: String): Boolean;
+  {* and ? like DOS, not case sensitive}
+  Begin
+  If P = '' Then
+    WildMatch := (N = '')
+  Else If P[1] = '*' Then
+    Begin
+    If WildMatch(Copy(P, 2, 255), N) Then
+      WildMatch := True
+    Else If N = '' Then
+      WildMatch := False
+    Else
+      WildMatch := WildMatch(P, Copy(N, 2, 255));
+    End
+  Else If N = '' Then
+    WildMatch := False
+  Else If (P[1] = '?') Or (UpCase(P[1]) = UpCase(N[1])) Then
+    WildMatch := WildMatch(Copy(P, 2, 255), Copy(N, 2, 255))
+  Else
+    WildMatch := False;
+  End;
+
+
+Function ExpandShellArgs(S: String): String;
+  {The arguments of a command line that have a * or ? (and are not in quotes) are replaced by the names of the files of
+   the current directory they fit, sorted: there is no shell to do it, and a DOS program (the archivers, *.*) did it
+   itself.  As in DOS a name that ends in .* also fits a file without an extension (*.* is every file).  Nothing fits: the argument stays as it is.}
+  Var
+    Tok, Out_, Pat, Names, T: String;
+    k, n: Word;
+    InQ, Quoted: Boolean;
+    SR: SearchRec;
+    List: Array[1..200] Of String[80];
+
+  Procedure Flush;
+    Var
+      i, j: Word;
+
+    Begin
+    If (Tok = '') And (Not Quoted) Then
+      Exit;
+    If Out_ <> '' Then
+      Out_ := Out_ + ' ';
+    If (Not Quoted) And ((Pos('*', Tok) > 0) Or (Pos('?', Tok) > 0)) And (Pos('/', Tok) = 0) Then
+      Begin
+      Pat := Tok;
+      n := 0;
+      FindFirst('*', AnyFile, SR);
+      While (DosError = 0) And (n < 200) Do
+        Begin
+        If ((SR.Attr And Directory) = 0) And (WildMatch(Pat, SR.Name) Or
+           ((Length(Pat) > 2) And (Copy(Pat, Length(Pat) - 1, 2) = '.*') And WildMatch(Copy(Pat, 1, Length(Pat) - 2), SR.Name))) Then
+          Begin
+          Inc(n);
+          List[n] := SR.Name;
+          End;
+        FindNext(SR);
+        End;
+      FindClose(SR);
+      If n = 0 Then
+        Out_ := Out_ + Tok
+      Else
+        Begin
+        For i := 1 To n Do
+          For j := i + 1 To n Do
+            If List[j] < List[i] Then
+              Begin
+              T := List[i]; List[i] := List[j]; List[j] := T;
+              End;
+        Names := '';
+        For i := 1 To n Do
+          Begin
+          If Names <> '' Then
+            Names := Names + ' ';
+          If Pos(' ', List[i]) > 0 Then
+            Names := Names + '"' + List[i] + '"'
+          Else
+            Names := Names + List[i];
+          End;
+        If Length(Out_) + Length(Names) + Length(S) > 250 Then
+          Out_ := Out_ + Tok                {too many for a command line of 255: left to the program}
+        Else
+          Out_ := Out_ + Names;
+        End;
+      End
+    Else If Quoted Then
+      Out_ := Out_ + '"' + Tok + '"'
+    Else
+      Out_ := Out_ + Tok;
+    Tok := '';
+    Quoted := False;
+    End;
+
+  Begin
+  Out_ := '';
+  Tok := '';
+  InQ := False;
+  Quoted := False;
+  For k := 1 To Length(S) Do
+    Begin
+    If S[k] = '"' Then
+      Begin
+      InQ := Not InQ;
+      Quoted := True;
+      End
+    Else If (S[k] = ' ') And (Not InQ) Then
+      Flush
+    Else
+      Tok := Tok + S[k];
+    End;
+  Flush;
+  ExpandShellArgs := ' ' + Out_;
+  End;
+
+
 Function ShellProgram(Name: String): String;
   {The program of a command line as it is meant: menus and doors are written the DOS way (a backslash in the path), a name
    without a path is looked for in the current directory (the BBS directory) first and then in the path.  A name that is
@@ -3756,7 +3894,7 @@ Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
 
   Begin
   EName := ShellProgram(ExtractWord(Cmd, 1));
-  CStr := Copy(Cmd, Length(ExtractWord(Cmd, 1)) + 1, 255);
+  CStr := ExpandShellArgs(Copy(Cmd, Length(ExtractWord(Cmd, 1)) + 1, 255));
   CDirStr := GetCurrentPath;
   ShellError := 0;
   If Not FileExist(EName) Then

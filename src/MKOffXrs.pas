@@ -67,10 +67,11 @@ Type XRSOffPtr = ^XRSOffObj;
 
 Implementation
 
-Uses MKString, MKFile, MKUsrAbs;
+Uses MKString, MKFile;
 
 Constructor XRSOffObj.Init;
   Begin
+  Inherited Init;
   New(XI);
   XI^.Error := 0;
   XI^.NumMsgs := 0;
@@ -102,7 +103,7 @@ Procedure XrsOffObj.CreateAreasXRS;
   Begin
   New(CA);
   Loc := 2;
-  User^.GetUserSec(@Sec);
+  User^.GetUserSec(Sec);
   CA^[1] := '|';
   CA^[2] := '|';
   For Area := 1 to 500 Do
@@ -162,7 +163,7 @@ Procedure XRSOffObj.CreateAccessXrs;
   Begin
   New(xs);
   Config^.GetCrashNmSec(Sec2);
-  User^.GetUserSec(@Sec);
+  User^.GetUserSec(Sec);
   FillChar(xs^, SizeOf(xs^), 0);
   For Area := 1 to 500 Do
     Begin

@@ -104,7 +104,7 @@ Type QwkOffPtr = ^QwkOffObj;
 Implementation
 
 
-Uses MKString, MKFile, MKCfgAbs, MKUsrAbs, MKDos, MKQwkG;
+Uses MKString, MKFile, MKCfgAbs, MKDos, MKQwkG;
 
 
 Function Bas2Lng(InValue: LongInt): LongInt;
@@ -174,6 +174,7 @@ Function Lng2Bas(InValue: LongInt): LongInt;
 
 Constructor QwkOffObj.Init;
   Begin
+  Inherited Init;
   New(QI);
   End;
 
@@ -477,7 +478,7 @@ Procedure QwkOffObj.DoControl;
   WriteLn(CF);
   WriteLn(CF,'0');
   WriteLn(CF,'0');
-  User^.GetUserSec(@Sec);
+  User^.GetUserSec(Sec);
   NumAvail := 0;
   For i := 1 to QwkConfs Do
     Begin

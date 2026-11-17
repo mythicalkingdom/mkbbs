@@ -50,6 +50,7 @@ Uses MKFile, MKString, MKCfgAbs;
 
 Constructor TxtOffObj.Init;
   Begin
+  Inherited Init;
   New(TI);
   End;
 

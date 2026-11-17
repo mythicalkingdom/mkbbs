@@ -46,6 +46,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbinkcfg src/MKBinkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omktoss src/MKToss.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwk src/MKQwk.pas
 for t in tosssetup tossdump tossmake tosscfg; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
@@ -130,6 +131,11 @@ if grep -q FAIL build/fidresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doormenutest.py build/work/doormenu | grep -E "^(ok|FAIL|skip)" | tee build/doormenuresult.txt
   if grep -q FAIL build/doormenuresult.txt; then exit 1; fi
+fi
+# the offline mail door (mkqwk): local mode on a private copy of the sample BBS, a real QWK packet
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/qwktest.py build build/qwkwork | grep -E "^(ok|FAIL|skip)" | tee build/qwkresult.txt
+  if grep -q FAIL build/qwkresult.txt; then exit 1; fi
 fi
 # the tosser (mktoss) on a private copy of the sample BBS, with packets made by MessagePacket.js
 if [ -f bbs/bbsc/ra/config.mk ]; then

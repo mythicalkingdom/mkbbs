@@ -591,6 +591,8 @@ Procedure TypeSeven(Cmd: String);
       End;
     Inc(CmdCtr);
     End;
+  If LastStar Then
+    CmdStr := CmdStr + '*';               {a * that ends the command line is a * (a wildcard: *.*)}
   Error := WriteDorInfo;
   If ((Error = 0) And (DoorSys)) Then
     Error := WriteDoorSys;

@@ -31,6 +31,26 @@ def script(path, text):
     os.chmod(path, 0o755)
 script(ra + '/door.sh', 'echo "DOOR node=$1 baud=$2 user=$3"\nls dorinfo1.def door.sys 2>&1\nexit 0\n')
 script(ra + '/games/door2.sh', 'echo "DOOR2 here"\n')
+open(ra + '/noext', 'w').write('x')
+# the offline mail door (mkqwk): its settings with this machine's paths, one user record
+import struct
+if os.path.exists(repo + '/bbs/bbsc/mkqwk/config.mko') and os.path.exists(repo + '/build/mkqwk'):
+    q = bytearray(open(repo + '/bbs/bbsc/mkqwk/config.mko', 'rb').read())
+    def qput(off, text, n):
+        q[off:off + n + 1] = bytes([len(text)]) + text.encode() + bytes(n - len(text))
+    qput(3063, ra + '/qtmp', 80)
+    qput(3063 + 81, ra + '/qusers', 80)
+    os.makedirs(ra + '/qtmp'); os.makedirs(ra + '/qusers')
+    open(ra + '/config.mko', 'wb').write(q)
+    rec = bytearray(843)
+    rec[0] = 8; rec[1:9] = b'Mark May'
+    rec[36:40] = (1).to_bytes(4, 'little')
+    rec[640 + 8] = ord('Z'); rec[640 + 9] = ord('Z'); rec[640 + 12] = 2
+    rec[640 + 4:640 + 6] = (500).to_bytes(2, 'little'); rec[640 + 6:640 + 8] = (100).to_bytes(2, 'little')
+    open(ra + '/qusers/users.mko', 'wb').write(rec)
+    have_qwk = True
+else:
+    have_qwk = False
 script(ra + '/lineread.sh', 'printf "name? "\nread x\necho "got:$x"\n')
 script(ra + '/rawkey.sh', 'stty raw -echo\nk=$(dd bs=1 count=1 2>/dev/null)\nstty sane\necho "key=$k"\n')
 script(ra + '/hang.sh', 'echo $$ > hang.pid\necho started\nexec sleep 60\n')
@@ -46,7 +66,7 @@ d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
 free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV' if k not in used]
-items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('missing', 'nope-door-xyz')]
+items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('missing', 'nope-door-xyz')]
 keys = {}
 slot = 1
 for name, data in items:
@@ -180,6 +200,21 @@ try:
     check('the program has a terminal: tty names it, TERM, COLUMNS, LINES and the window size are set (the caller reported 100 x 30)', b'/dev/pts/' in b and b'TERM=' in b and b'COLUMNS=100 LINES=30' in b and b'30 100' in b)
     b = run_item('raw', b'TERM=')
     check('*S: no terminal, the program gets the caller\'s connection itself (not a tty)', b'not a tty' in b and b'/dev/pts/' not in b)
+    b = run_item('glob', b'users.mko')
+    check('a * or ? in the arguments is expanded (there is no shell), sorted: echo *.mko', b'confs.mko users.mko' in b and b'*.mko' not in b)
+    b = run_item('glob2', b'noext')
+    check('a name ending in .* also fits a file without an extension (as in DOS); nothing fits: left as it is', b'noext' in b and b'zz*.*' in b)
+    if have_qwk:
+        c.sendall(keys['qwk'].encode())
+        b = until(c, b'door program loads', 6) + until(c, b'Command >', 6)
+        check('the offline mail door (mkqwk) runs from a menu: it asks for a command itself', b'Command >' in b and b'DOOR qwk' not in b)
+        c.sendall(b'c')                                   # its configuration menu
+        b = until(c, b'Command >', 5)
+        c.sendall(b'q')                                   # ... and back
+        b = until(c, b'Command >', 5)
+        c.sendall(b'q')                                   # quit the door
+        b = until(c, b'DOOR bare', 6) + until(c, b'Command >', 6)
+        check('its menus work (configuration and back), Quit returns to the BBS menu', b'DOOR bare' in b and b'Command >' in b)
     c.sendall(keys['rawkey'].encode())
     time.sleep(1.0)
     c.sendall(b'q')

@@ -186,6 +186,7 @@ Uses MKString, MKFile, MKCfgAbs;
 
 Constructor BwvOffObj.Init;
   Begin
+  Inherited Init;
   New(BI);
   BI^.CurrArea := $ffff;
   BI^.StartPos := 0;
@@ -303,7 +304,7 @@ Procedure BwvOffObj.DoInf;
   Inf^.InfAreaLen := SizeOf(BWInfAreaType);
   Inf^.MixLen := SizeOf(BWMixType);
   Inf^.FTILen := SizeOf(BWFTIType);
-  User^.GetUserSec(@Sec);
+  User^.GetUserSec(Sec);
   Config^.GetCrashNMSec(RSec);
   If Access(Sec, RSec) Then
     Inc(Inf^.NMFlags, NMFlagCrash);

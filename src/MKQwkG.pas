@@ -4,7 +4,7 @@ Unit MKQwkG;                           {Global routines used by MKQwk}
 
 Interface
 
-Uses MKGlobT, MKUsrAbs;
+Uses MKGlobT;
 
 {$I MKQwk.Inc}
 
@@ -14,7 +14,6 @@ Var
   QCfg: QwkCfg;                        {Configuration record}
   QwkUser: QwkUserRec;                 {Current user record}
   QwkNumber: LongInt;                  {Current user record position}
-  BBSUser: AbsUsrObjPtr;               {BBS user object pointer}
 
 
 Function  LoadQwkCfg: Boolean;          {Load config information}
