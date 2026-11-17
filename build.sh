@@ -48,6 +48,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omktoss src/MKToss.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwk src/MKQwk.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
 for t in tosssetup tossdump tossmake tosscfg; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
@@ -135,6 +136,8 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doormenutest.py build/work/doormenu | grep -E "^(ok|FAIL|skip)" | tee build/doormenuresult.txt
   if grep -q FAIL build/doormenuresult.txt; then exit 1; fi
 fi
+# mkdraw: the screen editor (ANSI / AVATAR / ASCII screens) through a pseudo terminal
+python3 tests/drawtest.py build build/work/draw | grep -E "^(FAIL|failures)"
 # mkcat: CP437 text to the terminal
 python3 tests/cattest.py build build/work/cat | grep -E "^(FAIL|failures)"
 # the offline mail door (mkqwk): local mode on a private copy of the sample BBS, a real QWK packet

@@ -5,6 +5,9 @@ Unit CfgBox;   {Small message boxes (replaces the CfgYN unit of the Object Profe
 Interface
 
 Function DoYesNo(Hdr: String; DefChoice: Boolean): Word;  {0 = Escape, 1 = yes, 2 = no}
+Const
+  MsgBoxTitle: String = 'MKRead';        {the title of MsgBox: the program that shows it}
+
 Procedure MsgBox(Msg: String);
 Procedure ProcessBox(Msg: String; Hdr: String);
   {A "please wait" box; drawn at once, no event loop}
@@ -71,7 +74,7 @@ Procedure MsgBox(Msg: String);
   If W > 76 Then
     W := 76;
   R.Assign(0, 0, W, 8);
-  New(D, Init(R, 'MKRead'));
+  New(D, Init(R, MsgBoxTitle));
   D^.Options := D^.Options Or ofCentered;
   R.Assign(3, 2, W - 3, 4);
   D^.Insert(New(PStaticText, Init(R, Msg)));

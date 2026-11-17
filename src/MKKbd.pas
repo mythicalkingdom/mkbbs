@@ -27,7 +27,7 @@ Procedure InstallKeyboard;
 
 Implementation
 
-Uses Keyboard, BaseUnix, Termio;
+Uses Keyboard, Mouse, BaseUnix, Termio, MKCp437;
 
 Var
   Buf: Array[0..255] Of Byte;
@@ -37,6 +37,7 @@ Var
   Shift: Byte = 0;
   SaveTio: Termios;
   RawOn: Boolean = False;
+  MouseBtn: Word = 0;                      {the buttons that are down (the xterm reports only the change)}
   Orig: TKeyboardDriver;
 
 Const
@@ -178,6 +179,41 @@ Function CodeScan(Code: Integer; Var Sc: Byte): Boolean;
   End;
 
 
+Procedure MouseReport(B, X, Y: Integer; Release: Boolean);
+  {An xterm mouse report (SGR form) as a Free Vision mouse event: 1 left, 2 right, 4 middle; the wheel is ignored}
+  Var
+    E: TMouseEvent;
+    Bt: Word;
+
+  Begin
+  If (B And 64) <> 0 Then
+    Exit;
+  Case B And 3 Of
+    0: Bt := MouseLeftButton;
+    1: Bt := MouseMiddleButton;
+    2: Bt := MouseRightButton;
+    Else Bt := 0;
+    End;
+  FillChar(E, SizeOf(E), 0);
+  E.x := X - 1;
+  E.y := Y - 1;
+  If (B And 32) <> 0 Then
+    E.Action := MouseActionMove          {the pointer moved (the buttons stay as they are)}
+  Else If Release Then
+    Begin
+    E.Action := MouseActionUp;
+    MouseBtn := MouseBtn And Not Bt;
+    End
+  Else
+    Begin
+    E.Action := MouseActionDown;
+    MouseBtn := MouseBtn Or Bt;
+    End;
+  E.Buttons := MouseBtn;
+  PutMouseEvent(E);
+  End;
+
+
 Function Parse(Var Ev: TKeyEvent): Boolean;
   {One event from Buf; False when the bytes there are not complete yet}
   Var
@@ -189,6 +225,7 @@ Function Parse(Var Ev: TKeyEvent): Boolean;
     Fin: Byte;
     Num: Array[0..2] Of Integer;
     NumCnt: Integer;
+    SgrMouse: Boolean;
 
   Begin
   Parse := False;
@@ -224,6 +261,9 @@ Function Parse(Var Ev: TKeyEvent): Boolean;
       Num[2] := 0;
       NumCnt := 0;
       i := 2;
+      SgrMouse := (Buf[1] = Ord('[')) And (BufLen > 2) And (Buf[2] = Ord('<'));
+      If SgrMouse Then
+        i := 3;                            {ESC [ < button ; column ; row M (press, motion) or m (release)}
       While (i < BufLen) And ((Buf[i] In [Ord('0')..Ord('9')]) Or (Buf[i] = Ord(';'))) Do
         Begin
         If Buf[i] = Ord(';') Then
@@ -246,6 +286,11 @@ Function Parse(Var Ev: TKeyEvent): Boolean;
         End;
       Fin := Buf[i];
       Drop(i + 1);
+      If SgrMouse Then
+        Begin
+        MouseReport(Num[0], Num[1], Num[2], Fin = Ord('m'));
+        Exit;
+        End;
       Sh := 0;
       If NumCnt >= 1 Then
         Sh := ModShift(Num[1]);
@@ -276,6 +321,15 @@ Function Parse(Var Ev: TKeyEvent): Boolean;
             $47: Sc := $77;
             $49: Sc := $84;
             End;
+        If (Sc >= $3B) And (Sc <= $44) Then          {F1..F10 with Ctrl, Alt or Shift: the DOS scan codes}
+          Begin
+          If (Sh And 4) <> 0 Then
+            Sc := Sc - $3B + $5E
+          Else If (Sh And 8) <> 0 Then
+            Sc := Sc - $3B + $68
+          Else If (Sh And 3) <> 0 Then
+            Sc := Sc - $3B + $54;
+          End;
         Ev := Make(Sh, Sc, 0);
         Shift := Sh;
         Parse := True;
@@ -312,10 +366,15 @@ Function Parse(Var Ev: TKeyEvent): Boolean;
       End;
     If Len = 2 Then
       U := ((C And $1F) Shl 6) Or (Buf[1] And $3F)
+    Else If Len = 3 Then
+      U := ((C And $0F) Shl 12) Or ((Buf[1] And $3F) Shl 6) Or (Buf[2] And $3F)
     Else
       U := 0;
     Drop(Len);
-    i := Cp437(U);
+    If (U > 127) And (U < 65536) And (Utf8ToCp437(U) <> 0) Then
+      i := Utf8ToCp437(U)                  {any character the IBM PC set has: box drawing, shading ...}
+    Else
+      i := Cp437(U);
     If i >= 0 Then
       Begin
       Ev := Make(0, 0, i);
