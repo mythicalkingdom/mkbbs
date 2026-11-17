@@ -281,6 +281,7 @@ Var
 
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
 Var
+  ShellError: Word;                    {what DoShell could not do: 0 = it ran the program, 2 = no such program, else the DOS error}
   CharsetMode: Byte;                   {0 = by the terminal type, 1 = CP437 as it is, 2 = UTF-8 (mk -U, the menu command)}
   SysopChatWanted: Boolean;            {the sysop (mkmon) asked for a chat; DoChat starts at the next InputChr}
 
@@ -3704,19 +3705,53 @@ Procedure DoorUser.SetStartTime; {Set start time}
   UserInfo^.StartTime := CurrentTime;
   End;
 
+Function ShellProgram(Name: String): String;
+  {The program of a command line as it is meant: menus and doors are written the DOS way (a backslash in the path), a name
+   without a path is looked for in the current directory (the BBS directory) first and then in the path.  A name that is
+   not found is returned as it is.}
+  Var
+    i: Word;
+    P: String;
+
+  Begin
+  For i := 1 To Length(Name) Do
+    If Name[i] = '\' Then
+      Name[i] := '/';
+  If (Name <> '') And (Pos('/', Name) = 0) Then
+    Begin
+    If FileExist('./' + Name) Then
+      Name := './' + Name
+    Else
+      Begin
+      P := FSearch(Name, GetEnv('PATH'));
+      If P <> '' Then
+        Name := P;
+      End;
+    End;
+  ShellProgram := Name;
+  End;
+
+
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
   {Run a program (or a shell) and come back.  DoSwap / DoWindow were for the
-   DOS memory swapper and are ignored.}
+   DOS memory swapper and are ignored.  ShellError says whether it could be run.}
   Var
     CDirStr: String;
     EName: String;
     CStr: String;
 
   Begin
-  EName := ExtractWord(Cmd, 1);
-  CStr := Copy(Cmd, Length(EName) + 1, 255);
+  EName := ShellProgram(ExtractWord(Cmd, 1));
+  CStr := Copy(Cmd, Length(ExtractWord(Cmd, 1)) + 1, 255);
   CDirStr := GetCurrentPath;
-  Exec(EName, CStr);
+  ShellError := 0;
+  If Not FileExist(EName) Then
+    ShellError := 2
+  Else
+    Begin
+    Exec(EName, CStr);
+    ShellError := DosError;
+    End;
   ChDir(StripTrail(CDirStr, DirectorySeparator));
   If IoResult <> 0 Then;
   User.SetTimeOut;

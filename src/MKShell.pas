@@ -520,8 +520,10 @@ Procedure TypeSeven(Cmd: String);
     CallInfo: Boolean;
     DoorStart: LongInt;
     Tx, Ty: Byte;
+    Failed: Word;
 
   Begin
+  Failed := 0;
   User.PostStatus(uoDoor);
   FreezeTime := False;
   FossilHot := False;
@@ -597,6 +599,7 @@ Procedure TypeSeven(Cmd: String);
     Tx := WhereX;
     Ty := WhereY;
     DoShell(CmdStr, Swapping, False);
+    Failed := ShellError;
     If FreezeTime Then
       User.AdjustTime(User.CurrentTime - DoorStart);
     End;
@@ -609,6 +612,14 @@ Procedure TypeSeven(Cmd: String);
   GoToXy(Tx, Ty);
   If Error = 0 Then
     User.ReadExit('');
+  If Failed <> 0 Then
+    Begin
+    {the caller is told: a door that does not start must not look like nothing happened}
+    User.DisplayNewLine;
+    User.DisplayStrLn('Error: ' + ExtractWord(CmdStr, 1) + ' could not be run');
+    LogEntry.WriteEntry('DOS shell failed (' + Long2Str(Failed) + ') : ' + CmdStr);
+    User.PressEnter;
+    End;
   End;
 
 End.

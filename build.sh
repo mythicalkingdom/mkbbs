@@ -126,6 +126,11 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/fidtest tests/fidtest.pas 2>&1 | gr
 mkdir -p build/fidwork
 build/fidtest build/fidwork | grep -E "^(ok|FAIL|failures)" | tee build/fidresult.txt
 if grep -q FAIL build/fidresult.txt; then exit 1; fi
+# menu command 007 (external programs, doors): paths, parameters, drop files, the caller's input, a program that is not there
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/doormenutest.py build/work/doormenu | grep -E "^(ok|FAIL|skip)" | tee build/doormenuresult.txt
+  if grep -q FAIL build/doormenuresult.txt; then exit 1; fi
+fi
 # the tosser (mktoss) on a private copy of the sample BBS, with packets made by MessagePacket.js
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/tosstest.py build build/tosswork | grep -E "^(ok|FAIL|skip)" | tee build/tossresult.txt
