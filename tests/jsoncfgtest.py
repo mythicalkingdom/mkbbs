@@ -59,6 +59,7 @@ check('mklist with only MKJSON lists the same areas as with MK (%d bytes)' % len
 
 # the UTF-8 text of the file and the CP437 of the record file
 d['config']['SystemName'] = 'Café ░ ñ'
+d['config']['BadMsgArea'] = 6                 # offline replies that cannot go where they were meant
 d['config']['BbsLocation'] = 'Zürich €'        # the euro sign has no CP437 code: a ?
 efile = os.path.join(work, 'edited.json')
 json.dump(d, open(efile, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -66,9 +67,11 @@ r = run('mkcfgcvt', '-y', '5', '1', MK=mk2, MKJSON=efile)
 check('JSON to MK (MKJSON is the file) completed', r.returncode == 0 and 'Conversion completed' in r.stdout)
 cfgmk = open(os.path.join(mk2, 'config.mk'), 'rb').read()
 check('the .mk file has the text in CP437', b'Caf\x82 \xb0 \xa4' in cfgmk and b'Z\x81rich ?' in cfgmk)
+check('config.mk has the size of the sample (BadMsgArea took bytes of AddOn)', len(cfgmk) == os.path.getsize(os.path.join(sample, 'config.mk')))
 check('all five record files are written', sorted(os.listdir(mk2)) == ['config.mk', 'echocfg.mk', 'files.mk', 'mailer.mk', 'messages.mk'])
 r = run('mkcfgcvt', '-y', '1', '5', MK=mk2, MKJSON=j2dir)
 d2 = json.load(open(os.path.join(j2dir, 'bbsconfig.json'), encoding='utf-8'))
+check('BadMsgArea went through .mk and back', d2['config'].get('BadMsgArea') == 6 and 'BadMsgArea' in d['config'])
 check('MK back to JSON: the UTF-8 text is back', d2['config']['SystemName'] == 'Café ░ ñ' and d2['config']['BbsLocation'] == 'Zürich ?')
 d['config']['BbsLocation'] = 'Zürich ?'
 check('MK to JSON to MK to JSON loses nothing (all sections the same)', d == d2)

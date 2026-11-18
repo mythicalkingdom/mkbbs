@@ -93,6 +93,7 @@ Type NameObj = Object
   Procedure SetIgnoreHrs(ST: Boolean);
   Procedure SetFullScrn(ST: Boolean);
   Procedure SetAvatar(ST: Boolean);
+  Procedure SetQwkNode(ST: Boolean);   {a QWK network node (MK user files only)}
   Procedure SetBirthDate(BD: String);
   Procedure SetFirstDate(BD: String);
   Function  IsDeleted: Boolean;
@@ -103,6 +104,7 @@ Type NameObj = Object
   Function  IsIgnoreHrs: Boolean;
   Function  IsFullScrn: Boolean;
   Function  IsAvatar: Boolean;
+  Function  IsQwkNode: Boolean;
   Function  GetComment: String;
   Procedure SetComment(CM: String);
   Function  GetHandle: String;
@@ -580,6 +582,28 @@ Procedure NameObj.SetAvatar(ST: Boolean);
          RAUsersRecord(User^.UserBuffer[User^.CurrentPos]).Attribute2 :=
          (RAUsersRecord(User^.UserBuffer[User^.CurrentPos]).Attribute2 and (Not 2));
     End;
+  End;
+
+
+Procedure NameObj.SetQwkNode(ST: Boolean);
+  Begin
+  If Not User^.ExtraLoaded Then
+    LoadExtra;
+  If User^.BbsType = 1 Then
+    Begin
+    If St Then
+      User^.MKExtra^.ExtraInfo := User^.MKExtra^.ExtraInfo or eiQwkNode
+    Else
+      User^.MKExtra^.ExtraInfo := User^.MKExtra^.ExtraInfo and (Not eiQwkNode);
+    End;
+  End;
+
+
+Function NameObj.IsQwkNode: Boolean;
+  Begin
+  If Not User^.ExtraLoaded Then
+    LoadExtra;
+  IsQwkNode := (User^.BbsType = 1) And ((User^.MKExtra^.ExtraInfo and eiQwkNode) <> 0);
   End;
 
 

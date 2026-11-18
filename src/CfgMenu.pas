@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail;
+  CfgXfer, CfgProt, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail;
 
 Const
   cmGeneral = 1000;
@@ -38,6 +38,7 @@ Const
   cmErrorLevels = 1015;
   cmDoors = 1016;
   cmPackers = 1017;
+  cmProtocols = 1100;
   cmOfflineType = 1018;
   cmMsgAreas = 1019;
   cmMsgOptions = 1020;
@@ -124,6 +125,7 @@ Function CfgStatus.Hint(AHelpCtx: Word): String;
     cmErrorLevels: Hint := 'ErrorLevels for Baud rates';
     cmDoors: Hint := 'Doors available from Log-on';
     cmPackers: Hint := 'Archive compression setup';
+    cmProtocols: Hint := 'File transfer protocols and their command lines';
     cmOfflineType: Hint := 'Offline Mail Packet Types';
     cmMsgAreas: Hint := 'Message area configuration';
     cmMsgOptions: Hint := 'Message Configuration Options';
@@ -194,8 +196,9 @@ Procedure CfgApp.InitMenuBar;
             NewItem('~E~rrorLevels', '', kbNoKey, cmErrorLevels, cmErrorLevels,
             NewItem('~D~oors', '', kbNoKey, cmDoors, cmDoors,
             NewItem('Pa~c~kers', '', kbNoKey, cmPackers, cmPackers,
+            NewItem('~T~ransfer Protocols', '', kbNoKey, cmProtocols, cmProtocols,
             NewItem('~O~ffline Type', '', kbNoKey, cmOfflineType, cmOfflineType,
-            Nil))))))))))))),
+            Nil)))))))))))))),
         NewSubMenu('~M~essages', hcNoContext,
         NewMenu(
           NewItem('~A~reas', '', kbNoKey, cmMsgAreas, cmMsgAreas,
@@ -292,6 +295,7 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmErrorLevels: DoCfgEL;
       cmDoors: DoPickDoor;
       cmPackers: DoCfgPPack;
+      cmProtocols: DoCfgProt;
       cmOfflineType: DoCfgOffType;
       cmMsgAreas: DoCfgMArea;
       cmMsgOptions: ;                  {no screen in the original either}

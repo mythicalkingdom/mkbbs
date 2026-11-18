@@ -360,6 +360,8 @@ Type CfgObj = Object
   Function  GetProtSpecAvail(PN: Word): Boolean; Virtual; {Is protocol avail special files}
   Function  GetProtChar(PN: Word): Char; Virtual; {Get protocol character}
   Function  GetProtName(PN: Word): String; Virtual; {Get protocol name}
+  Function  GetProtCmdLine(PN: Word): String; Virtual; {Get external protocol command line: send | receive}
+  Procedure SetProtCmdLine(PN: Word; Cmd: String); Virtual; {Set it}
   Procedure SetProtNormAvail(PN: Word; PA: Boolean); Virtual; {Is protocol avail norm files}
   Procedure SetProtSpecAvail(PN: Word; PA: Boolean); Virtual; {Is protocol avail special files}
   Procedure SetProtChar(PN: Word; PC: Char); Virtual; {Set protocol character}
@@ -404,11 +406,17 @@ Type CfgObj = Object
   Function  GetOffForceBull: Boolean; Virtual; {Get Force Bulletins}
   Procedure SetOffForceBull(OA: Boolean); Virtual; {Set force Bulletins}
   Function  GetOffAllowFreq: Boolean; Virtual; {Get offline allow file req}
+  Function  GetOffQwke: Boolean; Virtual; {QWKE long names and subjects in QWK packets}
+  Procedure SetOffQwke(OQ: Boolean); Virtual; {Set QWKE}
   Procedure SetOffAllowFreq(OA: Boolean); Virtual; {Set allow file req}
   Function  GetOffMax: Word; Virtual; {Get offline max msgs per pkt}
   Procedure SetOffMax(OM: Word); Virtual; {Set max msgs per pkt}
   Function  GetOffConfMax: Word; Virtual; {Get max msgs per area}
   Procedure SetOffConfMax(CM: Word); Virtual; {Set max msgs per area}
+  Function  GetBadMsgArea: Word; Virtual; {Get msg area for offline replies that cannot go where meant (0 = none)}
+  Procedure SetBadMsgArea(BA: Word); Virtual; {Set that area}
+  Function  GetOffReDate: Boolean; Virtual; {Redate offline replies to the import date}
+  Procedure SetOffReDate(RD: Boolean); Virtual; {Set redate}
   Function  GetOffCompRate: Word; Virtual; {Get estimate compress %}
   Procedure SetOffCompRate(CM: Word); Virtual; {Set est compr %}
   Function  GetOffSafetyMin: Word; Virtual; {Get offline safety minutes}
@@ -1850,6 +1858,15 @@ Function CfgObj.GetProtChar(PN: Word): Char; {Get protocol character}
   Begin
   End;
 
+Function CfgObj.GetProtCmdLine(PN: Word): String;
+  Begin
+  GetProtCmdLine := '';
+  End;
+
+Procedure CfgObj.SetProtCmdLine(PN: Word; Cmd: String);
+  Begin
+  End;
+
 Function CfgObj.GetProtName(PN: Word): String; {Get protocol name}
   Begin
   End;
@@ -2083,6 +2100,15 @@ Procedure CfgObj.SetOffForceBull(OA: Boolean);
   Begin
   End;
 
+Function CfgObj.GetOffQwke: Boolean;
+  Begin
+  GetOffQwke := False;
+  End;
+
+Procedure CfgObj.SetOffQwke(OQ: Boolean);
+  Begin
+  End;
+
 Function CfgObj.GetOffAllowFreq: Boolean;
   Begin
   GetOffAllowFreq := False;
@@ -2107,6 +2133,24 @@ Function  CfgObj.GetOffConfMax: Word;
   End;
 
 Procedure CfgObj.SetOffConfMax(CM: Word);
+  Begin
+  End;
+
+Function  CfgObj.GetBadMsgArea: Word;
+  Begin
+  GetBadMsgArea := 0;
+  End;
+
+Procedure CfgObj.SetBadMsgArea(BA: Word);
+  Begin
+  End;
+
+Function  CfgObj.GetOffReDate: Boolean;
+  Begin
+  GetOffReDate := False;
+  End;
+
+Procedure CfgObj.SetOffReDate(RD: Boolean);
   Begin
   End;
 

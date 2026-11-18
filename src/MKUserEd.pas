@@ -132,7 +132,7 @@ Procedure BuildLines;
     'More: ' + Pad2(YN(UR.More), 4) + 'Ansi: ' + Pad2(YN(UR.Ansi), 4) +
     'Avatar: ' + Pad2(YN(UR.Avatar), 4) + 'No Kill: ' + YN(UR.NoKill);
   Add(L);
-  Add(' Ignore Hrs: ' + Pad2(YN(UR.IgnoreHrs), 5) + 'Full Screen Editor: ' + YN(UR.FullScr));
+  Add(' Ignore Hrs: ' + Pad2(YN(UR.IgnoreHrs), 5) + 'Full Screen Editor: ' + Pad2(YN(UR.FullScr), 4) + 'QWK Node: ' + YN(UR.QwkNode));
   Add('');
   Add(' Birthdate: ' + Pad2(UR.Birthdate, 10) + 'First Called: ' + Pad2(UR.FirstCall, 10) +
     'Expiration: ' + UR.Expire);

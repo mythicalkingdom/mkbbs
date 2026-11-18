@@ -347,6 +347,8 @@ Type MKCfgObj = Object(CfgObj)
   Function  GetProtSpecAvail(PN: Word): Boolean; Virtual; {Is protocol avail special files}
   Function  GetProtChar(PN: Word): Char; Virtual; {Get protocol character}
   Function  GetProtName(PN: Word): String; Virtual; {Get protocol name}
+  Function  GetProtCmdLine(PN: Word): String; Virtual; {Get external protocol command line: send | receive}
+  Procedure SetProtCmdLine(PN: Word; Cmd: String); Virtual; {Set it}
   Procedure SetProtNormAvail(PN: Word; PA: Boolean); Virtual; {Is protocol avail norm files}
   Procedure SetProtSpecAvail(PN: Word; PA: Boolean); Virtual; {Is protocol avail special files}
   Procedure SetProtChar(PN: Word; PC: Char); Virtual; {Set protocol character}
@@ -393,11 +395,17 @@ Type MKCfgObj = Object(CfgObj)
   Function  GetOffForceBull: Boolean; Virtual; {Get Force Bulletins}
   Procedure SetOffForceBull(OA: Boolean); Virtual; {Set force Bulletins}
   Function  GetOffAllowFreq: Boolean; Virtual; {Get offline allow file req}
+  Function  GetOffQwke: Boolean; Virtual; {QWKE long names and subjects in QWK packets}
+  Procedure SetOffQwke(OQ: Boolean); Virtual; {Set QWKE}
   Procedure SetOffAllowFreq(OA: Boolean); Virtual; {Set allow file req}
   Function  GetOffMax: Word; Virtual; {Get offline max msgs per pkt}
   Procedure SetOffMax(OM: Word); Virtual; {Set max msgs per pkt}
   Function  GetOffConfMax: Word; Virtual; {Get max msgs per area}
   Procedure SetOffConfMax(CM: Word); Virtual; {Set max msgs per area}
+  Function  GetBadMsgArea: Word; Virtual; {Get msg area for offline replies that cannot go where meant (0 = none)}
+  Procedure SetBadMsgArea(BA: Word); Virtual; {Set that area}
+  Function  GetOffReDate: Boolean; Virtual; {Redate offline replies to the import date}
+  Procedure SetOffReDate(RD: Boolean); Virtual; {Set redate}
   Function  GetOffCompRate: Word; Virtual; {Get estimate compress %}
   Procedure SetOffCompRate(CM: Word); Virtual; {Set est compr %}
   Function  GetOffSafetyMin: Word; Virtual; {Get offline safety minutes}
@@ -3188,6 +3196,20 @@ Function MKCfgObj.GetProtChar(PN: Word): Char;
   End;
 
 
+Function MKCfgObj.GetProtCmdLine(PN: Word): String;
+  Begin
+  If (PN >= 11) And (PN <= 20) Then
+    GetProtCmdLine := MKCfg^.ExtProt[PN].CmdLine
+  Else
+    GetProtCmdLine := '';
+  End;
+
+Procedure MKCfgObj.SetProtCmdLine(PN: Word; Cmd: String);
+  Begin
+  If (PN >= 11) And (PN <= 20) Then
+    MKCfg^.ExtProt[PN].CmdLine := Copy(Cmd, 1, 80);
+  End;
+
 Function MKCfgObj.GetProtName(PN: Word): String;
   Begin
   Case PN of
@@ -3588,6 +3610,19 @@ Procedure MKCfgObj.SetOffForceBull(OA: Boolean);
     MKCfg^.OffAttr := MKCfg^.OffAttr And (Not oaForceBull);
   End;
 
+Function MKCfgObj.GetOffQwke: Boolean;
+  Begin
+  GetOffQwke := (MKCfg^.OffAttr and oaQwke) <> 0;
+  End;
+
+Procedure MKCfgObj.SetOffQwke(OQ: Boolean);
+  Begin
+  If OQ Then
+    MKCfg^.OffAttr := MKCfg^.OffAttr or oaQwke
+  Else
+    MKCfg^.OffAttr := MKCfg^.OffAttr And (Not oaQwke);
+  End;
+
 Function MKCfgObj.GetOffAllowFreq: Boolean;
   Begin
   GetOffAllowFreq := (MKCfg^.OffAttr and oaAllowFreq) <> 0;
@@ -3619,6 +3654,29 @@ Function MKCfgObj.GetOffConfMax: Word;
 Procedure MKCfgObj.SetOffConfMax(CM: Word);
   Begin
   MKCfg^.OffConfMax := Cm;
+  End;
+
+Function MKCfgObj.GetBadMsgArea: Word;
+  Begin
+  GetBadMsgArea := MKCfg^.BadMsgArea;
+  End;
+
+Procedure MKCfgObj.SetBadMsgArea(BA: Word);
+  Begin
+  MKCfg^.BadMsgArea := BA;
+  End;
+
+Function MKCfgObj.GetOffReDate: Boolean;
+  Begin
+  GetOffReDate := (MKCfg^.Attr And mcRedate) <> 0;
+  End;
+
+Procedure MKCfgObj.SetOffReDate(RD: Boolean);
+  Begin
+  If RD Then
+    MKCfg^.Attr := MKCfg^.Attr Or mcRedate
+  Else
+    MKCfg^.Attr := MKCfg^.Attr And (Not mcRedate);
   End;
 
 Function MKCfgObj.GetOffCompRate: Word;

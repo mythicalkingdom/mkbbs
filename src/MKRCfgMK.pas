@@ -207,6 +207,7 @@ Type MKRCfgObj = Object(CfgObj)
   Function  GetProtSpecAvail(PN: Word): Boolean; Virtual; {Is protocol avail special files}
   Function  GetProtChar(PN: Word): Char; Virtual; {Get protocol character}
   Function  GetProtName(PN: Word): String; Virtual; {Get protocol name}
+  Function  GetProtCmdLine(PN: Word): String; Virtual; {Get external protocol command line: send | receive}
   Function  GetPackAvail(PN: Word): Boolean; Virtual; {Is packer avail}
   Function  GetPackChar(PN: Word): Char; Virtual; {Get packer character}
   Function  GetPackName(PN: Word): String; Virtual; {Get packer name}
@@ -229,8 +230,11 @@ Type MKRCfgObj = Object(CfgObj)
   Function  GetOffAllowBull: Boolean; Virtual; {Get offline allow bulletins}
   Function  GetOffForceBull: Boolean; Virtual; {Get Force Bulletins}
   Function  GetOffAllowFreq: Boolean; Virtual; {Get offline allow file req}
+  Function  GetOffQwke: Boolean; Virtual; {QWKE long names and subjects in QWK packets}
   Function  GetOffMax: Word; Virtual; {Get offline max msgs per pkt}
   Function  GetOffConfMax: Word; Virtual; {Get max msgs per area}
+  Function  GetBadMsgArea: Word; Virtual; {Get msg area for offline replies that cannot go where meant}
+  Function  GetOffReDate: Boolean; Virtual; {Redate offline replies to the import date}
   Function  GetOffCompRate: Word; Virtual; {Get estimate compress %}
   Function  GetOffSafetyMin: Word; Virtual; {Get offline safety minutes}
   Function  GetOffScrns(SN: Word): String; Virtual; {Get offline screen names}
@@ -1984,6 +1988,14 @@ Function MKRCfgObj.GetProtChar(PN: Word): Char;
   End;
 
 
+Function MKRCfgObj.GetProtCmdLine(PN: Word): String;
+  Begin
+  If (PN >= 11) And (PN <= 20) Then
+    GetProtCmdLine := MKCfg^.ExtProt[PN].CmdLine
+  Else
+    GetProtCmdLine := '';
+  End;
+
 Function MKRCfgObj.GetProtName(PN: Word): String;
   Begin
   Case PN of
@@ -2209,6 +2221,11 @@ Function MKRCfgObj.GetOffForceBull: Boolean;
   GetOffForceBull := (MKCfg^.OffAttr and oaForceBull) <> 0;
   End;
 
+Function MKRCfgObj.GetOffQwke: Boolean;
+  Begin
+  GetOffQwke := (MKCfg^.OffAttr and oaQwke) <> 0;
+  End;
+
 Function MKRCfgObj.GetOffAllowFreq: Boolean;
   Begin
   GetOffAllowFreq := (MKCfg^.OffAttr and oaAllowFreq) <> 0;
@@ -2222,6 +2239,16 @@ Function MKRCfgObj.GetOffMax: Word;
 Function MKRCfgObj.GetOffConfMax: Word;
   Begin
   GetOffConfMax := MKCfg^.OffConfMax;
+  End;
+
+Function MKRCfgObj.GetBadMsgArea: Word;
+  Begin
+  GetBadMsgArea := MKCfg^.BadMsgArea;
+  End;
+
+Function MKRCfgObj.GetOffReDate: Boolean;
+  Begin
+  GetOffReDate := (MKCfg^.Attr And mcRedate) <> 0;
   End;
 
 Function MKRCfgObj.GetOffCompRate: Word;

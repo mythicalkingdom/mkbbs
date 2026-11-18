@@ -121,6 +121,7 @@ Const                                  {ExtUser.ExtraInfo}
   eiAutoPage =    64;                  {Automatic page at log-on}
   eiHiddenPage = 128;                  {Auto page but hidden from caller}
   eiAvatar =     256;                  {Avatar graphics}
+  eiQwkNode =    512;                  {A QWK network node: a system that calls in for its packet}
 
   uoaNew =         1;                  {New files list}
   uoaScrn =        2;                  {Screens}
@@ -246,7 +247,8 @@ Type BbsCfg = Record                   {Config.Mk file}
   MaxDesc: Byte;                       {Maximum file descritpion length}
   MinUlSpace: LongInt;                 {Minimum free space remaining}
   ULCredit: Word;                      {Credit for uploads}
-  AddOn: Array[1..40] of Byte;         {For add-ons to claim space}
+  BadMsgArea: Word;                    {Msg area for offline replies that cannot go where they were meant (0 = none)}
+  AddOn: Array[1..38] of Byte;         {For add-ons to claim space}
   LogAttr: Byte;                       {Type and level of logging}
   CheckBD: Byte;                       {Check birthdate at log-on}
   CheckPhone: Byte;                    {Check phone at log-on}
@@ -339,6 +341,7 @@ Const                                  {OffAttr = offline mail settings}
  oaAllowBull = 16;                     {Allow bulletins}
  oaForceBull = 32;                     {Force bulletins}
  oaAllowFreq = 64;                     {Allow file requests}
+ oaQwke = 128;                         {QWKE: long names and subjects in QWK packets}
 
 Const                                  {MsgCfg.Attr}
   mcAltLocking = 001;                  {True = record locking False=file lock}

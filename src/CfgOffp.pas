@@ -12,8 +12,8 @@ Uses MKString, MKCfgAbs, CfgForm;
 
 Type
   UserRecord = Record
-    MaxMsg, MaxConf, CompRate, Safety: Word;
-    AllowNew, ForceNew, AllowScrn, ForceScrn, AllowBull, ForceBull,
+    MaxMsg, MaxConf, CompRate, Safety, BadArea: Word;
+    ReDate, Qwke, AllowNew, ForceNew, AllowScrn, ForceScrn, AllowBull, ForceBull,
       AllowFreq: Boolean;
     Bull1, Welcome, Bull2, News, Bull3, GoodBye, Bull4, Bull5, Bull6, Bull7,
       Bull8, Bull9, Bull10: String[8];
@@ -31,6 +31,9 @@ Procedure EditOffCfgP;
   UR^.MaxConf := Config^.GetOffConfMax;
   UR^.CompRate := Config^.GetOffCompRate;
   UR^.Safety := Config^.GetOffSafetyMin;
+  UR^.BadArea := Config^.GetBadMsgArea;
+  UR^.ReDate := Config^.GetOffReDate;
+  UR^.Qwke := Config^.GetOffQwke;
   UR^.AllowNew := Config^.GetOffAllowNew;
   UR^.ForceNew := Config^.GetOffForceNew;
   UR^.AllowScrn := Config^.GetOffAllowScrn;
@@ -77,6 +80,12 @@ Procedure EditOffCfgP;
   F.AddYesNo('Force Bulletins:', UR^.ForceBull, 'Force Bulletins');
   F.At(7, 3, 7, 24);
   F.AddYesNo('Allow File Requests:', UR^.AllowFreq, 'Allow File Requests');
+  F.At(7, 38, 7, 67);
+  F.AddYesNo('Redate Replies When Imported:', UR^.ReDate, 'Redate Replies When Imported');
+  F.At(18, 38, 18, 63);
+  F.AddYesNo('QWKE Long Names:', UR^.Qwke, 'Long names and subjects (QWKE) in QWK packets');
+  F.At(19, 3, 19, 36);
+  F.AddNumber('Area For Replies That Cannot Go:', UR^.BadArea, 3, 0, 500, 'Message area for uploaded replies to an unknown conference or one that may not be written (0 = refuse them)');
   F.At(9, 3, 9, 16);
   F.AddString('Bulletin  1:', UR^.Bull1, 8, 'Bulletin  1');
   F.At(9, 38, 9, 47);
@@ -109,6 +118,9 @@ Procedure EditOffCfgP;
     Config^.SetOffConfMax(UR^.MaxConf);
     Config^.SetOffCompRate(UR^.CompRate);
     Config^.SetOffSafetyMin(UR^.Safety);
+    Config^.SetBadMsgArea(UR^.BadArea);
+    Config^.SetOffReDate(UR^.ReDate);
+    Config^.SetOffQwke(UR^.Qwke);
     Config^.SetOffAllowNew(UR^.AllowNew);
     Config^.SetOffForceNew(UR^.ForceNew);
     Config^.SetOffAllowScrn(UR^.AllowScrn);

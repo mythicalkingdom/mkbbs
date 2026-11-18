@@ -299,8 +299,9 @@ Function JsonTo_BbsCfg(Var R: BbsCfg): TJSONObject;
   O.Add('MaxDesc', TJSONInt64Number.Create(R.MaxDesc));
   O.Add('MinUlSpace', TJSONInt64Number.Create(R.MinUlSpace));
   O.Add('ULCredit', TJSONInt64Number.Create(R.ULCredit));
+  O.Add('BadMsgArea', TJSONInt64Number.Create(R.BadMsgArea));
   A := TJSONArray.Create;
-  For i16 := 1 To 40 Do
+  For i16 := 1 To 38 Do
     A.Add(TJSONInt64Number.Create(R.AddOn[i16]));
   O.Add('AddOn', A);
   O.Add('LogAttr', TJSONInt64Number.Create(R.LogAttr));
@@ -977,9 +978,12 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
   D := O.Find('ULCredit');
   If D <> Nil Then
     R.ULCredit := JsonNum(D, R.ULCredit, 0, 65535);
+  D := O.Find('BadMsgArea');
+  If D <> Nil Then
+    R.BadMsgArea := JsonNum(D, R.BadMsgArea, 0, 65535);
   D := O.Find('AddOn');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i45 := 1 To 40 Do
+    For i45 := 1 To 38 Do
       If i45 - 1 < TJSONArray(D).Count Then
         R.AddOn[i45] := JsonNum(TJSONArray(D).Items[i45 - 1], R.AddOn[i45], 0, 255);
   D := O.Find('LogAttr');
