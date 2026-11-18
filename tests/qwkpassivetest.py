@@ -107,7 +107,7 @@ o, rc = session([('Login: ', 'Chuck Ebenschweiger\r'), ('Password: ', 'x\r'), ('
 check('a user without the QWK node flag cannot come in', 'QWK:' not in o)
 before = dump(6)
 o, rc = session([('Login: ', 'Mark May\r'), ('Password: ', 'nodepw\r'), ('QWK: ', '?'), ('QWK: ', 'D'), ('QWK: ', 'U'), ('QWK: ', 'Q')])
-check('login with the password (any case): the QWK: prompt', 'QWK:' in o and 'D)ownload' in o)
+check('login with the password (any case): the QWK: prompt', 'QWK:' in o and 'Download QWK message packet' in o and 'Logging on to' in o)
 check('D: the packet was sent (a ZIP with MESSAGES.DAT)', os.path.exists(ra + '/sent.qwk') and 'messages.dat' in [n.lower() for n in zipfile.ZipFile(ra + '/sent.qwk').namelist()])
 check('U: the reply packet was posted', dump(6) != before)
 check('Q: ends the call, exit 0', rc == 0)

@@ -7,6 +7,7 @@ Unit MKQwkLog;       {mk -Q: the login of a QWK network system (or any caller wh
 
        Login:      the name of the user record (the QWK id of the system); no new users, no language, no screens
        Password:   the password of the record; three tries
+       Logging on to <system> as <name> ...   (as Synchronet says it, then the QWK: prompt)
        QWK:        D download the packet (<BBSID>.QWK), U upload the reply packet (<BBSID>.REP),
                    B both (upload first), ? the list, Q quit
 
@@ -66,6 +67,7 @@ Function QwkLogin: Boolean;
     Begin
     LogEntry.BlankLine;
     LogEntry.WriteEntry(User.GetUserName + ' on-line (QWK) at ' + Long2Str(UserBaud) + ' BPS');
+    User.DisplayStrLn('Logging on to ' + Config^.GetBbsName + ' as ' + User.GetUserName + ' ...');
     User.PostStatus(uoLogIn);
     User.SetUserTimesCalled(User.GetUserTimesCalled + 1);
     User.SetSessionTimeLimit(3600);
@@ -106,7 +108,15 @@ Procedure QwkSession;
              OfflineUL;
              OfflineDL;
              End;
-        '?': User.DisplayStrLn('D)ownload packet, U)pload replies, B)oth, Q)uit');
+        '?': Begin
+             User.DisplayNewLine;
+             User.DisplayStrLn('QWK Offline Reader Menu');
+             User.DisplayStrLn('U Upload REP reply packet');
+             User.DisplayStrLn('D Download QWK message packet');
+             User.DisplayStrLn('B Both: upload, then download');
+             User.DisplayStrLn('Q Quit');
+             User.DisplayNewLine;
+             End;
         'Q': Done := True;
         End;
       End;
