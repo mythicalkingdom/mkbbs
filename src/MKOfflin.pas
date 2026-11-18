@@ -16,6 +16,7 @@ Procedure AskOffAllYour;
 Procedure AskOffZero;
 Procedure AskOffMax;
 Procedure AskOffConfMax;
+Var OfflineQuiet: Boolean;   {a scripted caller (mk -Q): nothing is asked, nothing waits for Enter}
 Procedure OfflineAuto;
 Procedure OfflineUL;
 Procedure OfflineDL;
@@ -30,6 +31,13 @@ Uses MKFile, MKString, MKDoor, MKCfgAbs, MKGlobT, MKCFile,
   MKOffAbs, MKOffQwk, MKOffTxt, MKOffXrs, MKOffBwv,
   MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKOffDL, MKOffXfer,
   Dos;
+
+
+Procedure OffPause;
+  Begin
+  If Not OfflineQuiet Then
+    User.PressEnter;
+  End;
 
 
 Procedure SetPacker;
@@ -254,6 +262,35 @@ Procedure AskOffConfMax;
   End;
 
 
+Procedure QuietDefaults;
+  {a caller who cannot be asked gets the first protocol and packer of the system, QWK, and the largest packet}
+  Var
+    i: Word;
+
+  Begin
+  If GetUserProtNum = 0 Then
+    Begin
+    i := 1;
+    While (i <= 20) And Not (Config^.GetProtNormAvail(i) And (i <> 7)) Do
+      Inc(i);
+    If i <= 20 Then
+      User.SetUserProt(Config^.GetProtChar(i));
+    End;
+  If GetUserPackerNum = 0 Then
+    Begin
+    i := 1;
+    While (i <= 10) And Not Config^.GetPackAvail(i) Do
+      Inc(i);
+    If i <= 10 Then
+      User.SetUserPacker(UpCase(Config^.GetPackChar(i)));
+    End;
+  If User.GetUserOffMax = 0 Then
+    User.SetUserOffMax(Config^.GetOffMax);
+  If User.GetUserOffConfMax = 0 Then
+    User.SetUserOffConfMax(Config^.GetOffConfMax);
+  End;
+
+
 Function ValidateOffline: Boolean;
   Var
     AskAll: Boolean;
@@ -261,6 +298,12 @@ Function ValidateOffline: Boolean;
 
   Begin
   AskAll := False;
+  If OfflineQuiet Then
+    Begin
+    QuietDefaults;
+    ValidateOffline := True;
+    Exit;
+    End;
   If GetUserProtNum = 0 Then
     Begin
     SetProtocol;
@@ -444,7 +487,7 @@ Function SendMail(FN: String; JustName: String; WorkPath: String): Boolean;
     User.DisplayAttr(Config^.GetSystemColor(1));
     User.DisplayStrLn(Prompts.GetString(126));
     User.DisplayNewLine;
-    User.PressEnter;
+    OffPause;
     End
   Else
     Begin
@@ -461,7 +504,7 @@ Function SendMail(FN: String; JustName: String; WorkPath: String): Boolean;
     If Not XferOk Then
       Begin
       User.DisplayStrLn(Prompts.GetString(168));
-      User.PressEnter;
+      OffPause;
       End;
     End;
   SendMail := XferOk;
@@ -592,7 +635,7 @@ Procedure OfflineDL;
       Begin
       User.DisplayNewLine;
       User.DisplayStrLn(Prompts.GetString(178));
-      User.PressEnter;
+      OffPause;
       Quiet := True;
       Cont := False;
       End;
@@ -616,7 +659,7 @@ Procedure OfflineDL;
     End;
   If Cont And (Not Local) Then
     Begin
-    If User.GetUserOffVerify Then
+    If User.GetUserOffVerify And Not OfflineQuiet Then
       Begin
       Cont := OffVerify(WithBackSlash(WorkPath) + ArcName);
       Quiet := Not Cont;
@@ -631,7 +674,7 @@ Procedure OfflineDL;
     User.DisplayNewLine;
     User.DisplayAttr(Config^.GetSystemColor(1));
     User.DisplayStrLn(Prompts.GetString(364));
-    User.PressEnter;
+    OffPause;
     End;
   If Offline <> nil Then
     Dispose(Offline, Done);
@@ -672,7 +715,7 @@ Procedure OfflineUL;
     Begin
     User.DisplayNewLine;
     User.DisplayStrLn(Prompts.GetString(176));
-    User.PressEnter;
+    OffPause;
     Exit;
     End;
   Offline := New(QwkOffPtr, Init);
@@ -691,7 +734,8 @@ Procedure OfflineUL;
     Else
       Begin
       User.DisplayNewLine;
-      User.AskYN(Prompts.GetString(177), Have);
+      If Not OfflineQuiet Then
+        User.AskYN(Prompts.GetString(177), Have);
       If Have Then
         Begin
         Cmd := ProtCmd(False, ProtNum);
@@ -711,7 +755,7 @@ Procedure OfflineUL;
           Begin
           User.DisplayNewLine;
           User.DisplayStrLn(Prompts.GetString(168));
-          User.PressEnter;
+          OffPause;
           End;
         End;
       End;
@@ -737,7 +781,7 @@ Procedure OfflineUL;
       User.DisplayNewLine;
       User.DisplayStrLn(Prompts.GetString(178));
       If Not Local Then
-        User.PressEnter;
+        OffPause;
       End
     Else
       Begin
@@ -752,7 +796,7 @@ Procedure OfflineUL;
       User.DisplayNewLine;
       User.DisplayStrLn(Long2Str(Imported) + ' message(s) posted');
       If Not Local Then
-        User.PressEnter;
+        OffPause;
       End;
     End
   Else If Cont And Local Then

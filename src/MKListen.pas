@@ -42,7 +42,8 @@ Program MKListen;
           "busy":     "All lines are busy.",   sent when no node is free
           "ports": [
             { "port": 2323,                    required
-              "type": "telnet",                "telnet" | "raw" | "ws"
+              "type": "telnet",                "telnet" | "raw" | "ws" | "qwk" (telnet, mk -Q)
+              "qwk": true,                     any type: the callers get the QWK login (mk -Q)
               "baud": 2400,                    emulated speed, 0 = full speed
               "bind": "0.0.0.0",               address to listen on (IPv4)
               "nodes": "1-4",                  nodes for this port
@@ -59,6 +60,12 @@ Program MKListen;
         }
 
      "stype" is accepted for "type" (the name the JavaScript BBS used).
+
+     QWK port: "type": "qwk" (or "qwk": true on a telnet, raw or ws port) starts mk with -Q: the login for QWK
+     network systems and scripts (Login:, Password:, then QWK: with D, U, B, Q; see MKQwkLog).  Only users with the
+     QWK Node flag come in, the other ports are not affected.
+
+          { "port": 2327, "type": "qwk", "config": "/bbs/mk" }
 
      Sysop monitor: a port of "type": "sysop" is not a caller.  Whoever connects
      (Telnet, localhost only: use ssh port forwarding to reach it from outside)
@@ -292,8 +299,10 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     Key, Where: String;
     V: TJSONData;
     E: TJSONObject;
+    Qwk: Boolean;
 
   Begin
+  Qwk := False;
   Where := 'ports[' + IntToStr(Idx) + ']';
   P.Port := 0;
   P.SType := 'telnet';
@@ -318,14 +327,21 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     Else If (Key = 'type') Or (Key = 'stype') Then
       Begin
       P.SType := LowerCase(JStr(V, Where + '.type'));
-      If P.SType = 'sysop' Then
+      If P.SType = 'qwk' Then
+        Begin
+        Qwk := True;                   {a telnet port for QWK network systems and scripts: mk -Q}
+        P.SType := 'telnet';
+        End
+      Else If P.SType = 'sysop' Then
         Begin
         P.Sysop := True;
         P.SType := 'telnet';
         End
       Else If (P.SType <> 'telnet') And (P.SType <> 'raw') And (P.SType <> 'ws') Then
-        Die(Where + '.type must be "telnet", "raw", "ws" or "sysop" (TLS: put stunnel in front)');
+        Die(Where + '.type must be "telnet", "raw", "ws", "qwk" or "sysop" (TLS: put stunnel in front)');
       End
+    Else If Key = 'qwk' Then
+      Qwk := JBool(V, Where + '.qwk')
     Else If Key = 'baud' Then
       P.Baud := JInt(V, Where + '.baud', 0, 1000000)
     Else If Key = 'bind' Then
@@ -372,6 +388,8 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     Else If Copy(Key, 1, 1) <> '_' Then
       Die(Where + ': unknown key "' + O.Names[i] + '"');
     End;
+  If Qwk Then
+    P.Args := P.Args + ' -Q';
   If P.Port = 0 Then
     Die(Where + ' has no "port"');
   If P.Proxy And (P.Bind <> '127.0.0.1') Then

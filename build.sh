@@ -158,6 +158,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwknettest.py build build/work/qwknet | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwknetresult.txt
   if grep -q FAIL build/qwknetresult.txt; then exit 1; fi
 fi
+# mk -Q: the login of a QWK network system (Login:, Password:, QWK: D/U/B/Q)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/qwkpassivetest.py build build/work/qwklogin | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkloginresult.txt
+  if grep -q FAIL build/qwkloginresult.txt; then exit 1; fi
+fi
 # the tosser (mktoss) on a private copy of the sample BBS, with packets made by MessagePacket.js
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/tosstest.py build build/tosswork | grep -E "^(ok|FAIL|skip)" | tee build/tossresult.txt

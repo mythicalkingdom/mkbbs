@@ -41,6 +41,12 @@
       "config": "/bbs/ra"
     },
     {
+      "_note": "QWK network systems and scripts: telnet in, Login: (QWK id), Password:, then QWK: D/U/B/Q (mk -Q; only users with the QWK Node flag)",
+      "port": 2327,
+      "type": "qwk",
+      "config": "/bbs/ra"
+    },
+    {
       "_note": "sysop monitor: telnet to 127.0.0.1:2330 (from elsewhere use ssh -L 2330:127.0.0.1:2330), password in plain text or sha1:<hex digest>",
       "port": 2330,
       "type": "sysop",

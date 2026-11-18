@@ -7,7 +7,7 @@ Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
 MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
-MKLogOn, MKAvatar, MKSnoop, MKQwkNet, Dos
+MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, Dos
   ;
 
 
@@ -67,6 +67,7 @@ Var
   SessProxy: Boolean;
   RunDir: String;
   NetId: String;
+  QwkMode: Boolean;
 
 Begin
 StartUpPath := GetCurrentPath;
@@ -80,6 +81,7 @@ SessAddr := '';
 SessRate := 0;
 SessProxy := False;
 NetId := '';
+QwkMode := False;
 i := 1;
 While i <= ParamCount Do
   Begin
@@ -98,6 +100,7 @@ While i <= ParamCount Do
       'S': SessType := Copy(TmpStr,3,10);
       'G': NetId := Copy(ParamStr(i), 3, 40);   {a pass with a QWK network system (MKQwkNet): no caller}
       'H': SessProxy := True;      {PROXY header first on the connection}
+      'Q': QwkMode := True;          {the login of a QWK network system / script: MKQwkLog}
       'P': LogToPrinter := True;
       'C': OverridePort := Str2Long(Copy(TmpStr,3,5));
       'E': ExitErrorLevel := Str2Long(Copy(TmpStr,3,5));
@@ -241,40 +244,50 @@ Else
     CommSetBaud(UserBaud)
   Else
     CommSetBaud(OverrideBaud);
-  User.DisplayNewLine;
-  User.DisplayStr(Prompts.GetString(344));
-  User.DetectAnsi;
-  User.DisplayStr(#13 + PadRight('',' ', Length(Prompts.GetString(344)) + 10) + #13);
-  User.SetUserAnsi(User.WasAnsiDetected);
-  User.ClearScreen;                     {a clean screen for the version and copyright lines}
-  User.DisplayAttr(Config^.GetSystemColor(1));
-  User.DisplayStrLn(BbsVersion);
-  User.DisplayAttr(Config^.GetSystemColor(2));
-  User.DisplayStrLn(Copyright);
-  User.DisplayNewLine;
-  DoLanguage;
-  BbsDisplay.DisplayBbsFile('logo', '');
-  StartUpUser;
-  AskName;
+  If QwkMode Then
+    User.SetUserAnsi(False)
+  Else
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStr(Prompts.GetString(344));
+    User.DetectAnsi;
+    User.DisplayStr(#13 + PadRight('',' ', Length(Prompts.GetString(344)) + 10) + #13);
+    User.SetUserAnsi(User.WasAnsiDetected);
+    User.ClearScreen;                     {a clean screen for the version and copyright lines}
+    User.DisplayAttr(Config^.GetSystemColor(1));
+    User.DisplayStrLn(BbsVersion);
+    User.DisplayAttr(Config^.GetSystemColor(2));
+    User.DisplayStrLn(Copyright);
+    User.DisplayNewLine;
+    DoLanguage;
+    BbsDisplay.DisplayBbsFile('logo', '');
+    StartUpUser;
+    AskName;
+    End;
   End;
-User.GetUserSec(Sec);
-User.ClearScreen;
-User.DisplayNewLine;
-User.ClearScreen;
-User.DisplayAttr(Config^.GetSystemColor(1));
-User.SetMore(True);
-If IoResult <> 0 Then;
-Menu.Init;
-Menu.SetSecurity(Sec);
-Menu.Load('top');
-Menu.GlobalLoad('GLOBAL');
-If Menu.GetError <> 0 Then
+If QwkMode Then
+  QwkSession
+Else
   Begin
-  User.DisplayStrLn('Unable to load top menu ' + Long2Str(Menu.GetError));
-  Halt(1);
+  User.GetUserSec(Sec);
+  User.ClearScreen;
+  User.DisplayNewLine;
+  User.ClearScreen;
+  User.DisplayAttr(Config^.GetSystemColor(1));
+  User.SetMore(True);
+  If IoResult <> 0 Then;
+  Menu.Init;
+  Menu.SetSecurity(Sec);
+  Menu.Load('top');
+  Menu.GlobalLoad('GLOBAL');
+  If Menu.GetError <> 0 Then
+    Begin
+    User.DisplayStrLn('Unable to load top menu ' + Long2Str(Menu.GetError));
+    Halt(1);
+    End;
+  MenuState := 1;
+  Process;
   End;
-MenuState := 1;
-Process;
 User.WriteUser;
 User.WriteExit('');
 If User.UserIsLoaded Then
@@ -287,7 +300,8 @@ If User.UserIsLoaded Then
   End;
 User.PostStatus(uoWait);
 BbsDisplay.Done;
-Menu.Done;
+If Not QwkMode Then
+  Menu.Done;
 If DoorExit Then
   ExitLevel := DoorLevel
 Else
