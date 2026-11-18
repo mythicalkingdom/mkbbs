@@ -71,6 +71,7 @@ Type WsComObj = Object(AbsComObj)
   Function  WaitForChar(Ms: Word): Boolean; Virtual;
   Procedure FlushOut; Virtual;
   Procedure SetBPS(Rate: LongInt); Virtual;
+  Procedure SetBinary(B: Boolean); Virtual;
   Function  GetCommInfo: String; Virtual;
   Function  GetRemoteAddr: String; Virtual;
   Function  GetTermType: String; Virtual;
@@ -453,6 +454,13 @@ Procedure WsComObj.Fill(WaitMs: LongInt);
           Exit;
       End;
     End;
+  End;
+
+
+Procedure WsComObj.SetBinary(B: Boolean);
+  Begin
+  coBinary := B;
+  Inner^.SetBinary(B);
   End;
 
 

@@ -48,6 +48,11 @@ Type WindowObj = Object
   End;
 
 
+Var
+  ProtQuiet: Boolean;                  {file transfer: no progress window (the caller's line is the transfer; the screen is not his)}
+  ProtLastMsg: String;                 {the last message of a transfer, for the log}
+
+
 Type ProtocolWindowObj = Object(WindowObj)
   Procedure OpenWindow;
   Procedure CloseWindow;
@@ -171,6 +176,10 @@ Procedure WindowObj.CloseWindow;
 
 Procedure ProtocolWindowObj.CloseWindow;
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   Delay(300);
   WindowObj.CloseWindow;
   End;
@@ -178,6 +187,10 @@ Procedure ProtocolWindowObj.CloseWindow;
 
 Procedure ProtocolWindowObj.OpenWindow;
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   If WindowObj.OpenWindow(10, 5, 10 + 60, 5 + 9, White + Blue shl 4) Then;
   GoToXy(1,2);
   WriteLn(' File Name:');
@@ -193,6 +206,10 @@ Procedure ProtocolWindowObj.OpenWindow;
 
 Procedure ProtocolWindowObj.ShowProt(Prot: String);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GoToXy(30 - (Length(Prot) Div 2), 1);
   Write(Prot);
   End;
@@ -200,6 +217,10 @@ Procedure ProtocolWindowObj.ShowProt(Prot: String);
 
 Procedure ProtocolWindowObj.ShowName(filename: String);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   IF (Length(filename) > 45) Then
     filename[0] := #45;
   GotoXY(18,2);
@@ -210,6 +231,10 @@ Procedure ProtocolWindowObj.ShowName(filename: String);
 
 Procedure ProtocolWindowObj.ShowSize(l: LongInt);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GotoXY(18,3);
   ClrEol;
   Write(CommaStr(l));
@@ -222,6 +247,10 @@ Procedure ProtocolWindowObj.ShowElapsed(ET: LongInt);
     Seconds: Word;
 
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GoToXy(18, 5);
   ClrEol;
   Minutes := ET Div 60;
@@ -232,6 +261,10 @@ Procedure ProtocolWindowObj.ShowElapsed(ET: LongInt);
 
 Procedure ProtocolWindowObj.ShowCPS(CPS: LongInt);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GoToXy(18, 6);
   ClrEol;
   Write(Long2Str(CPS));
@@ -240,6 +273,10 @@ Procedure ProtocolWindowObj.ShowCPS(CPS: LongInt);
 
 Procedure ProtocolWindowObj.ShowCheck(is32: Boolean);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GotoXY(18,7);
   ClrEol;
   If (is32) Then
@@ -251,6 +288,11 @@ Procedure ProtocolWindowObj.ShowCheck(is32: Boolean);
 
 Procedure ProtocolWindowObj.Message(s: String);
   Begin
+  If ProtQuiet Then
+    Begin
+    ProtLastMsg := s;
+    Exit;
+    End;
   If (Length(s) > 45) Then
     s[0] := #45;
   GotoXY(18,9);
@@ -261,6 +303,10 @@ Procedure ProtocolWindowObj.Message(s: String);
 
 Procedure ProtocolWindowObj.ShowLoc(l: LongInt);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GoToXy(18,4);
   ClrEol;
   Write(CommaStr(l));
@@ -269,10 +315,17 @@ Procedure ProtocolWindowObj.ShowLoc(l: LongInt);
 
 Procedure ProtocolWindowObj.Errors(w: Word);
   Begin
+  If ProtQuiet Then
+    Begin
+    Exit;
+    End;
   GotoXY(18,8);
   ClrEol;
   Write(CommaStr(w));
   End;
 
 
+
+Begin
+ProtQuiet := True;
 End.

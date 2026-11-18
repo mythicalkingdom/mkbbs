@@ -90,6 +90,7 @@ Type TelnetComObj = Object(AbsComObj)
   Procedure Fill(WaitMs: LongInt);     {Internal}
   Procedure Process(C: Char);          {Internal}
   Procedure Data(C: Char);             {Internal}
+  Procedure SetBinary(B: Boolean); Virtual;     {a transfer: CR LF and CR NUL are data}
   Procedure Command(V, Opt: Byte);     {Internal: send IAC V Opt}
   Procedure Offer(Opt: Byte; Mine: Boolean); {Internal}
   Procedure GotOption(V, Opt: Byte);   {Internal}
@@ -270,9 +271,23 @@ Procedure TelnetComObj.GotSub;
   End;
 
 
+Procedure TelnetComObj.SetBinary(B: Boolean);
+  Begin
+  coBinary := B;
+  AfterCR := False;
+  Inner^.SetBinary(B);
+  End;
+
+
 Procedure TelnetComObj.Data(C: Char);
   Begin
-  If AfterCR And ((C = #0) Or (C = #10)) Then
+  If coBinary And (Him[TelOptBinary] = 1) Then
+    Begin
+    AfterCR := False;                    {a file, and the caller sends binary: every byte is data}
+    PeekCh := C;
+    HavePeek := True;
+    End
+  Else If AfterCR And ((C = #0) Or (C = #10)) Then
     AfterCR := False                     {CR NUL / CR LF: the second one is padding}
   Else
     Begin

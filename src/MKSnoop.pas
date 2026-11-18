@@ -92,6 +92,7 @@ Type
     Procedure FlushIn; Virtual;
     Procedure FlushOut; Virtual;
     Procedure SetBPS(Rate: LongInt); Virtual;
+    Procedure SetBinary(B: Boolean); Virtual;
     Function  GetBPS: LongInt; Virtual;
     Function  GetCommInfo: String; Virtual;
     Function  GetRemoteAddr: String; Virtual;
@@ -422,13 +423,20 @@ Procedure SnoopComObj.ReadCmds;
   End;
 
 
+Procedure SnoopComObj.SetBinary(B: Boolean);
+  Begin
+  coBinary := B;                         {a transfer is not shown to the monitors}
+  Inner^.SetBinary(B);
+  End;
+
+
 Procedure SnoopComObj.Copy2(Var Dt; DSize: Word);
   Var
     i: Word;
     k: LongInt;
 
   Begin
-  If ListenFd < 0 Then
+  If (ListenFd < 0) Or coBinary Then
     Exit;
   For k := 0 To DSize - 1 Do
     Begin

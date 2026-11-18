@@ -11,6 +11,10 @@ Const
   MaxCErrors = 15;
 
 
+Var
+  ProtTrace: Boolean;                  {every byte received (r) and sent (s) goes to StdErr (tests)}
+
+
 Type BufType = Array[0..zBufSize] of Byte;
 
 Type ZHdrType = Array[0..3] of Byte;
@@ -41,6 +45,9 @@ Type ProtInfo = Record
   TxHdr: ZHdrType;
   RxHdr: ZHdrType;
   Abort: Boolean;
+  RxName: String[100];    {Xmodem receive: the name of the file (Xmodem sends none)}
+  RxBlkNum: Integer;     {receive: the block that RX_GetBlock read}
+  RxBlkLen: Word;
   End;
 
 
@@ -64,9 +71,14 @@ Type ProtObj = Object
   Procedure WaitSend;
   Procedure GetNextSendFile;
   Procedure SendHeader;
+  Procedure SendEOT;
+  Procedure SendBatchEnd;
   Procedure SendData(BSize: Word);
   Procedure SendBlock;
-  Procedure Recv;
+  Function  Recv(Path: String): Boolean;
+  Procedure SetRecvName(Name: String);
+  Function  RX_GetBlock: Integer;
+  Function  RX_Receive(Path: String; Batch: Boolean): Boolean;
   Procedure ShowLoc(ZPos: LongInt);
   Procedure Z_PutLongIntoHeader(l: LongInt);
   Procedure RZ_AckBibi;
@@ -92,6 +104,10 @@ Implementation
 Uses Dos,
   MKVCrt,
 MKVideo, MKMisc, Crc16, Crc32, MKComAbs, MKString, MKFile, MKDos;
+
+
+Const
+  Crc32Good = -558161693;                {$DEBB20E3: what the CRC 32 of a block is with its own CRC added (a signed LongInt in FPC)}
 
 
 Const
@@ -214,7 +230,7 @@ Const
 
 Procedure Z_FlushOutbound;
   Begin
-  While(CommCarrier And Not CommOutEmpty) Do;
+  CommFlushOut;
   End;
 
 
@@ -235,37 +251,28 @@ Procedure Z_SendByte(b: Byte);
   Begin
   Time := TimeCounter + TxTimeOut;
   While ((Not CommSendNw(Chr(b))) And (Not TimeOut(Time))) Do;
+  If ProtTrace Then
+    Begin
+    Write(StdErr, ' s', b);
+    Flush(StdErr);
+    End;
   End;
 
 
 
 Function Z_AsyncOn(ZPort: Word; ZBaud: LongInt): Boolean;
+  {the session of the caller is open already; there has to be one}
   Begin
-  CurrentPort := ZPort;
-  CommInit;
-  CommSetBaud(zBaud);
-  CommFlow(fcHard);
+  Z_AsyncOn := CommActive;
   End;
 
 
 
 Function ProtObj.CancelKey: Boolean;
+  {the local keyboard is not read: on a session it is the caller's own line.  A caller who is gone ends the
+   transfer through the carrier.}
   Begin
   CancelKey := False;
-  If (KeyPressed) Then
-    Case ReadKey Of
-      #027: Begin
-            CancelKey := True;
-            Pwdw.Message('Aborted from keyboard');
-            PI^.Abort := True;
-            PI^.Error := 7;
-            End;
-      #000: Begin
-            Case ReadKey Of
-              #000:;
-              End;
-            End;
-      End;
   End;
 
 
@@ -292,7 +299,7 @@ Function Z_FileCRC32(Var f: File): LongInt;
     n: Integer;
 
   Begin
-  crc := $FFFFFFFF;
+  crc := -1;
   Seek(f,0);
   If (IOresult <> 0) Then;
   Repeat
@@ -313,6 +320,7 @@ Function Z_GetByte(tenths: Integer): Integer;
   Var
     Done: Boolean;
     Time: LongInt;
+    Bv: Integer;
 
 
   Begin
@@ -322,19 +330,32 @@ Function Z_GetByte(tenths: Integer): Integer;
     Begin
     If Not CommInEmpty Then
       Begin
-      z_GetByte := Ord(CommRecv);
+      Bv := Ord(CommRecv);
+      z_GetByte := Bv;
+      If ProtTrace Then
+        Begin
+        Write(StdErr, ' r', Bv);
+        Flush(StdErr);
+        End;
       Done := True;
-      End;
-    IF (Not CommCarrier) Then
+      End
+    Else If Not CommCarrier Then
       Begin
       Z_GetByte := RCDO; { nobody to talk to }
       Done := True;
-      End;
-    If TimeOut(Time) Then
+      End
+    Else If TimeOut(Time) Then
       Begin
       Z_GetByte := ZTimeOut;
+      If ProtTrace Then
+        Begin
+        Write(StdErr, ' T');
+        Flush(StdErr);
+        End;
       Done := True;
-      End;
+      End
+    Else
+      If CommWaitChar(50) Then;          {waits, not a busy loop}
     End;
   End;
 
@@ -673,11 +694,8 @@ Function Z_GetBinaryHeader(Var Hdr: ZHdrType): Integer;
     Z_GetBinaryHeader := ZERROR;
     ExitEarly := True;
     End;
-  If ((Not ExitEarly) and (Z_GetByte(1) = 13)) Then  {throw away CR/LF}
-    Begin
-    c := Z_GetByte(1);
+  If Not ExitEarly Then                    {a binary header has nothing after its CRC (the CR LF is for hex headers)}
     Z_GetBinaryHeader := RxType;
-    End;
   End;
 
 
@@ -704,7 +722,7 @@ Function Z_GetBinaryHead32(Var Hdr: ZHdrType): Integer;
       Case State of
         1: Begin                      {get type}
            RxType := c;
-           Crc := UpdC32(RxType, $ffffffff);
+           Crc := UpdC32(RxType, -1);
            End;
         2..5: Begin                   {get 4 data values}
            Hdr[State - 2] := Lo(c);
@@ -717,7 +735,7 @@ Function Z_GetBinaryHead32(Var Hdr: ZHdrType): Integer;
       End;
     Inc(State);
     End;
-  If ((Not ExitEarly) and (crc <> $debb20e3)) Then   {check CRC}
+  If ((Not ExitEarly) and (crc <> Crc32Good)) Then   {check CRC}
     Begin
     Inc(zerrors);
     PWdw.Errors(zerrors);
@@ -725,11 +743,8 @@ Function Z_GetBinaryHead32(Var Hdr: ZHdrType): Integer;
     Z_GetBinaryHead32 := ZERROR;
     ExitEarly := True;
     End;
-  If ((Not ExitEarly) and (Z_GetByte(1) = 13)) Then  {throw away CR/LF}
-    Begin
-    c := Z_GetByte(1);
+  If Not ExitEarly Then                    {a binary header has nothing after its CRC (the CR LF is for hex headers)}
     Z_GetBinaryHead32 := RxType;
-    End;
   End;
 
 
@@ -761,8 +776,7 @@ Function ProtObj.Z_GetHeader(Var Hdr: ZHdrType): Integer;
    c := Z_TimedRead;
    Case c Of
       ZPAD: Begin
-        HavePad := True;
-        c := Z_TimedRead;
+        HavePad := True;                    {the next byte is read at the top of the loop (a binary header has one ZPAD)}
         End;
       ZDLE: Begin
         If HavePad Then
@@ -885,7 +899,7 @@ Function RZ_ReceiveDa32(Var buf: buftype; blength: Integer): Integer;
 
   Begin
   usecrc32 := True;
-  crc := $FFFFFFFF;
+  crc := -1;
   rxcount := 0;
   done := False;
   REPEAT
@@ -906,7 +920,7 @@ Function RZ_ReceiveDa32(Var buf: buftype; blength: Integer): Integer;
                             GOTO crcfoo;
                           crc := UpdC32(Lo(c),crc)
                           End;
-                        IF (crc <> $DEBB20E3) Then
+                        IF (crc <> Crc32Good) Then
                           Begin
                           Inc(zerrors);
                           PWdw.Errors(zerrors);
@@ -1152,6 +1166,25 @@ again:
 End;
 
 
+Function SafeName(S: String): String;
+  {a name the sender gave: no directory, nothing that is not a plain character, not only dots, not hidden}
+  Var
+    i: Word;
+
+  Begin
+  For i := 1 To Length(S) Do
+    If (S[i] < ' ') Or (S[i] = '/') Or (S[i] = '\') Or (S[i] = ':') Or (S[i] = #127) Then
+      S[i] := '_';
+  While (Length(S) > 0) And (S[1] = '.') Do
+    Delete(S, 1, 1);
+  If S = '' Then
+    S := 'upload.dat';
+  If Length(S) > 100 Then
+    S := Copy(S, 1, 100);
+  SafeName := S;
+  End;
+
+
 Function ProtObj.RZ_GetHeader: Integer;
   Var
     e, p, n, i: Integer;
@@ -1169,11 +1202,11 @@ Function ProtObj.RZ_GetHeader: Integer;
   s := '';
   While (p < 255) And (secbuf[p] <> 0) Do
     Begin
-    s := s + UpCase(Chr(secbuf[p]));
+    s := s + Chr(secbuf[p]);
     Inc(p)
     End;
   Inc(p);
-  S := StripPath(S);
+  S := SafeName(StripPath(S));
   FName := s;
 
   (**** done with name ****)
@@ -1454,6 +1487,12 @@ Begin
         zcps := fsize Div ETime;
       shSetFTime(outfile,ftime);
       shCloseFile(outfile);
+      If (c = ZEOF) And (PI^.NumFiles < MaxFiles) Then
+        Begin
+        Inc(PI^.NumFiles);                    {received: its name, as it is on the disk}
+        PI^.FN[PI^.NumFiles] := zrxpath + fname;
+        PI^.Status[PI^.NumFiles] := 1;
+        End;
       Str(zcps:4,s);
       PWdw.Message(s+' cps');
       CASE c OF
@@ -1485,48 +1524,411 @@ End;
 
 
 Function ProtObj.Zmodem_Receive(path: String): Boolean;
-Var
-   i: Integer;
-Begin
-   IF (NOT Z_AsyncOn(CurrentPort, CurrentRate)) Then
-     Begin
-     ClrScr;
-     WRITELN('Unable to open:');
-     WRITELN('Port: ', CurrentPort);
-     WRITELN('Baud: ', CurrentRate);
-     Delay(2000);
-     Zmodem_Receive := False;
-     Exit
-     End;
-   PWdw.Init;
-   PWdw.OpenWindow;
-   PWdw.ShowProt('Zmodem Receive');
-   zrxpath := path;
-   IF (zrxpath <> '') And (zrxpath[Length(zrxpath)] <> '\') And (zrxpath[Length(zrxpath)] <> '/') Then
-      zrxpath := zrxpath + DirectorySeparator;
-   rxtimeout := 100;
-   tryzhdrtype := ZRINIT;
-   i := RZ_InitReceiver;
-   IF (i = ZCOMPL) OR ((i = ZFILE) And ((RZ_ReceiveBatch) = ZOK)) Then
-   Begin
-      PWdw.Message('Restoring async params');
-      CommRelease;
-      PWdw.CloseWindow;
-      PWdw.Done;
-      Zmodem_Receive := True
-   End
-   ELSE
-   Begin
-      CommFlushOut;
-      PWdw.Message('Sending CAN');
-      Z_SendCan;
-      PWdw.Message('Restoring async params');
-      CommRelease;
-      PWdw.CloseWindow;
-      PWdw.Done;
-      Zmodem_Receive := False;
-   End
-End;
+  {the files of a Zmodem sender are put in the directory path; PI^.NumFiles, FN[] and Status[] say what came}
+  Var
+    i: Integer;
+
+  Begin
+  If Not Z_AsyncOn(CurrentPort, CurrentRate) Then
+    Begin
+    Zmodem_Receive := False;
+    Exit;
+    End;
+  PWdw.Init;
+  PWdw.OpenWindow;
+  PWdw.ShowProt('Zmodem Receive');
+  PI^.NumFiles := 0;
+  PI^.StartTime := TimeCounter;
+  CommFlushIn;
+  CommSetBinary(True);
+  zrxpath := path;
+  IF (zrxpath <> '') And (zrxpath[Length(zrxpath)] <> '\') And (zrxpath[Length(zrxpath)] <> '/') Then
+     zrxpath := zrxpath + DirectorySeparator;
+  rxtimeout := 100;
+  tryzhdrtype := ZRINIT;
+  i := RZ_InitReceiver;
+  IF (i = ZCOMPL) OR ((i = ZFILE) And ((RZ_ReceiveBatch) = ZOK)) Then
+    Zmodem_Receive := True
+  ELSE
+    Begin
+    CommFlushOut;
+    PWdw.Message('Sending CAN');
+    Z_SendCan;
+    Zmodem_Receive := False;
+    End;
+  CommFlushOut;
+  If CommWaitChar(300) Then;               {what the sender still says (OO ...)}
+  CommFlushIn;
+  CommSetBinary(False);
+  PWdw.CloseWindow;
+  PWdw.Done;
+  End;
+
+
+(*######### Xmodem / Ymodem RECEIVE ROUTINES ##################*)
+
+Procedure ProtObj.SetRecvName(Name: String);
+  Begin
+  PI^.RxName := SafeName(StripPath(Name));
+  End;
+
+
+Function ProtObj.RX_GetBlock: Integer;
+  {One block of Xmodem / Ymodem.  0 = a good block (PI^.DataBlk, PI^.RxBlkNum, PI^.RxBlkLen), 1 = EOT, 2 = a damaged
+   block (the line has been left quiet), 3 = cancelled by the sender, 4 = no carrier, 5 = nothing came}
+  Var
+    c, i, Comp, Hi8, Lo8: Integer;
+    Len: Word;
+    Sum: Word;
+    Bad: Boolean;
+
+  Begin
+  c := Z_GetByte(182);
+  Case c Of
+    RCDO: Begin RX_GetBlock := 4; Exit; End;
+    ZTimeOut: Begin RX_GetBlock := 5; Exit; End;
+    4: Begin RX_GetBlock := 1; Exit; End;
+    24: Begin
+        c := Z_GetByte(20);
+        If c = 24 Then
+          RX_GetBlock := 3
+        Else
+          RX_GetBlock := 2;
+        Exit;
+        End;
+    1: Len := 128;
+    2: Len := 1024;
+    Else
+      Begin
+      While CommWaitChar(500) Do                {garbage: wait until the line is quiet}
+        If CommRecv = #0 Then;
+      RX_GetBlock := 2;
+      Exit;
+      End;
+    End;
+  Bad := False;
+  PI^.RxBlkNum := Z_GetByte(100);
+  Comp := Z_GetByte(100);
+  If (PI^.RxBlkNum < 0) Or (Comp < 0) Then
+    Bad := True
+  Else If (PI^.RxBlkNum + Comp) <> 255 Then
+    Bad := True;
+  i := 1;
+  While (i <= Len) And (Not Bad) Do
+    Begin
+    c := Z_GetByte(100);
+    If c < 0 Then
+      Bad := True
+    Else
+      PI^.DataBlk[i] := c;
+    Inc(i);
+    End;
+  If Not Bad Then
+    Begin
+    If PI^.CrcType = 0 Then
+      Begin
+      Sum := 0;
+      For i := 1 To Len Do
+        Sum := (Sum + PI^.DataBlk[i]) And $ff;
+      c := Z_GetByte(100);
+      If (c < 0) Or (c <> Sum) Then
+        Bad := True;
+      End
+    Else
+      Begin
+      Sum := 0;
+      For i := 1 To Len Do
+        Sum := UpdCrc(PI^.DataBlk[i], Sum);
+      Hi8 := Z_GetByte(100);
+      Lo8 := Z_GetByte(100);
+      If (Hi8 < 0) Or (Lo8 < 0) Then
+        Bad := True
+      Else
+        Begin
+        Sum := UpdCrc(Hi8, Sum);              {with the CRC that came, the CRC of the block is 0}
+        Sum := UpdCrc(Lo8, Sum);
+        If Sum <> 0 Then
+          Bad := True;
+        End;
+      End;
+    End;
+  If Bad Then
+    Begin
+    While CommWaitChar(500) Do
+      If CommRecv = #0 Then;
+    RX_GetBlock := 2;
+    End
+  Else
+    Begin
+    PI^.RxBlkLen := Len;
+    RX_GetBlock := 0;
+    End;
+  End;
+
+
+Function ProtObj.RX_Receive(Path: String; Batch: Boolean): Boolean;
+  {Xmodem (one file, named by SetRecvName) or Ymodem (a batch: names and sizes come in block 0) into the directory
+   Path.  Ymodem-G (GProt) has no ACKs for the data blocks.  CRC 16 is asked for first, the checksum only after three
+   tries (or when CrcType is 0).}
+  Var
+    FilePath: String;
+    InitCh: Char;
+    r, Expect, Errors, Tries, k, j: Integer;
+    Stop, FileOpen, GotEot, Started, UseCrc: Boolean;
+    Size, Got, Take: LongInt;
+    Name, Num: String;
+    FTm: LongInt;
+    Ok: Boolean;
+
+  Procedure Ask;
+    Begin
+    If PI^.GProt Then
+      CommSend('G')
+    Else If PI^.CrcType <> 0 Then
+      CommSend('C')
+    Else
+      CommSend(Chr(21));
+    CommFlushOut;
+    End;
+
+  Procedure Ack;
+    Begin
+    CommSend(Chr(6));
+    CommFlushOut;
+    End;
+
+  Procedure Nak;
+    Begin
+    CommSend(Chr(21));
+    CommFlushOut;
+    End;
+
+  Procedure Cancel;
+    Var
+      n: Integer;
+    Begin
+    For n := 1 To 8 Do
+      CommSend(Chr(24));
+    For n := 1 To 8 Do
+      CommSend(Chr(8));
+    CommFlushOut;
+    End;
+
+  Procedure CloseOne(WithTime: Boolean);
+    Begin
+    If FileOpen Then
+      Begin
+      If WithTime And (FTm > 0) Then
+        shSetFTime(outfile, FTm);
+      shCloseFile(outfile);
+      FileOpen := False;
+      End;
+    End;
+
+  Begin
+  Ok := False;
+  RX_Receive := False;
+  If Not CommActive Then
+    Exit;
+  If (Path <> '') And (Path[Length(Path)] <> '/') Then
+    Path := Path + '/';
+  PI^.NumFiles := 0;
+  PI^.StartTime := TimeCounter;
+  CommFlushIn;
+  CommSetBinary(True);
+  Stop := False;
+  FileOpen := False;
+  Expect := 0;
+  Errors := 0;
+  Tries := 0;
+  Started := False;
+  GotEot := False;
+  UseCrc := PI^.CrcType <> 0;
+  Size := 0;
+  Got := 0;
+  FTm := 0;
+  If Batch Then
+    Expect := 0
+  Else
+    Begin
+    If PI^.RxName = '' Then
+      PI^.RxName := 'upload.dat';
+    FilePath := Path + PI^.RxName;
+    If Not shMakeFile(outfile, FilePath) Then
+      Begin
+      CommSetBinary(False);
+      Exit;
+      End;
+    FileOpen := True;
+    Expect := 1;
+    End;
+  Ask;
+  While Not Stop Do
+    Begin
+    r := RX_GetBlock;
+    Case r Of
+      0: Begin
+         If Batch And (Expect = 0) Then
+           Begin
+           {block 0: the name, a NUL, the size and the time, or nothing: the end of the batch}
+           If (PI^.RxBlkNum = 0) Then
+             Begin
+             If PI^.DataBlk[1] = 0 Then
+               Begin
+               Ack;
+               PI^.Abort := False;
+               Ok := PI^.NumFiles > 0;
+               Stop := True;
+               End
+             Else
+               Begin
+               Name := '';
+               k := 1;
+               While (k <= 128) And (PI^.DataBlk[k] <> 0) Do
+                 Begin
+                 Name := Name + Chr(PI^.DataBlk[k]);
+                 Inc(k);
+                 End;
+               Inc(k);
+               Num := '';
+               While (k <= 128) And (PI^.DataBlk[k] In [48..57]) Do
+                 Begin
+                 Num := Num + Chr(PI^.DataBlk[k]);
+                 Inc(k);
+                 End;
+               Size := Str2Long(Num);
+               Inc(k);
+               Num := '';
+               While (k <= 128) And (PI^.DataBlk[k] In [48..55]) Do
+                 Begin
+                 Num := Num + Chr(PI^.DataBlk[k]);
+                 Inc(k);
+                 End;
+               If Num <> '' Then
+                 FTm := FromUnixDateStr(Num)
+               Else
+                 FTm := 0;
+               PI^.RxName := SafeName(StripPath(Name));
+               FilePath := Path + PI^.RxName;
+               If shMakeFile(outfile, FilePath) Then
+                 Begin
+                 FileOpen := True;
+                 Got := 0;
+                 Expect := 1;
+                 GotEot := False;
+                 Errors := 0;
+                 Ack;
+                 Ask;                         {now the data}
+                 End
+               Else
+                 Begin
+                 Cancel;
+                 Stop := True;
+                 End;
+               End;
+             End
+           Else
+             Nak;
+           End
+         Else If PI^.RxBlkNum = (Expect And $ff) Then
+           Begin
+           Started := True;
+           GotEot := False;
+           Take := PI^.RxBlkLen;
+           If Batch And (Size > 0) And (Got + Take > Size) Then
+             Take := Size - Got;
+           If Take > 0 Then
+             If Not shWrite(outfile, PI^.DataBlk, Take) Then
+               Begin
+               Cancel;
+               Stop := True;
+               End;
+           Inc(Got, Take);
+           Inc(Expect);
+           Errors := 0;
+           If Not PI^.GProt Then
+             Ack;
+           End
+         Else If PI^.RxBlkNum = ((Expect - 1) And $ff) Then
+           Begin
+           If Not PI^.GProt Then
+             Ack;                            {the sender did not get our ACK: the block again}
+           End
+         Else
+           Begin
+           Cancel;                            {a block from somewhere else: out of step}
+           Stop := True;
+           End;
+         End;
+      1: Begin
+         If (Not GotEot) And (Not PI^.GProt) Then
+           Begin
+           GotEot := True;
+           Nak;                              {the first EOT is answered with a NAK, the second with the ACK}
+           End
+         Else
+           Begin
+           Ack;
+           CloseOne(True);
+           Inc(PI^.NumFiles);
+           PI^.FN[PI^.NumFiles] := FilePath;
+           PI^.Status[PI^.NumFiles] := 1;
+           If Batch Then
+             Begin
+             Expect := 0;
+             Size := 0;
+             Ask;                            {the next name, or the end}
+             End
+           Else
+             Begin
+             Ok := True;
+             Stop := True;
+             End;
+           End;
+         End;
+      2: Begin
+         Inc(Errors);
+         If PI^.GProt Or (Errors > 10) Then
+           Begin
+           Cancel;
+           Stop := True;
+           End
+         Else
+           Nak;
+         End;
+      3, 4: Stop := True;
+      5: Begin
+         Inc(Errors);
+         If Errors > 10 Then
+           Stop := True
+         Else If (Not Started) And ((Batch And (Expect = 0)) Or ((Not Batch) And (Got = 0))) Then
+           Begin
+           {nothing has come yet: ask again; Xmodem falls back to the checksum after three C}
+           Inc(Tries);
+           If (Not Batch) And (Tries >= 3) And UseCrc And (Not PI^.GProt) Then
+             Begin
+             UseCrc := False;
+             PI^.CrcType := 0;
+             End;
+           Ask;
+           End
+         Else If PI^.GProt Then
+           Begin
+           Cancel;
+           Stop := True;
+           End
+         Else
+           Nak;
+         End;
+      End;
+    End;
+  CloseOne(False);
+  CommFlushOut;
+  If CommWaitChar(300) Then;
+  CommFlushIn;
+  CommSetBinary(False);
+  RX_Receive := Ok;
+  End;
 
 
 (*######### Send ROUTINES #####################################*)
@@ -1562,7 +1964,7 @@ Procedure SZ_SendBinaryHead32(htype: Byte; Var hdr: Zhdrtype);
   Z_SendByte(ZDLE);
   Z_SendByte(ZBIN32);
   SZ_Z_SendByte(htype);
-  crc := UpdC32(htype,$FFFFFFFF);
+  crc := UpdC32(htype,-1);
   For n := 0 To 3 Do
     Begin
     SZ_Z_SendByte(hdr[n]);
@@ -1618,7 +2020,7 @@ Procedure SZ_SendData(Var buf: DataBlkType; blength: Integer; frameEnd: Byte);
   Begin
   If (UseCrc32) Then
     Begin
-    Crc32 := $ffffffff;
+    Crc32 := -1;
     For t := 1 to (BLength) Do
       Begin
       SZ_Z_SendByte(Buf[t]);
@@ -2399,20 +2801,90 @@ Function ProtObj.StripPath(FN: String): String;
 
 
 Procedure ProtObj.SendHeader;
+  {Ymodem block 0: the name (as it is), a NUL, the size and the time of the file (octal seconds since 1970)}
   Var
     TempStr: String;
-    i: Word;
 
   Begin
-  TempStr := Lower(PI^.FN[PI^.CurrFile]);
-  TempStr := StripPath(TempStr);
-  TempStr := Lower(StripPath(PI^.FN[PI^.CurrFile]) + #0
+  TempStr := StripPath(PI^.FN[PI^.CurrFile]) + #0
     + Long2Str(FileSize(PI^.PFile)) + ' '
-    + ToUnixDateStr(FTime));
+    + ToUnixDateStr(FTime);
+  FillChar(PI^.DataBlk, 128, 0);
+  If Length(TempStr) > 120 Then
+    TempStr := Copy(TempStr, 1, 120);
   Move(TempStr[1], PI^.DataBlk, Length(TempStr));
   SendData(128);
   End;
 
+
+Procedure ProtObj.SendEOT;
+  {end of a file (Xmodem, Ymodem): EOT until the receiver ACKs it; a strict Xmodem receiver NAKs the first one}
+  Var
+    Tries, CanCount: Word;
+    Acked: Boolean;
+    Ch: Integer;
+
+  Begin
+  Acked := False;
+  Tries := 0;
+  CanCount := 0;
+  While (Not Acked) And (Tries < 10) And (Not PI^.Abort) Do
+    Begin
+    Inc(Tries);
+    Z_SendByte(4);
+    Ch := Z_GetByte(182);
+    Case Ch Of
+      6: Acked := True;
+      RCDO: Begin
+            PI^.Error := 1;
+            PI^.Abort := True;
+            End;
+      24: Begin
+          Inc(CanCount);
+          If CanCount > 1 Then
+            Begin
+            PI^.Error := 3;
+            PI^.Abort := True;
+            End;
+          End;
+      End;
+    End;
+  If Acked Then
+    PI^.Status[PI^.CurrFile] := 1
+  Else If PI^.Error = 0 Then
+    PI^.Error := 2;
+  End;
+
+
+Procedure ProtObj.SendBatchEnd;
+  {Ymodem: after the last file an empty block 0 ends the batch}
+  Var
+    Ch: Integer;
+    WaitTime: LongInt;
+    Got: Boolean;
+
+  Begin
+  Got := False;
+  WaitTime := TimeCounter + 1092;
+  While (Not Got) And (Not TimeOut(WaitTime)) And (Not PI^.Abort) Do
+    Begin
+    Ch := Z_GetByte(182);
+    If (Ch = 67) Or (Ch = 71) Or (Ch = 21) Then
+      Got := True
+    Else If Ch = RCDO Then
+      Begin
+      PI^.Error := 1;
+      PI^.Abort := True;
+      End;
+    End;
+  If Got Then
+    Begin
+    FillChar(PI^.DataBlk, 128, 0);
+    PI^.BlockNum := 0;
+    SendData(128);
+    End;
+  PI^.SendState := 0;
+  End;
 
 
 Procedure ProtObj.SendData(BSize: Word);
@@ -2428,16 +2900,13 @@ Procedure ProtObj.SendData(BSize: Word);
     CanCount: Word;
 
   Begin
-  Case PI^.CrcType of
-    0: CheckValue := 0;
-    1: CheckValue := 0;
-    End;
   WaitTime := TimeCounter + 1092;
   CanCount := 0;
   BlockErrors := 0;
   Finished := False;
   While ((Not Finished) and (Not PI^.Abort)) Do
     Begin
+    CheckValue := 0;                        {every try of a block starts again}
     ByteBlock := PI^.BlockNum And $ff;
     Case BSize Of
       0128: Z_SendByte(01);
@@ -2459,6 +2928,7 @@ Procedure ProtObj.SendData(BSize: Word);
     Case PI^.CrcType Of
       0: Z_SendByte(Lo(CheckValue));
       1: Begin
+         CheckValue := UpdCrc(0, UpdCrc(0, CheckValue));     {the CRC of a block is sent with 16 more zero bits}
          Z_SendByte(Hi(CheckValue));
          Z_SendByte(Lo(CheckValue));
          End;
@@ -2588,9 +3058,11 @@ Procedure ProtObj.SendBlock;
       Begin
       If NumRead = 0 Then
         Begin
-        Z_SendByte(4);
-        PI^.SendState := 3;
-        PI^.Status[PI^.CurrFile] := 1;
+        SendEOT;
+        If PI^.Error = 0 Then
+          PI^.SendState := 3
+        Else
+          PI^.SendState := 0;
         End
       Else
         Begin
@@ -2634,7 +3106,9 @@ Procedure ProtObj.GetNextSendFile;
       PI^.Error := 5;
       PI^.SendState := 0;
       Pwdw.Message('Unable to Open file' + PI^.FN[PI^.CurrFile]);
-      End;
+      End
+    Else
+      GetFTime(PI^.PFile, FTime);
     PI^.FPos := 0;
     End
   Else
@@ -2642,6 +3116,10 @@ Procedure ProtObj.GetNextSendFile;
     If ((PI^.Prot = 'Z') Or (PI^.Prot = '8')) Then
       Begin
       PI^.SendState := 13                   {Send Zmodem end of transfer}
+      End
+    Else If (PI^.Prot = 'Y') Or (PI^.Prot = 'G') Then
+      Begin
+      PI^.SendState := 5;                   {Ymodem: the empty block 0 that ends a batch}
       End
     Else
       Begin
@@ -2696,23 +3174,15 @@ Procedure ProtObj.ZOneFile; {SendState = 11}
 Procedure ProtObj.Send;
   Var
     i: Word;
-    tx, ty: Byte;
-    TA: Byte;
-    OldWinMin: Word;
-    OldWinMax: Word;
 
   Begin
-  OldWinMin := WindMin;
-  OldWinMax := WindMax;
-  TA := TextAttr;
-  Tx := WhereX;
-  Ty := WhereY;
   PI^.Abort := False;
   Pwdw.Init;
   PWdw.OpenWindow;
   For i := 1 to MaxFiles Do
     PI^.Status[i] := 0;
   PI^.CurrFile := 0;
+  PI^.StartTime := TimeCounter;
   If CurrentPort = 0 Then
     Begin
     PI^.SendState := 0;
@@ -2720,6 +3190,8 @@ Procedure ProtObj.Send;
     End
   Else
     Begin
+    CommFlushIn;
+    CommSetBinary(True);
     PI^.SendState := 3;
     PI^.Error := 0;
     End;
@@ -2737,6 +3209,7 @@ Procedure ProtObj.Send;
       11: ZOneFile;                         {Zmodem Setup of file send}
       12: i := SZ_SendFile;                 {Zmodem Send current file}
       13: SZ_EndSend;                       {Zmodem End of transfer}
+      05: SendBatchEnd;                     {Ymodem end of batch}
       End;
     End;
   If PI^.Error <> 0 Then
@@ -2750,16 +3223,15 @@ Procedure ProtObj.Send;
       6: Pwdw.Message('Error');
       7: Pwdw.Message('Cancelled Local');
       End;
-    Delay(1500);
     End;
   Close(PI^.PFile);
   If IoResult <> 0 Then;
+  CommFlushOut;
+  If CommWaitChar(300) Then;               {what the receiver still says}
+  CommFlushIn;
+  CommSetBinary(False);
   Pwdw.CloseWindow;
   Pwdw.Done;
-  WindMin := OldWinMin;
-  WindMax := OldWinMax;
-  GoToXY(TX, TY);
-  TextAttr := TA;
   End;
 
 
@@ -2769,13 +3241,15 @@ Function ProtObj.GetFileStatus(FN: Word): Byte;
   End;
 
 
-Procedure ProtObj.Recv;
+Function ProtObj.Recv(Path: String): Boolean;
+  {files from the other end into the directory Path: Zmodem, Ymodem (batch), Xmodem (one file: SetRecvName)}
   Begin
-  PI^.CurrFile := 1;
-  If CurrentPort = 0 Then
-    PI^.Error := 1
-  Else
-    PI^.Error := 0;
+  Recv := False;
+  Case PI^.Prot Of
+    'Z', '8': Recv := Zmodem_Receive(Path);
+    'Y', 'G': Recv := RX_Receive(Path, True);
+    'X', 'O', 'C', 'Q', 'S': Recv := RX_Receive(Path, False);
+    End;
   End;
 
 

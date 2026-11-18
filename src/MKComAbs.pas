@@ -80,6 +80,7 @@ Type AbsComObj = Object
   coNumBits: Byte;
   coStopBits: Byte;
   coParity: Byte;
+  coBinary: Boolean;                   {a file transfer is going on: bytes are data, no text conversions}
   Constructor Init;
   Destructor Done; Virtual;
   Function  OpenSession: Boolean; Virtual;      {Start / attach the session}
@@ -95,6 +96,7 @@ Type AbsComObj = Object
   Procedure LowerDTR; Virtual;                  {= Hangup}
   Procedure RaiseDTR; Virtual;                  {Nothing to raise}
   Procedure SetFlowCtl(FC: Byte); Virtual;      {Remembered only}
+  Procedure SetBinary(B: Boolean); Virtual;     {Bytes are data: no CR / LF / NUL handling, nothing copied to a monitor}
   Procedure StartBreak; Virtual;
   Procedure StopBreak; Virtual;
   Function  GetInfo: String; Virtual;
@@ -142,6 +144,8 @@ Procedure CommSetBaud(Baud: Word);    {Only records the nominal speed}
 Procedure CommFlow(Flow: Byte);       {Does nothing on a session}
 Procedure CommStartBreak;             {Does nothing}
 Procedure CommStopBreak;
+Procedure CommSetBinary(B: Boolean);  {A file transfer starts (True) or is over (False): the session passes bytes as they are}
+Function  CommWaitChar(Ms: Word): Boolean; {Waits up to Ms milliseconds for a byte (False: none came, or no caller)}
 Procedure LowerDTR;                   {Old name of CommHangup}
 Procedure RaiseDTR;                   {Does nothing}
 Procedure CommInit;
@@ -178,6 +182,7 @@ Constructor AbsComObj.Init;
   coParity := 0;
   coNumBits := 8;
   coStopBits := 1;
+  coBinary := False;
   End;
 
 
@@ -269,6 +274,12 @@ Procedure AbsComObj.StartBreak;
 
 Procedure AbsComObj.StopBreak;
   Begin
+  End;
+
+
+Procedure AbsComObj.SetBinary(B: Boolean);
+  Begin
+  coBinary := B;
   End;
 
 
@@ -489,6 +500,22 @@ Procedure CommStopBreak;
   Begin
   If ComSession <> Nil Then
     ComSession^.StopBreak;
+  End;
+
+
+Procedure CommSetBinary(B: Boolean);
+  Begin
+  If ComSession <> Nil Then
+    ComSession^.SetBinary(B);
+  End;
+
+
+Function CommWaitChar(Ms: Word): Boolean;
+  Begin
+  If ComSession <> Nil Then
+    CommWaitChar := ComSession^.WaitForChar(Ms)
+  Else
+    CommWaitChar := False;
   End;
 
 
