@@ -107,5 +107,35 @@ if pk2:
     check('a second run: nothing new (the last read pointer was moved)', b'local echo message' not in msgs2)
 else:
     check('a second run: nothing new (no packet, or an empty one)', True)
+
+# ---- the replies: a REP (a ZIP with BOARDID.MSG) for area 6, uploaded the local way (mkqwk -R: BOARDID.rep in the current directory)
+board = d[1:1 + d[0]].decode('latin-1').strip()
+repdir = tmp + '/rep'
+os.makedirs(repdir)
+shutil.copy(outdir + '/config.mko', repdir + '/config.mko')
+r = run('qwkmsgtest', 'reply', repdir + '/' + board.upper() + '.MSG', '6', board)
+check('the reply packet is made (3 messages, 2 in conference 6)', r.returncode == 0 and os.path.exists(repdir + '/' + board.upper() + '.MSG'))
+with zipfile.ZipFile(repdir + '/' + board.upper() + '.REP', 'w') as z:
+    z.write(repdir + '/' + board.upper() + '.MSG', board.upper() + '.MSG')
+os.remove(repdir + '/' + board.upper() + '.MSG')
+before = run('tossdump', '6').stdout
+r = subprocess.run([os.path.join(build, 'mkqwk'), '-RMark_May'], capture_output=True, text=True, env=env, cwd=repdir, encoding='latin-1', timeout=60, stdin=subprocess.DEVNULL)
+print(r.stdout[-600:], r.stderr[-300:])
+check('mkqwk -RMark_May runs (exit 0)', r.returncode == 0)
+after = run('tossdump', '6').stdout
+check('the messages of conference 6 are in area 6 now',
+      'subj=Reply via REP' in after and 'subj=Second reply' in after and 'reply line one|reply line two' in after and 'subj=Reply via REP' not in before)
+check('... from the user (the sample forces the log-in name), to All / Sysop, echo and local flags like the BBS editor sets them',
+      'from=Mark May to=All subj=Reply via REP' in after and 'from=Mark May to=Sysop subj=Second reply' in after and after.count('echo=TRUE') >= 3)
+check('... with the tear and origin lines of the area', 'reply line two|--- MK Bbs v0.01| * Origin:' in after)
+check('... the message of conference 999 (no such area, no area for bad messages) was not posted', 'Lost one' not in after)
+check('the duplicate file is in the user directory', os.path.exists(udir + '/qwkdupe.dat'))
+# the same packet again: duplicates, nothing new
+r = subprocess.run([os.path.join(build, 'mkqwk'), '-RMark_May'], capture_output=True, text=True, env=env, cwd=repdir, encoding='latin-1', timeout=60, stdin=subprocess.DEVNULL)
+after2 = run('tossdump', '6').stdout
+check('the same reply packet again posts nothing (duplicates)', after2 == after)
+os.remove(repdir + '/' + board.upper() + '.REP')
+r = subprocess.run([os.path.join(build, 'mkqwk'), '-RMark_May'], capture_output=True, text=True, env=env, cwd=repdir, encoding='latin-1', timeout=60, stdin=subprocess.DEVNULL)
+check('without a reply packet: says so, exit 0', r.returncode == 0)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

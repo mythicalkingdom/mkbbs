@@ -28,7 +28,7 @@ Implementation
 
 Uses MKFile, MKString, MKDoor, MKCfgAbs, MKGlobT, MKCFile,
   MKOffAbs, MKOffQwk, MKOffTxt, MKOffXrs, MKOffBwv,
-  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt,
+  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKQwkO,
   Dos;
 
 
@@ -361,7 +361,9 @@ Procedure OfflineAuto;
 
 
 Procedure OfflineUL;
+  {the reply packet of the caller: the code of the offline mail door (MKQwkO), run inside mk}
   Begin
+  UploadFromBbs;
   End;
 
 

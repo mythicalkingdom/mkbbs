@@ -62,6 +62,7 @@ Type QwkInfo = Record
   QwkCurrPos: Word;      {Current char within QwkRec}
   ReplyMsgs: Word;       {number of msgs in reply packet}
   BBSId: String[8];
+  Imported: LongInt;     {messages the last ImportPacket posted}
   End;
 
 
@@ -95,16 +96,21 @@ Type QwkOffObj = Object(AbsOffObj)
   Procedure SetCQwkRec(QN: LongInt);
   Procedure BuildIndex; {build index of areas/msgs from rep packet}
   Procedure ImportPacket; Virtual;
+  Function  GetImported: LongInt; Virtual;
   End;
 
 
 Type QwkOffPtr = ^QwkOffObj;
 
 
+Function FindNoCase(Dir: String; Name: String): String;
+  {the full path of a file in Dir whatever case its name is in ('' = none)}
+
+
 Implementation
 
 
-Uses MKString, MKFile, MKCfgAbs, MKDos, MKQwkG;
+Uses MKString, MKFile, MKCfgAbs, MKDos, MKQwkG, MKDoor, MKQwkImp;
 
 
 Function Bas2Lng(InValue: LongInt): LongInt;
@@ -176,6 +182,7 @@ Constructor QwkOffObj.Init;
   Begin
   Inherited Init;
   New(QI);
+  QI^.Imported := 0;
   End;
 
 
@@ -675,14 +682,142 @@ Procedure QwkOffObj.BuildIndex;
 
 
 
-Procedure QwkOffObj.ImportPacket;
+{ ---- the reply packet: the callbacks of MKQwkImp (conference = number of the message area, as in CONTROL.DAT) }
+
+Var
+  ImpUser: DoorUserPtr;
+  ImpSec: SecType;
+  ImpName: String[35];
+
+
+Function ImpWriteOk(Area: LongInt): Boolean;
+  {the caller can write in this area: it exists, write access, and private or public mail is allowed}
   Begin
-  New(QwkIn);
-  {** open file **}
-  BuildIndex;
-  {** toss mail **}
-  {** close file **}
-  Dispose(QwkIn);
+  ImpWriteOk := False;
+  If (Area < 1) Or (Area > Config^.GetMaxMsgAreas) Then
+    Exit;
+  If Length(Config^.GetMsgName(Area)) = 0 Then
+    Exit;
+  If Not Config^.MsgWriteAccess(Area, ImpSec) Then
+    Exit;
+  If (Not Config^.MsgAllowPriv(Area)) And (Not Config^.MsgAllowPubl(Area)) Then
+    Exit;
+  ImpWriteOk := True;
+  End;
+
+
+Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean;
+  Var
+    Area: LongInt;
+
+  Begin
+  ImpMap := False;
+  Area := Conf;
+  Moved := False;
+  If Not ImpWriteOk(Area) Then
+    Begin
+    Area := QCfg.BadMsgArea;           {the area for messages that cannot go where they were meant for}
+    Moved := True;
+    If Not ImpWriteOk(Area) Then
+      Exit;
+    End;
+  T.AreaId := Config^.GetMsgAreaId(Area);
+  T.Area := Area;
+  Case Config^.GetMsgType(Area) Of
+    EchoMail: T.Kind := mmtEchoMail;
+    NetMail: T.Kind := mmtNetMail;
+    Else T.Kind := mmtNormal;
+    End;
+  If T.Kind = mmtNetMail Then
+    Config^.GetMsgAddr(Area, T.OrigAddr);
+  If QCfg.ForceName Then
+    T.ForceFrom := ImpName;
+  If Config^.MsgAllowPriv(Area) Then
+    Begin
+    If Config^.MsgAllowPubl(Area) Then
+      T.PrivMode := 0
+    Else
+      T.PrivMode := 1;
+    End
+  Else
+    T.PrivMode := 2;
+  T.ReDate := (QCfg.Attr And qaReDate) <> 0;
+  If (T.Kind <> mmtNormal) And Config^.MsgAddFido(Area) Then
+    Begin
+    T.TearLine := '--- MK Bbs v0.01';
+    T.OriginLine := Config^.GetDefaultOrigStr(Area);
+    End;
+  ImpMap := True;
+  End;
+
+
+Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
+  Begin
+  Case Code Of
+    qiPosted: ImpUser^.UpdateForMsg;
+    qiDupe: ImpUser^.DisplayStrLn(Prompts.GetString(181));
+    qiGrunged: ImpUser^.DisplayStrLn(Prompts.GetString(182));
+    qiMoved: ImpUser^.DisplayStrLn(Prompts.GetString(180));
+    qiRefused: ImpUser^.DisplayStrLn(Prompts.GetString(136) + ' ' + Long2Str(Conf));
+    qiFailed: ImpUser^.DisplayStrLn(Prompts.GetString(260) + ' ' + Long2Str(Conf));
+    End;
+  End;
+
+
+Function FindNoCase(Dir: String; Name: String): String;
+  {the full path of a file in Dir whatever case its name is in ('' = none): names in packets are the sender's}
+  Var
+    FI: FindObj;
+    Res: String;
+
+  Begin
+  Res := '';
+  FI.Init;
+  FI.FFirst(WithBackSlash(Dir) + '*');
+  While FI.Found And (Res = '') Do
+    Begin
+    If Lower(FI.GetName) = Lower(Name) Then
+      Res := FI.GetFullPath;
+    FI.FNext;
+    End;
+  FI.Done;
+  FindNoCase := Res;
+  End;
+
+
+Procedure QwkOffObj.ImportPacket;
+  {<BBSID>.MSG in the work path: the messages of the caller's reply packet go into the message areas
+   (the duplicate file is in the directory of users.mko)}
+  Var
+    FN: String;
+    R: QwkImpResult;
+    E: Word;
+    Sec: SecType;
+
+  Begin
+  QI^.Imported := 0;
+  FN := FindNoCase(QI^.MsgPath, GetExtractSpec);
+  If FN = '' Then
+    Exit;
+  ImpUser := User;
+  ImpUser^.GetUserSec(Sec);
+  ImpSec := Sec;
+  ImpName := ImpUser^.GetUserName;
+  E := QwkImportFile(FN, WithBackSlash(QCfg.UserPath) + 'qwkdupe.dat', ImpMap, ImpNote, R);
+  If E <> 0 Then
+    ImpUser^.DisplayStrLn(Prompts.GetString(182))
+  Else
+    Begin
+    QI^.Imported := R.Posted;
+    QI^.ReplyMsgs := R.Msgs;
+    Inc(QwkUser.MsgsUL, R.Posted);
+    End;
+  End;
+
+
+Function QwkOffObj.GetImported: LongInt;
+  Begin
+  GetImported := QI^.Imported;
   End;
 
 

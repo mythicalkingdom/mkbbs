@@ -51,7 +51,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -164,6 +164,11 @@ if grep -q FAIL build/pktresult.txt; then exit 1; fi
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/qwkmsgtest tests/qwkmsgtest.pas 2>&1 | grep -E "Error|Fatal" || true
 python3 tests/qwkmsgtest.py build build/qwkwork | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkmsgresult.txt
 if grep -q FAIL build/qwkmsgresult.txt; then exit 1; fi
+# the reply / packet import (MKQwkImp): a REP into message areas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/qwkimptest tests/qwkimptest.pas 2>&1 | grep -E "Error|Fatal" || true
+rm -rf build/qwkimpwork; mkdir -p build/qwkimpwork
+build/qwkimptest build/qwkimpwork | grep -E "^(ok|FAIL|failures)" | tee build/qwkimpresult.txt
+if grep -q FAIL build/qwkimpresult.txt; then exit 1; fi
 # links without a host: looked up in the nodelist
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/nlhosttest.py build build/nlwork | grep -E "^(ok|FAIL|skip)" | tee build/nlresult.txt

@@ -34,7 +34,8 @@ Type AbsOffObj = Object
   Function  GetArchiveName(Packer: Word): String; Virtual;
   Function  GetReplyName: String; Virtual;
   Function  GetExtractSpec: String; Virtual;
-  Procedure ImportPacket; Virtual;
+  Procedure ImportPacket; Virtual;     {put the messages of the reply packet in the work path (SetPath) into the message areas}
+  Function  GetImported: LongInt; Virtual; {messages the last ImportPacket posted}
   End;
 
 
@@ -100,6 +101,12 @@ Function AbsOffObj.GetExtractSpec: String;
 
 Procedure AbsOffObj.ImportPacket;
   Begin
+  End;
+
+
+Function AbsOffObj.GetImported: LongInt;
+  Begin
+  GetImported := 0;
   End;
 
 

@@ -20,6 +20,7 @@ Interface
 Procedure ProcessCmdLine;
 Procedure MainQwk;
 Function  LocalMode: Boolean;          {-L / -R: the sysop's own terminal, not a caller through the BBS}
+Procedure UploadFromBbs;               {the reply upload for the user of the running BBS (mk menu command 156)}
 
 
 Implementation
@@ -651,13 +652,218 @@ Function GetPackNum: Word;
   End;
 
 
-Procedure OfflineUL(BatchMode: Boolean);
+Function UnPackReply(Offline: AbsOffPtr; Arc: String): Boolean;
+  {The caller's reply packet is an archive; the packers are tried one after the other (the caller's own first) until
+   <BBSID>.MSG is there.  Everything in the archive is extracted into the work path (a directory of its own).}
+  Var
+    Order: Array[1..11] Of Byte;
+    NumOrder: Word;
+    i, k: Word;
+    UserPk: Word;
+    TmpStr, Cmd, Args: String;
+
   Begin
-  { ** ** }
-  { ** non batch do upload}
-  { ** unpack archives}
-  { ** process packet}
-  { ** clean up}
+  UnPackReply := False;
+  NumOrder := 0;
+  UserPk := GetPackNum;
+  If (UserPk > 0) And (UserPk < 11) Then
+    Begin
+    Inc(NumOrder);
+    Order[NumOrder] := UserPk;
+    End;
+  For i := 1 To 10 Do
+    If (i <> UserPk) And QCfg.Packers[i].PackActive Then
+      Begin
+      Inc(NumOrder);
+      Order[NumOrder] := i;
+      End;
+  For k := 1 To NumOrder Do
+    Begin
+    i := Order[k];
+    TmpStr := StripBoth(QCfg.Packers[i].UnPackCmd, ' ');
+    If (QCfg.Packers[i].PackActive) And (Length(TmpStr) > 0) Then
+      Begin
+      Cmd := UnixPath(ExtractWord(TmpStr, 1));
+      Args := Copy(TmpStr, Length(ExtractWord(TmpStr, 1)) + 1, 128);
+      ChDir(StripTrail(OrigDir,'\'));
+      If ((Pos(':', Cmd) = 0) and (Pos('\', Cmd) = 0)) Then
+        Begin
+        If FindOnPath(Cmd, Cmd) Then
+          Cmd := FExpand(Cmd)
+        Else
+          Cmd := '';
+        End;
+      If (Cmd <> '') And FileExist(Cmd) Then
+        Begin
+        ChDir(StripTrail(WorkPath, '\'));
+        User.DisplayStrLn(Prompts.GetString(188));
+        DoShell(Cmd + ' ' + Args + ' ' + Arc, True, False);
+        If FindNoCase(WorkPath, Offline^.GetExtractSpec) <> '' Then
+          Begin
+          UnPackReply := True;
+          Exit;
+          End;
+        End;
+      End;
+    End;
+  End;
+
+
+Procedure OfflineUL(BatchMode: Boolean);
+  {The reply packet of the caller: in a BBS session it is received with the caller's protocol, when run locally
+   (-L / -R) it is <BBSID>.REP in the current directory.  It is unpacked in a work directory of its own and its
+   messages are posted (QwkOffObj.ImportPacket).}
+  Var
+    Offline: AbsOffPtr;
+    Cont, Have, XferOk: Boolean;
+    ProtNum: Word;
+    TmpStr, Src: String;
+    Names: Array[1..30] Of String[128];
+    NumNames, i: Word;
+    FI: FindObj;
+    UpFile: File;
+    Imported: LongInt;
+
+  Begin
+  If QwkUser.MailType <> qmtQwk Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn(Prompts.GetString(176));
+    User.PressEnter;
+    Exit;
+    End;
+  If (QwkUser.Attr And quaNoUL) <> 0 Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn(Prompts.GetString(172));
+    User.PressEnter;
+    Exit;
+    End;
+  Offline := New(QwkOffPtr, Init);
+  Offline^.SetBBSId(QCfg.BoardId);
+  WorkPath := CreateTempDir(QCfg.TempPath);
+  Cont := Length(WorkPath) > 0;
+  If Cont Then
+    Offline^.SetPath(WorkPath);
+  Have := True;
+  If Cont Then
+    Begin
+    If BatchMode Then
+      Begin
+      Src := FindNoCase(OrigDir, Offline^.GetReplyName);
+      Cont := (Src <> '') And CopyFile(Src, WithBackSlash(WorkPath) + 'upload.1');
+      If Src = '' Then
+        Begin
+        User.DisplayStrLn(Prompts.GetString(178));
+        Have := False;
+        End;
+      End
+    Else
+      Begin
+      User.DisplayNewLine;
+      User.AskYN(Prompts.GetString(177), Have);
+      If Have Then
+        Begin
+        ProtNum := GetProtNum;
+        XferOk := (ProtNum > 0) And (ProtNum < 11);
+        If XferOk Then
+          Begin
+          User.DisplayNewLine;
+          User.DisplayAttr(Config^.GetSystemColor(1));
+          User.DisplayStrLn(Prompts.GetString(130));
+          TmpStr := GetProtStr(ProtNum, False, '');
+          {a file transfer program needs the caller's connection as it is: no pseudo terminal}
+          CommRelease;
+          DoorRaw := True;
+          DoShell(TmpStr, True, False);
+          DoorRaw := False;
+          CommInit;
+          XferOk := (GetResultCode = 0) And (ShellError = 0);
+          End;
+        If Not XferOk Then
+          Begin
+          User.DisplayNewLine;
+          User.DisplayStrLn(Prompts.GetString(168));
+          User.PressEnter;
+          Cont := False;
+          End;
+        End;
+      End;
+    End;
+  If Cont And Have Then
+    Begin
+    {what was received: renamed, a file name of the caller must not look like an option to an unpacker}
+    ChDir(StripTrail(WorkPath, '\'));
+    NumNames := 0;
+    FI.Init;
+    FI.FFirst(WithBackSlash(WorkPath) + '*');
+    While FI.Found And (NumNames < 30) Do
+      Begin
+      If Copy(FI.GetName, 1, 7) <> 'upload.' Then
+        Begin
+        Inc(NumNames);
+        Names[NumNames] := FI.GetName;
+        End;
+      FI.FNext;
+      End;
+    FI.Done;
+    For i := 1 To NumNames Do
+      Begin
+      Assign(UpFile, WithBackSlash(WorkPath) + Names[i]);
+      Rename(UpFile, WithBackSlash(WorkPath) + 'upload.' + Long2Str(i + 1));
+      If IoResult <> 0 Then;
+      End;
+    {the packets: the file was a plain .MSG, or an archive of one}
+    If FindNoCase(WorkPath, Offline^.GetExtractSpec) = '' Then
+      Begin
+      FI.Init;
+      NumNames := 0;
+      FI.FFirst(WithBackSlash(WorkPath) + 'upload.*');
+      While FI.Found And (NumNames < 30) Do
+        Begin
+        Inc(NumNames);
+        Names[NumNames] := FI.GetName;
+        FI.FNext;
+        End;
+      FI.Done;
+      i := 1;
+      While (i <= NumNames) And (FindNoCase(WorkPath, Offline^.GetExtractSpec) = '') Do
+        Begin
+        If UnPackReply(Offline, Names[i]) Then;
+        Inc(i);
+        End;
+      End;
+    If FindNoCase(WorkPath, Offline^.GetExtractSpec) = '' Then
+      Begin
+      User.DisplayNewLine;
+      User.DisplayStrLn(Prompts.GetString(178));
+      If Not BatchMode Then
+        User.PressEnter;
+      End
+    Else
+      Begin
+      UpdateStatus(False, Prompts.GetString(366));
+      Offline^.ImportPacket;
+      Imported := Offline^.GetImported;
+      User.DisplayNewLine;
+      User.DisplayStrLn(Long2Str(Imported) + ' message(s) posted');
+      If Not BatchMode Then
+        User.PressEnter;
+      End;
+    End;
+  Dispose(Offline, Done);
+  ChDir('\');
+  If IoResult <> 0 Then;
+  ChDir(StripTrail(Config^.GetTempPath,'\'));
+  If IoResult <> 0 Then;
+  ChDir(StripTrail(OrigDir,'\'));
+  If IoResult <> 0 Then;
+  If Length(WorkPath) > 0 Then
+    Begin
+    CleanDir(WithBackSlash(WorkPath));
+    RmDir(StripTrail(WorkPath,'\'));
+    If IoResult <> 0 Then;
+    End;
   End;
 
 
@@ -861,7 +1067,7 @@ Procedure OfflineDL(BatchMode: Boolean);
     User.DisplayXY(1, 13);
   If (Cont and (Not BatchMode)) Then
     Begin
-    Cont := SendMail(WorkPath + Offline^.GetArchiveName(PackNum),
+    Cont := SendMail(WithBackSlash(WorkPath) + Offline^.GetArchiveName(PackNum),
       Offline^.GetArchiveName(PackNum));
     End;
   If Cont Then
@@ -1310,5 +1516,29 @@ Procedure MainQwk;
   End;
 
 
+Procedure UploadFromBbs;
+  {Called from mk itself: User, Config and Prompts are the ones of the BBS session.  The settings of the offline
+   mail door (config.mko) are loaded here, as mkqwk does.  The upload works in a directory of its own: mk is
+   back in its directory afterwards.}
+  Var
+    Cur: String;
+
+  Begin
+  GetDir(0, Cur);
+  QwkMode := 2;
+  If Not LoadQwkCfg Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn('Offline mail is not set up (config.mko not found)');
+    User.PressEnter;
+    Exit;
+    End;
+  LoadUser(User.GetUserName);
+  OfflineUL(False);
+  SaveUser;
+  {$I-}ChDir(Cur);{$I+}
+  If IoResult <> 0 Then;
+  End;
+
+
 End.
-

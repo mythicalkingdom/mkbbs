@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Menu command 007 (run an external program / door) in the real mk, over telnet, on a private copy of the sample BBS and of
 its menus.  usage: doormenutest.py <work dir>"""
-import json, os, re, shutil, socket, subprocess, sys, time
+import sys, json, os, re, shutil, socket, subprocess, sys, time
 
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, here)
@@ -38,6 +38,10 @@ if os.path.exists(repo + '/bbs/bbsc/mkqwk/config.mko') and os.path.exists(repo +
     q = bytearray(open(repo + '/bbs/bbsc/mkqwk/config.mko', 'rb').read())
     def qput(off, text, n):
         q[off:off + n + 1] = bytes([len(text)]) + text.encode() + bytes(n - len(text))
+    qput(203 + 143 * 1 + 1, 'zip -q -j', 70)                 # packer 2 (ZIP) and its unpacker, for this machine
+    qput(203 + 143 * 1 + 72, 'unzip -o -q', 70)
+    qput(203 + 1430 + 72, ra + '/rcv.sh', 70)                # protocol 1 (Zmodem): the receive program is a script that drops a reply packet
+    board = q[1:1 + q[0]].decode('latin-1').strip()
     qput(3063, ra + '/qtmp', 80)
     qput(3063 + 81, ra + '/qusers', 80)
     os.makedirs(ra + '/qtmp'); os.makedirs(ra + '/qusers')
@@ -49,6 +53,15 @@ if os.path.exists(repo + '/bbs/bbsc/mkqwk/config.mko') and os.path.exists(repo +
     rec[640 + 4:640 + 6] = (500).to_bytes(2, 'little'); rec[640 + 6:640 + 8] = (100).to_bytes(2, 'little')
     open(ra + '/qusers/users.mko', 'wb').write(rec)
     have_qwk = True
+    # the reply packet a caller would upload: <BOARDID>.REP, a ZIP with <BOARDID>.MSG (2 messages for area 6, 1 for an unknown conference)
+    import zipfile
+    subprocess.run([repo + '/build/qwkmsgtest', 'reply', ra + '/reply.msg', '6', board], check=True, capture_output=True)
+    with zipfile.ZipFile(ra + '/reply.zip', 'w') as z:
+        z.write(ra + '/reply.msg', board.upper() + '.MSG')
+    os.remove(ra + '/reply.msg')
+    # the "protocol": drops the file in the current directory (the work directory of the door) under a name an unpacker could take for an option
+    open(ra + '/rcv.sh', 'w').write('#!/bin/sh\ncp %s/reply.zip ./-evil.rep\nexit 0\n' % ra)
+    os.chmod(ra + '/rcv.sh', 0o755)
 else:
     have_qwk = False
 script(ra + '/lineread.sh', 'printf "name? "\nread x\necho "got:$x"\n')
@@ -65,8 +78,8 @@ for f in os.listdir(menus):
 d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
-free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV' if k not in used]
-items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('missing', 'nope-door-xyz')]
+free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV890' if k not in used]
+items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('qwkul', repo + '/build/mkqwk -U'), ('qwkin', '#156'), ('missing', 'nope-door-xyz')]
 keys = {}
 slot = 1
 for name, data in items:
@@ -78,6 +91,8 @@ for name, data in items:
     k = free.pop(0)
     r = bytearray(REC)
     r[0] = 7
+    if data.startswith('#'):                      # a menu command of mk itself
+        r[0] = int(data[1:]); data = ''
     prompt = ('DOOR ' + name).encode()
     r[7] = len(prompt); r[8:8 + len(prompt)] = prompt
     r[7 + 76] = ord(k)
@@ -215,6 +230,29 @@ try:
         c.sendall(b'q')                                   # quit the door
         b = until(c, b'DOOR bare', 6) + until(c, b'Command >', 6)
         check('its menus work (configuration and back), Quit returns to the BBS menu', b'DOOR bare' in b and b'Command >' in b)
+    if have_qwk:
+        c.sendall(keys['qwkul'].encode())
+        b = until(c, b'reply file', 8)
+        check('the offline mail door (mkqwk -U) asks whether there is a reply file to upload', b'reply file' in b)
+        c.sendall(b'y')
+        b1 = until(c, b'message(s) posted', 12)
+        c.sendall(b'\r')                                    # the Press Enter after the summary
+        b = b1 + until(c, b'Command >', 8)
+        check('it receives the packet (the "protocol" script) and unpacks it (a file name like -evil.rep is no option)', b'Begin transfer now' in b1 and b'Uncompressing file' in b1)
+        check('the caller of this test has no write access in area 6 or 999: told so, nothing posted', b'Access denied! 6' in b1 and b'0 message(s) posted' in b1 and b'Command >' in b)
+        dump = subprocess.run([repo + '/build/tossdump', '6'], capture_output=True, text=True, env=dict(os.environ, MK=ra), encoding='latin-1').stdout
+        check('... and area 6 has none of the replies', 'Reply via REP' not in dump and 'Second reply' not in dump)
+    if have_qwk:
+        c.sendall(keys['qwkin'].encode())
+        b = until(c, b'reply file', 8)
+        check('menu command 156 (the upload inside mk, no mkqwk) asks whether there is a reply file', b'reply file' in b)
+        c.sendall(b'y')
+        b1 = until(c, b'message(s) posted', 12)
+        c.sendall(b'\r')
+        b = b1 + until(c, b'Command >', 8)
+        check('... receives and unpacks the packet, posts the 2 messages for area 6 (this user may write there), refuses conference 999, and returns to the menu', b'Uncompressing file' in b1 and b'Access denied! 999' in b1 and b'2 message(s) posted' in b1 and b'Command >' in b)
+        dump = subprocess.run([repo + '/build/tossdump', '6'], capture_output=True, text=True, env=dict(os.environ, MK=ra), encoding='latin-1').stdout
+        check('... and area 6 now has the replies, in the name of the caller', 'Reply via REP' in dump and 'Second reply' in dump)
     c.sendall(keys['rawkey'].encode())
     time.sleep(1.0)
     c.sendall(b'q')

@@ -3,6 +3,7 @@ program qwkmsgtest;
 {$H+}
 { qwkmsgtest write <file> [rep]   the messages qwkjs.mjs also writes
   qwkmsgtest dump <file> [rep]    every message of a file, one field per line
+  qwkmsgtest reply <file> <conf> <board>  a REP with two messages in conference <conf> and one in 999
   qwkmsgtest self <dir>           round trips, conferences, kludges, status, ReWriteHdr, DeleteMsg, errors, damage }
 uses MKString, MKFile, MKGlobT, MKMsgAbs, MKMsgQwk, Dos;
 
@@ -114,6 +115,22 @@ begin
   FillChar(H, 128, 32); H[0] := Ord('P'); H[1] := Ord('K');
   BlockWrite(Fl, H, 128);
 end;
+
+{ qwkmsgtest reply <file> <conf> <boardid>: the reply packet a QWK reader would make (tests/qwktest.py) }
+procedure Reply(F: String; Conf: LongInt; Board: String);
+begin
+  EraseFile(F);
+  M.Init; M.SetMsgPath(F); M.SetPacketId(Board); M.SetRepMode(True);
+  M.CreateMsgBase(0, 0);
+  M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('ALL'); M.SetSubj('Reply via REP'); M.SetMsgConf(Conf);
+  M.SetDate('11-17-26'); M.SetTime('12:30'); M.DoStringLn('reply line one'); M.DoStringLn('reply line two'); M.WriteMsg;
+  M.StartNewMsg; M.SetFrom('SOMEONE ELSE'); M.SetTo('SYSOP'); M.SetSubj('Second reply'); M.SetMsgConf(Conf);
+  M.SetDate('11-17-26'); M.SetTime('12:31'); M.DoStringLn('another one'); M.WriteMsg;
+  M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('ALL'); M.SetSubj('Lost one'); M.SetMsgConf(999);
+  M.SetDate('11-17-26'); M.SetTime('12:32'); M.DoStringLn('nobody has conference 999'); M.WriteMsg;
+  M.Done;
+end;
+
 
 procedure Self(D: String);
 var F, F2: String; E: Word; i: Word; S: String; N: LongInt; Fl: File; Raw: array[0..127] of Byte;
@@ -362,6 +379,7 @@ begin
   if ParamCount < 2 then begin writeln('usage: qwkmsgtest write|dump|self <file|dir> [rep]'); Halt(2); end;
   if ParamStr(1) = 'write' then WriteSet(ParamStr(2), ParamStr(3) = 'rep')
   else if ParamStr(1) = 'dump' then Dump(ParamStr(2), ParamStr(3) = 'rep')
+  else if ParamStr(1) = 'reply' then Reply(ParamStr(2), Str2Long(ParamStr(3)), ParamStr(4))
   else Self(ParamStr(2));
   if Fails > 0 then Halt(1);
 end.
