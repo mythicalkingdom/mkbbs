@@ -51,7 +51,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -91,6 +91,10 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   CFGDIR=$PWD/build/cfgwork2/ra python3 tests/cfgshot.py '\x1be' '\r' ' ' '\r' '\x1b' '\x1bx' 'y' > /dev/null 2>&1
   N=$(cmp -l bbs/bbsc/ra/config.mk build/cfgwork2/ra/config.mk | wc -l)
   [ "$N" -ge 1 ] && [ "$N" -le 4 ] && echo 'ok   mkconfig: event status choice saved' || { echo "FAIL mkconfig: event edit ($N bytes differ)"; exit 1; }
+  # Transfer Protocols (General menu): external protocol 11 gets a key and a "send | receive" command line
+  mkdir -p build/cfgwork3/ra; (cd bbs/bbsc/ra && tar cf - --exclude='mkbink.conf*' --exclude='Mailer.Mk' .) | tar xf - -C build/cfgwork3/ra
+  CFGDIR=$PWD/build/cfgwork3/ra python3 tests/cfgshot.py '\x1bg' 't' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\r' 'Zed' '\t' 'R' '\t' '\t' '\t' 'sz %F | rz' '\r' '\x1b' '\x1bx' 'y' > /dev/null 2>&1
+  strings build/cfgwork3/ra/config.mk | grep -q 'sz %F | rz' && echo 'ok   mkconfig: external protocol command line saved' || { echo 'FAIL mkconfig: protocol edit not saved'; exit 1; }
 fi
 # MKRead: read a message and write a reply on a private copy of the sample BBS
 if [ -f bbs/bbsc/ra/config.mk ]; then
@@ -145,6 +149,14 @@ python3 tests/cattest.py build build/work/cat | grep -E "^(FAIL|failures)"
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwktest.py build build/qwkwork | grep -E "^(ok|FAIL|skip)" | tee build/qwkresult.txt
   if grep -q FAIL build/qwkresult.txt; then exit 1; fi
+fi
+# MKProt (Zmodem both ways) against the real lrzsz over a socketpair
+python3 tests/prottest.py build build/work/prot | grep -E "^(ok|FAIL|skip|failures)" | tee build/protresult.txt
+if grep -q FAIL build/protresult.txt; then exit 1; fi
+# mk -G<id>: a pass with a QWK network system (reply packet, packet of the hub, last read past the imported messages)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/qwknettest.py build build/work/qwknet | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwknetresult.txt
+  if grep -q FAIL build/qwknetresult.txt; then exit 1; fi
 fi
 # the tosser (mktoss) on a private copy of the sample BBS, with packets made by MessagePacket.js
 if [ -f bbs/bbsc/ra/config.mk ]; then

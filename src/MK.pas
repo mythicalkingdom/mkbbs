@@ -7,7 +7,7 @@ Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
 MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
-MKLogOn, MKAvatar, MKSnoop, Dos
+MKLogOn, MKAvatar, MKSnoop, MKQwkNet, Dos
   ;
 
 
@@ -66,6 +66,7 @@ Var
   SessRate: LongInt;
   SessProxy: Boolean;
   RunDir: String;
+  NetId: String;
 
 Begin
 StartUpPath := GetCurrentPath;
@@ -78,6 +79,7 @@ SessType := '';
 SessAddr := '';
 SessRate := 0;
 SessProxy := False;
+NetId := '';
 i := 1;
 While i <= ParamCount Do
   Begin
@@ -94,6 +96,7 @@ While i <= ParamCount Do
              UserBaud := SessRate;
            End;
       'S': SessType := Copy(TmpStr,3,10);
+      'G': NetId := Copy(ParamStr(i), 3, 40);   {a pass with a QWK network system (MKQwkNet): no caller}
       'H': SessProxy := True;      {PROXY header first on the connection}
       'P': LogToPrinter := True;
       'C': OverridePort := Str2Long(Copy(TmpStr,3,5));
@@ -182,6 +185,25 @@ Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.lc') +
   Config^.GetLangFile(1) + '.lc');
 CommaChar := Prompts.GetChar(320);
 SysStats.Load;
+If NetId <> '' Then
+  Begin
+  {mk -G<id>: the mail of a QWK network system is exchanged, nobody is on line}
+  LocalMode := True;
+  CurrentPort := 0;
+  User.SetSessionTimeLimit(3600);
+  User.SetStartTime;
+  User.SetIdleTimeLimit(3600);
+  LogEntry.WriteEntry('QWK network pass with ' + NetId);
+  ExitLevel := QwkNetPass(NetId);
+  LogEntry.WriteEntry('QWK network pass ended: ' + Long2Str(ExitLevel));
+  User.PostStatus(uoNotAvail);
+  User.Done;
+  LogEntry.Done;
+  Config^.Done;
+  Dispose(ComSession, Done);
+  ComSession := Nil;
+  Halt(ExitLevel);
+  End;
 If Not LocalMode Then
   AnsiSoundOn := False;                 {the caller's terminal plays the music}
 If ShellToMailer Then

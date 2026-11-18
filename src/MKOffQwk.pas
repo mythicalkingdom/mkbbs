@@ -17,84 +17,99 @@ Unit MKOffQwk;       {QWK Offline mail Object}
 
 Interface
 
-Uses MKGlobT, MKMsgAbs, MKOffAbs,
+Uses MKGlobT, MKMsgAbs, MKOffAbs, MKMsgQwk,
   Dos;
 
 
-Const QIdxSize = 3000;
-Const QwkBufSize = 150;
-Const MaxQwkPers = 300;
-Const QwkConfs = 2000;
+{
+     A QWK packet for a caller (MESSAGES.DAT, the .NDX files, CONTROL.DAT, DOOR.ID) and the messages of his reply packet.
+     The message file is written with MKMsgQwk (conference = number of the message area, message number = the number
+     of the message in its area), the rest is made here.  The BBS id is SetBBSId, the work directory SetPath;
+     the settings of the BBS are Config (MKCfgAbs) and the caller is User (MKDoor).  Needs nothing of the MKQwk
+     door (config.mko).
 
-Type QwkIdxType = Record
+       SetKeepKludges(True)  keeps the MSGID, REPLY, Via and TZ kludge lines of the messages as @ lines (QWK networks);
+                             the other kludge lines are always left out
+       SetImportOpts         what ImportPacket does with the messages of a reply packet
+       SetLink(Id, ConfOf, AreaOf)  the packet is the reply packet (REP) for the QWK system Id, as a node makes it for its hub: the
+                             file is Id.msg (packed into Id.rep), the conference of a message is ConfOf(area) and not
+                             the area number (AreaOf is the way back, for the packet of the hub), no CONTROL.DAT and no index files; the packet that comes from the hub
+                             (messages.dat) is what ImportPacket then reads
+}
+
+
+Const QwkConfs = 2000;                 {highest conference (area) number in a packet}
+Const MaxQwkMsgs = 200000;             {messages in a packet}
+
+
+Type QwkIdxType = Record               {a record of an .NDX file}
   QwkPtr: LongInt;
   MsgConf: Byte;
   End;
 
 
-Type QwkImportRec = Record
-  SeekPos: LongInt;
+Type QwkExpType = Record               {a message of the packet: its header block and its area}
+  Blk: LongInt;
   Area: Word;
   End;
+Type QwkExpArray = Array[1..MaxQwkMsgs] Of QwkExpType;
+Type QwkExpPtr = ^QwkExpArray;
+Type QwkIdxArray = Array[1..MaxQwkMsgs] Of QwkIdxType;
+Type QwkIdxPtr = ^QwkIdxArray;
 
 
-Type QwkRecType = Array[1..128] of Char;
-Type QwkBufType = Array[0..QwkBufSize] of QwkRecType;
-Type PersArray = Array[1..MaxQwkPers] of QwkIdxType;
-Type QwkIdxArray = Array[1..QIdxSize] of QwkIdxType;
-Type QwkAreaType = Array[1..QIdxSize] of Word;
-Type QwkImportIdx = Array[1..QIdxSize] of QwkImportRec;
+Type QwkConfFunc = Function(N: LongInt): LongInt;   {the conference of a message area at the other end (-1 = none)}
 
 
 Type QwkInfo = Record
   MsgPath: String;
-  NumMsgs: Word;
-  QwkWorkNum: LongInt;
-  PersExported: Word;
-  ConfExported: Array[1..QwkConfs] of Word;
-  ConfImported: Array[1..QwkConfs] of Boolean;
-  NumExported: Word;
-  BufStart: LongInt;     {Record number of first record in buffer}
-  QwkNumRead: Integer;   {Number of read records in the buffer}
-  NeedWritten: Array[0..QwkBufSize] of Boolean; {buffer needs written}
-  QwkFile: File;         {QWK/REP file}
-  QwkError: Word;        {Status from QWK file activity}
-  QwkCurrPos: Word;      {Current char within QwkRec}
-  ReplyMsgs: Word;       {number of msgs in reply packet}
+  Q: QwkMsgPtr;                        {MESSAGES.DAT}
+  Exp: QwkExpPtr;
+  NumExp: LongInt;
+  ExpCap: LongInt;
+  Pers: QwkExpPtr;                     {the messages to the caller (personal.ndx)}
+  NumPers: LongInt;
+  PersCap: LongInt;
+  ConfCount: Array[0..QwkConfs] Of Word;
+  ReplyMsgs: Word;                     {messages in the reply packet}
   BBSId: String[8];
-  Imported: LongInt;     {messages the last ImportPacket posted}
+  Imported: LongInt;                   {messages the last ImportPacket posted}
+  KeepKludges: Boolean;
+  Qwke: Boolean;
+  Link: Boolean;                       {SetLink: the packet is a REP for another system}
+  LinkId: String[40];
+  ConfOf: QwkConfFunc;                 {area -> conference of the other end}
+  AreaOf: QwkConfFunc;                 {conference of the other end -> area}
+  ImpPosted: Array[1..QwkConfs] Of Word; {link: messages the import posted in each area}
+  ImpPending: Array[1..QwkConfs] Of LongInt; {link: messages of the area still to be sent before the import}
+  ImpFirst: Array[1..QwkConfs] Of LongInt; {link: numbers of the first and the last message the import posted}
+  ImpLast: Array[1..QwkConfs] Of LongInt;
+  ImpTouched: Array[1..QwkConfs] Of Boolean;
   End;
 
 
 Type QwkOffObj = Object(AbsOffObj)
-  QwkBuf: ^QwkBufType;   {Qwk record buffer}
-  CQwkRec: ^QwkRecType;  {Active Qwk record pointer}
   QI: ^QwkInfo;
-  Pers: ^PersArray;
-  MsgExport: ^QwkIdxArray;
-  QwkArea: ^QwkAreaType;
-  QwkIn: ^QwkImportIdx;
   Constructor Init; {Initialize}
   Destructor Done; Virtual; {Done}
   Procedure SetPath(MP: String); Virtual; {Set msg path/other info}
   Procedure SetBBSID(ID: String); Virtual; {Set bbs id/filename}
+  Procedure SetKeepKludges(KK: Boolean);
+  Procedure SetQwke(QK: Boolean); Virtual;
+  Procedure SetLink(RemoteId: String; ConfOf: QwkConfFunc; AreaOf: QwkConfFunc);
+  Function  LinkImported(Area: Word; Var Pending, First, Last: LongInt): Word;
+    {link: messages the import posted in the area, the numbers of the first and last, and how many messages of the
+     area were still to be sent before it (the last read of the user is before them)}
   Function  StartPacket: Word; Virtual; {Do Packet startup tasks}
   Function  ClosePacket: Word; Virtual; {Do Packet finish tasks}
   Function  AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boolean; Virtual;
   Function  GetArchiveName(Packer: Word): String; Virtual;
   Function  GetReplyName: String; Virtual;
   Function  GetExtractSpec: String; Virtual;
-  Procedure PutHdrStr(St: String; Loc: Word);
-  Procedure PutStr(Var St: String);
-  Function  GetHdrStr(Start:Integer; NumChar:Integer):String;
   Procedure PersIdx;
   Procedure DoIdx;
   Procedure DoControl;
   Procedure WriteDoorId;
-  Procedure SetNeedWritten(QN: LongInt);
-  Procedure FlushQwkBuf;
-  Procedure SetCQwkRec(QN: LongInt);
-  Procedure BuildIndex; {build index of areas/msgs from rep packet}
   Procedure ImportPacket; Virtual;
   Function  GetImported: LongInt; Virtual;
   End;
@@ -110,7 +125,7 @@ Function FindNoCase(Dir: String; Name: String): String;
 Implementation
 
 
-Uses MKString, MKFile, MKCfgAbs, MKDos, MKQwkG, MKDoor, MKQwkImp;
+Uses MKString, MKFile, MKCfgAbs, MKDos, MKDoor, MKQwkImp, MKOffXfer, MKOpen, MKOffDL;
 
 
 Function Bas2Lng(InValue: LongInt): LongInt;
@@ -182,12 +197,21 @@ Constructor QwkOffObj.Init;
   Begin
   Inherited Init;
   New(QI);
-  QI^.Imported := 0;
+  FillChar(QI^, SizeOf(QI^), 0);
   End;
 
 
 Destructor QwkOffObj.Done;
   Begin
+  If QI^.Q <> Nil Then
+    Begin
+    Dispose(QI^.Q, Done);
+    QI^.Q := Nil;
+    End;
+  If QI^.Exp <> Nil Then
+    FreeMem(QI^.Exp, QI^.ExpCap * SizeOf(QwkExpType));
+  If QI^.Pers <> Nil Then
+    FreeMem(QI^.Pers, QI^.PersCap * SizeOf(QwkExpType));
   Dispose(QI);
   End;
 
@@ -198,242 +222,193 @@ Procedure QwkOffObj.SetPath(MP: String);
   End;
 
 
-Procedure QwkOffObj.SetNeedWritten(QN: LongInt);
-  Var
-    BC: LongInt;
-
+Procedure QwkOffObj.SetKeepKludges(KK: Boolean);
   Begin
-  BC := Qn - QI^.BufStart;
-  If ((BC >= 0) and (BC <= QwkBufSize)) Then
-    QI^.NeedWritten[BC] := True;
+  QI^.KeepKludges := KK;
   End;
 
 
-Procedure QwkOffObj.FlushQwkBuf;
+Procedure QwkOffObj.SetLink(RemoteId: String; ConfOf: QwkConfFunc; AreaOf: QwkConfFunc);
+  Begin
+  QI^.AreaOf := AreaOf;
+  QI^.Link := True;
+  QI^.LinkId := Copy(RemoteId, 1, 40);
+  QI^.ConfOf := ConfOf;
+  End;
+
+
+Procedure QwkOffObj.SetQwke(QK: Boolean);
+  Begin
+  QI^.Qwke := QK;
+  End;
+
+
+Function Grow(Var P: QwkExpPtr; Var Cap: LongInt; Need: LongInt): Boolean;
+  {room for Need records}
   Var
-    i: Integer;
+    NewP: QwkExpPtr;
+    NewCap: LongInt;
 
   Begin
-  i := QwkBufSize;
-  While ((Not QI^.NeedWritten[i]) and (i >= 0)) Do
-    Dec(i);
-  Inc(i);
-  If i > 0 Then
+  Grow := True;
+  If Need <= Cap Then
+    Exit;
+  Grow := False;
+  If Need > MaxQwkMsgs Then
+    Exit;
+  NewCap := Cap + Cap Div 2 + 256;
+  If NewCap > MaxQwkMsgs Then
+    NewCap := MaxQwkMsgs;
+  GetMem(NewP, NewCap * SizeOf(QwkExpType));
+  If NewP = Nil Then
+    Exit;
+  If P <> Nil Then
     Begin
-    Seek(QI^.QwkFile, QI^.BufStart);
-    QI^.QwkError := IoResult;
-    If QI^.QwkError = 0 Then
-      Begin
-      BlockWrite(QI^.QwkFile, QwkBuf^, i);
-      QI^.QwkError := IoResult;
-      End;
-    QI^.BufStart := -3000;
-    For i := 0 to QwkBufSize Do
-      QI^.NeedWritten[i] := False;
+    Move(P^, NewP^, Cap * SizeOf(QwkExpType));
+    FreeMem(P, Cap * SizeOf(QwkExpType));
     End;
+  P := NewP;
+  Cap := NewCap;
+  Grow := True;
   End;
-
-
-Procedure QwkOffObj.SetCQwkRec(QN: LongInt);
-  Var
-    i: Word;
-
-  Begin
-  QI^.QwkError := 0;
-  If ((QN >= QI^.BufStart) and (Qn < (QI^.BufStart + QwkBufSize))) Then
-    CQwkRec := @QwkBuf^[QN - QI^.BufStart]
-  Else
-    Begin
-    FlushQwkBuf;
-    QI^.BufStart := Qn;
-    Seek(QI^.QwkFile, QI^.BufStart);
-    QI^.QwkError := IoResult;
-    If QI^.QwkError = 0 Then
-      Begin
-      BlockRead(QI^.QwkFile, QwkBuf^, QwkBufSize, QI^.QwkNumRead);
-      QI^.QwkError := IoResult;
-      End;
-    For i := 0 to QwkBufSize Do
-      QI^.NeedWritten[i] := False;
-    CQwkRec := @QwkBuf^[0];
-    End;
-  End;
-
-
-Procedure QwkOffObj.PutHdrStr(St: String; Loc: Word);
-  Var
-    i: Word;
-
-  Begin
-  For i := 1 to Length(St) Do
-    CQwkRec^[Loc + i - 1] := St[i];
-  End;
-
-
-Function QwkOffObj.GetHdrStr(Start:Integer; NumChar:Integer):String;
-  Var
-    TempStr: String;
-    I: Integer;
-    Count: Integer;
-
-  Begin
-  If ((Start + NumChar) > 129) Then
-    NumChar := 129 - Start;
-  TempStr := '';
-  Count := 0;
-  I := Start;
-  While Count < NumChar Do
-    Begin
-    TempStr[Count + 1] := CQwkRec^[Start + Count];
-    Inc(Count);
-    End;
-  TempStr[0] := Chr(NumChar);
-  GetHdrStr := TempStr;
-  End;
-
-
-
-Procedure QwkOffObj.PutStr(Var St: String);
-  Var
-    i: Word;
-
-  Begin
-  For i := 1 to Length(St) Do
-    Begin
-    Inc(QI^.QwkCurrPos);
-    If QI^.QwkCurrPos > 128 Then
-      Begin
-      Inc(QI^.QwkWorkNum);
-      QI^.QwkCurrPos := 1;
-      SetCQwkRec(QI^.QwkWorkNum);
-      SetNeedWritten(QI^.QwkWorkNum);
-      End;
-    CQwkRec^[QI^.QwkCurrPos] := St[i];
-    End;
-  End;
-
 
 
 Function QwkOffObj.AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boolean;
+  {the message goes into MESSAGES.DAT (MKMsgQwk): the conference is the area, the number the number of the message.
+   A message that cannot be written (no text ...) is left out and is not an error; False is a packet that cannot go on.}
   Const
     StrLen = 72;
 
   Var
-    TmpStr: String;
-    i: Word;
-    MsgStartQwk: LongInt;
-    Crc: LongInt;
+    Q: QwkMsgPtr;
+    Line: String;
+    S: String;
+    Net: Boolean;
     TAddr: AddrType;
+    Lines: Word;
+    Res: Word;
+    Conf: LongInt;
 
   Begin
-  If QI^.NumExported < QIdxSize Then
+  AddMsg := False;
+  Q := QI^.Q;
+  If (Q = Nil) Or (Area > QwkConfs) Then
+    Exit;
+  Conf := Area;
+  If QI^.Link Then
     Begin
-    Inc(QI^.QwkWorkNum);
-    SetCQwkRec(QI^.QwkWorkNum);
-    MsgStartQwk := QI^.QwkWorkNum;
-    If ((ToYou) and (QI^.PersExported < MaxQwkPers)) Then
+    Conf := QI^.ConfOf(Area);
+    If Conf < 0 Then
       Begin
-      Inc(QI^.PersExported);
-      Pers^[QI^.PersExported].MsgConf := Area and $ff;
-      Pers^[QI^.PersExported].QwkPtr := MsgStartQwk;
+      AddMsg := True;                  {an area the other end does not know: not in its packet}
+      Exit;
       End;
-    Inc(QI^.NumExported);
-    Inc(QI^.ConfExported[Area]);
-    MsgExport^[QI^.NumExported].QwkPtr := MsgStartQwk;
-    MsgExport^[QI^.NumExported].MsgConf := Area and $ff;
-    QwkArea^[QI^.NumExported] := Area;
-    SetNeedWritten(QI^.QwkWorkNum);
-    QI^.QwkCurrPos := 129;
-    FillChar(CQwkRec^, SizeOf(QwkRecType), ' ');
-    If Msg.IsRcvd Then
-      Begin
-      If Msg.IsPriv Then
-        CQwkRec^[1] := '*'
-      Else
-        CQwkRec^[1] := '-'
-      End
+    End;
+  Net := Config^.GetMsgType(Area) = NetMail;
+  Q^.StartNewMsg;
+  Q^.SetMsgConf(Conf);
+  If QI^.Link Then
+    Q^.SetEcho(Config^.GetMsgType(Area) = EchoMail);
+  Q^.SetQwkNum(Msg.GetMsgNum);
+  Q^.SetPriv(Msg.IsPriv);
+  Q^.SetRcvd(Msg.IsRcvd);
+  S := Msg.GetFrom;
+  If StripBoth(S, ' ') = '' Then
+    S := 'Unknown';
+  Q^.SetFrom(S);
+  Q^.SetTo(Msg.GetTo);
+  If Net Then
+    Begin
+    If QI^.Link Then
+      Msg.GetDest(TAddr)               {a reply packet says where the message is going}
     Else
-      Begin
-      If Msg.IsPriv Then
-        CQwkRec^[1] := '+'
-      Else
-        CQwkRec^[1] := ' '
-      End;
-    TmpStr := PadRight(Copy(Long2Str(Msg.GetMsgNum),1,7),' ',7); {msg num}
-    PutHdrStr(TmpStr, 2);
-    PutHdrStr(Msg.GetDate, 9);
-    PutHdrStr(Copy(Msg.GetTime, 1, 5), 17);
-    PutHdrStr(Upper(Copy(Msg.GetTo, 1, 25)), 22);
-    PutHdrStr(Upper(Copy(Msg.GetFrom, 1, 25)), 47);
-    If Config^.GetMsgType(Area) = NetMail Then
-      Begin
       Msg.GetOrig(TAddr);
-      PutHdrStr('@' + AddrStr(TAddr),72);
+    Q^.SetSubj('@' + AddrStr(TAddr));
+    End
+  Else
+    Q^.SetSubj(Msg.GetSubj);
+  Q^.SetDate(Msg.GetDate);
+  Q^.SetTime(Copy(Msg.GetTime, 1, 5));
+  Q^.SetRefer(Msg.GetRefer);
+  Lines := 0;
+  If Net Then
+    Begin
+    Q^.DoStringLn('Subj: ' + Msg.GetSubj);
+    Inc(Lines);
+    End;
+  Msg.MsgTxtStartUp;
+  While Not Msg.EOM Do
+    Begin
+    Line := Msg.GetString(StrLen);
+    If (Length(Line) > 0) And (Line[1] = #1) Then
+      Begin
+      {a kludge line: the pieces of one that was wrapped belong to it}
+      While Msg.WasWrap And (Not Msg.EOM) And (Length(Line) < 180) Do
+        Line := Line + Msg.GetString(StrLen);
+      If QI^.KeepKludges Then
+        Q^.DoKludgeLn(Line);
       End
     Else
-      PutHdrStr(Copy(Msg.GetSubj, 1, 25), 72);
-    PutHdrStr(PadRight(Copy(Long2Str(Msg.GetRefer),1,8),' ',8), 109);
-    CQwkRec^[123] := #225;
-    CQwkRec^[124] := Chr(Lo(Area));
-    CQwkRec^[125] := Chr(Area shr 8);
-    CQwkRec^[128] := ' ';
-    Msg.MsgTxtStartUp;
-    If Config^.GetMsgType(Area) = NetMail Then
       Begin
-      TmpStr := 'Subj: ' + Msg.GetSubj;
-      PutStr(TmpStr);
+      Q^.DoStringLn(Line);
+      Inc(Lines);
       End;
-    TmpStr := Msg.GetString(StrLen);
-    TmpStr[0] := Chr(Length(TmpStr) + 1);
-    TmpStr[Length(TmpStr)] := #227;
-    While (Not Msg.EOM) or (Length(TmpStr) > 1) Do
+    End;
+  If Lines = 0 Then
+    Q^.DoStringLn('(no text)');            {QWK has no message without text}
+  Res := Q^.WriteMsg;
+  If Res = 0 Then
+    Begin
+    If (Not Grow(QI^.Exp, QI^.ExpCap, QI^.NumExp + 1)) Or
+       (ToYou And (Not Grow(QI^.Pers, QI^.PersCap, QI^.NumPers + 1))) Then
+      Exit;
+    Inc(QI^.NumExp);
+    QI^.Exp^[QI^.NumExp].Blk := Q^.GetLastBlock;
+    QI^.Exp^[QI^.NumExp].Area := Area;
+    Inc(QI^.ConfCount[Area]);
+    If ToYou Then
       Begin
-      If (TmpStr[1] <> #1) Then
-        PutStr(TmpStr);
-      TmpStr := Msg.GetString(StrLen);
-      TmpStr[0] := Chr(Length(TmpStr) + 1);
-      TmpStr[Length(TmpStr)] := #227;
+      Inc(QI^.NumPers);
+      QI^.Pers^[QI^.NumPers].Blk := Q^.GetLastBlock;
+      QI^.Pers^[QI^.NumPers].Area := Area;
       End;
-    If QI^.QwkCurrPos < 128 Then
-      Begin
-      For i := QI^.QwkCurrPos + 1 to 128 Do
-      CQwkRec^[i] := ' ';
-      End;
-    SetCQwkRec(MsgStartQwk);
-    PutHdrStr(PadRight(Long2Str(QI^.QwkWorkNum + 1 - MsgStartQwk),' ',6),117);
-    SetNeedWritten(MsgStartQwk);
-    SetCQwkRec(QI^.QwkWorkNum);
     AddMsg := True;
     End
   Else
-    AddMsg := False;
+    AddMsg := (Res >= 1005) And (Res <= 1008);   {this message only}
   End;
 
 
 Function QwkOffObj.GetArchiveName(Packer: Word): String;
   Begin
-  GetArchiveName := QI^.BBSID + '.qwk';
+  If QI^.Link Then
+    GetArchiveName := QI^.LinkId + '.rep'
+  Else
+    GetArchiveName := QI^.BBSID + '.qwk';
   End;
 
 
 Procedure QwkOffObj.PersIdx;
   Var
-    i: Word;
+    i: LongInt;
     PersFile: File;
+    Rec: QwkIdxType;
 
   Begin
-  If QI^.PersExported > 0 Then
+  If QI^.NumPers > 0 Then
     Begin
-    For i := 1 to QI^.PersExported Do
-      Pers^[i].QwkPtr := Lng2Bas(Pers^[i].QwkPtr + 1);
     Assign(PersFile, QI^.MsgPath + 'personal.ndx');
-    ReWrite(PersFile, 5);
-    BlockWrite(PersFile, Pers^, QI^.PersExported);
+    ReWrite(PersFile, SizeOf(QwkIdxType));
+    For i := 1 To QI^.NumPers Do
+      Begin
+      Rec.QwkPtr := Lng2Bas(QI^.Pers^[i].Blk + 1);
+      Rec.MsgConf := QI^.Pers^[i].Area And $ff;
+      BlockWrite(PersFile, Rec, 1);
+      End;
     Close(PersFile);
     If IoResult <> 0 Then;
     End;
   End;
-
 
 
 Procedure QwkOffObj.WriteDoorId;
@@ -479,7 +454,7 @@ Procedure QwkOffObj.DoControl;
   WriteLn(CF, Config^.GetBBSLoc);
   WriteLn(CF, Config^.GetBBSPhone);
   WriteLn(CF, Upper(Config^.GetSysopName) + ',Sysop');
-  WriteLn(CF, '0 ,' + QCfg.BoardId);
+  WriteLn(CF, '0 ,' + QI^.BBSId);
   WriteLn(CF, FormattedDosDate(GetDosDate,'MM-DD-YYYY,') + TimeStr(GetDosDate));
   WriteLn(CF, Upper(User^.GetUserName));
   WriteLn(CF);
@@ -487,7 +462,7 @@ Procedure QwkOffObj.DoControl;
   WriteLn(CF,'0');
   User^.GetUserSec(Sec);
   NumAvail := 0;
-  For i := 1 to QwkConfs Do
+  For i := 1 to Config^.GetMaxMsgAreas Do
     Begin
     If Config^.MsgReadAccess(i, Sec) Then
       Inc(NumAvail);
@@ -495,7 +470,7 @@ Procedure QwkOffObj.DoControl;
   WriteLn(CF,NumAvail);
   WriteLn(CF, '0');
   WriteLn(CF, 'Area 0');
-  For i := 1 to QwkConfs Do
+  For i := 1 to Config^.GetMaxMsgAreas Do
     Begin
     If Config^.MsgReadAccess(i, Sec) Then
       Begin
@@ -527,99 +502,87 @@ Procedure QwkOffObj.DoControl;
 Procedure QwkOffObj.DoIdx;
   Var
     i: Word;
-    IdxPointer: Word;
-    OrgPointer: Word;
+    j: LongInt;
     IdxFile: File;
-    FileStr: String;
-    QwkIdx: ^QwkIdxArray;
+    Rec: QwkIdxType;
 
   Begin
-  If QI^.PersExported > 0 Then
+  If QI^.NumPers > 0 Then
     PersIdx;
-  New(QwkIdx);
-  If QwkIdx <> Nil Then
+  For i := 0 to QwkConfs do
     Begin
-    For i := 1 to QwkConfs do
+    If QI^.ConfCount[i] > 0 Then
       Begin
-      If QI^.ConfExported[i] > 0 Then
-        Begin
-        IdxPointer := 0;
-        FileStr := ConCat(QI^.MsgPath, PadLeft(Long2Str(i),'0',3),'.ndx');
-        Assign(IdxFile, FileStr);
-        ReWrite(IdxFile,SizeOf(QwkIdxType));
-        For OrgPointer := 1 to QI^.NumExported Do
+      Assign(IdxFile, ConCat(QI^.MsgPath, PadLeft(Long2Str(i),'0',3),'.ndx'));
+      ReWrite(IdxFile, SizeOf(QwkIdxType));
+      For j := 1 to QI^.NumExp Do
+        If QI^.Exp^[j].Area = i Then
           Begin
-          If QwkArea^[OrgPointer] = i Then
-            Begin
-            Inc(IdxPointer);
-            QwkIdx^[IdxPointer].MsgConf := i and $ff;
-            QwkIdx^[IdxPointer].QwkPtr := Lng2Bas(MsgExport^[OrgPointer].QwkPtr + 1);
-            End;
+          Rec.MsgConf := i and $ff;
+          Rec.QwkPtr := Lng2Bas(QI^.Exp^[j].Blk + 1);
+          BlockWrite(IdxFile, Rec, 1);
           End;
-        BlockWrite(IdxFile, QwkIdx^, IdxPointer);
-        Close(IdxFile);
-        If Ioresult <> 0 Then;
-        End;
+      Close(IdxFile);
+      If Ioresult <> 0 Then;
       End;
-    Dispose(QwkIdx);
     End;
   End;
-
 
 
 Function QwkOffObj.StartPacket: Word;
   Var
-    i: Word;
-    QError: Word;
+    Q: QwkMsgPtr;
+    E: Word;
 
   Begin
-  New(QwkBuf);
-  New(Pers);
-  New(MsgExport);
-  New(QwkArea);
-  If (QwkBuf=Nil) or (QI=Nil) or (Pers=Nil) or (MsgExport=Nil) or (QwkArea=Nil) Then
-    QError := 1000
+  New(Q, Init);
+  If QI^.Link Then
+    Begin
+    Q^.SetMsgPath(QI^.MsgPath + QI^.LinkId + '.msg');
+    Q^.SetPacketId(QI^.LinkId);
+    Q^.SetRepMode(True);
+    End
   Else
-    QError := 0;
-  IF QError = 0 Then
     Begin
-    QI^.PersExported := 0;
-    Assign(QI^.QwkFile, QI^.MsgPath + 'messages.dat');
-    ReWrite(QI^.QwkFile, 128);
-    If IoResult <> 0 Then
-      QError := 1001;
+    Q^.SetMsgPath(QI^.MsgPath + 'messages.dat');
+    Q^.SetPacketId('Produced by Mythical Kingdom Software - Copyright Mark May');
     End;
-  If QError = 0 Then
+  Q^.SetUpperNames(True);
+  If QI^.Qwke Then
+    Q^.SetQwke(qkAuto);
+  E := Q^.CreateMsgBase(0, 0);
+  If E <> 0 Then
     Begin
-    QI^.BufStart := -1000;
-    QI^.QwkNumRead := 0;
-    For i := 0 to QwkBufSize Do
-    QI^.NeedWritten[i] := False;
-    QI^.QwkWorkNum := 0;
-    SetCQwkRec(QI^.QwkWorkNum);
-    FillChar(CQwkRec^, SizeOf(QwkRecType), ' ');
-    PutHdrStr('Produced by Mythical Kingdom Software - Copyright Mark May', 1);
-    SetNeedWritten(0);
-    For i := 1 to QwkConfs Do
-      QI^.ConfExported[i] := 0;
-    QI^.NumExported := 0;
+    Dispose(Q, Done);
+    Q := Nil;
     End;
-  StartPacket :=  QError;
+  QI^.Q := Q;
+  QI^.NumExp := 0;
+  QI^.NumPers := 0;
+  FillChar(QI^.ConfCount, SizeOf(QI^.ConfCount), 0);
+  StartPacket := E;
   End;
 
 
 Function QwkOffObj.ClosePacket: Word;
+  Var
+    E: Word;
+
   Begin
-  FlushQwkBuf;
-  Close(QI^.QwkFile);
-  ClosePacket := IoResult;
-  DoIdx;
-  DoControl;
-  WriteDoorId;
-  Dispose(Pers);
-  Dispose(QwkArea);
-  Dispose(MsgExport);
-  Dispose(QwkBuf);
+  E := 0;
+  If QI^.Q <> Nil Then
+    Begin
+    E := QI^.Q^.CloseMsgBase;
+    Dispose(QI^.Q, Done);
+    QI^.Q := Nil;
+    End;
+  If Not QI^.Link Then
+    Begin
+    DoIdx;
+    DoControl;
+    WriteDoorId;
+    End;
+  ClosePacket := E;
   End;
 
 
@@ -631,63 +594,21 @@ Function QwkOffObj.GetReplyName: String;
 
 Function QwkOffObj.GetExtractSpec: String;
   Begin
-  GetExtractSpec := QI^.BBSID + '.msg';
+  If QI^.Link Then
+    GetExtractSpec := 'messages.dat'   {what comes from the hub is a QWK packet}
+  Else
+    GetExtractSpec := QI^.BBSID + '.msg';
   End;
-
-
-Procedure QwkOffObj.BuildIndex;
-  Type CharSet = Set of Char;
-  Var
-    i: Word;
-    MaxNum: LongInt;
-    NumBlocks: LongInt;
-    LastMsgEnd: LongInt;
-    QwkWorkNum: LongInt;
-
-  Const
-    DateSep = ['-','/', #196];
-
-  Begin
-  LastMsgEnd := 0;
-  QI^.ReplyMsgs := 0;
-  For i := 0 To QwkConfs Do
-    QI^.ConfImported[i] := False;
-  MaxNum := FileSize(QI^.QwkFile);
-  QwkWorkNum := 1;
-  While (QwkWorkNum <= MaxNum) Do
-    Begin
-    SetCQwkRec(QwkWorkNum);
-    If ((CQwkRec^[11] in DateSep) and (CQwkRec^[14] in DateSep) and
-    (CQwkRec^[19] = ':')) Then
-      Begin
-      Inc(QI^.ReplyMsgs);
-      QwkIn^[QI^.ReplyMsgs].Area := Ord(CQwkRec^[124]);
-      If CQwkRec^[125] <> ' ' Then
-      Inc(QwkIn^[QI^.ReplyMsgs].Area, (Word(Ord(CQwkRec^[125])) * 256));
-      QI^.ConfImported[QwkIn^[QI^.ReplyMsgs].Area] := True;
-      QwkIn^[QI^.ReplyMsgs].SeekPos := QwkWorkNum;
-      NumBlocks := Str2Long(StripBoth(GetHdrStr(117, 6),' '));
-      If NumBlocks < 1 Then
-        NumBlocks := 1;
-      Inc(QwkWorkNum, NumBlocks);
-      LastMsgEnd := QwkWorkNum - 1;
-      End
-    Else
-      Begin
-      NumBlocks := 1;
-      Inc(QwkWorkNum, NumBlocks);
-      End;
-    End;
-  End;
-
 
 
 { ---- the reply packet: the callbacks of MKQwkImp (conference = number of the message area, as in CONTROL.DAT) }
 
 Var
+  ImpQI: ^QwkInfo;
   ImpUser: DoorUserPtr;
   ImpSec: SecType;
   ImpName: String[35];
+  ImpO: OffImportOpts;
 
 
 Function ImpWriteOk(Area: LongInt): Boolean;
@@ -706,17 +627,72 @@ Function ImpWriteOk(Area: LongInt): Boolean;
   End;
 
 
+Function ImpMapLink(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean;
+  {the packet of a hub: the conference is one of the other end, the system itself posts (names as they are, no tear
+   and origin lines: the messages bring their own)}
+  Var
+    Area: LongInt;
+    M: AbsMsgPtr;
+    LR, Cnt: LongInt;
+
+  Begin
+  ImpMapLink := False;
+  Moved := False;
+  Area := ImpQI^.AreaOf(Conf);
+  If (Area < 1) Or (Area > QwkConfs) Or (Area > Config^.GetMaxMsgAreas) Then
+    Exit;
+  If Length(Config^.GetMsgName(Area)) = 0 Then
+    Exit;
+  T.AreaId := Config^.GetMsgAreaId(Area);
+  T.Area := Area;
+  Case Config^.GetMsgType(Area) Of
+    EchoMail: T.Kind := mmtEchoMail;
+    NetMail: T.Kind := mmtNetMail;
+    Else T.Kind := mmtNormal;
+    End;
+  If T.Kind = mmtNetMail Then
+    Config^.GetMsgAddr(Area, T.OrigAddr);
+  T.PrivMode := 0;
+  If Not ImpQI^.ImpTouched[Area] Then
+    Begin
+    ImpQI^.ImpTouched[Area] := True;
+    ImpQI^.ImpPending[Area] := 0;
+    ImpQI^.ImpFirst[Area] := 0;
+    ImpQI^.ImpLast[Area] := 0;
+    LR := OffUserLR(Area);
+    If OpenMsgArea(M, T.AreaId) Then
+      Begin
+      Cnt := 0;
+      M^.SeekFirst(LR + 1);
+      While M^.SeekFound Do
+        Begin
+        Inc(Cnt);
+        M^.SeekNext;
+        End;
+      ImpQI^.ImpPending[Area] := Cnt;
+      If CloseMsgArea(M) Then;
+      End;
+    End;
+  ImpMapLink := True;
+  End;
+
+
 Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean;
   Var
     Area: LongInt;
 
   Begin
+  If ImpQI^.Link Then
+    Begin
+    ImpMap := ImpMapLink(Conf, T, Moved);
+    Exit;
+    End;
   ImpMap := False;
   Area := Conf;
   Moved := False;
   If Not ImpWriteOk(Area) Then
     Begin
-    Area := QCfg.BadMsgArea;           {the area for messages that cannot go where they were meant for}
+    Area := ImpO.BadArea;           {the area for messages that cannot go where they were meant for}
     Moved := True;
     If Not ImpWriteOk(Area) Then
       Exit;
@@ -730,7 +706,7 @@ Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean
     End;
   If T.Kind = mmtNetMail Then
     Config^.GetMsgAddr(Area, T.OrigAddr);
-  If QCfg.ForceName Then
+  If ImpO.ForceName Then
     T.ForceFrom := ImpName;
   If Config^.MsgAllowPriv(Area) Then
     Begin
@@ -741,7 +717,7 @@ Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean
     End
   Else
     T.PrivMode := 2;
-  T.ReDate := (QCfg.Attr And qaReDate) <> 0;
+  T.ReDate := ImpO.ReDate;
   If (T.Kind <> mmtNormal) And Config^.MsgAddFido(Area) Then
     Begin
     T.TearLine := '--- MK Bbs v0.01';
@@ -752,9 +728,26 @@ Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean
 
 
 Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
+  Var
+    A: LongInt;
+
   Begin
   Case Code Of
-    qiPosted: ImpUser^.UpdateForMsg;
+    qiPosted: Begin
+              ImpUser^.UpdateForMsg;
+              If ImpQI^.Link Then
+                Begin
+                A := ImpQI^.AreaOf(Conf);
+                If (A >= 1) And (A <= QwkConfs) And (Msg <> Nil) Then
+                  Begin
+                  Inc(ImpQI^.ImpPosted[A]);
+                  If (ImpQI^.ImpFirst[A] = 0) Or (Msg^.GetMsgNum < ImpQI^.ImpFirst[A]) Then
+                    ImpQI^.ImpFirst[A] := Msg^.GetMsgNum;
+                  If Msg^.GetMsgNum > ImpQI^.ImpLast[A] Then
+                    ImpQI^.ImpLast[A] := Msg^.GetMsgNum;
+                  End;
+                End;
+              End;
     qiDupe: ImpUser^.DisplayStrLn(Prompts.GetString(181));
     qiGrunged: ImpUser^.DisplayStrLn(Prompts.GetString(182));
     qiMoved: ImpUser^.DisplayStrLn(Prompts.GetString(180));
@@ -765,29 +758,14 @@ Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
 
 
 Function FindNoCase(Dir: String; Name: String): String;
-  {the full path of a file in Dir whatever case its name is in ('' = none): names in packets are the sender's}
-  Var
-    FI: FindObj;
-    Res: String;
-
   Begin
-  Res := '';
-  FI.Init;
-  FI.FFirst(WithBackSlash(Dir) + '*');
-  While FI.Found And (Res = '') Do
-    Begin
-    If Lower(FI.GetName) = Lower(Name) Then
-      Res := FI.GetFullPath;
-    FI.FNext;
-    End;
-  FI.Done;
-  FindNoCase := Res;
+  FindNoCase := OffFindNoCase(Dir, Name);
   End;
 
 
 Procedure QwkOffObj.ImportPacket;
   {<BBSID>.MSG in the work path: the messages of the caller's reply packet go into the message areas
-   (the duplicate file is in the directory of users.mko)}
+   (the settings are SetImportOpts)}
   Var
     FN: String;
     R: QwkImpResult;
@@ -796,6 +774,9 @@ Procedure QwkOffObj.ImportPacket;
 
   Begin
   QI^.Imported := 0;
+  ImpQI := QI;
+  FillChar(QI^.ImpPosted, SizeOf(QI^.ImpPosted), 0);
+  FillChar(QI^.ImpTouched, SizeOf(QI^.ImpTouched), 0);
   FN := FindNoCase(QI^.MsgPath, GetExtractSpec);
   If FN = '' Then
     Exit;
@@ -803,14 +784,30 @@ Procedure QwkOffObj.ImportPacket;
   ImpUser^.GetUserSec(Sec);
   ImpSec := Sec;
   ImpName := ImpUser^.GetUserName;
-  E := QwkImportFile(FN, WithBackSlash(QCfg.UserPath) + 'qwkdupe.dat', ImpMap, ImpNote, R);
+  ImpO := ImpOpts;
+  E := QwkImportFile(FN, ImpO.DupeFile, ImpMap, ImpNote, R);
   If E <> 0 Then
     ImpUser^.DisplayStrLn(Prompts.GetString(182))
   Else
     Begin
     QI^.Imported := R.Posted;
     QI^.ReplyMsgs := R.Msgs;
-    Inc(QwkUser.MsgsUL, R.Posted);
+    End;
+  End;
+
+
+Function QwkOffObj.LinkImported(Area: Word; Var Pending, First, Last: LongInt): Word;
+  Begin
+  LinkImported := 0;
+  Pending := 0;
+  First := 0;
+  Last := 0;
+  If (Area >= 1) And (Area <= QwkConfs) And QI^.ImpTouched[Area] Then
+    Begin
+    Pending := QI^.ImpPending[Area];
+    First := QI^.ImpFirst[Area];
+    Last := QI^.ImpLast[Area];
+    LinkImported := QI^.ImpPosted[Area];
     End;
   End;
 

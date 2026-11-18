@@ -28,6 +28,13 @@ begin
   end;
 end;
 
+function MapFree(Conf: LongInt; var T: QwkImpTarget; var Moved: Boolean): Boolean;
+begin
+  { no forced name: the message keeps the name it has (a QWK network node posts in the names of its users) }
+  MapFree := Conf = 1;
+  T.AreaId := 'J' + Dir + 'a1'; T.Area := 1; T.PrivMode := 0;
+end;
+
 procedure NoteProc(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
 begin
   if Code < 10 then Inc(Notes[Code]);
@@ -84,7 +91,7 @@ begin
   if OpenOrCreateMsgArea(M, 'J' + Dir + Name) then CloseMsgArea(M) else writeln('cannot make ', Name);
 end;
 
-var R: QwkImpResult; E: Word; M: AbsMsgPtr; i: Integer; S: String;
+var R: QwkImpResult; E: Word; M: AbsMsgPtr; i: Integer; S: String; Q: QwkMsgObj;
 begin
   Fails := 0;
   Dir := WithBackSlash(ParamStr(1));
@@ -139,6 +146,23 @@ begin
   E := QwkImportFile(Dir + 'test.msg', Dir + 'imp.dup', MapProc, NoteProc, R);
   Check('importing the file again: 5 dupes, nothing posted', (E = 0) and (R.Dupes = 5) and (R.Posted = 0) and (Notes[qiDupe] = 5));
   Check('... the areas did not grow', OpenMsgArea(M, 'J' + Dir + 'a1') and (M^.GetHighMsgNum = 2));
+  CloseMsgArea(M);
+
+  { QWKE: a reply packet with long names and subject, no forced name }
+  EraseFile(Dir + 'qwke.msg');
+  Q.Init; Q.SetMsgPath(Dir + 'qwke.msg'); Q.SetPacketId('MKBBS'); Q.SetRepMode(True); Q.SetQwke(qkOn);
+  Q.CreateMsgBase(0, 0);
+  Q.StartNewMsg; Q.SetFrom('Alexandria von Hohenzollern-Sigmaringen'); Q.SetTo('ALL'); Q.SetSubj('A subject that is much longer than 25 bytes'); Q.SetMsgConf(1);
+  Q.SetDate('05-06-07'); Q.SetTime('08:09'); Q.DoStringLn('long name text');
+  Check('QWKE REP written', Q.WriteMsg = 0);
+  Q.CloseMsgBase; Q.Done;
+  E := QwkImportFile(Dir + 'qwke.msg', '', MapFree, NoteProc, R);
+  Check('QWKE REP imported: 1 posted', (E = 0) and (R.Posted = 1));
+  Check('... the area has the long name and the long subject', OpenMsgArea(M, 'J' + Dir + 'a1') and (M^.GetHighMsgNum = 3));
+  M^.SeekFirst(3); M^.MsgStartUp;
+  Check('... from "Alexandria von Hohenzollern-Sigmaringen" (Proper case of the long name), subject whole', M^.SeekFound and
+    (M^.GetFrom = 'Alexandria Von Hohenzollern-Sigmaringen') and (M^.GetSubj = 'A subject that is much longer than 25 bytes'));
+  S := Esc(AllText(M)); Check('... and the text has no To:/From:/Subject: lines: ' + S, S = 'long name text');
   CloseMsgArea(M);
 
   { errors }

@@ -117,17 +117,33 @@ begin
 end;
 
 { qwkmsgtest reply <file> <conf> <boardid>: the reply packet a QWK reader would make (tests/qwktest.py) }
-procedure Reply(F: String; Conf: LongInt; Board: String);
+procedure Reply(F: String; Conf: LongInt; Board: String; Tag: String);
 begin
   EraseFile(F);
   M.Init; M.SetMsgPath(F); M.SetPacketId(Board); M.SetRepMode(True);
   M.CreateMsgBase(0, 0);
-  M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('ALL'); M.SetSubj('Reply via REP'); M.SetMsgConf(Conf);
+  M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('ALL'); M.SetSubj('Reply via REP' + Tag); M.SetMsgConf(Conf);
   M.SetDate('11-17-26'); M.SetTime('12:30'); M.DoStringLn('reply line one'); M.DoStringLn('reply line two'); M.WriteMsg;
-  M.StartNewMsg; M.SetFrom('SOMEONE ELSE'); M.SetTo('SYSOP'); M.SetSubj('Second reply'); M.SetMsgConf(Conf);
+  M.StartNewMsg; M.SetFrom('SOMEONE ELSE'); M.SetTo('SYSOP'); M.SetSubj('Second reply' + Tag); M.SetMsgConf(Conf);
   M.SetDate('11-17-26'); M.SetTime('12:31'); M.DoStringLn('another one'); M.WriteMsg;
-  M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('ALL'); M.SetSubj('Lost one'); M.SetMsgConf(999);
+  M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('ALL'); M.SetSubj('Lost one' + Tag); M.SetMsgConf(999);
   M.SetDate('11-17-26'); M.SetTime('12:32'); M.DoStringLn('nobody has conference 999'); M.WriteMsg;
+  M.Done;
+end;
+
+
+{ qwkmsgtest hub <file> <conf>: the MESSAGES.DAT of a hub (tests/qwknettest.py): two messages in conference <conf>, one in 99 }
+procedure Hub(F: String; Conf: LongInt);
+begin
+  EraseFile(F);
+  M.Init; M.SetMsgPath(F); M.SetPacketId('HUBPKT');
+  M.CreateMsgBase(0, 0);
+  M.StartNewMsg; M.SetFrom('REMOTE USER'); M.SetTo('ALL'); M.SetSubj('Hub message one'); M.SetMsgConf(Conf);
+  M.SetDate('11-18-26'); M.SetTime('09:00'); M.DoStringLn('from the hub, line one'); M.DoStringLn('line two'); M.WriteMsg;
+  M.StartNewMsg; M.SetFrom('ANOTHER REMOTE'); M.SetTo('ALL'); M.SetSubj('Hub message two'); M.SetMsgConf(Conf);
+  M.SetDate('11-18-26'); M.SetTime('09:01'); M.DoStringLn('second from the hub'); M.WriteMsg;
+  M.StartNewMsg; M.SetFrom('REMOTE USER'); M.SetTo('ALL'); M.SetSubj('Unmapped'); M.SetMsgConf(99);
+  M.SetDate('11-18-26'); M.SetTime('09:02'); M.DoStringLn('a conference nobody maps'); M.WriteMsg;
   M.Done;
 end;
 
@@ -196,6 +212,15 @@ begin
   M.SetConference(-1);
   M.StartNewMsg; M.SetFrom('Mark'); M.SetSubj('No conference'); M.DoStringLn('y');
   Check('write with neither: conference 0 (the main board)', (M.WriteMsg = 0) and M.ConfPresent(0));
+  { the BBS number in a packet, and where the header went (for the index files) }
+  M.StartNewMsg; M.SetFrom('Mark'); M.SetSubj('Number'); M.SetMsgConf(7); M.SetQwkNum(4242); M.DoStringLn('z');
+  Check('write with a number of the caller (SetQwkNum)', M.WriteMsg = 0);
+  Check('... GetLastBlock is the block of its header (block 0 is the id)', (M.GetLastBlock > 0) and (M.GetLastBlock = SizeFile(F) div 128 - 2));
+  M.SetConference(7); M.SeekFirst(1); M.MsgStartUp;
+  Check('... number 4242 in the file, in conference 7', M.SeekFound and (M.GetQwkNum = 4242) and (M.GetMsgConf = 7));
+  M.StartNewMsg; M.SetFrom('Mark'); M.SetSubj('Number'); M.SetMsgConf(7); M.DoStringLn('z2');
+  Check('... the next one without SetQwkNum goes on after the highest', (M.WriteMsg = 0) and (M.GetMsgNum >= 1));
+  M.SetConference(-1);
 
   { names and fields cut, kludges }
   M.StartNewMsg; M.SetFrom('A very long name that does not fit in 25'); M.SetTo('B'); M.SetSubj('A subject longer than twenty-five bytes');
@@ -212,6 +237,39 @@ begin
   M.MsgTxtStartUp;
   S := M.GetNoKludgeStr(79);
   Check('... first line without kludges is "body line"', S = 'body line');
+
+  { QWKE: long names and subjects }
+  M.SetQwke(qkOn);
+  M.StartNewMsg; M.SetFrom('Alexandria von Hohenzollern-Sigmaringen'); M.SetTo('Bob'); M.SetSubj('Re: a subject that is far longer than the 25 bytes');
+  M.SetMsgConf(11); M.DoKludgeLn('MSGID: 1:2/3 e1'); M.DoStringLn('qwke body'); M.DoStringLn('To: this is text, not a header line');
+  Check('QWKE write (qkOn)', M.WriteMsg = 0);
+  Check('... nothing was cut', not M.GetCut);
+  M.SetConference(11); M.SeekFirst(1); M.MsgStartUp;
+  Check('... read back (qkOn): the long From and Subject whole, To short', (M.GetFrom = 'Alexandria von Hohenzollern-Sigmaringen') and
+    (M.GetSubj = 'Re: a subject that is far longer than the 25 bytes') and (M.GetTo = 'BOB'));
+  Check('... the text has no From:/Subject: lines, the MSGID kludge and the later "To:" text line stay',
+    Esc(AllText) = '^MSGID: 1:2/3 e1|qwke body|To: this is text, not a header line|');
+  M.SetQwke(qkAuto);
+  M.SetConference(11); M.SeekFirst(1); M.MsgStartUp;
+  Check('... read with qkAuto the same (the header fields are the start of the long ones)', M.GetFrom = 'Alexandria von Hohenzollern-Sigmaringen');
+  M.SetQwke(qkOff);
+  M.SetConference(11); M.SeekFirst(1); M.MsgStartUp;
+  Check('... read with qkOff: cut at 25, the lines are text', (M.GetFrom = 'ALEXANDRIA VON HOHENZOLLE') and
+    (Pos('From: Alexandria von Hohenzollern-Sigmaringen', Esc(AllText)) > 0));
+  { qkAuto does not take a line of an ordinary message for a header: the header does not match it }
+  M.SetQwke(qkOff);
+  M.StartNewMsg; M.SetFrom('Mark'); M.SetTo('Jim'); M.SetSubj('Plain'); M.SetMsgConf(12);
+  M.DoStringLn('From: somebody else entirely, written by hand as text'); M.DoStringLn('real text');
+  Check('write a plain message that starts with a "From:" text line', M.WriteMsg = 0);
+  M.SetQwke(qkAuto);
+  M.SetConference(12); M.SeekFirst(1); M.MsgStartUp;
+  Check('... qkAuto keeps it as text (the header From is not the start of it)', (M.GetFrom = 'MARK') and
+    (Esc(AllText) = 'From: somebody else entirely, written by hand as text|real text|'));
+  M.SetQwke(qkOn);
+  M.SetConference(12); M.SeekFirst(1); M.MsgStartUp;
+  Check('... qkOn takes it as the long From', M.GetFrom = 'somebody else entirely, written by hand as text');
+  M.SetQwke(qkOff);
+  M.SetConference(-1);
 
   { errors of WriteMsg }
   M.SetConference(-1);
@@ -379,7 +437,8 @@ begin
   if ParamCount < 2 then begin writeln('usage: qwkmsgtest write|dump|self <file|dir> [rep]'); Halt(2); end;
   if ParamStr(1) = 'write' then WriteSet(ParamStr(2), ParamStr(3) = 'rep')
   else if ParamStr(1) = 'dump' then Dump(ParamStr(2), ParamStr(3) = 'rep')
-  else if ParamStr(1) = 'reply' then Reply(ParamStr(2), Str2Long(ParamStr(3)), ParamStr(4))
+  else if ParamStr(1) = 'reply' then Reply(ParamStr(2), Str2Long(ParamStr(3)), ParamStr(4), ParamStr(5))
+  else if ParamStr(1) = 'hub' then Hub(ParamStr(2), Str2Long(ParamStr(3)))
   else Self(ParamStr(2));
   if Fails > 0 then Halt(1);
 end.

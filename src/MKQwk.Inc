@@ -105,6 +105,7 @@ Const
   qaReDate =     1;                    {Redate msgs to upload date}
   qaAllowTwit =  2;                    {Allow twitting}
   qaAllowFreq =  4;                    {Allow file requests}
+  qaQwke =       8;                    {QWKE long names and subjects in packets}
 
 
 

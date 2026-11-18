@@ -20,7 +20,6 @@ Interface
 Procedure ProcessCmdLine;
 Procedure MainQwk;
 Function  LocalMode: Boolean;          {-L / -R: the sysop's own terminal, not a caller through the BBS}
-Procedure UploadFromBbs;               {the reply upload for the user of the running BBS (mk menu command 156)}
 
 
 Implementation
@@ -29,7 +28,7 @@ Implementation
 Uses MKFile, MKString, MKQwkG, MKCfgAbs, MKGlobT, Dos, MKDos, MKStr,
   MKSess, MKDoor, MKMisc, MKMsgSel, MKMsgJam,
   MKOffAbs, MKOffTxt, MKOffQwk, MKOffBwv, {MKOffXrs,}
-  MKOpen, MKMsgAbs, MKComAbs;
+  MKOpen, MKMsgAbs, MKComAbs, MKOffDL, MKOffXfer;
 
 
 Var
@@ -61,77 +60,6 @@ Function UnixPath(S: String): String;
     If S[i] = '\' Then
       S[i] := '/';
   UnixPath := S;
-  End;
-
-
-Function CvtProtStr(PStr:String; FileName:String): String;
-  Var
-    i: Word;
-    v: Word;
-    TStr: String;
-    CvtState: Word; {0=normal, 1=have percent}
-
-  Begin
-  i := 1;
-  CvtState := 0;
-  TStr := '';
-  While i <= Length(PStr) Do
-    Begin
-    If CvtState = 0 Then
-      Begin
-      If PStr[i] = '%' Then
-        Begin
-        CvtState := 1;
-        End
-      Else
-        Begin
-        TStr[0] := Chr(Length(TStr) + 1);
-        TStr[Length(TStr)] := PStr[i];
-        End;
-      End
-    Else
-      Begin
-      Case UpCase(PStr[i]) of
-        '%': Begin
-             TStr := TStr + '%';
-             End;
-        'P': Begin
-             CvtState := 0;
-             TStr := TStr + Long2Str(PortNum);
-             End;
-        'B': Begin
-             CvtState := 0;
-             TStr := TStr + Long2Str(User.GetUserBaud);
-             End;
-        'F': Begin
-             CvtState := 0;
-             TStr := TStr + FileName;
-             End;
-        'L': Begin
-             If QCfg.LockedBaud = 0 Then
-               TStr := TStr + Long2Str(User.GetUserBaud)
-             Else
-               TStr := TStr + Long2Str(QCfg.LockedBaud);
-             CvtState := 0;
-             End;
-        'N': Begin
-             MKStrCat(TStr, User.GetUserName);
-             End;
-        Else
-             Begin
-             TStr := TStr + '%' + PStr[i];
-             CvtState := 0;
-             End;
-        End;
-      End;
-    Inc(i);
-    End;
-  If CvtState = 1 Then
-    Begin
-    TStr[0] := Chr(Length(TStr) + 1);
-    TStr[Length(TStr)] := '%';
-    End;
-  CvtProtStr := TStr;
   End;
 
 
@@ -444,28 +372,13 @@ Function GetProtNum: Word;
   End;
 
 
-Function GetProtStr(ProtNum: Word; DoSend: Boolean; JustName: String): String;
-  Var
-    TmpStr: String[128];
-    ProtCmd: String[128];
-
+Function ProtCmd(ProtNum: Word; DoSend: Boolean; JustName: String): String;
+  {the command line of the protocol with %F ... filled in}
   Begin
   If DoSend Then
-    TmpStr := QCfg.Prots[ProtNum].SendCmd
+    ProtCmd := OffExpand(QCfg.Prots[ProtNum].SendCmd, JustName, PortNum, QCfg.LockedBaud)
   Else
-    TmpStr := QCfg.Prots[ProtNum].RcvCmd;
-  TmpStr := StripBoth(TmpStr,' ');
-  ProtCmd := ExtractWord(TmpStr, 1);
-  TmpStr := Copy(TmpStr, Length(ProtCmd) + 1, 128);
-  ProtCmd := UnixPath(ProtCmd);
-  ChDir(StripTrail(OrigDir,'\'));
-  If ((Pos(':', ProtCmd) = 0) and (Pos('\', ProtCmd) = 0)) Then
-    Begin
-    If FindOnPath(ProtCmd, ProtCmd) Then
-      ProtCmd := FExpand(ProtCmd);
-    End;
-  ChDir(StripTrail(WorkPath, '\'));
-  GetProtStr := ProtCmd + ' ' + CvtProtStr(TmpStr, JustName);
+    ProtCmd := OffExpand(QCfg.Prots[ProtNum].RcvCmd, JustName, PortNum, QCfg.LockedBaud);
   End;
 
 
@@ -473,49 +386,29 @@ Function SendMail(FN: String; JustName: String): Boolean;
   Var
     XFerOK : Boolean;
     ProtNum: Word;
-    TryAgain: Boolean;
-    TmpStr: String;
 
   Begin
-  TryAgain := True;
-  While TryAgain Do
+  ProtNum := GetProtNum;
+  XferOk := (ProtNum > 0) and (ProtNum < 11);
+  If XferOk Then
+    XferOk := EstimateXferTime(SizeFile(FN), User.GetUserBaud, 90) <
+    User.TimeRemain;
+  If Not XferOk Then
     Begin
-    ProtNum := GetProtNum;
-    XferOk := (ProtNum > 0) and (ProtNum < 11);
-    If XferOk Then
-      XferOk := EstimateXferTime(SizeFile(FN), User.GetUserBaud, 90) <
-      User.TimeRemain;
-    If Not XferOk Then
-      Begin
-      User.DisplayNewLine;
-      User.DisplayAttr(Config^.GetSystemColor(1));
-      User.DisplayStrLn(Prompts.GetString(126));
-      User.DisplayNewLine;
-      User.PressEnter;
-      End;
-    If XferOk Then
-      Begin
-      User.DisplayNewLine;
-      User.DisplayAttr(Config^.GetSystemColor(1));
-      User.DisplayStrLn(Prompts.GetString(130));
-      User.DisplayStr(Prompts.GetString(129));
-      User.DisplayStrLn(' ' + JustName);
-      TmpStr := GetProtStr(ProtNum, True, JustName);
-      {a file transfer program needs the caller's connection as it is: no pseudo terminal}
-      CommRelease;
-      DoorRaw := True;
-      DoShell(TmpStr, True, False);
-      DoorRaw := False;
-      CommInit;
-      XFerOk := (GetResultCode = 0) And (ShellError = 0);
-      End;
-    TryAgain := False;
-    If Not XferOk Then
-      Begin
-      {** Ask try again **}
-      If TryAgain Then
-        AskProtocol;
-      End;
+    User.DisplayNewLine;
+    User.DisplayAttr(Config^.GetSystemColor(1));
+    User.DisplayStrLn(Prompts.GetString(126));
+    User.DisplayNewLine;
+    User.PressEnter;
+    End;
+  If XferOk Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayAttr(Config^.GetSystemColor(1));
+    User.DisplayStrLn(Prompts.GetString(130));
+    User.DisplayStr(Prompts.GetString(129));
+    User.DisplayStrLn(' ' + JustName);
+    XFerOk := OffTransfer(ProtCmd(ProtNum, True, JustName), OrigDir, WorkPath);
     End;
   SendMail := XferOk;
   End;
@@ -652,60 +545,25 @@ Function GetPackNum: Word;
   End;
 
 
-Function UnPackReply(Offline: AbsOffPtr; Arc: String): Boolean;
-  {The caller's reply packet is an archive; the packers are tried one after the other (the caller's own first) until
-   <BBSID>.MSG is there.  Everything in the archive is extracted into the work path (a directory of its own).}
+Procedure UnpackCmds(Var Cmds: OffCmdList; Var Num: Word);
+  {the unpack commands to try on a reply packet: the packer of the caller first, then the others}
   Var
-    Order: Array[1..11] Of Byte;
-    NumOrder: Word;
-    i, k: Word;
-    UserPk: Word;
-    TmpStr, Cmd, Args: String;
+    i, UserPk: Word;
 
   Begin
-  UnPackReply := False;
-  NumOrder := 0;
+  Num := 0;
   UserPk := GetPackNum;
-  If (UserPk > 0) And (UserPk < 11) Then
+  If (UserPk > 0) And (UserPk < 11) And QCfg.Packers[UserPk].PackActive Then
     Begin
-    Inc(NumOrder);
-    Order[NumOrder] := UserPk;
+    Inc(Num);
+    Cmds[Num] := QCfg.Packers[UserPk].UnPackCmd;
     End;
   For i := 1 To 10 Do
     If (i <> UserPk) And QCfg.Packers[i].PackActive Then
       Begin
-      Inc(NumOrder);
-      Order[NumOrder] := i;
+      Inc(Num);
+      Cmds[Num] := QCfg.Packers[i].UnPackCmd;
       End;
-  For k := 1 To NumOrder Do
-    Begin
-    i := Order[k];
-    TmpStr := StripBoth(QCfg.Packers[i].UnPackCmd, ' ');
-    If (QCfg.Packers[i].PackActive) And (Length(TmpStr) > 0) Then
-      Begin
-      Cmd := UnixPath(ExtractWord(TmpStr, 1));
-      Args := Copy(TmpStr, Length(ExtractWord(TmpStr, 1)) + 1, 128);
-      ChDir(StripTrail(OrigDir,'\'));
-      If ((Pos(':', Cmd) = 0) and (Pos('\', Cmd) = 0)) Then
-        Begin
-        If FindOnPath(Cmd, Cmd) Then
-          Cmd := FExpand(Cmd)
-        Else
-          Cmd := '';
-        End;
-      If (Cmd <> '') And FileExist(Cmd) Then
-        Begin
-        ChDir(StripTrail(WorkPath, '\'));
-        User.DisplayStrLn(Prompts.GetString(188));
-        DoShell(Cmd + ' ' + Args + ' ' + Arc, True, False);
-        If FindNoCase(WorkPath, Offline^.GetExtractSpec) <> '' Then
-          Begin
-          UnPackReply := True;
-          Exit;
-          End;
-        End;
-      End;
-    End;
   End;
 
 
@@ -718,11 +576,10 @@ Procedure OfflineUL(BatchMode: Boolean);
     Cont, Have, XferOk: Boolean;
     ProtNum: Word;
     TmpStr, Src: String;
-    Names: Array[1..30] Of String[128];
-    NumNames, i: Word;
-    FI: FindObj;
-    UpFile: File;
+    Cmds: OffCmdList;
+    NumCmds: Word;
     Imported: LongInt;
+    ImpO: OffImportOpts;
 
   Begin
   If QwkUser.MailType <> qmtQwk Then
@@ -771,14 +628,7 @@ Procedure OfflineUL(BatchMode: Boolean);
           User.DisplayNewLine;
           User.DisplayAttr(Config^.GetSystemColor(1));
           User.DisplayStrLn(Prompts.GetString(130));
-          TmpStr := GetProtStr(ProtNum, False, '');
-          {a file transfer program needs the caller's connection as it is: no pseudo terminal}
-          CommRelease;
-          DoorRaw := True;
-          DoShell(TmpStr, True, False);
-          DoorRaw := False;
-          CommInit;
-          XferOk := (GetResultCode = 0) And (ShellError = 0);
+          XferOk := OffTransfer(ProtCmd(ProtNum, False, ''), OrigDir, WorkPath);
           End;
         If Not XferOk Then
           Begin
@@ -793,46 +643,9 @@ Procedure OfflineUL(BatchMode: Boolean);
   If Cont And Have Then
     Begin
     {what was received: renamed, a file name of the caller must not look like an option to an unpacker}
-    ChDir(StripTrail(WorkPath, '\'));
-    NumNames := 0;
-    FI.Init;
-    FI.FFirst(WithBackSlash(WorkPath) + '*');
-    While FI.Found And (NumNames < 30) Do
-      Begin
-      If Copy(FI.GetName, 1, 7) <> 'upload.' Then
-        Begin
-        Inc(NumNames);
-        Names[NumNames] := FI.GetName;
-        End;
-      FI.FNext;
-      End;
-    FI.Done;
-    For i := 1 To NumNames Do
-      Begin
-      Assign(UpFile, WithBackSlash(WorkPath) + Names[i]);
-      Rename(UpFile, WithBackSlash(WorkPath) + 'upload.' + Long2Str(i + 1));
-      If IoResult <> 0 Then;
-      End;
-    {the packets: the file was a plain .MSG, or an archive of one}
-    If FindNoCase(WorkPath, Offline^.GetExtractSpec) = '' Then
-      Begin
-      FI.Init;
-      NumNames := 0;
-      FI.FFirst(WithBackSlash(WorkPath) + 'upload.*');
-      While FI.Found And (NumNames < 30) Do
-        Begin
-        Inc(NumNames);
-        Names[NumNames] := FI.GetName;
-        FI.FNext;
-        End;
-      FI.Done;
-      i := 1;
-      While (i <= NumNames) And (FindNoCase(WorkPath, Offline^.GetExtractSpec) = '') Do
-        Begin
-        If UnPackReply(Offline, Names[i]) Then;
-        Inc(i);
-        End;
-      End;
+    OffRenameUploads(WorkPath);
+    UnpackCmds(Cmds, NumCmds);
+    If Not OffUnpackReply(Offline, WorkPath, OrigDir, Cmds, NumCmds) Then;
     If FindNoCase(WorkPath, Offline^.GetExtractSpec) = '' Then
       Begin
       User.DisplayNewLine;
@@ -843,8 +656,14 @@ Procedure OfflineUL(BatchMode: Boolean);
     Else
       Begin
       UpdateStatus(False, Prompts.GetString(366));
+      ImpO.BadArea := QCfg.BadMsgArea;
+      ImpO.ForceName := QCfg.ForceName;
+      ImpO.ReDate := (QCfg.Attr And qaReDate) <> 0;
+      ImpO.DupeFile := WithBackSlash(QCfg.UserPath) + 'qwkdupe.dat';
+      Offline^.SetImportOpts(ImpO);
       Offline^.ImportPacket;
       Imported := Offline^.GetImported;
+      Inc(QwkUser.MsgsUL, Imported);
       User.DisplayNewLine;
       User.DisplayStrLn(Long2Str(Imported) + ' message(s) posted');
       If Not BatchMode Then
@@ -867,39 +686,88 @@ Procedure OfflineUL(BatchMode: Boolean);
   End;
 
 
+Var
+  DLFull: Boolean;                     {the full screen display}
+  DLIdx: Word;
+  DLPhase: Byte;
+  DLSelected: Array[1..OffAreas] Of Boolean;
+
+
+Function DLSel(N: Word; Var Area: Word; Var Mode: Byte): Boolean;
+  {the conferences of the caller in turn; with "your mail in all areas" the others follow, for his mail only}
+  Begin
+  DLSel := False;
+  If N = 1 Then
+    Begin
+    DLIdx := 0;
+    DLPhase := 1;
+    FillChar(DLSelected, SizeOf(DLSelected), 0);
+    End;
+  If DLPhase = 1 Then
+    Begin
+    Repeat
+      Inc(DLIdx);
+    Until (DLIdx > QwkUserAreas) Or ((QwkUser.UserConfs[DLIdx].Area > 0) And
+      (QwkUser.UserConfs[DLIdx].Typ <> qctNone));
+    If DLIdx <= QwkUserAreas Then
+      Begin
+      Area := QwkUser.UserConfs[DLIdx].Area;
+      If Area <= OffAreas Then
+        DLSelected[Area] := True;
+      Case QwkUser.UserConfs[DLIdx].Typ Of
+        qctMy: Mode := omMy;
+        qctAll: Mode := omAllYour;
+        Else Mode := omAll;
+        End;
+      DLSel := True;
+      Exit;
+      End;
+    If (QwkUser.Attr And quaAllYours) = 0 Then
+      Exit;
+    DLPhase := 2;
+    DLIdx := 0;
+    End;
+  Repeat
+    Inc(DLIdx);
+  Until (DLIdx > Config^.GetMaxMsgAreas) Or (DLIdx > OffAreas) Or (Not DLSelected[DLIdx]);
+  If (DLIdx <= Config^.GetMaxMsgAreas) And (DLIdx <= OffAreas) Then
+    Begin
+    Area := DLIdx;
+    Mode := omMy;
+    DLSel := True;
+    End;
+  End;
+
+
+Procedure DLEv(What: Word; Area: Word; N: LongInt);
+  Begin
+  Case What Of
+    oeArea: UpdateArea(DLFull, N, Area);
+    oeAreaMsg: If (N Mod 5) = 0 Then UpdateNumArea(DLFull, N);
+    oePktMsg: If (N Mod 5) = 0 Then UpdateNumPkt(DLFull, N);
+    oeAreaEnd: Begin
+               UpdateNumArea(DLFull, N);
+               If Not DLFull Then
+                 User.DisplayNewLine;
+               End;
+    End;
+  End;
+
+
 Procedure OfflineDL(BatchMode: Boolean);
   Var
     Offline: AbsOffPtr;
-    CurrArea: Word;
-    AreaCount: Word;
-    CMsg: AbsMsgPtr;
-    NewLastRead: Array[1..200] of LongInt;
-    i: Word;
     Cont: Boolean;
-    SysopAccess: Boolean;
-    NetAccess: Boolean;
-    ToYou: Boolean;
-    FromYou: Boolean;
-    ToAll: Boolean;
-    MsgOk: Boolean;
-    Sec: SecType;
-    CName: String[35];
-    CHdl: String[35];
-    NumThisArea: Word;
-    NumThisPkt: Word;
-    NumAreas: Word;
-    Done: Boolean;
-    PackCmd: String;
-    TmpStr: String;
+    Quiet: Boolean;                    {nothing to send, or the caller does not want it: not an error}
+    P: OffDLParams;
+    R: OffDLResult;
     PackNum: Word;
-    MaxMsgs: Word;
-    AreaMax: Word;
+    ArcName: String;
     FullScrn: Boolean;
 
   Begin
-  NumThisPkt := 0;
-  NumAreas := 0;
   FullScrn := User.GetUserAnsi or User.GetUserAvatar;
+  DLFull := FullScrn;
   If FullScrn Then
     Begin
     If DisplayFile('mko-proc','') = ' ' Then;
@@ -907,19 +775,8 @@ Procedure OfflineDL(BatchMode: Boolean);
   Else
     User.ClearScreen;
   UpdateStatus(FullScrn, Prompts.GetString(366));
-  CName := Upper(User.GetUserName);
-  CHdl := Upper(User.GetUserHandle);
-  If Length(CHdl) = 0 Then
-    CHdl := #8#255#0#13#65;
-  MaxMsgs := QwkUser.MaxMsgs;
-  If QCfg.MaxMsgs < MaxMsgs Then
-    MaxMsgs := QCfg.MaxMsgs;
-  AreaMax := QwkUser.MaxConfMsgs;
-  If QCfg.MaxConfMsgs < AreaMax Then
-    AreaMax := QCfg.MaxConfMsgs;
+  Quiet := False;
   Offline := nil;
-  For i := 1 to 200 Do
-    NewLastRead[i] := -1;
   Cont := ValidateOffline;
   If Cont Then
     Begin
@@ -937,6 +794,7 @@ Procedure OfflineDL(BatchMode: Boolean);
   If Cont Then
     Begin
     Offline^.SetBBSId(QCfg.BoardId);
+    Offline^.SetQwke((QCfg.Attr And qaQwke) <> 0);
     WorkPath := CreateTempDir(QCfg.TempPath);
     Cont := Length(WorkPath) > 0;
     End;
@@ -947,141 +805,59 @@ Procedure OfflineDL(BatchMode: Boolean);
     End;
   If Cont Then
     Begin
-    User.GetUserSec(Sec);
-    AreaCount := 1;
-    Done := False;
-    While ((AreaCount <= 200) and (Not Done)) Do
-      Begin
-      If ((QwkUser.UserConfs[AreaCount].Area > 0) and
-      (QwkUser.UserConfs[AreaCount].Typ <> qctNone)) Then
-        Begin
-        CurrArea := QwkUser.UserConfs[AreaCount].Area;
-        If Config^.MsgReadAccess(CurrArea, Sec) Then
-          Begin
-          SysopAccess := Config^.MsgSysopAccess(CurrArea, Sec);
-          NetAccess := (Config^.GetMsgNetStatus(CurrArea) and User.GetUserNetStatus) <> 0;
-          Inc(NumAreas);
-          NumThisArea := 0;
-          If OpenMsgArea(CMsg, Config^.GetMsgAreaId(CurrArea)) Then
-            Begin
-            UpdateArea(FullScrn, NumAreas, CurrArea);
-            CMsg^.SeekFirst(GetLastRead(CurrArea) + 1);
-            While (CMsg^.SeekFound and (Not Done) and (NumThisArea < AreaMax)) Do
-              Begin
-              CMsg^.MsgStartUp;
-              FromYou := (Upper(CMsg^.GetFrom) = CName)
-                Or (Upper(CMsg^.GetFrom) = CHdl);
-              ToYou := (Upper(CMsg^.GetTo) = CName)
-                Or (Upper(CMsg^.GetTo) = CHdl);
-              ToAll := (Upper(CMsg^.GetTo) = 'ALL');
-              If (Not CMsg^.IsPriv) or SysopAccess Or ToYou Or FromYou
-              Or NetAccess Then
-                Begin
-                Case QwkUser.UserConfs[AreaCount].Typ Of
-                  qctNone: MsgOk := False;
-                  qctOn: MsgOk := True;
-                  qctMy: MsgOk := ToYou;
-                  qctAll: MsgOk := ToYou or ToAll;
-                  End;
-                If MsgOk Then
-                  Begin
-                  NewLastRead[AreaCount] := CMsg^.GetMsgNum;
-                  If Not Offline^.AddMsg(CMsg^, CurrArea, False) Then
-                    Begin
-                    User.DisplayNewLine;
-                    User.DisplayStrLn(Prompts.GetString(364));
-                    User.PressEnter;
-                    Done := True;
-                    End;
-                  Inc(NumThisArea);
-                  Inc(NumThisPkt);
-                  If NumThisPkt > MaxMsgs Then
-                    Done := True;
-                  If (NumThisArea Mod 5) = 0 Then
-                    UpdateNumArea(FullScrn, NumThisArea);
-                  If (NumThisPkt Mod 5) = 0 Then
-                    UpdateNumPkt(FullScrn, NumThisPkt);
-                  End;
-                If (Not Batchmode) and (Not Done) Then
-                  Done := Not User.Ok;
-                End;
-              CMsg^.SeekNext;
-              End;
-            UpdateNumArea(FullScrn, NumThisArea);
-            If CloseMsgArea(CMsg) Then;
-            If Not FullScrn Then
-              User.DisplayNewLine;
-            End;
-          End;
-        End;
-      Inc(AreaCount);
-      End;
-    UpdateNumPkt(FullScrn, NumThisPkt);
+    P.Sel := DLSel;
+    P.Ev := DLEv;
+    P.MaxMsgs := QwkUser.MaxMsgs;
+    If QCfg.MaxMsgs < P.MaxMsgs Then
+      P.MaxMsgs := QCfg.MaxMsgs;
+    P.AreaMax := QwkUser.MaxConfMsgs;
+    If QCfg.MaxConfMsgs < P.AreaMax Then
+      P.AreaMax := QCfg.MaxConfMsgs;
+    P.OwnMsgs := (QwkUser.Attr And quaOwnMsgs) <> 0;
+    P.CheckUser := Not BatchMode;
+    Cont := OffExport(Offline, P, R);
+    UpdateNumPkt(FullScrn, R.NumMsgs);
     If Offline^.ClosePacket <> 0 Then
       Cont := False;
-    End;
-  PackNum := GetPackNum;
-  If Cont Then
-    Begin
-    If ((PackNum > 0) and (Qcfg.Packers[PackNum].PackActive)) Then
+    If Cont And (R.NumMsgs = 0) And ((QwkUser.Attr And quaNoMsg) = 0) Then
       Begin
-      TmpStr := QCfg.Packers[PackNum].PackCmd;
-      TmpStr := StripBoth(TmpStr,' ');
-      PackCmd := UnixPath(ExtractWord(TmpStr, 1));
-      TmpStr := Copy(TmpStr, Length(ExtractWord(TmpStr, 1)) + 1, 128);
-      ChDir(StripTrail(OrigDir,'\'));
-      If ((Pos(':', PackCmd) = 0) and (Pos('\', PackCmd) = 0)) Then
-        Begin
-        If FindOnPath(PackCmd, PackCmd) Then
-          PackCmd := FExpand(PackCmd)
-        Else
-         Cont := False;;
-        End;
-      End
-    Else
+      User.DisplayNewLine;
+      User.DisplayStrLn(Prompts.GetString(178));
+      If Not BatchMode Then
+        User.PressEnter;
+      Quiet := True;
       Cont := False;
-    End;
-  If Cont Then
-    Cont := FileExist(PackCmd);
-  If Cont Then
-    Begin
-    ChDir(StripTrail(WorkPath, '\'));
-    Cont := IoResult = 0;
-    End;
-  If Cont Then
-    Begin
-    If BatchMode Then
-      TmpStr := PackCmd + ' ' + TmpStr + ' ' + WithBackSlash(OrigDir) +
-      Offline^.GetArchiveName(PackNum) + ' ' + '*.*'
-    Else
-      TmpStr := PackCmd + ' ' + TmpStr + ' ' + Offline^.GetArchiveName(PackNum) +
-      ' ' + '*.*';
-    End;
-  If Cont Then
-    Begin
-    UpdateStatus(FullScrn, Prompts.GetString(189));
-    DoShell(TmpStr, True, False);
-    Cont := (GetResultCode = 0) And (ShellError = 0);
-    End;
-  If (Cont and FullScrn) Then
-    User.DisplayXY(1, 13);
-  If (Cont and (Not BatchMode)) Then
-    Begin
-    Cont := SendMail(WithBackSlash(WorkPath) + Offline^.GetArchiveName(PackNum),
-      Offline^.GetArchiveName(PackNum));
-    End;
-  If Cont Then
-    Begin
-    For AreaCount := 1 to 200 Do
-      Begin
-      If NewLastRead[AreaCount] >= 0 Then
-        Begin
-        CurrArea := QwkUser.UserConfs[AreaCount].Area;
-        SetLastRead(CurrArea, NewLastRead[AreaCount]);
-        End;
       End;
     End;
-  If Not Cont Then
+  If Cont Then
+    Begin
+    PackNum := GetPackNum;
+    ArcName := Offline^.GetArchiveName(PackNum);
+    Cont := (PackNum > 0) And (PackNum < 11) And QCfg.Packers[PackNum].PackActive;
+    If Cont Then
+      Begin
+      UpdateStatus(FullScrn, Prompts.GetString(189));
+      If BatchMode Then
+        Cont := OffRun(QCfg.Packers[PackNum].PackCmd, OrigDir, WorkPath, WithBackSlash(OrigDir) + ArcName + ' *.*')
+      Else
+        Cont := OffRun(QCfg.Packers[PackNum].PackCmd, OrigDir, WorkPath, ArcName + ' *.*');
+      End;
+    End;
+  If Cont And FullScrn Then
+    User.DisplayXY(1, 13);
+  If Cont And (Not BatchMode) Then
+    Begin
+    If (QwkUser.Attr And quaAskPkt) <> 0 Then
+      Begin
+      Cont := OffVerify(WithBackSlash(WorkPath) + ArcName);
+      Quiet := Not Cont;
+      End;
+    If Cont Then
+      Cont := SendMail(WithBackSlash(WorkPath) + ArcName, ArcName);
+    End;
+  If Cont Then
+    OffCommitLR(R);                    {the caller has what was in the packet}
+  If (Not Cont) And (Not Quiet) Then
     Begin
     User.DisplayNewLine;
     User.DisplayAttr(Config^.GetSystemColor(1));
@@ -1090,10 +866,6 @@ Procedure OfflineDL(BatchMode: Boolean);
     End;
   If Offline <> nil Then
     Dispose(Offline, Done);
-  ChDir('\');
-  If IoResult <> 0 Then;
-  ChDir(StripTrail(Config^.GetTempPath,'\'));
-  If IoResult <> 0 Then;
   ChDir(StripTrail(OrigDir,'\'));
   If IoResult <> 0 Then;
   If Length(WorkPath) > 0 Then
@@ -1513,31 +1285,6 @@ Procedure MainQwk;
        End;
     End;
   Prompts.Done;
-  End;
-
-
-Procedure UploadFromBbs;
-  {Called from mk itself: User, Config and Prompts are the ones of the BBS session.  The settings of the offline
-   mail door (config.mko) are loaded here, as mkqwk does.  The upload works in a directory of its own: mk is
-   back in its directory afterwards.}
-  Var
-    Cur: String;
-
-  Begin
-  GetDir(0, Cur);
-  QwkMode := 2;
-  If Not LoadQwkCfg Then
-    Begin
-    User.DisplayNewLine;
-    User.DisplayStrLn('Offline mail is not set up (config.mko not found)');
-    User.PressEnter;
-    Exit;
-    End;
-  LoadUser(User.GetUserName);
-  OfflineUL(False);
-  SaveUser;
-  {$I-}ChDir(Cur);{$I+}
-  If IoResult <> 0 Then;
   End;
 
 

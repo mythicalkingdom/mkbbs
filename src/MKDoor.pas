@@ -186,6 +186,7 @@ Type DoorUser = Object
   Function  GetUserBbsType: Byte;      {Get Bbs type}
   Procedure SetUserBbsType(BT: Byte);  {Set Bbs type}
   Function  GetUserAvatar: Boolean;    {Get avatar setting}
+  Function  GetUserQwkNode: Boolean;   {The user is a QWK network node (MK user files only)}
   Procedure SetUserAvatar(AV: Boolean);{Set user avatar}
   Function  GetUserFullEd: Boolean;    {Get full-screen editor setting}
   Procedure SetUserFullEd(FE: Boolean);{Set full-screen editor setting}
@@ -2918,6 +2919,13 @@ Procedure DoorUser.SetUserOffGate(OA: Boolean); {User is gating msgs}
       UserInfo^.ExitInfo.ExtUser.OffAttr :=
       UserInfo^.ExitInfo.ExtUser.OffAttr and (Not uoaGateWay);
     End;
+  End;
+
+
+Function DoorUser.GetUserQwkNode: Boolean;
+  Begin
+  GetUserQwkNode := (UserInfo^.BbsType = 1) And
+    ((UserInfo^.ExitInfo.ExtUser.ExtraInfo and eiQwkNode) <> 0);
   End;
 
 

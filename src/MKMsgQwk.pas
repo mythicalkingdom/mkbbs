@@ -35,7 +35,7 @@ Unit MKMsgQwk;       {QWK message file (MESSAGES.DAT, REP) message object}
        Lines are ended by #13.  Leading @VIA:, @MSGID:, @REPLY: and @TZ: lines (the
        Synchronet/QWK convention) come out as ^A kludge lines (^AVia ..., ^AMSGID: ...,
        ^AREPLY: ..., ^ATZ: ...), GetMsgId / GetReplyId give the first two.  Names
-       and subject are the 25 byte fields (QWKE long names are not handled).
+       and subject are the 25 byte fields; with SetQwke (below) the long names and subject of QWKE come out too.
        The status byte gives IsPriv and IsRcvd (SetStatusStyle: the QWK spec, or
        PCBoard's way, which has '+' and '*' the other way round); GetStatusChar,
        GetHasTag (byte 127, a tag line is present), GetEchoFlag (byte 126 'E' of a
@@ -60,6 +60,14 @@ Unit MKMsgQwk;       {QWK message file (MESSAGES.DAT, REP) message object}
        back; DeleteMsg marks it as killed (the numbers after it go down by one and the
        cursor is left on the one before it, so a SeekNext loop goes on).
 
+     QWKE (long names and subjects)
+       QWKE keeps a name or subject of more than 25 bytes whole: the 25 bytes of the header are cut as before and the
+       message text starts with the lines "To: ...", "From: ..." and "Subject: ..." for the fields that were cut.
+       SetQwke(qkOn) reads and writes them; qkAuto reads them only where they fit the header (the 25 bytes of the
+       header are the start of the long value: a line "To: ..." of an ordinary message stays text) and writes them
+       for fields that are too long; qkOff (the default) leaves them as text.  Cut fields are not reported by
+       GetCut then.  Of the long fields 80 bytes are kept.
+
      Errors (the result of OpenMsgBase, CreateMsgBase, WriteMsg, ...):
        1000 cannot open   1001 no such file   1002 no file name set
        1003 too short for a QWK file   1004 the file is damaged, not changed
@@ -81,6 +89,10 @@ Const
   qcCp437 = 1;
   qcUtf8 = 2;
   qcLatin1 = 3;
+
+  qkOff = 0;        {SetQwke: the To:, From: and Subject: lines are text}
+  qkAuto = 1;       {read the ones that fit the header, write them for the fields that are too long}
+  qkOn = 2;         {always read them, write them for the fields that are too long}
 
   qsQwk = 0;        {SetStatusStyle: '+' private unread, '*' private read}
   qsPcBoard = 1;    {'*' private unread, '+' private read}
@@ -158,6 +170,8 @@ Type MKQwkInfoType = Record
   WCap: LongInt;
   WConf: LongInt;                 {conference of the message being written, -1 = not set}
   WEcho: Boolean;
+  WNum: LongInt;                  {number to write for the message being written, -1 = the next one}
+  LastBlk: LongInt;               {block of the header of the message written last (0 = none yet)}
   MailType: MsgMailType;
   NewDate: String[10];
   NewTime: String[8];
@@ -171,6 +185,7 @@ Type MKQwkInfoType = Record
   StyleSet: Boolean;
   RepMode: Boolean;
   UpperNames: Boolean;
+  Qwke: Byte;
   Dropped: Word;
   Cut: Boolean;
   End;
@@ -269,6 +284,8 @@ Type QwkMsgObj = Object(AbsMsgObj)
   Function  GetConference: LongInt;          {the filter, -1 = all}
   Function  GetMsgConf: LongInt;             {conference of the current message}
   Procedure SetMsgConf(C: LongInt);          {conference of the message being written}
+  Procedure SetQwkNum(N: LongInt);           {message number to write (the BBS number in a packet for a caller); else the next one of the conference}
+  Function  GetLastBlock: LongInt;           {block (0 = the id block) of the header of the message that WriteMsg wrote last, for index files}
   Function  NextConf(After: LongInt): LongInt; {next conference above After that has messages, -1 = none}
   Function  ConfPresent(C: LongInt): Boolean;
   Function  GetQwkNum: LongInt;              {message number written in the file}
@@ -288,6 +305,7 @@ Type QwkMsgObj = Object(AbsMsgObj)
   Procedure SetStatusStyle(St: Byte);        {qsQwk, qsPcBoard}
   Procedure SetRepMode(B: Boolean);
   Procedure SetUpperNames(B: Boolean);       {default True}
+  Procedure SetQwke(Mode: Byte);             {qkOff, qkAuto, qkOn: QWKE long names and subjects}
   Function  GetClean: Boolean;               {the file is whole}
   Function  GetCut: Boolean;                 {the last WriteMsg cut a name or the subject}
   Function  GetDropped: Word;                {kludge lines the last WriteMsg could not keep}
@@ -746,6 +764,66 @@ Function EffStyle(Var PI: MKQwkInfoType): Byte;
   End;
 
 
+Function QweLine(Body: QwkBytePtr; S, E: LongInt; Var VS: LongInt): Integer;
+  {1 To: 2 From: 3 Subject: at the start of the line S .. E, 0 = none; VS is where the value starts}
+  Function At(Const P: String): Boolean;
+    Var
+      k: Integer;
+    Begin
+    At := False;
+    If E - S < Length(P) Then
+      Exit;
+    For k := 1 To Length(P) Do
+      If Body^[S + k - 1] <> Ord(P[k]) Then
+        Exit;
+    At := True;
+    End;
+  Begin
+  QweLine := 0;
+  If At('To: ') Then
+    Begin
+    QweLine := 1;
+    VS := S + 4;
+    End
+  Else If At('From: ') Then
+    Begin
+    QweLine := 2;
+    VS := S + 6;
+    End
+  Else If At('Subject: ') Then
+    Begin
+    QweLine := 3;
+    VS := S + 9;
+    End;
+  End;
+
+
+Function QweFits(Const Hdr, Val: String): Boolean;
+  {the 25 bytes of the header are the start of the long value (names are upper case in the header)}
+  Var
+    H, V: String;
+
+  Begin
+  H := Upper(StripBoth(Hdr, ' '));
+  V := Upper(Copy(Val, 1, 25));
+  QweFits := (Length(Val) > 25) And (H = StripBoth(V, ' '));
+  End;
+
+
+Function CleanName(Const S0: String): String;
+  Var
+    S: String;
+    i: Word;
+
+  Begin
+  S := S0;
+  For i := 1 To Length(S) Do
+    If S[i] < ' ' Then
+      S[i] := ' ';
+  CleanName := StripBoth(S, ' ');
+  End;
+
+
 Procedure LoadMsg(Var PI: MKQwkInfoType; Var E: QwkEntry);
   Var
     H: QwkHdr;
@@ -759,6 +837,8 @@ Procedure LoadMsg(Var PI: MKQwkInfoType; Var E: QwkEntry);
     Leading: Boolean;
     Kind: Integer;
     Val: String;
+    Qk: Integer;
+    Hdr: String;
 
   Begin
   With PI Do
@@ -866,8 +946,37 @@ Procedure LoadMsg(Var PI: MKQwkInfoType; Var E: QwkEntry);
           Begin
           Kind := 0;
           If Leading Then
-            Kind := FindKludge(Body, LineStart, i, VS);
-          If Kind > 0 Then
+            Begin
+            Qk := 0;
+            If Qwke <> qkOff Then
+              Qk := QweLine(Body, LineStart, i, VS);
+            If Qk > 0 Then
+              Begin
+              Val := ConvStr(@Body^[VS], i - VS, Enc);
+              Val := StripBoth(Val, ' ');
+              Case Qk Of
+                1: Hdr := ToStr;
+                2: Hdr := FromStr;
+                Else Hdr := SubjStr;
+                End;
+              If (Qwke = qkOn) Or QweFits(Hdr, Val) Then
+                Begin
+                Val := Copy(Val, 1, 80);
+                Case Qk Of
+                  1: ToStr := Val;
+                  2: FromStr := Val;
+                  Else SubjStr := Val;
+                  End;
+                Kind := 9;               {taken: not a line of the text}
+                End;
+              End;
+            If Kind = 0 Then
+              Kind := FindKludge(Body, LineStart, i, VS);
+            End;
+          If Kind = 9 Then
+            Begin
+            End
+          Else If Kind > 0 Then
             Begin
             Val := ConvStr(@Body^[VS], i - VS, Enc);
             While (Length(Val) > 0) And (Val[1] = ' ') Do
@@ -974,6 +1083,7 @@ Constructor QwkMsgObj.Init;
     Begin
     Filter := -1;
     WConf := -1;
+    WNum := -1;
     ReadCs := qcCp437;
     UpperNames := True;
     PacketId := 'QWK';
@@ -1417,6 +1527,18 @@ Function QwkMsgObj.NextConf(After: LongInt): LongInt;
   End;
 
 
+Procedure QwkMsgObj.SetQwkNum(N: LongInt);
+  Begin
+  PI^.WNum := N;
+  End;
+
+
+Function QwkMsgObj.GetLastBlock: LongInt;
+  Begin
+  GetLastBlock := PI^.LastBlk;
+  End;
+
+
 Procedure QwkMsgObj.SetHasTag(B: Boolean);
   Begin
   PI^.HasTag := B;
@@ -1457,6 +1579,12 @@ Procedure QwkMsgObj.SetStatusStyle(St: Byte);
 Procedure QwkMsgObj.SetRepMode(B: Boolean);
   Begin
   PI^.RepMode := B;
+  End;
+
+
+Procedure QwkMsgObj.SetQwke(Mode: Byte);
+  Begin
+  PI^.Qwke := Mode;
   End;
 
 
@@ -1525,6 +1653,7 @@ Procedure QwkMsgObj.StartNewMsg;
     ReplyStr := '';
     WConf := -1;
     WEcho := False;
+    WNum := -1;
     WLen := 0;
     End;
   End;
@@ -1723,6 +1852,19 @@ Function QwkMsgObj.WriteMsg: Word;
           End;
         LineStart := i + 1;
         End;
+    If Qwke <> qkOff Then
+      Begin
+      {QWKE: the names and the subject that do not fit the 25 bytes of the header, whole}
+      T := CleanName(ToStr);
+      If Length(T) > 25 Then
+        PutLine('To: ' + Copy(T, 1, 80));
+      T := CleanName(FromStr);
+      If Length(T) > 25 Then
+        PutLine('From: ' + Copy(T, 1, 80));
+      T := CleanName(SubjStr);
+      If Length(T) > 25 Then
+        PutLine('Subject: ' + Copy(T, 1, 80));
+      End;
     If Have[1] Then PutLine('@MSGID: ' + Lead[1]);
     If Have[2] Then PutLine('@REPLY: ' + Lead[2]);
     If Have[3] Then PutLine('@VIA: ' + Lead[3]);
@@ -1805,6 +1947,8 @@ Function QwkMsgObj.WriteMsg: Word;
       {number: in a REP the conference, else the next one in the conference}
       If RepMode Then
         Number := Conf
+      Else If (WNum >= 1) And (WNum <= MaxNumber) Then
+        Number := WNum
       Else
         Begin
         MaxNum := 0;
@@ -1857,6 +2001,9 @@ Function QwkMsgObj.WriteMsg: Word;
         If S[i] < ' ' Then S[i] := ' ';
       S := StripBoth(S, ' ');
       PutField(H, 71, S, Cut);
+      If Qwke <> qkOff Then
+        Cut := (Length(CleanName(ToStr)) > 80) Or (Length(CleanName(FromStr)) > 80) Or
+          (Length(CleanName(SubjStr)) > 80);
       If (Ref > 0) And (Ref <= 99999999) Then
         PutAscii(H, 108, 8, Ref)
       Else
@@ -1906,6 +2053,7 @@ Function QwkMsgObj.WriteMsg: Word;
           If InView(PI^, Ent^[NumEnt - 1]) Then
             AddView(PI^, NumEnt - 1);
           LastNum := Number;
+          LastBlk := OldSize Div BlkSize;
           End
         Else
           Res := 1010;

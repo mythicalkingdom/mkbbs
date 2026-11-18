@@ -286,6 +286,7 @@ Function QwkImportFile(FN: String; DupeFN: String; Map: QwkImpMapProc; Note: Qwk
   Q.Init;
   Q.SetMsgPath(FN);
   Q.SetReadCharset(qcAuto);
+  Q.SetQwke(qkAuto);                   {QWKE long names and subjects, where they fit the header}
   E := Q.OpenMsgBase;
   If E <> 0 Then
     Begin

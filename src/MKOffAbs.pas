@@ -21,11 +21,22 @@ Uses MKGlobT, MKMsgAbs, MKDoor,
   Dos;
 
 
+Type OffImportOpts = Record            {how the reply packet of a caller is posted (ImportPacket)}
+  BadArea: Word;                       {message area for replies that cannot go where they were meant (0 = refuse them)}
+  ForceName: Boolean;                  {the messages are From the caller (a QWK network node posts in the names of its users)}
+  ReDate: Boolean;                     {the messages get the date of the import}
+  DupeFile: String[250];               {file of the duplicate check ('' = none)}
+  End;
+
+
 Type AbsOffObj = Object
   User: DoorUserPtr;                   {the caller (MKDoor.User unless SetUsrPtr says otherwise)}
+  ImpOpts: OffImportOpts;
   Constructor Init; {Initialize}
   Destructor Done; Virtual; {Done}
   Procedure SetUsrPtr(Var U: DoorUserPtr);
+  Procedure SetImportOpts(Var O: OffImportOpts); {before ImportPacket}
+  Procedure SetQwke(QK: Boolean); Virtual;     {QWKE long names and subjects in the packet (QWK only)}
   Procedure SetPath(MP: String); Virtual; {Set msg path/other info}
   Procedure SetBBSID(ID: String); Virtual; {Set BBS id/filename}
   Function  StartPacket: Word; Virtual; {Do Packet startup tasks}
@@ -48,6 +59,19 @@ Implementation
 Constructor AbsOffObj.Init;
   Begin
   User := @MKDoor.User;
+  FillChar(ImpOpts, SizeOf(ImpOpts), 0);
+  ImpOpts.ForceName := True;
+  End;
+
+
+Procedure AbsOffObj.SetQwke(QK: Boolean);
+  Begin
+  End;
+
+
+Procedure AbsOffObj.SetImportOpts(Var O: OffImportOpts);
+  Begin
+  ImpOpts := O;
   End;
 
 

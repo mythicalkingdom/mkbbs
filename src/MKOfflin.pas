@@ -28,7 +28,7 @@ Implementation
 
 Uses MKFile, MKString, MKDoor, MKCfgAbs, MKGlobT, MKCFile,
   MKOffAbs, MKOffQwk, MKOffTxt, MKOffXrs, MKOffBwv,
-  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKQwkO,
+  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKOffDL, MKOffXfer,
   Dos;
 
 
@@ -360,25 +360,84 @@ Procedure OfflineAuto;
   End;
 
 
-Procedure OfflineUL;
-  {the reply packet of the caller: the code of the offline mail door (MKQwkO), run inside mk}
+{ ---- the packet for the caller, and the replies of the caller.  The settings are those of config.mk (packers, protocols with
+  their command lines, BoardId ...) and of the record of the caller; the programs of MKQwk (config.mko) are not needed. }
+
+Var
+  SelIdx: Word;
+
+
+Function ProtCmd(Send: Boolean; Var ProtNum: Word): String;
+  {the protocol of the caller; the command line of the external ones (11 - 20), '' for the internal ones}
   Begin
-  UploadFromBbs;
+  ProtNum := GetUserProtNum;
+  If ProtNum >= 11 Then
+    ProtCmd := OffSplitProt(Config^.GetProtCmdLine(ProtNum), Send)
+  Else
+    ProtCmd := '';
   End;
 
 
-Function SendMail(FN: String; JustName: String): Boolean;
-  Var
-    XFerOk : Boolean;
-    ProtNum: Word;
-    Prot: ProtObj;
+Function ProtUsable(ProtNum: Word; Cmd: String): Boolean;
+  {the internal protocols 1 - 6 are built in (MKProt: Xmodem, 1k-Xmodem, Ymodem, Zmodem, Ymodem-G, Xmodem-G; Sealink, 7, is
+   not used); an external one (11 - 20) needs its command}
+  Begin
+  ProtUsable := ((ProtNum >= 1) And (ProtNum <= 6)) Or ((ProtNum >= 11) And (Cmd <> ''));
+  End;
 
+
+Procedure SetInternal(Var Prot: ProtObj; ProtNum: Word);
+  Begin
+  Case ProtNum Of
+    1: Prot.SetXmodem;
+    2: Prot.SetX1K;
+    3: Prot.SetYmodem;
+    5: Prot.SetYModemG;
+    6: Prot.SetXmodemG;
+    Else Prot.SetZmodem;
+    End;
+  End;
+
+
+Function InternalSend(FN: String; ProtNum: Word): Boolean;
+  Var
+    Prot: ProtObj;
 
   Begin
   Prot.Init;
+  SetInternal(Prot, ProtNum);
   Prot.AddSendFile(FN);
-  XferOk := EstimateXferTime(SizeFile(FN), User.GetUserBaud, 90) <
-    User.TimeRemain;
+  Prot.Send;
+  InternalSend := (Prot.PI^.Error = 0) And (Prot.GetFileStatus(1) = 1);
+  Prot.Done;
+  End;
+
+
+Function InternalRecv(WorkPath: String; ProtNum: Word): Boolean;
+  Var
+    Prot: ProtObj;
+
+  Begin
+  Prot.Init;
+  SetInternal(Prot, ProtNum);
+  Prot.SetRecvName('upload.dat');          {Xmodem sends no name; it is renamed afterwards}
+  InternalRecv := Prot.Recv(WorkPath) And (Prot.PI^.NumFiles > 0);
+  Prot.Done;
+  End;
+
+
+Function SendMail(FN: String; JustName: String; WorkPath: String): Boolean;
+  Var
+    XferOk: Boolean;
+    ProtNum: Word;
+    Cmd: String;
+
+  Begin
+  Cmd := ProtCmd(True, ProtNum);
+  XferOk := ProtUsable(ProtNum, Cmd);
+  If XferOk Then
+    XferOk := EstimateXferTime(SizeFile(FN), User.GetUserBaud, 90) <
+      User.TimeRemain;
   If Not XferOk Then
     Begin
     User.DisplayNewLine;
@@ -386,82 +445,93 @@ Function SendMail(FN: String; JustName: String): Boolean;
     User.DisplayStrLn(Prompts.GetString(126));
     User.DisplayNewLine;
     User.PressEnter;
-    End;
-  If XferOk Then
+    End
+  Else
     Begin
-    ProtNum := GetUserProtNum;
     User.DisplayNewLine;
     User.DisplayAttr(Config^.GetSystemColor(1));
     User.DisplayStrLn(Prompts.GetString(130));
-    User.DisplayStrLn(Prompts.GetString(129));
-    Case ProtNum of
-      1: Prot.SetXmodem;
-      2: Prot.SetX1k;
-      3: Prot.SetYmodem;
-      4: Prot.SetZmodem;
-      5: Prot.SetYModemG;
-      6: Prot.SetXmodemG;
-      7: Prot.SetSealink;
-      End;
-    If ((ProtNum < 08) and (ProtNum > 0)) Then
+    User.DisplayStrLn(Prompts.GetString(129) + ' ' + JustName);
+    User.PostStatus(uoXfer);
+    If ProtNum <= 10 Then
+      XferOk := InternalSend(FN, ProtNum)
+    Else
+      XferOk := OffTransfer(OffExpand(Cmd, JustName, 0, 0), StartUpPath, WorkPath);
+    User.DisplayNewLine;
+    If Not XferOk Then
       Begin
-      CommFlow(fcHard);
-      User.PostStatus(uoXfer);
-      User.DisplayStrLn(Prompts.GetString(129) + ' ' + JustName);
-      Prot.Send;
-      CommFlow(fcBoth);
-      User.DisplayNewLine;
-      User.DisplayNewLine;
-      XferOk := Prot.GetFileStatus(1) = 1;
-      End
+      User.DisplayStrLn(Prompts.GetString(168));
+      User.PressEnter;
+      End;
     End;
-  Prot.Done;
-  SendMail:= XferOk;
+  SendMail := XferOk;
+  End;
+
+
+Function PktSel(N: Word; Var Area: Word; Var Mode: Byte): Boolean;
+  {the message areas the caller has chosen for offline mail (and the others for his own mail with "your mail in all areas")}
+  Var
+    Chosen: Boolean;
+
+  Begin
+  PktSel := False;
+  If N = 1 Then
+    SelIdx := 0;
+  While SelIdx < Config^.GetMaxMsgAreas Do
+    Begin
+    Inc(SelIdx);
+    Chosen := (User.GetUserOffline(SelIdx) And Config^.GetMsgAllowOffline(SelIdx)) Or
+      Config^.GetMsgForceOffline(SelIdx);
+    If Chosen Or (User.GetUserOffAllYour And Config^.GetMsgAllowOffline(SelIdx)) Then
+      Begin
+      Area := SelIdx;
+      If Chosen Then
+        Mode := omAll
+      Else
+        Mode := omMy;
+      PktSel := True;
+      Exit;
+      End;
+    End;
+  End;
+
+
+Procedure PktEv(What: Word; Area: Word; N: LongInt);
+  Var
+    i: Word;
+
+  Begin
+  Case What Of
+    oeArea: User.DisplayStr(Config^.GetMsgName(Area) + '      ');
+    oeAreaMsg: Begin
+               For i := 1 To 4 Do
+                 User.DisplayBkSpc;
+               User.DisplayStr(PadLeft(Long2Str(N), ' ', 4));
+               End;
+    oeAreaEnd: User.DisplayNewLine;
+    End;
   End;
 
 
 Procedure OfflineDL;
   Var
     Offline: AbsOffPtr;
-    CurrArea: Word;
     OffType: Word;
-    CMsg: AbsMsgPtr;
-    NewLastRead: Array[1..500] of LongInt;
-    i: Word;
-    WorkPath: String[128];
+    WorkPath: String;
     Cont: Boolean;
-    SysopAccess: Boolean;
-    NetAccess: Boolean;
-    ToYou: Boolean;
-    FromYou: Boolean;
-    Sec: SecType;
-    CName: String[35];
-    CHdl: String[35];
-    NumThisArea: Word;
-    NumThisPkt: Word;
-    Done: Boolean;
-    PackCmd: String[128];
-    TmpStr: String[128];
+    Quiet: Boolean;                    {nothing to send or not wanted: not an error}
+    Local: Boolean;                    {the sysop at the console: the packet is left in the BBS directory}
+    P: OffDLParams;
+    R: OffDLResult;
     PackNum: Word;
-    MaxMsgs: Word;
-    AreaMax: Word;
+    ArcName: String;
 
   Begin
   WorkPath := '';
-  CName := Upper(User.GetUserName);
-  CHdl := Upper(User.GetUserHandle);
-  If Length(CHdl) = 0 Then
-    CHdl := #8 + #255 + #0 + #13;
-  MaxMsgs := User.GetUserOffMax;
-  If Config^.GetOffMax < MaxMsgs Then
-    MaxMsgs := Config^.GetOffMax;
-  AreaMax := User.GetUserOffConfMax;
-  If Config^.GetOffConfMax < AreaMax Then
-    AreaMax := Config^.GetOffConfMax;
+  Quiet := False;
+  Local := Not CommActive;
   User.PostStatus(uoMail);
   Offline := nil;
-  For i := 1 to 500 Do
-    NewLastRead[i] := -1;
   Cont := ValidateOffline;
   If Cont Then
     Begin
@@ -499,133 +569,64 @@ Procedure OfflineDL;
     Begin
     Offline^.SetPath(WorkPath);
     Offline^.SetBBSID(Config^.GetBBSID);
+    Offline^.SetQwke(Config^.GetOffQwke Or User.GetUserQwkNode);
     If Offline^.StartPacket <> 0 Then
       Cont := False;
     End;
   If Cont Then
     Begin
-    NumThisPkt := 0;
-    User.GetUserSec(Sec);
-    CurrArea := 1;
-    Done := False;
-    While ((CurrArea <= Config^.GetMaxMsgAreas) and User.Ok and (Not Done)) Do
-      Begin
-      If Config^.MsgReadAccess(CurrArea, Sec) Then
-        Begin
-        If ((User.GetUserOffline(CurrArea) and
-        Config^.GetMsgAllowOffline(CurrArea)) or
-        Config^.GetMsgForceOffline(CurrArea)) Then
-          Begin
-          SysopAccess := Config^.MsgSysopAccess(CurrArea, Sec);
-          NetAccess := (Config^.GetMsgNetStatus(CurrArea) and
-            User.GetUserNetStatus) <> 0;
-          NumThisArea := 0;
-          If OpenMsgArea(CMsg, CurrArea) Then
-            Begin
-            User.DisplayStr(Config^.GetMsgName(CurrArea) + '      ');
-            CMsg^.SeekFirst(CMsg^.GetLastRead(User.GetUserRecNum) + 1);
-            While (CMsg^.SeekFound and (Not Done) and User.OK and
-            (NumThisArea < AreaMax)) Do
-              Begin
-              CMsg^.MsgStartUp;
-              FromYou := (Upper(CMsg^.GetFrom) = CName)
-                Or (Upper(CMsg^.GetFrom) = CHdl);
-              ToYou := (Upper(CMsg^.GetTo) = CName)
-                Or (Upper(CMsg^.GetTo) = CHdl);
-              If (Not CMsg^.IsPriv) or SysopAccess Or ToYou Or FromYou
-              Or NetAccess Then
-                Begin
-                NewLastRead[CurrArea] := CMsg^.GetMsgNum;
-                If Not Offline^.AddMsg(CMsg^, CurrArea, False) Then
-                  Begin
-                  User.DisplayNewLine;
-                  User.DisplayStrLn(Prompts.GetString(364));
-                  User.PressEnter;
-                  Done := True;
-                  End;
-                Inc(NumThisArea);
-                Inc(NumThisPkt);
-                If NumThisPkt > MaxMsgs Then
-                  Done := True;
-                For i := 1 to 4 Do
-                  User.DisplayBkSpc;
-                User.DisplayStr(PadLeft(Long2Str(NumThisArea),' ', 4));
-                End;
-              CMsg^.SeekNext;
-              End;
-            If CloseMsgArea(CMsg) Then;
-            End;
-          User.DisplayNewLine;
-          End;
-        End;
-      Inc(CurrArea);
-      End;
+    P.Sel := PktSel;
+    P.Ev := PktEv;
+    P.MaxMsgs := User.GetUserOffMax;
+    If Config^.GetOffMax < P.MaxMsgs Then
+      P.MaxMsgs := Config^.GetOffMax;
+    P.AreaMax := User.GetUserOffConfMax;
+    If Config^.GetOffConfMax < P.AreaMax Then
+      P.AreaMax := Config^.GetOffConfMax;
+    P.OwnMsgs := User.GetUserOffOwn;
+    P.CheckUser := True;
+    Cont := OffExport(Offline, P, R);
     If Offline^.ClosePacket <> 0 Then
       Cont := False;
-    End;
-  PackNum := GetUserPackerNum;
-  If Cont Then
-    Begin
-    If (PackNum > 0) Then
+    If Cont And (R.NumMsgs = 0) And (Not User.GetUserOffZero) Then
       Begin
-      TmpStr := Config^.GetPackCmdLine(PackNum);
-      TmpStr := StripBoth(TmpStr,' ');
-      PackCmd := ExtractWord(TmpStr, 1);
-      TmpStr := Copy(TmpStr, Length(PackCmd) + 1, 128);
-      ChDir(StripTrail(StartUpPath, DirectorySeparator));
-      Cont := IoResult = 0;
-      End
-    Else
+      User.DisplayNewLine;
+      User.DisplayStrLn(Prompts.GetString(178));
+      User.PressEnter;
+      Quiet := True;
       Cont := False;
+      End;
     End;
   If Cont Then
     Begin
-    If FindOnPath(PackCmd, PackCmd) Then
+    PackNum := GetUserPackerNum;
+    ArcName := Offline^.GetArchiveName(PackNum);
+    Cont := PackNum > 0;
+    If Cont Then
       Begin
-      PackCmd := FExpand(PackCmd);
-      End
-    Else
-      Cont := False;;
-    End;
-  If Cont Then
-    Begin
-    ChDir(StripTrail(WorkPath, DirectorySeparator));
-    Cont := IoResult = 0;
-    End;
-  If Cont Then
-    Begin
-    If FileExist(PackCmd) Then
-      Begin
-      If CurrentPort = 0 Then
-        TmpStr := PackCmd + ' ' + TmpStr + ' ' + WithBackSlash(StartUpPath) +
-        Offline^.GetArchiveName(PackNum) + ' ' + '*.*'
+      User.DisplayNewLine;
+      User.DisplayAttr(Config^.GetSystemColor(1));
+      User.DisplayStrLn(Prompts.GetString(189));
+      If Local Then
+        Cont := OffRun(Config^.GetPackCmdLine(PackNum), StartUpPath, WorkPath,
+          WithBackSlash(StartUpPath) + ArcName + ' *.*')
       Else
-        TmpStr := PackCmd + ' ' + TmpStr + ' ' + Offline^.GetArchiveName(PackNum) +
-        ' ' + '*.*';
-      End
-    Else
-      Cont := False;
+        Cont := OffRun(Config^.GetPackCmdLine(PackNum), StartUpPath, WorkPath, ArcName + ' *.*');
+      End;
     End;
-  User.DisplayNewLine;
-  User.DisplayStrLn(TmpStr);
-  If Cont Then
+  If Cont And (Not Local) Then
     Begin
-    User.DisplayNewLine;
-    User.DisplayAttr(Config^.GetSystemColor(1));
-    User.DisplayStrLn(Prompts.GetString(189));
-    DoShell(TmpStr, True, False);
-    Cont := (GetResultCode = 0);
-    End;
-  If (Cont and (CurrentPort <> 0)) Then
-    Begin
-    Cont := SendMail(WorkPath + Offline^.GetArchiveName(PackNum),
-      Offline^.GetArchiveName(PackNum));
+    If User.GetUserOffVerify Then
+      Begin
+      Cont := OffVerify(WithBackSlash(WorkPath) + ArcName);
+      Quiet := Not Cont;
+      End;
+    If Cont Then
+      Cont := SendMail(WithBackSlash(WorkPath) + ArcName, ArcName, WorkPath);
     End;
   If Cont Then
-    Begin
-    { *** update last read *** }
-    End;
-  If Not Cont Then
+    OffCommitLR(R);                    {the caller has what was in the packet}
+  If (Not Cont) And (Not Quiet) Then
     Begin
     User.DisplayNewLine;
     User.DisplayAttr(Config^.GetSystemColor(1));
@@ -634,8 +635,6 @@ Procedure OfflineDL;
     End;
   If Offline <> nil Then
     Dispose(Offline, Done);
-  ChDir(StripTrail(Config^.GetTempPath, DirectorySeparator));
-  If IoResult <> 0 Then;
   ChDir(StripTrail(StartUpPath, DirectorySeparator));
   If IoResult <> 0 Then;
   If Length(WorkPath) > 0 Then
@@ -646,5 +645,132 @@ Procedure OfflineDL;
     End;
   User.PostStatus(uoBrowse);
   End;
+
+
+Procedure OfflineUL;
+  {The reply packet of the caller (QWK): it is received with the protocol of the caller (the sysop at the console:
+   <BBSID>.REP in the BBS directory), unpacked in a work directory of its own and its messages are posted.}
+  Var
+    Offline: AbsOffPtr;
+    WorkPath: String;
+    Cont, Have: Boolean;
+    ProtNum, i, k: Word;
+    Cmd, Src: String;
+    Cmds: OffCmdList;
+    NumCmds: Word;
+    Imported: LongInt;
+    ImpO: OffImportOpts;
+    Local: Boolean;
+
+  Begin
+  Local := Not CommActive;
+  WorkPath := '';
+  Offline := nil;
+  If Not ValidateOffline Then
+    Exit;
+  If UpCase(User.GetUserOffType) <> 'Q' Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn(Prompts.GetString(176));
+    User.PressEnter;
+    Exit;
+    End;
+  Offline := New(QwkOffPtr, Init);
+  Offline^.SetBBSId(Config^.GetBBSID);
+  WorkPath := CreateTempDir(Config^.GetTempPath);
+  Cont := Length(WorkPath) > 0;
+  Have := True;
+  If Cont Then
+    Begin
+    Offline^.SetPath(WorkPath);
+    If Local Then
+      Begin
+      Src := OffFindNoCase(StartUpPath, Offline^.GetReplyName);
+      Have := (Src <> '') And CopyFile(Src, WithBackSlash(WorkPath) + 'upload.1');
+      End
+    Else
+      Begin
+      User.DisplayNewLine;
+      User.AskYN(Prompts.GetString(177), Have);
+      If Have Then
+        Begin
+        Cmd := ProtCmd(False, ProtNum);
+        Cont := ProtUsable(ProtNum, Cmd);
+        If Cont Then
+          Begin
+          User.DisplayNewLine;
+          User.DisplayAttr(Config^.GetSystemColor(1));
+          User.DisplayStrLn(Prompts.GetString(130));
+          User.PostStatus(uoXfer);
+          If ProtNum <= 10 Then
+            Cont := InternalRecv(WorkPath, ProtNum)
+          Else
+            Cont := OffTransfer(OffExpand(Cmd, '', 0, 0), StartUpPath, WorkPath);
+          End;
+        If Not Cont Then
+          Begin
+          User.DisplayNewLine;
+          User.DisplayStrLn(Prompts.GetString(168));
+          User.PressEnter;
+          End;
+        End;
+      End;
+    End;
+  If Cont And Have Then
+    Begin
+    OffRenameUploads(WorkPath);
+    NumCmds := 0;
+    k := GetUserPackerNum;
+    If k > 0 Then
+      Begin
+      Inc(NumCmds);
+      Cmds[NumCmds] := Config^.GetUnPackCmdLine(k);
+      End;
+    For i := 1 To 10 Do
+      If (i <> k) And Config^.GetPackAvail(i) And (NumCmds < 11) Then
+        Begin
+        Inc(NumCmds);
+        Cmds[NumCmds] := Config^.GetUnPackCmdLine(i);
+        End;
+    If Not OffUnpackReply(Offline, WorkPath, StartUpPath, Cmds, NumCmds) Then
+      Begin
+      User.DisplayNewLine;
+      User.DisplayStrLn(Prompts.GetString(178));
+      If Not Local Then
+        User.PressEnter;
+      End
+    Else
+      Begin
+      ImpO.BadArea := Config^.GetBadMsgArea;
+      ImpO.ForceName := Not User.GetUserQwkNode;
+      ImpO.ReDate := Config^.GetOffReDate;
+      ImpO.DupeFile := WithBackSlash(Config^.GetMsgPath(1)) + 'qwkdupe.dat';
+      Offline^.SetImportOpts(ImpO);
+      User.PostStatus(uoMail);
+      Offline^.ImportPacket;
+      Imported := Offline^.GetImported;
+      User.DisplayNewLine;
+      User.DisplayStrLn(Long2Str(Imported) + ' message(s) posted');
+      If Not Local Then
+        User.PressEnter;
+      End;
+    End
+  Else If Cont And Local Then
+    Begin
+    User.DisplayStrLn(Prompts.GetString(178));
+    End;
+  If Offline <> nil Then
+    Dispose(Offline, Done);
+  ChDir(StripTrail(StartUpPath, DirectorySeparator));
+  If IoResult <> 0 Then;
+  If Length(WorkPath) > 0 Then
+    Begin
+    CleanDir(WithBackSlash(WorkPath));
+    RmDir(StripTrail(WorkPath, DirectorySeparator));
+    If IoResult <> 0 Then;
+    End;
+  User.PostStatus(uoBrowse);
+  End;
+
 
 End.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Menu command 007 (run an external program / door) in the real mk, over telnet, on a private copy of the sample BBS and of
 its menus.  usage: doormenutest.py <work dir>"""
-import sys, json, os, re, shutil, socket, subprocess, sys, time
+import sys, json, os, re, shutil, socket, subprocess, sys, time, zipfile
 
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, here)
@@ -41,6 +41,7 @@ if os.path.exists(repo + '/bbs/bbsc/mkqwk/config.mko') and os.path.exists(repo +
     qput(203 + 143 * 1 + 1, 'zip -q -j', 70)                 # packer 2 (ZIP) and its unpacker, for this machine
     qput(203 + 143 * 1 + 72, 'unzip -o -q', 70)
     qput(203 + 1430 + 72, ra + '/rcv.sh', 70)                # protocol 1 (Zmodem): the receive program is a script that drops a reply packet
+    qput(0, 'MythKing', 8)                                   # the same board id as config.mk: one reply packet for both
     board = q[1:1 + q[0]].decode('latin-1').strip()
     qput(3063, ra + '/qtmp', 80)
     qput(3063 + 81, ra + '/qusers', 80)
@@ -53,6 +54,22 @@ if os.path.exists(repo + '/bbs/bbsc/mkqwk/config.mko') and os.path.exists(repo +
     rec[640 + 4:640 + 6] = (500).to_bytes(2, 'little'); rec[640 + 6:640 + 8] = (100).to_bytes(2, 'little')
     open(ra + '/qusers/users.mko', 'wb').write(rec)
     have_qwk = True
+    # offline mail inside mk (menu commands 156 and 157) needs only config.mk: an external protocol "send | receive", the packer
+    # commands for this machine, and area 6 forced into the offline mail of every caller
+    open(ra + '/snd.sh', 'w').write('#!/bin/sh\ncp "$1" %s/sent.qwk\nexit 0\n' % ra)
+    os.chmod(ra + '/snd.sh', 0o755)
+    cj = os.path.join(work, 'cj'); os.makedirs(cj)
+    envj = dict(os.environ, MK=ra, MKJSON=cj)
+    subprocess.run([repo + '/build/mkcfgcvt', '-y', '1', '5'], env=envj, check=True, capture_output=True)
+    dj = json.load(open(os.path.join(cj, 'bbsconfig.json'), encoding='utf-8'))
+    cc = dj['config']
+    cc['ExtProt'][0] = {'Key': 'R', 'Attr': 3, 'Name': 'TestProt', 'CmdLine': ra + '/snd.sh %F | ' + ra + '/rcv.sh'}
+    cc['ExtPack'][1]['PCmdLine'] = 'zip -q -j'
+    cc['ExtPack'][1]['UCmdLine'] = 'unzip -o -q'
+    dj['messages']['6']['Permit'] |= 1024
+    cc['OffAttr'] |= 128                                     # QWKE long names in the packets (oaQwke)
+    json.dump(dj, open(os.path.join(cj, 'bbsconfig.json'), 'w', encoding='utf-8'), ensure_ascii=False)
+    subprocess.run([repo + '/build/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True)
     # the reply packet a caller would upload: <BOARDID>.REP, a ZIP with <BOARDID>.MSG (2 messages for area 6, 1 for an unknown conference)
     import zipfile
     subprocess.run([repo + '/build/qwkmsgtest', 'reply', ra + '/reply.msg', '6', board], check=True, capture_output=True)
@@ -79,7 +96,7 @@ d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
 free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV890' if k not in used]
-items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('qwkul', repo + '/build/mkqwk -U'), ('qwkin', '#156'), ('missing', 'nope-door-xyz')]
+items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('qwkul', repo + '/build/mkqwk -U'), ('qwkin', '#156'), ('qwkout', '#157'), ('setprot', '#153'), ('missing', 'nope-door-xyz')]
 keys = {}
 slot = 1
 for name, data in items:
@@ -111,6 +128,11 @@ json.dump(cfg, open(os.path.join(work, 'listen.json'), 'w'))
 lst = subprocess.Popen([repo + '/build/mklisten', '-c', os.path.join(work, 'listen.json')], stdout=subprocess.DEVNULL)
 
 fails = 0
+OFFRULES = [(b'Choose transfer protocol ?', b'R'), (b'Choose archive packer ?', b'Z'), (b'Choose Offline Mail Type', b'Q'),
+            (b'Maximum messages per packet?', b'100\r'), (b'Maximum messages per message area?', b'50\r'),
+            (b'new files list included', b'n'), (b'bulletins included', b'n'), (b'screens included', b'n'),
+            (b'want each packet', b'n'), (b'Flag messages as read', b'n'), (b'Receive your own messages', b'y'),
+            (b'Search all areas for your mail', b'n'), (b'even with zero messages', b'n')]
 
 
 def check(name, ok):
@@ -118,6 +140,76 @@ def check(name, ok):
     print(('ok   ' if ok else 'FAIL ') + 'door menu: ' + name)
     if not ok:
         fails += 1
+
+
+def bridge(c, argv, cwd, secs=90):
+    """an lrzsz program (sz / rz) works on the telnet session: what it writes goes to the caller's socket with 255 doubled,
+    what the socket brings (255 255 = data 255) goes to its input.  Returns when the program has ended."""
+    import select
+    p = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    iac = False
+    end = time.time() + secs
+    c.settimeout(None)
+    out_open = True
+    while time.time() < end and out_open:
+        r, _, _ = select.select([c, p.stdout], [], [], 0.2)
+        if c in r:
+            d = c.recv(65536)
+            if not d:
+                break
+            data = bytearray()
+            for b in d:
+                if iac:
+                    iac = False
+                    if b == 255:
+                        data.append(255)
+                    continue                        # a command byte: ignored (the options were answered at the start)
+                if b == 255:
+                    iac = True
+                else:
+                    data.append(b)
+            try:
+                p.stdin.write(bytes(data)); p.stdin.flush()
+            except (BrokenPipeError, OSError):
+                pass
+        if p.stdout in r:
+            d = os.read(p.stdout.fileno(), 65536)
+            if not d:
+                out_open = False
+            else:
+                c.sendall(d.replace(b'\xff', b'\xff\xff'))
+    try:
+        p.stdin.close()
+    except OSError:
+        pass
+    try:
+        p.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        p.kill()
+    return p.returncode
+
+
+def drive(s, rules, stop, secs=20):
+    """answers the prompts of the offline mail set-up (a caller's first use): rules = [(prompt, answer)], until stop is seen"""
+    buf = b''
+    end = time.time() + secs
+    s.settimeout(0.3)
+    while time.time() < end:
+        try:
+            x = s.recv(4096)
+        except socket.timeout:
+            x = b''
+        buf += x
+        t = strip(buf)
+        if stop in t:
+            return t
+        if not x:
+            for pat, ans in rules:
+                if pat in t:
+                    s.sendall(ans)
+                    buf = b''
+                    break
+    return strip(buf)
 
 
 def until(s, needle, secs=8):
@@ -156,6 +248,7 @@ def show(b):
 
 try:
     c = conn(24661)
+    c.sendall(bytes([255, 251, 0, 255, 253, 0]))                      # IAC WILL BINARY, IAC DO BINARY: a caller that can take a file
     # what the caller gets first: the ANSI detection, then (the caller is ANSI) the screen is cleared, then the version lines
     raw = b''
     c.settimeout(0.2)
@@ -244,7 +337,7 @@ try:
         check('... and area 6 has none of the replies', 'Reply via REP' not in dump and 'Second reply' not in dump)
     if have_qwk:
         c.sendall(keys['qwkin'].encode())
-        b = until(c, b'reply file', 8)
+        b = drive(c, OFFRULES, b'reply file', 40)
         check('menu command 156 (the upload inside mk, no mkqwk) asks whether there is a reply file', b'reply file' in b)
         c.sendall(b'y')
         b1 = until(c, b'message(s) posted', 12)
@@ -253,6 +346,91 @@ try:
         check('... receives and unpacks the packet, posts the 2 messages for area 6 (this user may write there), refuses conference 999, and returns to the menu', b'Uncompressing file' in b1 and b'Access denied! 999' in b1 and b'2 message(s) posted' in b1 and b'Command >' in b)
         dump = subprocess.run([repo + '/build/tossdump', '6'], capture_output=True, text=True, env=dict(os.environ, MK=ra), encoding='latin-1').stdout
         check('... and area 6 now has the replies, in the name of the caller', 'Reply via REP' in dump and 'Second reply' in dump)
+        # menu command 157: the packet for the caller (area 6 is forced into everybody's offline mail), packed and sent
+        c.sendall(keys['qwkout'].encode())
+        b = until(c, b'Command >', 40)
+        sent = ra + '/sent.qwk'
+        check('menu command 157 (the download inside mk) packs the packet and sends it with the protocol of the caller', os.path.exists(sent) and b'Begin transfer now' in b and b'Command >' in b)
+        pk = os.path.join(work, 'pk'); os.makedirs(pk)
+        names = []
+        if os.path.exists(sent):
+            z = zipfile.ZipFile(sent)
+            names = [n.lower() for n in z.namelist()]
+            z.extractall(pk)
+        check('... it holds messages.dat, control.dat, door.id and the index of conference 6', all(n in names for n in ('messages.dat', 'control.dat', 'door.id', '006.ndx')))
+        pdump = subprocess.run([repo + '/build/qwkmsgtest', 'dump', pk + '/messages.dat'], capture_output=True, text=True, encoding='latin-1').stdout
+        check('... the replies are in it (the caller\'s own messages: he asked for them) in conference 6', 'Reply via REP' in pdump and 'conf=6' in pdump)
+        ctl = open(pk + '/control.dat', encoding='latin-1').read().split('\n') if os.path.exists(pk + '/control.dat') else []
+        check('... control.dat has the board id of config.mk', len(ctl) > 4 and ctl[4].endswith('MythKing'))
+        c.sendall(keys['qwkout'].encode())
+        b = until(c, b'continue', 40)
+        check('a second download has nothing new: the last read pointers went on', b'No messages found' in b)
+        c.sendall(b'\r')
+        check('... and the menu is back', b'Command >' in until(c, b'Command >', 8))
+    if have_qwk and shutil.which('sz') and shutil.which('rz'):
+        # the built-in Zmodem (MKProt) over the telnet session, against the real sz / rz
+        c.sendall(keys['setprot'].encode())
+        b = drive(c, [(b'Choose transfer protocol ?', b'Z')], b'Command >', 20)
+        check('menu command 153: the caller chooses Zmodem (an internal protocol)', b'Command >' in b)
+        subprocess.run([repo + '/build/qwkmsgtest', 'reply', ra + '/rep2.msg', '6', 'MythKing', ' B'], check=True, capture_output=True)
+        with zipfile.ZipFile(ra + '/Reply B.zip', 'w') as z:
+            z.write(ra + '/rep2.msg', 'MYTHKING.MSG')
+        os.remove(ra + '/rep2.msg')
+        c.sendall(keys['qwkin'].encode())
+        b = until(c, b'reply file', 8)
+        c.sendall(b'y')
+        b = until(c, b'Begin transfer now', 8)
+        rc = bridge(c, ['sz', '-b', ra + '/Reply B.zip'], ra)
+        b = until(c, b'message(s) posted', 20)
+        c.sendall(b'\r')
+        b += until(c, b'Command >', 8)
+        check('reply upload with the built-in Zmodem: sz sends "Reply B.zip" (a name with a blank), it is unpacked and posted', rc == 0 and b'2 message(s) posted' in b and b'Command >' in b)
+        dump = subprocess.run([repo + '/build/tossdump', '6'], capture_output=True, text=True, env=dict(os.environ, MK=ra), encoding='latin-1').stdout
+        check('... the new messages are in area 6', 'Reply via REP B' in dump and 'Second reply B' in dump)
+        rzdir = os.path.join(work, 'rz'); os.makedirs(rzdir)
+        c.sendall(keys['qwkout'].encode())
+        until(c, b'Begin transfer now', 40)
+        rc = bridge(c, ['rz', '-b'], rzdir)
+        b = until(c, b'Command >', 20)
+        got = [f for f in os.listdir(rzdir)]
+        check('download with the built-in Zmodem: rz receives the packet, the menu is back', rc == 0 and len(got) == 1 and b'Command >' in b)
+        if got:
+            z = zipfile.ZipFile(os.path.join(rzdir, got[0]))
+            z.extractall(os.path.join(rzdir, 'x'))
+            pd = subprocess.run([repo + '/build/qwkmsgtest', 'dump', os.path.join(rzdir, 'x', 'messages.dat')], capture_output=True, text=True, encoding='latin-1').stdout
+            check('... the packet is a QWK packet with the new messages (the binary survived the telnet session)', 'Reply via REP B' in pd and 'Second reply B' in pd and 'Reply via REP\n' not in pd.replace('Reply via REP B', ''))
+    if have_qwk and shutil.which('sb') and shutil.which('rb'):
+        # the same with Ymodem (batch: names in block 0), the caller chooses it with command 153
+        c.sendall(keys['setprot'].encode())
+        b = drive(c, [(b'Choose transfer protocol ?', b'Y')], b'Command >', 20)
+        check('menu command 153: the caller chooses Ymodem', b'Command >' in b)
+        subprocess.run([repo + '/build/qwkmsgtest', 'reply', ra + '/rep3.msg', '6', 'MythKing', ' C'], check=True, capture_output=True)
+        with zipfile.ZipFile(ra + '/replyc.zip', 'w') as z:
+            z.write(ra + '/rep3.msg', 'MYTHKING.MSG')
+        os.remove(ra + '/rep3.msg')
+        c.sendall(keys['qwkin'].encode())
+        until(c, b'reply file', 8)
+        c.sendall(b'y')
+        until(c, b'Begin transfer now', 8)
+        rc = bridge(c, ['sb', '-b', ra + '/replyc.zip'], ra)
+        b = until(c, b'message(s) posted', 20)
+        c.sendall(b'\r')
+        b += until(c, b'Command >', 8)
+        check('reply upload with the built-in Ymodem: sb sends it, it is unpacked and posted', rc == 0 and b'2 message(s) posted' in b and b'Command >' in b)
+        rbdir = os.path.join(work, 'rb'); os.makedirs(rbdir)
+        c.sendall(keys['qwkout'].encode())
+        until(c, b'Begin transfer now', 40)
+        rc = bridge(c, ['rb', '-b'], rbdir)
+        b = until(c, b'Command >', 20)
+        got = os.listdir(rbdir)
+        ok = False
+        if len(got) == 1:
+            pd = subprocess.run(['unzip', '-p', os.path.join(rbdir, got[0]), 'messages.dat'], capture_output=True)
+            with open(os.path.join(rbdir, 'm.dat'), 'wb') as fh:
+                fh.write(pd.stdout)
+            pdump = subprocess.run([repo + '/build/qwkmsgtest', 'dump', os.path.join(rbdir, 'm.dat')], capture_output=True, text=True, encoding='latin-1').stdout
+            ok = 'Reply via REP C' in pdump and 'Second reply C' in pdump
+        check('download with the built-in Ymodem: rb receives the packet (a QWK packet with the new messages), the menu is back', rc == 0 and ok and b'Command >' in b)
     c.sendall(keys['rawkey'].encode())
     time.sleep(1.0)
     c.sendall(b'q')

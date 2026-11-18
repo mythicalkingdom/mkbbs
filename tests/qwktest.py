@@ -70,7 +70,7 @@ rec[o + 8] = ord('Z')                                    # Protocol
 rec[o + 9] = ord('Z')                                    # Packer (ZIP)
 rec[o + 10:o + 12] = (0).to_bytes(2, 'little')           # Attr
 rec[o + 12] = 2                                          # MailType qmtQwk
-open(udir + '/users.mko', 'wb').write(rec)
+open(udir + '/users.mko', 'wb').write(rec)                # Attr 0: the caller does not get his own messages
 
 
 def run(prog, *a, **kw):
@@ -81,6 +81,11 @@ r = run('tosssetup', tmp + '/in', tmp + '/outb', tmp + '/un')
 os.makedirs(tmp + '/in', exist_ok=True)
 r = run('tossmake')
 check('two local messages are in area 6 (written like the BBS editor does)', r.returncode == 0)
+# the two messages are from the caller himself: without "receive own messages" there is nothing for him
+r = subprocess.run([os.path.join(build, 'mkqwk'), '-LMark_May'], capture_output=True, text=True, env=env, cwd=outdir, encoding='latin-1', timeout=60, stdin=subprocess.DEVNULL)
+check('his own messages are not in his packet (no packet is made)', r.returncode == 0 and not [f for f in os.listdir(outdir) if f.lower().endswith('.qwk')])
+rec[o + 10:o + 12] = (16).to_bytes(2, 'little')          # Attr: quaOwnMsgs
+open(udir + '/users.mko', 'wb').write(rec)
 r = subprocess.run([os.path.join(build, 'mkqwk'), '-LMark_May'], capture_output=True, text=True, env=env, cwd=outdir, encoding='latin-1', timeout=60, stdin=subprocess.DEVNULL)
 print(r.stdout[-800:], r.stderr[-300:])
 check('mkqwk -LMark_May runs (exit 0)', r.returncode == 0)
