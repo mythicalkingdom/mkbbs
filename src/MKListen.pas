@@ -35,6 +35,8 @@ Program MKListen;
           "logfile":  "/var/log/mkbbs/listen.log",
           "pidfile":  "/var/run/mklisten.pid",
           "workdir":  "/bbs",                  current directory of mk
+          "localnode": 9,                      node number for the L key of mkmon (mk -L; not one of the
+                                               nodes of a port; 0 or left out: no L key)
           "nodes":    "1-8",                   node numbers handed out (N, "N-M" or [N, M])
           "maxperip": 3,                       callers per address on a port (0 = any)
           "busy":     "All lines are busy.",   sent when no node is free
@@ -72,6 +74,17 @@ Program MKListen;
      it.  To let mkmon see the nodes, the listener keeps a directory "rundir"
      (default /tmp/mklisten-<uid>, mode 0700) with node<N>.info (written here)
      and node<N>.snoop (the Unix socket mk opens; environment MKRUN tells mk).
+
+     Local BBS from the monitor: with "localnode" set, the L key in mkmon runs
+     "mk -L -N<localnode>" on the sysop's connection (a pseudo terminal; mk asks
+     for its login as usual) and returns to the node list when mk ends.  Give it
+     a node number that is not one of the nodes of any port (mklisten refuses to
+     start otherwise) and put it at the top level, next to "nodes":
+
+          { "mk": "/usr/local/bin/mk", "nodes": "1-8", "localnode": 9, ... }
+
+     0 or no "localnode": no L key.  The path of mk is handed to mkmon in the
+     environment (MKMON_MK, and MKMON_NODE for the node number).
 
      TLS (telnets, wss): let stunnel terminate it and connect to a local port of
      this program, with "protocol = proxy" in the stunnel service and
@@ -150,6 +163,7 @@ Var
   TestOnly: Boolean = False;
   MkPath: String = 'mk';
   MonPath: String = '';
+  LocalNode: Integer = 0;              {node number of the local MK that the L key of mkmon runs, 0 = no L key}
   RunDir: String = '';
   RunUser, RunGroup: String;
   LogPath, PidPath, WorkDir: String;
@@ -480,6 +494,7 @@ Procedure LoadConfig;
     If Key = 'mk' Then MkPath := JStr(V, 'mk')
     Else If Key = 'mkmon' Then MonPath := JStr(V, 'mkmon')
     Else If Key = 'rundir' Then RunDir := JStr(V, 'rundir')
+    Else If Key = 'localnode' Then LocalNode := JInt(V, 'localnode', 0, 255)
     Else If Key = 'user' Then RunUser := JStr(V, 'user')
     Else If Key = 'group' Then RunGroup := JStr(V, 'group')
     Else If Key = 'logfile' Then LogPath := JStr(V, 'logfile')
@@ -512,6 +527,10 @@ Procedure LoadConfig;
     LoadPort(TJSONObject(V.Items[i]), i);
     End;
   Root.Free;
+  If LocalNode > 0 Then
+    For i := 0 To High(Ports) Do
+      If (Not Ports[i].Sysop) And (LocalNode >= Ports[i].First) And (LocalNode <= Ports[i].Last) Then
+        Die(CfgFile + ': "localnode" ' + IntToStr(LocalNode) + ' is one of the nodes of port ' + IntToStr(Ports[i].Port));
   MkPath := ResolveProg(MkPath);
   If MonPath = '' Then
     Begin
@@ -1301,7 +1320,12 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     EnvS.Add(P.Env[j]);
   EnvS.Add('MKRUN=' + RunDir);
   If P.Sysop Then
+    Begin
     EnvS.Add('MKMON_PASSWORD=' + P.Password);
+    EnvS.Add('MKMON_MK=' + MkPath);                {for the L key: mk -L on this node}
+    If LocalNode > 0 Then
+      EnvS.Add('MKMON_NODE=' + IntToStr(LocalNode));
+    End;
   SetLength(Envv, EnvS.Count + 1);
   For i := 0 To EnvS.Count - 1 Do
     Envv[i] := PChar(EnvS[i]);

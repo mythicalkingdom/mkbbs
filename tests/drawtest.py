@@ -276,6 +276,14 @@ s.keys(RIGHT, RIGHT, RIGHT, DOWN, DOWN, ENTER, ENTER)  # area then "Yes" (defaul
 s.keys(wait=0.4)
 check('Alt-Z clears an area (after the question): the first row of the box is blank in the area', t.cell(1, 1)[0] == ' ' and t.cell(4, 3)[0] == ' ' and t.cell(4, 1)[0] == ' ' and t.cell(5, 1)[0] == '═', [t.cell(1, 1), t.cell(4, 3), t.cell(4, 1), t.cell(5, 1)])
 
+# ---------------------------------------------------------------- the help dialog fits on the desktop
+s.keys(ALT('h'), wait=0.5)
+txt = [t.row(y) for y in range(25)]
+check('Alt-H: the whole help shows (first and last lines, and the OK button)',
+      any('Alt-A  Color' in r for r in txt) and any('Alt-Z  Zap' in r for r in txt) and any('OK' in r for r in txt),
+      [r.strip() for r in txt if r.strip()][:3])
+s.keys(ENTER)
+
 # ---------------------------------------------------------------- enclose, drawing mode, insert/delete line
 s.keys(HOME, PGUP)
 s.keys(ALT('d'), UP, UP, UP, ENTER)                      # drawing set 2 (double lines)

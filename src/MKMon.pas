@@ -20,7 +20,9 @@ Program MKMon;
      text, or "sha1:" and the hex digest).  Without that variable only the
      list (-l) works.
 
-     In the node list: M shows the mailer (the binkp mailer mkbink that mklisten runs, see MKMonMail);
+     In the node list: L runs the BBS in local mode (mk -L -N<node>, the node of "localnode" in the mklisten
+     configuration, mk from MKMON_MK) on this connection and returns here when it ends (it asks for the sysop's login
+     as usual; one at a time); M shows the mailer (the binkp mailer mkbink that mklisten runs, see MKMonMail);
      a node number and Enter watch the node, the number and
      K disconnect it, C chat with the caller (watches the node, the chat starts
      when the BBS is ready), + / - give / take 5 minutes.  While
@@ -37,8 +39,8 @@ Program MKMon;
 }
 
 Uses
-  BaseUnix, Sockets, Dos, sha1,
-  MKString, MKFile, MKGlobT, MKComAbs, MKSess, MKMonMail, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB;
+  BaseUnix, Unix, Sockets, Dos, sha1,
+  MKString, MKFile, MKGlobT, MKComAbs, MKSess, MKMonMail, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKPty;
 
 
 Type
@@ -383,7 +385,7 @@ Procedure ShowNodes(Typed: String);
     SayLn('(nobody is online)');
   SayLn('');
   SayLn('Type a node number, then:  Enter watch   C chat   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
-  Say('R refresh, M mailer, Q quit: ' + Typed);
+  Say('R refresh, M mailer, L local BBS, Q quit: ' + Typed);
   CommFlushOut;
   End;
 
@@ -956,6 +958,51 @@ Function Watch(Node: LongInt; ChatFirst: Boolean): String;
   End;
 
 
+Function LocalMk: String;
+  {L: the BBS in local mode (mk -L) on the node of the listener's "localnode" setting, on a pseudo terminal
+   to this connection; the answer is a message (empty when it ran and ended)}
+  Var
+    MkPath, NodeStr, Term: String;
+    Lock: LongInt;
+    Code: LongInt;
+    R: Word;
+
+  Begin
+  LocalMk := '';
+  MkPath := GetEnv('MKMON_MK');
+  NodeStr := GetEnv('MKMON_NODE');
+  If (MkPath = '') Or (Str2Long(NodeStr) < 1) Then
+    Begin
+    LocalMk := 'The local BBS is not set up ("localnode" in the mklisten configuration).';
+    Exit;
+    End;
+  {one local session at a time: a lock on a file in the run directory (gone with the process)}
+  Lock := fpOpen(RunDir + '/local.lock', O_RDWR Or O_CREAT, 438);
+  If Lock < 0 Then
+    Begin
+    LocalMk := 'Cannot open ' + RunDir + '/local.lock';
+    Exit;
+    End;
+  If fpFlock(Lock, LOCK_EX Or LOCK_NB) <> 0 Then
+    Begin
+    fpClose(Lock);
+    LocalMk := 'The local BBS is already running.';
+    Exit;
+    End;
+  Term := ComSession^.GetTermType;
+  R := PtyRun(MkPath, '-L -N' + Long2Str(Str2Long(NodeStr)), Term, Code);
+  fpFlock(Lock, LOCK_UN);
+  fpClose(Lock);
+  Say(Esc + '[0m' + Esc + '[?25h' + Esc + '[?1049l');     {whatever the BBS left on the terminal}
+  If R = ptyNoPty Then
+    LocalMk := 'No pseudo terminal for the local BBS.'
+  Else If R = ptyNoExec Then
+    LocalMk := 'Cannot start ' + MkPath
+  Else If Code <> 0 Then
+    LocalMk := 'The local BBS ended with code ' + Long2Str(Code) + '.';
+  End;
+
+
 Procedure Monitor;
   Var
     Typed, Msg: String;
@@ -1002,6 +1049,18 @@ Procedure Monitor;
         'M': Begin
              Typed := '';
              Msg := MailerScreen(RunDir);       {the binkp mailer (mkbink), if mklisten runs it}
+             ShowNodes('');
+             If Msg <> '' Then
+               Begin
+               SayLn('');
+               SayLn(Msg);
+               CommFlushOut;
+               Msg := '';
+               End;
+             End;
+        'L': Begin
+             Typed := '';
+             Msg := LocalMk;
              ShowNodes('');
              If Msg <> '' Then
                Begin

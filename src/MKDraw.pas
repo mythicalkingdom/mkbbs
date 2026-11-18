@@ -1336,17 +1336,18 @@ Procedure WriteStr(S: String);
 
 
 Procedure ShowHelp;
+  {18 lines at most: the dialog needs 5 more and the desktop is 23 rows}
   Begin
   ShowText('Command Keys for MKDraw',
     'Alt-A  Color/attribute select      Alt-F1..F10  Select character set 1-10' + #13 +
     'Alt-B  Blinking toggle             Ctrl-F1..F5  Select character set 11-15' + #13 +
-    'Alt-C  Copy area                   Alt-1..Alt-9 Select character set 1-9' + #13 +
-    'Alt-D  Drawing mode                F1..F10      Enter special character' + #13 +
-    'Alt-E  Enclose in frame            Home / End   Beginning / end of line' + #13 +
-    'Alt-F  Attribute fill area         PgUp / PgDn  Top / bottom of screen' + #13 +
-    'Alt-G  Get extended character set  Arrow keys   Move the cursor (draws in drawing mode)' + #13 +
-    'Alt-H  Help                        Tab          Next tab stop' + #13 +
-    'Alt-I  Intensity toggle            Del          Delete character' + #13 +
+    'Alt-I  Intensity toggle            Alt-1..Alt-9 Select character set 1-9' + #13 +
+    'Alt-C  Copy area                   F1..F10      Enter special character' + #13 +
+    'Alt-D  Drawing mode                Home / End   Beginning / end of line' + #13 +
+    'Alt-E  Enclose in frame            PgUp / PgDn  Top / bottom of screen' + #13 +
+    'Alt-F  Attribute fill area         Arrow keys   Move the cursor (draws in drawing mode)' + #13 +
+    'Alt-G  Get extended character set  Tab          Next tab stop' + #13 +
+    'Alt-H  Help                        Del          Delete character' + #13 +
     'Alt-L  Load screen                 Ins          Toggle insert mode' + #13 +
     'Alt-M  Move area                   Bksp         Delete the character to the left' + #13 +
     'Alt-P  Pick BBS code               Ctrl-A..Z    Enter that control code' + #13 +
@@ -1354,10 +1355,8 @@ Procedure ShowHelp;
     'Alt-S  Save screen area            Right click  Esc' + #13 +
     'Alt-U  Color under cursor          Left click   Move the cursor' + #13 +
     'Alt-V  Insert line' + #13 +
-    'Alt-W  Double image' + #13 +
-    'Alt-X  Exit' + #13 +
     'Alt-Y  Delete line' + #13 +
-    'Alt-Z  Zap/clear area');
+    'Alt-W  Double image   Alt-X  Exit   Alt-Z  Zap/clear area');
   End;
 
 

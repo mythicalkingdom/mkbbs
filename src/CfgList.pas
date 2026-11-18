@@ -23,7 +23,7 @@ Type
 Procedure RunList(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
   Edit: CfgItemEdit);
 
-Procedure ShowText(Title: String; Text: String);
+Procedure ShowText(Title: String; Text: AnsiString);
   {A dialog with a few lines of text (separated by #13) and an OK button}
 
 Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
@@ -236,12 +236,12 @@ Function RunPick(Title: String; Count: Word; Width: Byte; GetStr: CfgItemStr;
 
 
 
-Procedure ShowText(Title: String; Text: String);
+Procedure ShowText(Title: String; Text: AnsiString);
   {Text: lines separated by #13}
   Var
     D: PDialog;
     R: TRect;
-    N, i: Integer;
+    N, i, Start: Integer;
     W: Integer;
 
   Begin
@@ -253,8 +253,17 @@ Procedure ShowText(Title: String; Text: String);
   R.Assign(0, 0, W, N + 5);
   New(D, Init(R, Title));
   D^.Options := D^.Options Or ofCentered;
-  R.Assign(2, 1, W - 2, N + 1);
-  D^.Insert(New(PStaticText, Init(R, Text)));
+  {one static text per line: a ShortString holds only 255 characters}
+  N := 0;
+  Start := 1;
+  For i := 1 To Length(Text) + 1 Do
+    If (i > Length(Text)) Or (Text[i] = #13) Then
+      Begin
+      R.Assign(2, 1 + N, W - 2, 2 + N);
+      D^.Insert(New(PStaticText, Init(R, Copy(Text, Start, i - Start))));
+      Inc(N);
+      Start := i + 1;
+      End;
   R.Assign(W Div 2 - 5, N + 2, W Div 2 + 5, N + 4);
   D^.Insert(New(PButton, Init(R, 'O~K~', cmOK, bfDefault)));
   D^.SelectNext(False);

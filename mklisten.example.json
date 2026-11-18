@@ -4,6 +4,8 @@
   "logfile": "/var/log/mkbbs/mklisten.log",
   "workdir": "/bbs/ra",
   "nodes": "1-8",
+  "_note_localnode": "the L key in mkmon (sysop port) runs mk -L on this node number and returns to mkmon when it ends; use a number that is not one of the nodes above or of a port. Remove the line for no L key",
+  "localnode": 9,
   "_note_mailer": "the binkp mailer (mkbink): mklisten makes its settings with mkbinkcfg from the BBS configuration (mkconfig: EchoMail > Mailer) and runs it while the mailer is switched on there; without this section nothing is run",
   "mailer": {
     "config": "/bbs/ra",

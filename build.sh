@@ -71,6 +71,7 @@ build/wstest | grep -E "FAIL|failures"
 build/listentest build/mklisten build/fakemk build/work 2>&1 | grep -E "^(FAIL|failures)"
 mkdir -p build/work/mon
 python3 tests/montest.py build/mklisten build/fakemk build/mkmon build/work/mon | grep -E "^(FAIL|failures)"
+python3 tests/monlocaltest.py build/mklisten build/mkmon build/work/monlocal | grep -E "^(FAIL|failures)"
 # the real Synchronet sample base (from the JS project): every index CRC must match ours
 if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then
   cp javascript/message_bases/synchronet/fsx_bbs.s?? build/work/
