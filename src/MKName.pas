@@ -592,7 +592,11 @@ Procedure NameObj.SetQwkNode(ST: Boolean);
   If User^.BbsType = 1 Then
     Begin
     If St Then
-      User^.MKExtra^.ExtraInfo := User^.MKExtra^.ExtraInfo or eiQwkNode
+      Begin
+      If (User^.MKExtra^.ExtraInfo and eiQwkNode) = 0 Then
+        User^.MKExtra^.ExtraInfo := User^.MKExtra^.ExtraInfo or eiQwkControl;   {a new node gets CONTROL.DAT (CONTROL OFF turns it off)}
+      User^.MKExtra^.ExtraInfo := User^.MKExtra^.ExtraInfo or eiQwkNode;
+      End
     Else
       User^.MKExtra^.ExtraInfo := User^.MKExtra^.ExtraInfo and (Not eiQwkNode);
     End;

@@ -39,7 +39,6 @@ cc = dj['config']
 cc['ExtPack'][1]['PCmdLine'] = 'zip -q -j'
 cc['ExtPack'][1]['UCmdLine'] = 'unzip -o -q'
 cc['ExtProt'][0] = {'Key': 'R', 'Attr': 3, 'Name': 'TestProt', 'CmdLine': ra + '/snd.sh %F | ' + ra + '/rcv.sh'}
-dj['messages']['6']['Permit'] |= 1024
 json.dump(dj, open(cj + '/bbsconfig.json', 'w', encoding='utf-8'), ensure_ascii=False)
 subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True)
 board = 'MythKing'
@@ -111,5 +110,61 @@ check('login with the password (any case): the QWK: prompt', 'QWK:' in o and 'Do
 check('D: the packet was sent (a ZIP with MESSAGES.DAT)', os.path.exists(ra + '/sent.qwk') and 'messages.dat' in [n.lower() for n in zipfile.ZipFile(ra + '/sent.qwk').namelist()])
 check('U: the reply packet was posted', dump(6) != before)
 check('Q: ends the call, exit 0', rc == 0)
+
+# control messages to SBBS: the areas of the node and its last read pointers (ADD, DROP, RESET)
+def ctl(*cmds):
+    subprocess.run([build + '/qwkmsgtest', 'control', ra + '/reply.msg', board] + list(cmds), check=True, capture_output=True)
+    os.remove(ra + '/reply.zip')
+    with zipfile.ZipFile(ra + '/reply.zip', 'w') as z:
+        z.write(ra + '/reply.msg', board.upper() + '.MSG')
+
+
+names = []
+
+
+def pull(*cmds):
+    """upload control messages, then download: the number of messages in the packet in area 6 (-1 = no packet)"""
+    if os.path.exists(ra + '/sent.qwk'):
+        os.remove(ra + '/sent.qwk')
+    ctl(*cmds)
+    o, rc = session([('Login: ', 'Mark May\r'), ('Password: ', 'nodepw\r'), ('QWK: ', 'U'), ('QWK: ', 'D'), ('QWK: ', 'Q')])
+    if not os.path.exists(ra + '/sent.qwk'):
+        return -1, o
+    with zipfile.ZipFile(ra + '/sent.qwk') as z:
+        global names
+        names = [n.lower() for n in z.namelist()]
+        z.extract([n for n in z.namelist() if n.lower() == 'messages.dat'][0], work)
+    d = subprocess.run([build + '/qwkmsgtest', 'dump', work + '/messages.dat'], capture_output=True, text=True, encoding='latin-1').stdout
+    os.remove(work + '/messages.dat')
+    return d.count(' conf=6 '), o
+
+
+n, o = pull('6:RESET')
+check('RESET: the pointer is back at the start, the area is in the packet', n >= 2 and 'RESET 6: done' in o)
+check('... the control message is not posted', 'RESET' not in dump(6) or 'control message' not in dump(6))
+n, o = pull('6:DROP')
+check('DROP: the area leaves the packets', n <= 0 and 'DROP 6: done' in o)
+n, o = pull('6:ADD 999999')
+check('ADD with a pointer past the end: joined, nothing new', n <= 0 and 'ADD 6: done' in o)
+n, o = pull('6:RESET 01/01/80')
+check('RESET with a date: all messages from that day', n >= 2)
+n, o = pull('6:RESET 12/31/79')
+check('... a date after the last message: nothing new', n <= 0)
+n, o = pull('6:RESETALL -1')
+check('RESETALL -msgs: the last message only', n == 1 and 'RESETALL: done' in o)
+n, o = pull('6:DROP 6', '6:FILES ON')
+check('DROP conf# and an ignored command', n <= 0 and 'FILES: ignored' in o)
+n, o = pull('3:NOSUCH')
+check('an unknown command is not done and not posted', 'NOSUCH 3: not done' in o and 'NOSUCH' not in dump(3))
+n, o = pull('6:ADD', '6:RESET')
+check('a new node gets CONTROL.DAT and DOOR.ID by default', n >= 2 and 'control.dat' in names and 'door.id' in names)
+n, o = pull('6:CONTROL OFF', '6:ADD', '6:RESET')
+check('CONTROL OFF: they are gone (as on Synchronet without CONTROL ON)', n >= 2 and 'control.dat' not in names and 'door.id' not in names)
+n, o = pull('6:RESET')
+check('... and stay out (the setting is the node\'s)', 'control.dat' not in names)
+n, o = pull('6:CONTROL ON', '6:ADD', '6:RESET')
+check('CONTROL ON: they are in the packet again', 'control.dat' in names and 'door.id' in names)
+n, o = pull('6:CONTROL MAYBE')
+check('CONTROL with another value is not done', 'CONTROL: not done' in o)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

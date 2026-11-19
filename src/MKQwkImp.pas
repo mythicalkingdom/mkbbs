@@ -29,6 +29,10 @@ Unit MKQwkImp;       {the messages of a QWK message file go into message areas}
        - T.ReDate gives the messages today's date, else the date they were written
        - duplicates: with a file name in DupeFN the messages are checked by a CRC of conference, names,
          subject, date and time (MKDupe, 15 days), the file is made if it is not there
+     Control messages: a message to SBBS or MK (as Synchronet networks send them) is not posted when the caller of
+     QwkImportFile has set QwkControl: the procedure gets the conference and the subject ("ADD", "DROP 12" ...) and
+     returns True when it took the message.  They are handled before the conferences are mapped (a node may drop
+     an area it cannot write to).
      Costs, crash / immediate netmail flags and QWKE long names are not handled yet.
 }
 
@@ -45,6 +49,7 @@ Const
   qiRefused = 4;      {a conference that Map refused: its messages are not posted}
   qiFailed = 5;       {a message or an area that could not be written / opened}
   qiMoved = 6;        {the messages of a conference are put in the area for bad messages}
+  qiControl = 7;      {a control message (to SBBS or MK) was taken by QwkControl}
 
 
 Type QwkImpTarget = Record
@@ -70,12 +75,17 @@ Type QwkImpResult = Record
   Grunged: LongInt;
   Refused: LongInt;
   Moved: LongInt;                 {counted in Posted, too}
+  Control: LongInt;               {control messages (QwkControl took them)}
   Failed: LongInt;
   End;
 
 
 Type QwkImpMapProc = Function(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean;
 Type QwkImpNoteProc = Procedure(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
+
+
+Type QwkImpControlProc = Function(Conf: LongInt; Subj: String): Boolean;
+Var QwkControl: QwkImpControlProc;     {Nil = messages to SBBS and MK are posted like the others}
 
 
 Function QwkImportFile(FN: String; DupeFN: String; Map: QwkImpMapProc; Note: QwkImpNoteProc;
@@ -117,6 +127,13 @@ Procedure InitTarget(Var T: QwkImpTarget);
   T.Kind := mmtNormal;
   T.Local := True;
   T.Echo := True;
+  End;
+
+
+Function IsControl(ToName: String): Boolean;
+  Begin
+  ToName := Upper(StripBoth(ToName, ' '));
+  IsControl := Assigned(QwkControl) And ((ToName = 'SBBS') Or (ToName = 'MK'));
   End;
 
 
@@ -164,6 +181,8 @@ Procedure PostOne(Var Q: QwkMsgObj; Msg: AbsMsgPtr; Var T: QwkImpTarget; Conf: L
   ToName := StripBoth(Q.GetTo, ' ');
   If ToName = '' Then
     ToName := 'ALL';
+  If IsControl(ToName) Then
+    Exit;                               {taken before (QwkControl)}
   Date := Q.GetDate;
   Time := Q.GetTime;
   Subj := SubjField;
@@ -310,6 +329,21 @@ Function QwkImportFile(FN: String; DupeFN: String; Map: QwkImpMapProc; Note: Qwk
       Q.SeekFirst(1);
       N := Q.NumberOfMsgs;
       Inc(R.Msgs, N);
+      If Assigned(QwkControl) Then
+        Begin
+        While Q.SeekFound Do
+          Begin
+          Q.MsgStartUp;
+          If IsControl(Q.GetTo) Then
+            Begin
+            If QwkControl(Conf, Q.GetSubj) Then;
+            Inc(R.Control);
+            Note(qiControl, Conf, Nil);
+            End;
+          Q.SeekNext;
+          End;
+        Q.SeekFirst(1);
+        End;
       InitTarget(T);
       Moved := False;
       If (Not Map(Conf, T, Moved)) Or (T.AreaId = '') Then

@@ -122,6 +122,7 @@ Const                                  {ExtUser.ExtraInfo}
   eiHiddenPage = 128;                  {Auto page but hidden from caller}
   eiAvatar =     256;                  {Avatar graphics}
   eiQwkNode =    512;                  {A QWK network node: a system that calls in for its packet}
+  eiQwkControl = 1024;                 {QWK node: its packets have CONTROL.DAT and DOOR.ID (control message CONTROL ON)}
 
   uoaNew =         1;                  {New files list}
   uoaScrn =        2;                  {Screens}

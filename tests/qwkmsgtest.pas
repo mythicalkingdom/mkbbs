@@ -132,6 +132,23 @@ begin
 end;
 
 
+{ qwkmsgtest control <file> <board> <conf>:<subject> ...: a reply packet of control messages to SBBS (tests/qwkpassivetest.py) }
+procedure Control(F: String; Board: String);
+var i: Word; S: String; P: Word;
+begin
+  EraseFile(F);
+  M.Init; M.SetMsgPath(F); M.SetPacketId(Board); M.SetRepMode(True);
+  M.CreateMsgBase(0, 0);
+  for i := 4 to ParamCount do
+  begin
+    S := ParamStr(i); P := Pos(':', S);
+    M.StartNewMsg; M.SetFrom('MARK MAY'); M.SetTo('SBBS'); M.SetSubj(Copy(S, P + 1, 70)); M.SetMsgConf(Str2Long(Copy(S, 1, P - 1)));
+    M.SetDate('11-18-26'); M.SetTime('12:00'); M.DoStringLn('control message'); M.WriteMsg;
+  end;
+  M.Done;
+end;
+
+
 { qwkmsgtest hub <file> <conf>: the MESSAGES.DAT of a hub (tests/qwknettest.py): two messages in conference <conf>, one in 99 }
 procedure Hub(F: String; Conf: LongInt);
 begin
@@ -438,6 +455,7 @@ begin
   if ParamStr(1) = 'write' then WriteSet(ParamStr(2), ParamStr(3) = 'rep')
   else if ParamStr(1) = 'dump' then Dump(ParamStr(2), ParamStr(3) = 'rep')
   else if ParamStr(1) = 'reply' then Reply(ParamStr(2), Str2Long(ParamStr(3)), ParamStr(4), ParamStr(5))
+  else if ParamStr(1) = 'control' then Control(ParamStr(2), ParamStr(3))
   else if ParamStr(1) = 'hub' then Hub(ParamStr(2), Str2Long(ParamStr(3)))
   else Self(ParamStr(2));
   if Fails > 0 then Halt(1);

@@ -613,6 +613,7 @@ Procedure OfflineDL;
     Offline^.SetPath(WorkPath);
     Offline^.SetBBSID(Config^.GetBBSID);
     Offline^.SetQwke(Config^.GetOffQwke Or User.GetUserQwkNode);
+    Offline^.SetControlFiles((Not User.GetUserQwkNode) Or User.GetUserQwkControl);  {a node asks for them: CONTROL ON}
     If Offline^.StartPacket <> 0 Then
       Cont := False;
     End;

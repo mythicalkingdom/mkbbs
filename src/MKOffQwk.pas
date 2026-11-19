@@ -76,6 +76,7 @@ Type QwkInfo = Record
   Imported: LongInt;                   {messages the last ImportPacket posted}
   KeepKludges: Boolean;
   Qwke: Boolean;
+  ControlFiles: Boolean;               {CONTROL.DAT and DOOR.ID are in the packet}
   Link: Boolean;                       {SetLink: the packet is a REP for another system}
   LinkId: String[40];
   ConfOf: QwkConfFunc;                 {area -> conference of the other end}
@@ -96,6 +97,7 @@ Type QwkOffObj = Object(AbsOffObj)
   Procedure SetBBSID(ID: String); Virtual; {Set bbs id/filename}
   Procedure SetKeepKludges(KK: Boolean);
   Procedure SetQwke(QK: Boolean); Virtual;
+  Procedure SetControlFiles(CF: Boolean); Virtual;
   Procedure SetLink(RemoteId: String; ConfOf: QwkConfFunc; AreaOf: QwkConfFunc);
   Function  LinkImported(Area: Word; Var Pending, First, Last: LongInt): Word;
     {link: messages the import posted in the area, the numbers of the first and last, and how many messages of the
@@ -198,6 +200,7 @@ Constructor QwkOffObj.Init;
   Inherited Init;
   New(QI);
   FillChar(QI^, SizeOf(QI^), 0);
+  QI^.ControlFiles := True;
   End;
 
 
@@ -564,6 +567,12 @@ Function QwkOffObj.StartPacket: Word;
   End;
 
 
+Procedure QwkOffObj.SetControlFiles(CF: Boolean);
+  Begin
+  QI^.ControlFiles := CF;
+  End;
+
+
 Function QwkOffObj.ClosePacket: Word;
   Var
     E: Word;
@@ -579,8 +588,11 @@ Function QwkOffObj.ClosePacket: Word;
   If Not QI^.Link Then
     Begin
     DoIdx;
-    DoControl;
-    WriteDoorId;
+    If QI^.ControlFiles Then
+      Begin
+      DoControl;
+      WriteDoorId;
+      End;
     End;
   ClosePacket := E;
   End;
@@ -727,6 +739,236 @@ Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean
   End;
 
 
+{ ---- control messages of a QWK network node (to SBBS or MK, as Synchronet networks send them): the areas of its offline
+  mail are its subscriptions and its last read pointers tell what it has had.
+    ADD [ptr | -msgs | mm/dd/yy]       the conference joins the packets, the pointer is set when one is given
+    DROP [conf#]                       the conference (or conf#) leaves the packets
+    RESET [ptr | -msgs | mm/dd/yy]     the pointer of the conference (no value = from the first message)
+    RESETALL [ptr | -msgs | mm/dd/yy]  the pointers of all the conferences of the node
+  ptr = messages after this number are new, -msgs = only the last messages are new, a date = the messages from that day.
+    CONTROL [ON | OFF]                 CONTROL.DAT and DOOR.ID are in the packets of the node (or not)
+  FREQ, FILES, ATTACH, CTRL-A, TZ, VIA, MSGID and NDX are taken and ignored (nothing there to change). }
+
+Function DateKey(S: String): LongInt;
+  {mm/dd/yy, mm-dd-yy or mm/dd/yyyy as yyyymmdd, 0 = not a date}
+  Var
+    P: Array[1..3] Of LongInt;
+    N, i: Word;
+    InNum: Boolean;
+
+  Begin
+  DateKey := 0;
+  N := 0;
+  InNum := False;
+  For i := 1 To Length(S) Do
+    If S[i] In ['0'..'9'] Then
+      Begin
+      If Not InNum Then
+        Begin
+        Inc(N);
+        If N > 3 Then
+          Exit;
+        P[N] := 0;
+        InNum := True;
+        End;
+      P[N] := P[N] * 10 + Ord(S[i]) - 48;
+      End
+    Else
+      InNum := False;
+  If N <> 3 Then
+    Exit;
+  If P[3] < 100 Then
+    Begin
+    If P[3] < 80 Then
+      Inc(P[3], 2000)
+    Else
+      Inc(P[3], 1900);
+    End;
+  DateKey := P[3] * 10000 + P[1] * 100 + P[2];
+  End;
+
+
+Function ResolvePtr(Area: Word; Arg: String; Var Ptr: LongInt): Boolean;
+  {the last read pointer an argument of ADD / RESET means in this area}
+  Type
+    NumArr = Array[1..1000000] Of LongInt;
+  Var
+    M: AbsMsgPtr;
+    Nums: ^NumArr;
+    Cnt, N, Key: LongInt;
+    Prev, Last: LongInt;
+    Found: Boolean;
+
+  Begin
+  ResolvePtr := True;
+  Ptr := 0;
+  If Arg = '' Then
+    Exit;
+  If Arg[1] In ['0'..'9'] Then
+    Begin
+    If (Pos('/', Arg) = 0) And (Pos('-', Arg) = 0) And (Pos('.', Arg) = 0) Then
+      Begin
+      Ptr := Str2Long(Arg);
+      Exit;
+      End;
+    End
+  Else If Arg[1] <> '-' Then
+    Begin
+    ResolvePtr := False;
+    Exit;
+    End;
+  Key := 0;
+  If Arg[1] <> '-' Then
+    Begin
+    Key := DateKey(Arg);
+    If Key = 0 Then
+      Begin
+      ResolvePtr := False;
+      Exit;
+      End;
+    End;
+  If Not OpenMsgArea(M, Config^.GetMsgAreaId(Area)) Then
+    Begin
+    ResolvePtr := False;
+    Exit;
+    End;
+  New(Nums);
+  Cnt := 0;
+  Prev := 0;
+  Last := 0;
+  Found := False;
+  M^.SeekFirst(1);
+  While M^.SeekFound Do
+    Begin
+    M^.MsgStartUp;
+    N := M^.GetMsgNum;
+    If (Key > 0) And (Not Found) Then
+      Begin
+      If DateKey(M^.GetDate) >= Key Then
+        Found := True
+      Else
+        Prev := N;
+      End;
+    If Cnt < 1000000 Then
+      Begin
+      Inc(Cnt);
+      Nums^[Cnt] := N;
+      End;
+    Last := N;
+    M^.SeekNext;
+    End;
+  If CloseMsgArea(M) Then;
+  If Key > 0 Then
+    Begin
+    If Found Then
+      Ptr := Prev
+    Else
+      Ptr := Last;                       {nothing from that day on: nothing is new}
+    End
+  Else
+    Begin
+    N := Str2Long(Copy(Arg, 2, 20));
+    If (N >= Cnt) Or (N < 0) Then
+      Ptr := 0
+    Else If N = 0 Then
+      Ptr := Last
+    Else
+      Ptr := Nums^[Cnt - N];
+    End;
+  Dispose(Nums);
+  End;
+
+
+Function CtlArea(Area: LongInt): Boolean;
+  {the node can have this conference}
+  Begin
+  CtlArea := (Area >= 1) And (Area <= Config^.GetMaxMsgAreas) And (Area <= QwkConfs) And
+    (Length(Config^.GetMsgName(Area)) > 0) And Config^.MsgReadAccess(Area, ImpSec);
+  End;
+
+
+Function ImpControl(Conf: LongInt; Subj: String): Boolean;
+  Var
+    Cmd, Arg: String;
+    Area: LongInt;
+    Ptr: LongInt;
+    A: Word;
+    Ok: Boolean;
+    Msg: String;
+
+  Begin
+  ImpControl := True;
+  Subj := StripBoth(Subj, ' ');
+  Cmd := Upper(ExtractWord(Subj, 1));
+  Arg := ExtractWord(Subj, 2);
+  Ok := False;
+  If Cmd = 'ADD' Then
+    Begin
+    If CtlArea(Conf) And Config^.GetMsgAllowOffline(Conf) And ResolvePtr(Conf, Arg, Ptr) Then
+      Begin
+      ImpUser^.SetUserOffline(Conf, True);
+      If Arg <> '' Then
+        OffSetUserLR(Conf, Ptr);
+      Ok := True;
+      End;
+    End
+  Else If Cmd = 'DROP' Then
+    Begin
+    Area := Conf;
+    If Arg <> '' Then
+      Area := Str2Long(Arg);
+    If CtlArea(Area) And (Not Config^.GetMsgForceOffline(Area)) Then
+      Begin
+      ImpUser^.SetUserOffline(Area, False);
+      Ok := True;
+      End;
+    Conf := Area;
+    End
+  Else If Cmd = 'RESET' Then
+    Begin
+    If CtlArea(Conf) And ResolvePtr(Conf, Arg, Ptr) Then
+      Begin
+      OffSetUserLR(Conf, Ptr);
+      Ok := True;
+      End;
+    End
+  Else If Cmd = 'RESETALL' Then
+    Begin
+    Ok := True;
+    For A := 1 To Config^.GetMaxMsgAreas Do
+      If (A <= QwkConfs) And CtlArea(A) And (ImpUser^.GetUserOffline(A) Or Config^.GetMsgForceOffline(A)) Then
+        If ResolvePtr(A, Arg, Ptr) Then
+          OffSetUserLR(A, Ptr)
+        Else
+          Ok := False;
+    Conf := 0;
+    End
+  Else If Cmd = 'CONTROL' Then
+    Begin
+    Arg := Upper(Arg);
+    Ok := (Arg = '') Or (Arg = 'ON') Or (Arg = 'OFF');
+    If Ok Then
+      ImpUser^.SetUserQwkControl(Arg <> 'OFF');
+    Conf := 0;
+    End
+  Else If (Cmd = 'FREQ') Or (Cmd = 'FILES') Or (Cmd = 'ATTACH') Or (Cmd = 'CTRL-A') Or (Cmd = 'TZ') Or
+          (Cmd = 'VIA') Or (Cmd = 'MSGID') Or (Cmd = 'NDX') Then
+    Begin
+    ImpUser^.DisplayStrLn(Cmd + ': ignored');
+    Exit;
+    End;
+  If Conf > 0 Then
+    Msg := ' ' + Long2Str(Conf)
+  Else
+    Msg := '';
+  If Ok Then
+    ImpUser^.DisplayStrLn(Cmd + Msg + ': done')
+  Else
+    ImpUser^.DisplayStrLn(Cmd + Msg + ': not done');
+  ImpControl := Ok;
+  End;
+
+
 Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
   Var
     A: LongInt;
@@ -785,7 +1027,12 @@ Procedure QwkOffObj.ImportPacket;
   ImpSec := Sec;
   ImpName := ImpUser^.GetUserName;
   ImpO := ImpOpts;
+  If (Not QI^.Link) And ImpUser^.GetUserQwkNode Then
+    QwkControl := ImpControl                {a node's control messages: ADD, DROP, RESET ...}
+  Else
+    QwkControl := Nil;
   E := QwkImportFile(FN, ImpO.DupeFile, ImpMap, ImpNote, R);
+  QwkControl := Nil;
   If E <> 0 Then
     ImpUser^.DisplayStrLn(Prompts.GetString(182))
   Else

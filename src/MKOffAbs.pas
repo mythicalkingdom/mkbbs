@@ -37,6 +37,7 @@ Type AbsOffObj = Object
   Procedure SetUsrPtr(Var U: DoorUserPtr);
   Procedure SetImportOpts(Var O: OffImportOpts); {before ImportPacket}
   Procedure SetQwke(QK: Boolean); Virtual;     {QWKE long names and subjects in the packet (QWK only)}
+  Procedure SetControlFiles(CF: Boolean); Virtual; {CONTROL.DAT and DOOR.ID in the packet (QWK only; default yes)}
   Procedure SetPath(MP: String); Virtual; {Set msg path/other info}
   Procedure SetBBSID(ID: String); Virtual; {Set BBS id/filename}
   Function  StartPacket: Word; Virtual; {Do Packet startup tasks}
@@ -65,6 +66,11 @@ Constructor AbsOffObj.Init;
 
 
 Procedure AbsOffObj.SetQwke(QK: Boolean);
+  Begin
+  End;
+
+
+Procedure AbsOffObj.SetControlFiles(CF: Boolean);
   Begin
   End;
 
