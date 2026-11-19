@@ -52,7 +52,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -163,6 +163,13 @@ fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwkcfgtest.py build build/work/qwkcfg | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkcfgresult.txt
   if grep -q FAIL build/qwkcfgresult.txt; then exit 1; fi
+fi
+# the client session (MKComClient: TCP + Telnet client mode), alone and against mklisten with a "qwk" port (mk -Q) with Zmodem both ways
+python3 tests/clienttest.py build | grep -E "^(FAIL|failures)" | tee build/clientresult.txt
+if grep -q FAIL build/clientresult.txt; then exit 1; fi
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/clientxfertest.py build build/work/clientxfer | grep -E "^(FAIL|skip|failures)" | tee build/clientxferresult.txt
+  if grep -q FAIL build/clientxferresult.txt; then exit 1; fi
 fi
 # mk -Q: the login of a QWK network system (Login:, Password:, QWK: D/U/B/Q)
 if [ -f bbs/bbsc/ra/config.mk ]; then

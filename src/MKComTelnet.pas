@@ -22,6 +22,12 @@ Unit MKComTelnet;   {Telnet protocol filter over another session}
      ScreenChanged is set when a NAWS or TTYPE report arrived; the owner may
      look at it now and then and clear it.
 
+     Client mode (SetClient): this side is the caller and the wrapped session is a connection to a BBS or another
+     server.  Nothing is asked for at first except suppress go-ahead and binary (both ways); the server's requests are
+     answered: SGA, binary, terminal type (the name given to SetClient) and window size (NAWS) are accepted, ECHO is
+     accepted from the server, everything else is refused.  What arrives is data as it is (CR LF is not changed: the
+     text is for a script, not for a BBS).
+
      Everything else (carrier, buffering, emulated speed, hangup) is the wrapped
      session's: a filter does no I/O of its own.
 }
@@ -59,6 +65,9 @@ Type TelnetComObj = Object(AbsComObj)
   Us: Array[0..255] Of Byte;           {0 off, 1 on, 2 asked and waiting}
   Him: Array[0..255] Of Byte;
   Cols, Rows: Word;                    {Caller's window, 0 = unknown}
+  Client: Boolean;                     {SetClient: this side is the caller}
+  CTerm: String[40];                   {client: the terminal type told to the server}
+  CCols, CRows: Word;                  {client: the window size told to the server}
   TermType: String[40];
   ScreenChanged: Boolean;
   WinVer: Word;                        {Counts the NAWS reports}
@@ -91,6 +100,9 @@ Type TelnetComObj = Object(AbsComObj)
   Procedure Process(C: Char);          {Internal}
   Procedure Data(C: Char);             {Internal}
   Procedure SetBinary(B: Boolean); Virtual;     {a transfer: CR LF and CR NUL are data}
+  Procedure SetClient(Term: String; AC, AR: Word); {this side is the caller: Term = terminal type, AC x AR = window}
+  Function  Can(Opt: Byte; Mine: Boolean): Boolean; {Internal: the option is supported}
+  Procedure SendNaws;                  {Internal: client}
   Procedure Command(V, Opt: Byte);     {Internal: send IAC V Opt}
   Procedure Offer(Opt: Byte; Mine: Boolean); {Internal}
   Procedure GotOption(V, Opt: Byte);   {Internal}
@@ -116,6 +128,40 @@ Function Supports(Opt: Byte; Mine: Boolean): Boolean;
   End;
 
 
+Function TelnetComObj.Can(Opt: Byte; Mine: Boolean): Boolean;
+  Begin
+  If Not Client Then
+    Can := Supports(Opt, Mine)
+  Else If Mine Then
+    Can := Opt In [TelOptBinary, TelOptSGA, TelOptTType, TelOptNaws]
+  Else
+    Can := Opt In [TelOptBinary, TelOptSGA, TelOptEcho];
+  End;
+
+
+Procedure TelnetComObj.SetClient(Term: String; AC, AR: Word);
+  Begin
+  Client := True;
+  CTerm := Term;
+  CCols := AC;
+  CRows := AR;
+  End;
+
+
+Procedure TelnetComObj.SendNaws;
+  Begin
+  Inner^.SendChar(Chr(TelIAC));
+  Inner^.SendChar(Chr(TelSB));
+  Inner^.SendChar(Chr(TelOptNaws));
+  Inner^.SendChar(Chr(CCols Shr 8));
+  Inner^.SendChar(Chr(CCols And 255));
+  Inner^.SendChar(Chr(CRows Shr 8));
+  Inner^.SendChar(Chr(CRows And 255));
+  Inner^.SendChar(Chr(TelIAC));
+  Inner^.SendChar(Chr(TelSE));
+  End;
+
+
 Constructor TelnetComObj.Init(AInner: AbsComPtr; AOwns: Boolean);
   Begin
   Inherited Init;
@@ -133,6 +179,10 @@ Constructor TelnetComObj.Init(AInner: AbsComPtr; AOwns: Boolean);
   TermType := '';
   ScreenChanged := False;
   WinVer := 0;
+  Client := False;
+  CTerm := 'ansi';
+  CCols := 80;
+  CRows := 24;
   End;
 
 
@@ -177,6 +227,15 @@ Function TelnetComObj.OpenSession: Boolean;
   If Not Inner^.OpenSession Then
     Exit;
   OpenSession := True;
+  If Client Then
+    Begin
+    Offer(TelOptSGA, True);
+    Offer(TelOptSGA, False);
+    Offer(TelOptBinary, True);
+    Offer(TelOptBinary, False);
+    Inner^.FlushOut;
+    Exit;
+    End;
   Offer(TelOptEcho, True);
   Offer(TelOptSGA, True);
   Offer(TelOptSGA, False);
@@ -201,10 +260,12 @@ Procedure TelnetComObj.GotOption(V, Opt: Byte);
   Begin
   Case V Of
     TelDO:
-      If Supports(Opt, True) Then
+      If Can(Opt, True) Then
         Begin
         If Us[Opt] = 0 Then
           Command(TelWILL, Opt);
+        If Client And (Opt = TelOptNaws) And (Us[Opt] <> 1) Then
+          SendNaws;
         Us[Opt] := 1;
         End
       Else
@@ -216,14 +277,14 @@ Procedure TelnetComObj.GotOption(V, Opt: Byte);
       Us[Opt] := 0;
       End;
     TelWILL:
-      If Supports(Opt, False) Then
+      If Can(Opt, False) Then
         Begin
         If Him[Opt] = 0 Then
           Command(TelDO, Opt);
         If Him[Opt] <> 1 Then
           Begin
           Him[Opt] := 1;
-          If Opt = TelOptTType Then
+          If (Opt = TelOptTType) And (Not Client) Then
             Begin                        {ask for the terminal type: IAC SB TTYPE SEND IAC SE}
             Inner^.SendChar(Chr(TelIAC));
             Inner^.SendChar(Chr(TelSB));
@@ -253,6 +314,21 @@ Procedure TelnetComObj.GotSub;
   Begin
   If SbLen = 0 Then
     Exit;
+  If Client Then
+    Begin
+    If (Sb[0] = TelOptTType) And (SbLen >= 2) And (Sb[1] = 1) Then
+      Begin                              {SEND: IAC SB TTYPE IS <name> IAC SE}
+      Inner^.SendChar(Chr(TelIAC));
+      Inner^.SendChar(Chr(TelSB));
+      Inner^.SendChar(Chr(TelOptTType));
+      Inner^.SendChar(#0);
+      For i := 1 To Length(CTerm) Do
+        Inner^.SendChar(CTerm[i]);
+      Inner^.SendChar(Chr(TelIAC));
+      Inner^.SendChar(Chr(TelSE));
+      End;
+    Exit;
+    End;
   If (Sb[0] = TelOptNaws) And (SbLen >= 5) Then
     Begin
     Cols := Sb[1] * 256 + Sb[2];
@@ -281,7 +357,12 @@ Procedure TelnetComObj.SetBinary(B: Boolean);
 
 Procedure TelnetComObj.Data(C: Char);
   Begin
-  If coBinary And (Him[TelOptBinary] = 1) Then
+  If Client Then
+    Begin
+    PeekCh := C;                         {text for a script: as it comes}
+    HavePeek := True;
+    End
+  Else If coBinary And (Him[TelOptBinary] = 1) Then
     Begin
     AfterCR := False;                    {a file, and the caller sends binary: every byte is data}
     PeekCh := C;
