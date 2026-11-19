@@ -73,8 +73,9 @@ Procedure QApp.InitStatusLine;
   R.A.Y := R.B.Y - 1;
   StatusLine := New(PStatusLine, Init(R,
     NewStatusDef(0, $FFFF,
-      NewStatusKey('~F10~ Menu', kbF10, cmMenu,
-      NewStatusKey('~Alt-X~ Quit', kbAltX, cmQuitDlg, Nil)),
+      NewStatusKey('~Alt-M~ Menu', kbAltM, cmMenu,
+      NewStatusKey('', kbF10, cmMenu,
+      NewStatusKey('~Alt-X~ Quit', kbAltX, cmQuitDlg, Nil))),
     Nil)));
   End;
 

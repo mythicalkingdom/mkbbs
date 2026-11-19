@@ -18,7 +18,8 @@ Program MKDraw;
         Alt-C  copy area               Alt-M  move area                Alt-F  attribute fill of an area
         Alt-Z  zap (clear) an area     Alt-E  enclose an area in a frame
         Alt-V  insert line             Alt-Y  delete line              Alt-W  double image (2 x 2)
-        Alt-G  get a character set     Alt-P  pick a BBS screen code   Alt-L  load       Alt-S  save
+        Alt-G  get a character set     Alt-P  pick a BBS screen code   Alt-L  load       Alt-S  save area
+        Alt-T  save the whole screen
         F1..F10  enter the special characters of the current set (Alt-F1..F10 = set 1..10, Ctrl-F1..F5 = set 11..15,
                  Alt-1..Alt-9 = set 1..9)       Ctrl-A..Ctrl-Z  enter that control code
         Esc    the fast menu with all commands     Alt-H  help      Alt-X  leave
@@ -410,6 +411,7 @@ Function KeyCommand(K: Word): Word;
     kbAltP: KeyCommand := cmBbsCode;
     kbAltR: KeyCommand := cmReverse;
     kbAltS: KeyCommand := cmSave;
+    kbAltT: KeyCommand := cmSaveAll;
     kbAltU: KeyCommand := cmUnder;
     kbAltV: KeyCommand := cmInsLine;
     kbAltW: KeyCommand := cmDouble;
@@ -884,7 +886,8 @@ Function SaveAscii(FN: String; XL, YL, XH, YH: Byte; Action: Word): Boolean;
   End;
 
 
-Procedure SaveFile;
+Procedure SaveFile(Whole: Boolean);
+  {Whole: the whole screen is saved, no area is asked for}
   Var
     FStr: NameStr;
     EStr: ExtStr;
@@ -912,8 +915,20 @@ Procedure SaveFile;
     DoSave := Not FileExist(Name);
   If Not DoSave Then
     DoSave := DoYesNo('[ Overwrite File ]', False) = 1;
-  If DoSave Then
+  If DoSave And Whole Then
+    Begin
+    XL := 1;
+    YL := 1;
+    XH := ScrW;
+    YH := ScrH;
+    End
+  Else If DoSave Then
+    Begin
+    MsgBox('Choose the area to save: move to the upper left corner and press Enter, then move to the lower right corner and press Enter.');
     DoSave := GetRect(XL, YL, XH, YH);
+    If Not DoSave Then
+      MsgBox('Nothing was saved: no area was chosen.');
+    End;
   If DoSave Then
     Begin
     Action := GetActionCmd;
@@ -1353,9 +1368,9 @@ Procedure ShowHelp;
     'Alt-P  Pick BBS code               Ctrl-A..Z    Enter that control code' + #13 +
     'Alt-R  Reverse attribute           Esc          Fast menu: every command' + #13 +
     'Alt-S  Save screen area            Right click  Esc' + #13 +
-    'Alt-U  Color under cursor          Left click   Move the cursor' + #13 +
-    'Alt-V  Insert line' + #13 +
-    'Alt-Y  Delete line' + #13 +
+    'Alt-T  Save the whole screen       Left click   Move the cursor' + #13 +
+    'Alt-U  Color under cursor' + #13 +
+    'Alt-V  Insert line   Alt-Y  Delete line' + #13 +
     'Alt-W  Double image   Alt-X  Exit   Alt-Z  Zap/clear area');
   End;
 
@@ -1418,7 +1433,8 @@ Procedure CmdProcess(Cmd: Word; Ch: Char; MX, MY: Integer);
         End;
       End;
     ccMouseSel: SetCursorTo(MX, MY);
-    cmSave: SaveFile;
+    cmSave: SaveFile(False);
+    cmSaveAll: SaveFile(True);
     cmHelp: ShowHelp;
     cmAttrPick: PickAttr('[ Pick Color ]', TextAttr);
     cmUnder: TextAttr := CellAttr(X, Y);

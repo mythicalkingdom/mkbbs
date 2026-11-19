@@ -404,11 +404,30 @@ def save_all(args, outname, upleft=1):
     ss.keys(END, wait=0.05)
     ss.keys(*([BACK] * 90), wait=0.01)
     ss.keys(outname, ENTER, wait=0.4)
+    ss.keys(ENTER, wait=0.3)                              # the pop-up that explains the two corners
     ss.keys(HOME, PGUP, ENTER, wait=0.2)
     ss.keys(PGDN, END, ENTER, wait=0.3)                    # area: the whole screen
     ss.keys(ENTER, wait=0.5)                              # action: none
     return ss
 
+
+# the pop-ups of saving an area: what to do, and (Esc while choosing) nothing was saved
+def screen_text(ss):
+    return ' '.join(ss.t.row(y) for y in range(25))
+
+
+ss = Session([small])
+ss.keys(ALT('s'), wait=0.5)
+ss.keys(END, wait=0.05)
+ss.keys(*([BACK] * 90), wait=0.01)
+ss.keys(os.path.join(work, 'never'), ENTER, wait=0.5)
+check('saving an area: a pop-up explains the corners', 'upper left corner' in screen_text(ss) and 'lower right corner' in screen_text(ss), screen_text(ss)[:200])
+ss.keys(ENTER, wait=0.3)
+ss.keys(ESC, wait=0.5)
+check('Esc while choosing the area: a pop-up says nothing was saved', 'Nothing was saved' in screen_text(ss), '')
+ss.keys(ENTER, wait=0.3)
+check('... and no file was written', not any(f.startswith('never') for f in os.listdir(work)), os.listdir(work))
+ss.close()
 
 out = os.path.join(work, 'out')
 ss = save_all([small], out)
@@ -423,6 +442,24 @@ if all(os.path.exists(out + e) for e in ('.asc', '.ans', '.avt')):
     sg = [m.group(1) for m in re.finditer(rb'\x1b\[([0-9;]*)m', ans)]
     check('.ans: after every colour reset the foreground and the background are set again (the colour guard)', leaks(ans) == 0 and b'0' in sg, (leaks(ans), sg))
     check('.avt: attribute ^V^A, a run of the 10 double lines is ^Y char count', avt.startswith(b'\x16\x01\x1e' + bytes([201])) and b'\x19' + bytes([205]) + b'\x0a' in avt and avt.count(b'\r\n') == 23, avt[:40])
+ss.close()
+
+# Alt-T: the whole screen, no area is asked for: the same files as choosing the whole screen with Alt-S
+out3 = os.path.join(work, 'whole')
+ss = Session([small])
+ss.keys(ALT('t'), wait=0.5)
+ss.keys(END, wait=0.05)
+ss.keys(*([BACK] * 90), wait=0.01)
+ss.keys(out3, ENTER, wait=0.5)
+check('Alt-T: no pop-up about corners and no area is asked for', 'upper left corner' not in screen_text(ss) and 'Action' in screen_text(ss), screen_text(ss)[:160])
+ss.keys(ENTER, wait=0.5)
+ss.close()
+check('Alt-T writes the .asc, .ans and .avt of the whole screen', all(os.path.exists(out3 + e) for e in ('.asc', '.ans', '.avt')), os.listdir(work))
+if all(os.path.exists(out3 + e) for e in ('.asc', '.ans', '.avt', )) and all(os.path.exists(out + e) for e in ('.asc', '.ans', '.avt')):
+    check('... the files are the same as with Alt-S and the whole screen chosen', all(open(out3 + e, 'rb').read() == open(out + e, 'rb').read() for e in ('.asc', '.ans', '.avt')), '')
+ss = Session([small])
+ss.keys(ALT('h'), wait=0.5)
+check('the help lists Alt-T', 'Alt-T' in screen_text(ss) and 'Alt-Z' in screen_text(ss), '')
 ss.close()
 
 # the same without the guard (-n): a reset that leaves a colour to the terminal

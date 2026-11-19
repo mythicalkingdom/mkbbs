@@ -43,6 +43,7 @@ Const
   cmExitDraw = 4118;
   cmDrawMode = 4119;
   cmDouble = 4120;
+  cmSaveAll = 4121;        {save the whole screen: no area is asked}
 
   CharsInSet = 10;
 
@@ -363,7 +364,7 @@ Function GetActionCmd: Word;
 
 
 Const
-  MenuItems = 19;
+  MenuItems = 20;
   MenuText: Array[1..MenuItems] Of String[28] = (
     ' Attribute Selection',
     ' Toggle Blinking',
@@ -381,12 +382,13 @@ Const
     ' Enclose area in box frame',
     ' Load a screen file',
     ' Save a screen file',
+    ' Save the whole screen',
     ' Help',
     ' Drawing mode',
     ' Exit from MKDraw');
   MenuCode: Array[1..MenuItems] Of Word = (
     cmAttrPick, cmBlink, cmIntens, cmUnder, cmReverse, cmFill, cmCopy, cmMove, cmInsLine, cmDelLine,
-    cmClear, cmBbsCode, cmGetSet, cmEnclose, cmLoad, cmSave, cmHelp, cmDrawMode, cmExitDraw);
+    cmClear, cmBbsCode, cmGetSet, cmEnclose, cmLoad, cmSave, cmSaveAll, cmHelp, cmDrawMode, cmExitDraw);
 
 
 Function MenuStr(Item: Word): String;
