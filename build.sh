@@ -47,6 +47,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbinkcfg src/MKBinkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omktoss src/MKToss.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwk src/MKQwk.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwkcfg src/MKQwkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
@@ -157,6 +158,11 @@ if grep -q FAIL build/protresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwknettest.py build build/work/qwknet | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwknetresult.txt
   if grep -q FAIL build/qwknetresult.txt; then exit 1; fi
+fi
+# mkqwkcfg: the configuration of the offline mail door (config.mko, users.mko, confs.mko)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/qwkcfgtest.py build build/work/qwkcfg | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkcfgresult.txt
+  if grep -q FAIL build/qwkcfgresult.txt; then exit 1; fi
 fi
 # mk -Q: the login of a QWK network system (Login:, Password:, QWK: D/U/B/Q)
 if [ -f bbs/bbsc/ra/config.mk ]; then

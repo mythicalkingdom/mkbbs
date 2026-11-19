@@ -71,7 +71,7 @@ Procedure EditProt(PN: Word);
   Else
     Begin
     F.At(5, 3, 5, 3);
-    F.AddText('Internal protocols do not work on Linux.');
+    F.AddText('Internal protocol: built into mk (offline mail and file transfers).');
     End;
   If F.Execute Then
     Begin
