@@ -37,7 +37,7 @@ begin
   if S = nil then begin writeln('error: ', Err); halt(1); end;
   ComSession := S;
   CurrentPort := 1; CurrentRate := 38400;
-  ProtQuiet := True;
+  ProtQuiet := True; ProtKeepInput := True;
   if not WaitFor('Login: ', 15000) then begin writeln('no login prompt'); halt(2); end;
   Say(ParamStr(3) + #13);
   if not WaitFor('Password: ', 5000) then begin writeln('no password prompt'); halt(2); end;

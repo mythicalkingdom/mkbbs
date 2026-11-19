@@ -63,6 +63,7 @@ Type QwkImpTarget = Record
   Echo: Boolean;                  {SetEcho}
   ReDate: Boolean;
   KeepKludges: Boolean;
+  Create: Boolean;                {the message base is made when it is not there (the areas of a network)}
   TearLine: String[80];
   OriginLine: String[100];
   End;
@@ -351,7 +352,7 @@ Function QwkImportFile(FN: String; DupeFN: String; Map: QwkImpMapProc; Note: Qwk
         Inc(R.Refused, N);
         Note(qiRefused, Conf, Nil);
         End
-      Else If Not OpenMsgArea(Msg, T.AreaId) Then
+      Else If Not ((T.Create And OpenOrCreateMsgArea(Msg, T.AreaId)) Or ((Not T.Create) And OpenMsgArea(Msg, T.AreaId))) Then
         Begin
         Inc(R.Failed, N);
         Note(qiFailed, Conf, Nil);

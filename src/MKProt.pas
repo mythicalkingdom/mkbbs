@@ -12,6 +12,7 @@ Const
 
 
 Var
+  ProtKeepInput: Boolean;              {a transfer with a BBS (this program is the caller): what follows the end of the transfer (the BBS prompt) is not thrown away}
   ProtTrace: Boolean;                  {every byte received (r) and sent (s) goes to StdErr (tests)}
 
 
@@ -103,7 +104,7 @@ Implementation
 
 Uses Dos,
   MKVCrt,
-MKVideo, MKMisc, Crc16, Crc32, MKComAbs, MKString, MKFile, MKDos;
+MKVideo, MKMisc, Crc16, Crc32, MKComAbs, MKString, MKFile, MKDos, MKPlat;
 
 
 Const
@@ -243,6 +244,26 @@ Procedure Z_SendBreak;
   End;
 
 
+Var
+  TraceLast: Int64;
+
+Procedure TraceTime;
+  {the debug trace: the time (ms) when there has been a pause}
+  Var
+    T: Int64;
+
+  Begin
+  T := MKTicks;
+  If T - TraceLast > 150 Then
+    Begin
+    Write(StdErr, ' @', T Mod 1000000);
+    TraceLast := T;
+    End
+  Else
+    TraceLast := T;
+  End;
+
+
 Procedure Z_SendByte(b: Byte);
 (* Output one Byte *)            {check for timeout}
   Var
@@ -253,6 +274,7 @@ Procedure Z_SendByte(b: Byte);
   While ((Not CommSendNw(Chr(b))) And (Not TimeOut(Time))) Do;
   If ProtTrace Then
     Begin
+    TraceTime;
     Write(StdErr, ' s', b);
     Flush(StdErr);
     End;
@@ -334,6 +356,7 @@ Function Z_GetByte(tenths: Integer): Integer;
       z_GetByte := Bv;
       If ProtTrace Then
         Begin
+        TraceTime;
         Write(StdErr, ' r', Bv);
         Flush(StdErr);
         End;
@@ -1073,7 +1096,8 @@ Procedure ProtObj.RZ_AckBibi;
       79: Begin
           IF (Z_GetByte(10) = 79) Then
             {null};
-          CommFlushIn;
+          If Not ProtKeepInput Then
+            CommFlushIn;
           Exit
           End
       ELSE
@@ -1323,7 +1347,8 @@ Var
    adone: Boolean;
 Begin
    zerrors := 0;
-   adone := False;
+   adone := True;                        {the loop goes on (UNTIL NOT adone): it is left by Exit and GOTO err; it was False, so a
+                                          NAK, a time out or a repeated ZFILE ended the file instead of asking for the position again}
    eofseen := False;
    c := RZ_GetHeader;
    IF (c <> ZOK) Then
@@ -1434,7 +1459,10 @@ moredata:
                          GOTO err;
                       ShowLoc(rxBytes)
                    End;
-         ZFILE: Begin
+         ZFILE: Begin                    {the sender says it again (it had two requests for it): ask for the position again}
+                   Dec(n);
+                   IF (n < 0) Then
+                      GOTO err;
                    c := RZ_ReceiveData(secbuf,ZBUFSIZE);
                 End;
          ZEOF: IF (rxpos = rxBytes) Then
@@ -1527,6 +1555,7 @@ Function ProtObj.Zmodem_Receive(path: String): Boolean;
   {the files of a Zmodem sender are put in the directory path; PI^.NumFiles, FN[] and Status[] say what came}
   Var
     i: Integer;
+    RcvOk: Boolean;
 
   Begin
   If Not Z_AsyncOn(CurrentPort, CurrentRate) Then
@@ -1547,18 +1576,20 @@ Function ProtObj.Zmodem_Receive(path: String): Boolean;
   rxtimeout := 100;
   tryzhdrtype := ZRINIT;
   i := RZ_InitReceiver;
-  IF (i = ZCOMPL) OR ((i = ZFILE) And ((RZ_ReceiveBatch) = ZOK)) Then
-    Zmodem_Receive := True
-  ELSE
+  RcvOk := (i = ZCOMPL) OR ((i = ZFILE) And ((RZ_ReceiveBatch) = ZOK));
+  Zmodem_Receive := RcvOk;
+  IF Not RcvOk Then
     Begin
     CommFlushOut;
     PWdw.Message('Sending CAN');
     Z_SendCan;
-    Zmodem_Receive := False;
     End;
   CommFlushOut;
-  If CommWaitChar(300) Then;               {what the sender still says (OO ...)}
-  CommFlushIn;
+  If (Not RcvOk) Or (Not ProtKeepInput) Then
+    Begin
+    If CommWaitChar(300) Then;             {what the sender still says (OO ...)}
+    CommFlushIn;
+    End;                                   {as the caller of a BBS what follows is wanted: its prompt}
   CommSetBinary(False);
   PWdw.CloseWindow;
   PWdw.Done;
@@ -3227,8 +3258,11 @@ Procedure ProtObj.Send;
   Close(PI^.PFile);
   If IoResult <> 0 Then;
   CommFlushOut;
-  If CommWaitChar(300) Then;               {what the receiver still says}
-  CommFlushIn;
+  If (PI^.Error <> 0) Or (Not ProtKeepInput) Then
+    Begin
+    If CommWaitChar(300) Then;             {what the receiver still says}
+    CommFlushIn;
+    End;                                   {as the caller of a BBS what follows is wanted: its prompt}
   CommSetBinary(False);
   Pwdw.CloseWindow;
   Pwdw.Done;

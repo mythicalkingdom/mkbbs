@@ -428,13 +428,13 @@ Procedure QwkOffObj.WriteDoorId;
   WriteLn(CFile, 'DOOR = MKQwk');
   WriteLn(CFile, 'VERSION = 1.1');
   WriteLn(CFile, 'SYSTEM = Mythical Kingdom');
-  WriteLn(CFile, 'CONTROLNAME = MKQWK');
+  WriteLn(CFile, 'CONTROLNAME = MK');
   WriteLn(CFile, 'CONTROLTYPE = ADD');
   WriteLn(CFile, 'CONTROLTYPE = DROP');
   WriteLn(CFile, 'CONTROLTYPE = RESET');
-  WriteLn(CFile, 'CONTROLTYPE = BLTS');
-  WriteLn(CFile, 'CONTROLTYPE = FILES');
-  WriteLn(CFile, 'CONTROLTYPE = NEWS');
+  WriteLn(CFile, 'CONTROLTYPE = RESETALL');
+  WriteLn(CFile, 'CONTROLTYPE = CONTROL');
+  WriteLn(CFile, 'MIXEDCASE = YES');
   Close(CFile);
   If IoResult <> 0 Then;
   End;
@@ -657,6 +657,7 @@ Function ImpMapLink(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boo
     Exit;
   T.AreaId := Config^.GetMsgAreaId(Area);
   T.Area := Area;
+  T.Create := True;                 {an area of a network may not have a message base yet}
   Case Config^.GetMsgType(Area) Of
     EchoMail: T.Kind := mmtEchoMail;
     NetMail: T.Kind := mmtNetMail;
