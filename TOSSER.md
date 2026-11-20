@@ -49,7 +49,7 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    `<hex of the address difference>.<day><n>`, or kept as a packet; then `mkbink queue -O <outbound> -Z <zone> -t <addr>
    -F <flavour> -x`).  Options: `-t` toss only, `-s` scan only, `-b mkbink`.  Tests: `tests/tosstest.py` (outbound checked
    with a built ../mkbink), `tests/scanflagstest.pas` (the flags the scanner reads in JAM, Squish, Merlin).
-   Not done: a high-water mark (every run reads every message of every echo area), packet passwords, `.req`.
+   Not done: a high-water mark (every run reads every message of every echo area), packet passwords.
 3. **Areafix and packet passwords (done)**: netmail to Areafix / AreaMgr (our address) with the system's password (`EchoSys.PWD`) as subject.
    Commands `%LIST %QUERY %UNLINKED %HELP +TAG -TAG` (see original/AREAFIX.TXT), changes `EchoTo` bits in EchoCfg.Mk,
    answer is a netmail back.  Which areas a system may see: `Networks` bitmap against the area's net status.  Requests
@@ -99,7 +99,16 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
      the old names could collide); `{$I+}` in `Log` had switched I/O checking on for the rest of the program.
    * Tests: `tests/tosstest.py` (routes, no route, `!`; three attached files with their actions, a missing file, files that
      arrive, transit), `tests/mailertest.py` (the Routing page saves).
-6. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` file requests.
+6. **File requests, send side (done; the plan is `FREQ-PLAN.md`)**: a local netmail with the file request attribute for a system we
+   call directly (its address is the destination) is not packed.  Its subject names the files, blank separated, with `!password`
+   (6 characters at most, FTS-0006) after the name it is for; they are added to the system's `.req` in the BSO outbound
+   (`mkbink queue -R`, which writes `name !password` lines, CR LF, no duplicates, and makes the mailer call), the netmail is
+   marked sent (and killed with Kill/Sent) and the log says so.  Refused, logged and left unsent: a password over 6 characters,
+   a password before any name, a subject without a name, an update request (`+time` / `-time`, not supported yet), more than 20
+   names.  A request for a node behind a route goes out as an ordinary netmail with its flag.  Tests: `tests/tosstest.py`
+   (needs `../mkbink/build/mkbink`), `../mkbink/tests/freqtest.py`.
+   Not done: answering requests (mkbink hook + `mkfreq`), update requests.
+7. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` answering and update requests.
 
 ## Known fixes made on the way
 

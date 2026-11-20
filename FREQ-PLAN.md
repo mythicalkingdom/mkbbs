@@ -160,11 +160,11 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
 ## Phases
 
 1. **Spec and contract** (this document) and the settings keys in mkbink's links file format.  No behaviour yet.
-2. **Send side first** (mkbink part done 2026-11-19, in the mkbink repo, not committed: `queue -R`, `.req` sent and removed, `tests/freqtest.py` 18 checks; the `mktoss` conversion of the netmail is **not started**), because it can be tested end to end with what exists:
+2. **Send side first** (mkbink part done 2026-11-19, in the mkbink repo, not committed: `queue -R`, `.req` sent and removed, `tests/freqtest.py` 18 checks; the `mktoss` conversion of the netmail done 2026-11-19: `FileRequest` in `MKToss.pas`, `tests/tosstest.py` +6 checks; **phase 2 is complete**), because it can be tested end to end with what exists:
    `mkbink queue -R` (request lines, locking, no duplicates) → `mkbink` treats a waiting `.req` as mail and sends it →
    `mktoss` converts the netmail.  Test with two mkbink instances: the second one only logs what the `.req` said (a stub
    hook).
-3. **Receive side in mkbink**: read the `.req`, run the hook, queue the answer, same-session sending, limits, policy keys.
+3. **Receive side in mkbink** (done 2026-11-19 in the mkbink repo, uncommitted: `freq`, `freq-unsecure`, `on-freq`, `freq-max-files`, `freq-max-kb`, `DoFreq`, `tests/freqtest.py` 29 checks; answers are queued and sent at the next call, **not in the same session**: the engine has one batch per session, see mkbink `NOTES.md`): read the `.req`, run the hook, queue the answer, same-session sending, limits, policy keys.
    Test with a stub hook that returns fixed paths.
 4. **`mkfreq`**: area search, magic names, security profile, passwords, limits, notes.  Test on the private copy of the sample
    BBS (its file areas), with all the refusal cases.
@@ -186,8 +186,8 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
 
 ## Open questions
 
-1. **Same-session sending.**  How much of mkbink's session code has to change to look at the outbound again after the `.req`
-   arrives?  (Binkd does it; to be checked in mkbink's session and flow code before phase 3.)
+1. **Same-session sending.**  Answered by looking at the code: the session has one batch (`TransferComplete`), so a second batch
+   (binkd's way) has to be added to the protocol engine.  Left for later; the answer goes with the next call.
 2. **Who writes the answer netmail**, `mktoss` or `mkfreq`?  Proposal: `mkfreq` writes a note file next to the answer and
    `mktoss` posts it, so only one program writes to the message bases.
 3. **Per-name passwords for the files in an area:** is a password per *area* enough, or per file?  Proposal: per magic name and

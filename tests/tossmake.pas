@@ -2,7 +2,7 @@ program tossmake;
 {$mode tp}
 { tossmake: local messages as the BBS writes them (mk's editor): echomail in area 6 and netmail in area 4 }
 uses Dos, MKString, MKGlobT, MKCfgAbs, MKCfgMK, MKMsgAbs, MKOpen;
-var P: AbsMsgPtr; A, B: AddrType; AttachFlag: Boolean;
+var P: AbsMsgPtr; A, B: AddrType; AttachFlag, ReqFlag: Boolean;
 
 procedure Net(Subj: String; Dest: AddrType; Crash, Hold, Priv: Boolean); forward;
 procedure NetF(Subj: String; Dest: AddrType; Attach: Boolean); forward;
@@ -16,7 +16,7 @@ begin
   P^.SetOrig(A); P^.SetDest(Dest);
   P^.SetFrom('Mark May'); P^.SetTo('Someone'); P^.SetSubj(Subj);
   P^.SetDate('11-16-26'); P^.SetTime('14:15');
-  P^.SetPriv(Priv); P^.SetCrash(Crash); P^.SetHold(Hold); P^.SetLocal(True); P^.SetEcho(True); P^.SetFAttach(AttachFlag);
+  P^.SetPriv(Priv); P^.SetCrash(Crash); P^.SetHold(Hold); P^.SetLocal(True); P^.SetEcho(True); P^.SetFAttach(AttachFlag); P^.SetFileReq(ReqFlag);
   P^.DoStringLn('netmail text');
   if P^.WriteMsg <> 0 then begin writeln('write failed'); Halt(1); end;
   if CloseMsgArea(P) then;
@@ -36,7 +36,7 @@ begin
 end;
 
 begin
-  AttachFlag := False;
+  AttachFlag := False; ReqFlag := False;
   Config := New(MKCfgObjPtr, Init); Config^.Load;
   if ParamStr(1) = 'route' then begin
     { netmail for addresses the routes decide: 1:120/5 -> system 2 (hold), 1:120/9 and 3:3/3 -> no route }
@@ -46,6 +46,21 @@ begin
     Net('netmail to 1:120/9', B, False, False, True);
     B.Zone := 3; B.Net := 3; B.Node := 3;
     Net('netmail to 3:3/3', B, False, False, True);
+    Halt(0);
+  end;
+  if ParamStr(1) = 'freq' then begin
+    { file requests (netmail with the file request attribute): to system 2 (1:110/200, direct), refused ones, and one for a node behind system 1 }
+    ReqFlag := True;
+    B.Zone := 1; B.Net := 110; B.Node := 200; B.Point := 0;
+    Net('this.arc !that nodelist.*', B, False, False, True);
+    Net('long.zip !toolong7', B, False, False, True);
+    Net('upd.zip +599634000', B, False, False, True);
+    Net('!pw', B, False, False, True);
+    B.Node := 201;
+    Net('not.direct.zip', B, False, False, True);
+    B.Zone := 2; B.Net := 250; B.Node := 1;
+    Net('routed.zip', B, False, False, True);
+    ReqFlag := False;
     Halt(0);
   end;
   if ParamStr(1) = 'attach' then begin

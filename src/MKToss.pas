@@ -31,6 +31,11 @@ Program MKToss;
        -f   run although the tosser is not switched on (EchoMail > Mailer > Tosser); without it mktoss does nothing then
             and says so (exit status 3), so a cron job or the mailer's hook can call it all the time
 
+     - file requests: a local netmail with the file request attribute for a system we call directly is not packed: its
+       subject names the files ("name !password", 6 characters at most) and they are added to that system's .req
+       (mkbink queue -R); the netmail is marked sent.  Refused and left unsent: a long password, no name, an update
+       request (+/-time).  See FREQ-PLAN.md.
+
      File names given (as the mailer's on-inbound hook does) are ignored: the whole inbound is tossed.  Runs one at a
      time: a second mktoss waits until the first is done (lock file mktoss.lock in the inbound directory).
 
@@ -72,7 +77,7 @@ Var
   Problems: Boolean;
   LogName: String;
   OutDir, SpoolDir, BinkProg: String;
-  Forwarded, Scanned, NetSent: LongInt;
+  Forwarded, Scanned, NetSent, FreqMade: LongInt;
   LastSerial: LongInt;
   DoToss, DoScan: Boolean;
   MailCfg: ^MailerCfgType;
@@ -2329,6 +2334,104 @@ Function RouteFor(Var D: AddrType; Var FlavOv: Byte): Word;
   End;
 
 
+Function FileRequest(M: AbsMsgPtr; Var C: MsgCopy; Sys: Word; Var D: AddrType): Boolean;
+  {A local netmail with the file request attribute for a system we call directly is not packed: its subject names the files
+   (blank separated, "!password" after the name it is for, FTS-0006: 6 characters at most) and they are added to that system's
+   .req in the outbound (mkbink queue -R).  True when the netmail was dealt with: made into requests and marked sent, or
+   refused (it stays unsent and the log says why).  False: not for this treatment (the system is not the destination: the
+   netmail is routed and goes out as it is).}
+  Var
+    A: AddrType;
+    Subj, Tok, Cmd: String;
+    p: Word;
+    N: Word;
+    Names: Array[1..20] Of String[80];
+    Pws: Array[1..20] Of String[12];
+    i: Word;
+    Bad: String;
+    Rc: LongInt;
+
+  Begin
+  FileRequest := False;
+  FillChar(Names, SizeOf(Names), 0);
+  FillChar(Pws, SizeOf(Pws), 0);
+  Config^.GetEchoToAddr(Sys, A);
+  If A.Zone = 0 Then
+    A.Zone := Ours[1].Zone;
+  If Not AddrEqual(A, D) Then
+    Exit;
+  FileRequest := True;
+  Bad := '';
+  N := 0;
+  Subj := StripBoth(C.Subj, ' ') + ' ';
+  While (Length(Subj) > 0) And (Bad = '') Do
+    Begin
+    p := 1;
+    While (p <= Length(Subj)) And (Subj[p] <> ' ') Do
+      Inc(p);
+    Tok := Copy(Subj, 1, p - 1);
+    Subj := StripBoth(Copy(Subj, p + 1, 255), ' ');
+    If Subj <> '' Then
+      Subj := Subj + ' ';
+    If Tok = '' Then
+      Continue;
+    If Tok[1] = '!' Then
+      Begin
+      If N = 0 Then
+        Bad := 'a password (' + Tok + ') comes before any name'
+      Else If Pws[N] <> '' Then
+        Bad := 'two passwords for ' + Names[N]
+      Else If Length(Tok) = 1 Then
+        Bad := 'a ! without a password after ' + Names[N]
+      Else If Length(Tok) > 7 Then
+        Bad := 'the password for ' + Names[N] + ' is longer than 6 characters (FTS-0006)'
+      Else
+        Pws[N] := Copy(Tok, 2, 10);
+      End
+    Else If ((Tok[1] = '+') Or (Tok[1] = '-')) And (Length(Tok) > 1) And (Tok[2] In ['0'..'9']) Then
+      Bad := 'update requests (' + Tok + ') are not supported yet'
+    Else If N >= 20 Then
+      Bad := 'more than 20 names'
+    Else
+      Begin
+      Inc(N);
+      Names[N] := Copy(Tok, 1, 80);
+      Pws[N] := '';
+      End;
+    End;
+  If (Bad = '') And (N = 0) Then
+    Bad := 'the subject names no file';
+  If Bad <> '' Then
+    Begin
+    Log('file request #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ': ' + Bad + ', it stays unsent');
+    Problems := True;
+    Exit;
+    End;
+  Cmd := ShellQuote(BinkPath) + ' queue -O ' + ShellQuote(Copy(OutDir, 1, Length(OutDir) - 1)) + ' -Z ' +
+    Long2Str(Ours[1].Zone) + ' -t ' + AddrStr(A) + ' -R';
+  For i := 1 To N Do
+    Begin
+    Cmd := Cmd + ' ' + ShellQuote(Names[i]);
+    If Pws[i] <> '' Then
+      Cmd := Cmd + ' ' + ShellQuote('!' + Pws[i]);
+    End;
+  Rc := fpSystem(Cmd + ' >/dev/null 2>&1');
+  If Rc <> 0 Then
+    Begin
+    Log('file request #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ': mkbink queue -R failed (status ' + Long2Str(Rc) +
+      '), it stays unsent');
+    Problems := True;
+    Exit;
+    End;
+  Inc(FreqMade);
+  Log('file request #' + Long2Str(M^.GetMsgNum) + ' to ' + AddrStr(D) + ': ' + Long2Str(N) + ' name(s) added to its .req: ' + C.Subj);
+  M^.SetSent(True);
+  M^.ReWriteHdr;
+  If C.KillSent Then
+    M^.DeleteMsg;
+  End;
+
+
 Procedure ScanNetArea(Area: Word);
   {netmail that is not sent and not for us}
   Var
@@ -2345,6 +2448,7 @@ Procedure ScanNetArea(Area: Word);
     i: Word;
     FilesOk: Boolean;
     NewSubj: String;
+    Handled: Boolean;
 
   Begin
   If Not OpenMsgArea(M, Config^.GetMsgAreaId(Area)) Then
@@ -2392,6 +2496,11 @@ Procedure ScanNetArea(Area: Word);
               Flav := FlavourOf(Sys);
             End;
           End;
+        Handled := False;
+        If C.FileReq And (Not C.FAttach) And M^.IsLocal Then
+          Handled := FileRequest(M, C, Sys, D);
+        If Not Handled Then
+          Begin
         Via := '';
         If Not M^.IsLocal Then
           Begin
@@ -2448,6 +2557,7 @@ Procedure ScanNetArea(Area: Word);
           End
         Else
           Problems := True;
+          End;
         CopyFree(C);
         End;
       End;
@@ -2730,7 +2840,7 @@ If (Not Force) And HaveMail And ((MailCfg^.Flags And mcTosser) = 0) Then
   End;
 LockInbound;
 LoadSerial;
-Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0; Areafixes := 0;
+Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0; FreqMade := 0; Areafixes := 0;
 
 Problems := False;
 Dupes.Init;
@@ -2750,7 +2860,7 @@ Dupes.CloseFile;
 Dupes.Done;
 Log('mktoss done: ' + Long2Str(Tossed) + ' tossed, ' + Long2Str(Netmails) + ' netmail, ' + Long2Str(Passed) +
   ' passed through, ' + Long2Str(Dups) + ' duplicates, ' + Long2Str(Bad) + ' bad; ' + Long2Str(Forwarded) +
-  ' passed on, ' + Long2Str(Scanned) + ' scanned, ' + Long2Str(NetSent) + ' netmail sent, ' + Long2Str(Areafixes) +
+  ' passed on, ' + Long2Str(Scanned) + ' scanned, ' + Long2Str(NetSent) + ' netmail sent, ' + Long2Str(FreqMade) + ' file request(s) made, ' + Long2Str(Areafixes) +
   ' areafix');
 If Problems Then
   Halt(2);
