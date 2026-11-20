@@ -27,9 +27,24 @@ configuration, a new hook utility).  They talk through files and one hook comman
   of the binkp login.
 * Its name is the destination's net and node in hex, `.REQ`: for 12/2 it is `000C0002.REQ`.  In the BSO outbound it sits
   with the `.flo`/`.clo` files of that node (in the zone's and point's directory where they apply).
-* Not in scope: update requests with a date, anything else the excerpt of the spec does not define *(decided: passwords are
-  all there is)*.
-* Be strict in what we write (lines end in CR; names as given; no password over 6 characters) and liberal in what we read
+* **Update requests** (the rest of the line format, from the spec text the sysop supplied 2026-11-19): a name may be followed
+  by a sign and a time, `+` or `-` and a UNIX-style decimal number of seconds (UTC).  `+` asks for the files that match the name
+  and are **newer** than that time; `-` for the files that match and are dated **up to and including** it.  The sign is
+  required.  Complete action line:
+
+  ```
+  <filename>[<space>!<password>][<space><+/-><time>]<cr>        e.g.   NEWOPUS.* +599634000
+  ```
+
+  (The spec's example says 1 January 1989 00:00 on the East Coast and "GMT+06"; 599634000 is 05:00 UTC, which is 00:00 at
+  GMT-5.  The number is what counts: seconds since 1970-01-01 UTC.)
+  **Deferred** *(decided 2026-11-19)*: the first version writes and reads only `name [!password]`.  When it is added: the
+  send side takes `+time` / `-time` tokens after the name (and password) in the netmail subject and in `mkbink queue -R`
+  (`-time` must not be read as an option there); the receive side passes the sign and time to the hook as part of the request
+  line, and `mkfreq` compares the file dates.  A line with a sign and time that the first version does not understand is
+  **answered with a NOTE** ("update requests are not supported"), not treated as a plain name.
+* Be strict in what we write (the spec ends a line with CR; we write CR LF, because readers that use ReadLn need the LF and
+  the others skip it; names as given; no password over 6 characters) and liberal in what we read
   (lines end in CR, LF or CRLF; names are not case sensitive; ignore what follows a name or password that we do not
   understand).
 
@@ -145,7 +160,7 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
 ## Phases
 
 1. **Spec and contract** (this document) and the settings keys in mkbink's links file format.  No behaviour yet.
-2. **Send side first**, because it can be tested end to end with what exists:
+2. **Send side first** (mkbink part done 2026-11-19, in the mkbink repo, not committed: `queue -R`, `.req` sent and removed, `tests/freqtest.py` 18 checks; the `mktoss` conversion of the netmail is **not started**), because it can be tested end to end with what exists:
    `mkbink queue -R` (request lines, locking, no duplicates) → `mkbink` treats a waiting `.req` as mail and sends it →
    `mktoss` converts the netmail.  Test with two mkbink instances: the second one only logs what the `.req` said (a stub
    hook).
@@ -181,4 +196,4 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
    unsent `.req` of that node.
 5. **Attach-style outbound** (mkbink's FrontDoor-style mode): the netmail with the request flag is left alone today.  Leave
    it so: file requests are BSO only for now.
-6. **Update requests** (a date after the name) are out of scope unless you have the part of the spec that defines them.
+6. **Update requests** (`+time` / `-time`): spec text now in hand (see the format section); deferred to a later version.
