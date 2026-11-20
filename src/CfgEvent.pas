@@ -99,7 +99,7 @@ Procedure EditEvent(EventNum: Word);
       'What the event does: run a command, or poll / hold / free a link (or *) through the mailer');
     F.At(7, 4, 7, 12);
     F.Show(58);
-    F.AddString('Command:', Cmd, 100, 'The command line (no shell), or the address or * for the mailer actions');
+    F.AddString('Command:', Cmd, 100, 'The command line (no shell); the address or * for the mailer actions; the id of the hub (its map file) for a hub pass');
     F.At(9, 4, 9, 22);
     F.AddChoice('If it was missed:', X.Late, 1, 0, 'Skip|Within minutes|Run|Run per miss',
       'Skip it; run it if at most the minutes below late; run it once however late; run once for each time it was missed');

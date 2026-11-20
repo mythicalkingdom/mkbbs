@@ -179,6 +179,7 @@ Type
     Defined: Boolean;
     Status, Minutes, Days, EL, Forced, Action, Flags, Late, LateMin, LateMax, Timeout: Integer;
     Cmd: String;
+    MapFile: String;                   {a hub pass: the map file of the hub (mkevents)}
     Seen: Boolean;                     {LastDue is valid}
     LastDue: Int64;                    {local seconds: the last occurrence dealt with}
     LastRun: Int64;                    {UNIX time of the last start}
@@ -188,6 +189,8 @@ Type
   TEvJob = Record                      {an occurrence that waits to start}
     N: Integer;
     Due, Expires, Kicked: Int64;
+    NotBefore: Int64;                  {a hub pass that failed waits until then (real time)}
+    Attempt: Integer;                  {0 = the first try}
     Termed: Boolean;
     End;
 
@@ -197,6 +200,7 @@ Type
     Phase: Integer;
     Started, Deadline, TermAt: Int64;
     Result: Integer;
+    Attempt: Integer;
     End;
 
 
@@ -1779,6 +1783,16 @@ Procedure EvLoad;
         Else
           EvBbsDir := F[1];
         End
+      Else If (F.Count >= 3) And (F[0] = 'MAP') Then
+        Begin
+        N := EvField(F, 1);
+        If (N >= 1) And (N <= MaxEv) Then
+          Begin
+          EvDefs[N].MapFile := F[2];
+          For K := 3 To F.Count - 1 Do
+            EvDefs[N].MapFile := EvDefs[N].MapFile + #9 + F[K];
+          End;
+        End
       Else If (F.Count >= 13) And (F[0] = 'EVENT') Then
         Begin
         N := EvField(F, 1);
@@ -1898,9 +1912,54 @@ Function EvName(N: Integer): String;
   EvName := 'event ' + IntToStr(N);
   Case EvDefs[N].Action Of
     1: EvName := EvName + ' (' + EvDefs[N].Cmd + ')';
+    3: EvName := EvName + ' (hub ' + EvDefs[N].Cmd + ')';
     4: EvName := EvName + ' (poll ' + EvDefs[N].Cmd + ')';
     5: EvName := EvName + ' (hold ' + EvDefs[N].Cmd + ')';
     6: EvName := EvName + ' (free ' + EvDefs[N].Cmd + ')';
+  End;
+  End;
+
+
+Function HubSetting(N: Integer; Const Key, Default: String): String;
+  {A word or line of the map file of the hub of event N: "retry 300", "onfail /path/command" ...}
+  Var
+    L: TStringList;
+    i, P: Integer;
+    Line, K: String;
+
+  Begin
+  HubSetting := Default;
+  If (EvDefs[N].MapFile = '') Or (Not FileExists(EvDefs[N].MapFile)) Then
+    Exit;
+  L := TStringList.Create;
+  Try
+    Try
+      L.LoadFromFile(EvDefs[N].MapFile);
+    Except
+      Exit;
+    End;
+    For i := 0 To L.Count - 1 Do
+      Begin
+      Line := L[i];
+      P := Pos(';', Line);
+      If P > 0 Then Line := Copy(Line, 1, P - 1);
+      P := Pos('#', Line);
+      If P > 0 Then Line := Copy(Line, 1, P - 1);
+      Line := Trim(Line);
+      P := Pos(' ', Line);
+      If P = 0 Then P := Pos(#9, Line);
+      If P > 0 Then
+        Begin
+        K := LowerCase(Copy(Line, 1, P - 1));
+        If K = Key Then
+          Begin
+          HubSetting := Trim(Copy(Line, P + 1, MaxInt));
+          Exit;
+          End;
+        End;
+      End;
+  Finally
+    L.Free;
   End;
   End;
 
@@ -1962,10 +2021,85 @@ Procedure EvStartScript(Idx: Integer);
   End;
 
 
+Function HubFailed(Idx: Integer; Rc: Integer): Boolean;
+  {A hub pass (mk -G<id>) failed.  Codes 5 (hub not reached), 6 (login or transfer) and 7 (reply packet refused) are tried
+   again after "retry" seconds (default 300, doubled each time, at most "retry-max", default 3600), up to "retries" times
+   (default 3); then, or for another code, the "onfail" command of the map file runs with the id, the result and the number
+   of tries.  True when a new try is waiting.}
+  Var
+    N, Retries, Wait, RetryMax, Retry, K: Integer;
+    Job: Integer;
+    Cmd: String;
+    P: TStringList;
+    Pid: TPid;
+    Prog: String;
+
+  Begin
+  HubFailed := False;
+  N := EvRuns[Idx].N;
+  Retries := StrToIntDef(HubSetting(N, 'retries', '3'), 3);
+  Retry := StrToIntDef(HubSetting(N, 'retry', '300'), 300);
+  RetryMax := StrToIntDef(HubSetting(N, 'retry-max', '3600'), 3600);
+  If (Rc >= 5) And (Rc <= 7) And (EvRuns[Idx].Attempt < Retries) Then
+    Begin
+    Wait := Retry;
+    For K := 1 To EvRuns[Idx].Attempt Do
+      Wait := Wait * 2;
+    If (Wait > RetryMax) Or (Wait < 1) Then
+      Wait := RetryMax;
+    Job := Length(EvQueue);
+    SetLength(EvQueue, Job + 1);
+    EvQueue[Job].N := N;
+    EvQueue[Job].Due := EvNowLocal;
+    EvQueue[Job].Expires := 0;
+    EvQueue[Job].Kicked := 0;
+    EvQueue[Job].Termed := False;
+    EvQueue[Job].NotBefore := Now_ + Wait;
+    EvQueue[Job].Attempt := EvRuns[Idx].Attempt + 1;
+    Log('events: ' + EvName(N) + ' failed (' + IntToStr(Rc) + '), trying again in ' + IntToStr(Wait) + ' seconds (try ' +
+      IntToStr(EvRuns[Idx].Attempt + 2) + ' of ' + IntToStr(Retries + 1) + ')');
+    HubFailed := True;
+    Exit;
+    End;
+  Log('events: ' + EvName(N) + ' failed (' + IntToStr(Rc) + ') after ' + IntToStr(EvRuns[Idx].Attempt + 1) + ' tr' +
+    Copy('ies', 1, 3 * Ord(EvRuns[Idx].Attempt > 0)) + Copy('y', 1, Ord(EvRuns[Idx].Attempt = 0)));
+  Cmd := HubSetting(N, 'onfail', '');
+  If Cmd <> '' Then
+    Begin
+    P := TStringList.Create;
+    Try
+      SplitCmd(Cmd, P);
+      If P.Count > 0 Then
+        Begin
+        Prog := P[0];
+        P.Delete(0);
+        If (Pos('/', Prog) = 0) And (EvBbsDir <> '') And FileExists(EvBbsDir + Prog) Then
+          Prog := EvBbsDir + Prog
+        Else If Pos('/', Prog) = 0 Then
+          Prog := ResolveProg(Prog);
+        P.Add(Trim(EvDefs[N].Cmd));
+        P.Add(IntToStr(Rc));
+        P.Add(IntToStr(EvRuns[Idx].Attempt + 1));
+        Pid := SpawnEvent(Prog, P, ['MKEVENT=' + IntToStr(N), 'MKRESULT=' + IntToStr(Rc)], True);
+        Log('events: ' + EvName(N) + ': onfail ' + Prog + ' ' + Trim(EvDefs[N].Cmd) + ' ' + IntToStr(Rc));
+        End;
+    Finally
+      P.Free;
+    End;
+    End;
+  End;
+
+
 Procedure EvActionDone(Idx: Integer; Rc: Integer);
   Begin
   EvRuns[Idx].Result := Rc;
   EvRuns[Idx].Pid := 0;
+  If (EvDefs[EvRuns[Idx].N].Action = 3) And (Rc <> 0) And (EvRuns[Idx].Phase = 1) Then
+    If HubFailed(Idx, Rc) Then
+      Begin
+      EvEndRun(Idx);                     {a new try is queued: no events.sh yet}
+      Exit;
+      End;
   If (EvDefs[EvRuns[Idx].N].EL > 0) And (EvRuns[Idx].Phase = 1) Then
     EvStartScript(Idx)
   Else
@@ -1973,7 +2107,7 @@ Procedure EvActionDone(Idx: Integer; Rc: Integer);
   End;
 
 
-Procedure EvStart(N: Integer);
+Procedure EvStart(N: Integer; Attempt: Integer);
   Var
     Idx: Integer;
     P: TStringList;
@@ -1991,6 +2125,7 @@ Procedure EvStart(N: Integer);
   EvRuns[Idx].Deadline := Now_ + Int64(EvTimeout(N)) * 60;
   EvRuns[Idx].TermAt := 0;
   EvRuns[Idx].Result := 0;
+  EvRuns[Idx].Attempt := Attempt;
   Log('events: starting ' + EvName(N) + Copy(' (exclusive: the BBS is closed)', 1, 32 * Ord(EvIsExclusive(N))));
   Case EvDefs[N].Action Of
     1: Begin
@@ -2030,8 +2165,23 @@ Procedure EvStart(N: Integer);
        EvActionDone(Idx, Rc);
        End;
     3: Begin
-       Log('events: ' + EvName(N) + ': hub passes are not available yet');
-       EvActionDone(Idx, 1);
+       If Trim(EvDefs[N].Cmd) = '' Then
+         Begin
+         Log('events: ' + EvName(N) + ' has no hub (the id of its map file)');
+         EvActionDone(Idx, 1);
+         Exit;
+         End;
+       P := TStringList.Create;
+       Try
+         P.Add('-G' + Trim(EvDefs[N].Cmd));
+         Pid := SpawnEvent(MkPath, P, ['MKEVENT=' + IntToStr(N)], True);
+       Finally
+         P.Free;
+       End;
+       If Pid <= 0 Then
+         EvActionDone(Idx, 127)
+       Else
+         EvRuns[Idx].Pid := Pid;
        End;
     Else
       EvActionDone(Idx, 0);
@@ -2149,6 +2299,8 @@ Procedure EventsTick;
           EvQueue[High(EvQueue)].Expires := MKEvent.ExpiresAt(EvDefs[n].Late, EvDefs[n].LateMin, Latest);
           EvQueue[High(EvQueue)].Kicked := 0;
           EvQueue[High(EvQueue)].Termed := False;
+          EvQueue[High(EvQueue)].NotBefore := 0;
+          EvQueue[High(EvQueue)].Attempt := 0;
           End;
         End;
       End;
@@ -2181,7 +2333,9 @@ Procedure EventsTick;
   While (i <= High(EvQueue)) And (Not Stop) Do
     Begin
     n := EvQueue[i].N;
-    If EvIsExclusive(n) Then
+    If EvQueue[i].NotBefore > RealNow Then
+      Inc(i)                                   {a hub pass waiting to try again}
+    Else If EvIsExclusive(n) Then
       Begin
       If (Length(EvRuns) > 0) Then
         Stop := True                           {it waits for the others; nothing behind it starts}
@@ -2211,9 +2365,9 @@ Procedure EventsTick;
         Stop := True
       Else
         Begin
-        Idx := i;
-        Delete(EvQueue, Idx, 1);
-        EvStart(n);
+        Idx := EvQueue[i].Attempt;
+        Delete(EvQueue, i, 1);
+        EvStart(n, Idx);
         Stop := True;
         End;
       End
@@ -2236,8 +2390,9 @@ Procedure EventsTick;
           Stop := True
         Else
           Begin
+          Idx := EvQueue[i].Attempt;
           Delete(EvQueue, i, 1);
-          EvStart(n);
+          EvStart(n, Idx);
           End;
         End;
       End;

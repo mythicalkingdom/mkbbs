@@ -189,9 +189,9 @@ normal ports are not affected.
 The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.  Each event has a time, the days it runs, a status
 (enabled / disabled), and, in `events.mk`, what it does (see `EVENTS-PLAN.md`):
 
-* **Action:** *Command* (a program and its arguments, no shell, at most 100 characters; put longer ones in a script), or *Mailer poll /
-  hold / free* of a link or `*` (every link), which talk to the mailer through its control socket.  The hub pass action is not
-  built yet.
+* **Action:** *Command* (a program and its arguments, no shell, at most 100 characters; put longer ones in a script), *Mailer poll /
+  hold / free* of a link or `*` (every link), which talk to the mailer through its control socket, or *Hub pass* (the command is the
+  id of the hub: `mk -G<id>` is run; a pass that fails with 5, 6 or 7 is tried again as its map file says, see `NETWORKING.md`).
 * **If it was missed** (`mklisten` was down at the time): *Skip*, run *Within N minutes* (default 10), *Run* once however late, or *Run per
   miss* (once for each time it was missed, at most "Most runs", default 5).  What `mklisten` remembers is in `events.run` in the
   BBS directory; delete it and nothing counts as missed.

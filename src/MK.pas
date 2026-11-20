@@ -98,6 +98,7 @@ While i <= ParamCount Do
              UserBaud := SessRate;
            End;
       'S': SessType := Copy(TmpStr,3,10);
+      'D': QwkNetDry := True;       {with -G: a dry run, nothing is sent or changed}
       'G': NetId := Copy(ParamStr(i), 3, 40);   {a pass with a QWK network system (MKQwkNet): no caller}
       'H': SessProxy := True;      {PROXY header first on the connection}
       'Q': QwkMode := True;          {the login of a QWK network system / script: MKQwkLog}

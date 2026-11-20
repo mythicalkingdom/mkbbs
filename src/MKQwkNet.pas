@@ -3,6 +3,14 @@ Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<Remo
 {$I MKB.Def}
 
 {
+     The messages the pass posts from the hub's packet are written down (RemoteId.imp next to the map file: area and message
+     number) and are not put in a reply packet, whatever the last read pointer says: they do not go back to where they came from.
+     An entry is kept 60 days (a last read pointer put back by hand within that time is safe; message numbers of a base that is
+     packed can change, so old entries are not trusted for longer).
+
+     mk -G<RemoteId> -D   a dry run: says what the reply packet would hold (messages per area, from which number on), whether a
+                          reply packet or a packet of the hub is waiting, and changes nothing: no packet, no pointer, no call.
+                          Do this before a pass when the pointers were moved by hand.
      mk -G<RemoteId>      exchanges mail with the QWK system RemoteId (its QWK id, as given) without a caller: the
                           messages that are new to it go into the reply packet (REP) for it, the packet that came
                           from it is posted.  The files are moved by something else (a script, a transfer
@@ -51,12 +59,37 @@ Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<Remo
      Long names and subjects (QWKE) are used in the reply packet and read from the packet.
 
      The exit code: 0 done, 1 no map file, 2 the user is not there (or is not a QWK node), 3 the reply packet could not be made,
-     4 the packet of the system could not be read, 5 the hub could not be reached, 6 the script (login, transfer) failed.
+     4 the packet of the system could not be read, 5 the hub could not be reached, 6 the script (login, transfer) failed,
+     7 the hub did not accept the reply packet (see reply-error and reply-ok below; the packet stays and goes again next time).
+
+     What the hub says after it got the reply packet can tell that it refused it (Synchronet says so for a sub-board that
+     is not there ...): the transcript has the text, and these lines of the map file name what to look for (blank
+     separated words are one text, upper or lower case, up to 8 of each):
+
+         reply-error  not found           any of these in the text = refused
+         reply-ok     unpacked            when there are any, one of them has to be in the text
+
+     Retrying and failing is the business of whoever starts the pass: mklisten, when an event of the BBS has the action
+     "Hub pass" (the id of the hub as its command).  It reads these lines of the map file:
+
+         retries  3                      tries after the first one when the result is 5, 6 or 7 (default 3, 0 = none)
+         retry    300                    seconds before the first new try, doubled each time (default 300)
+         retry-max 3600                  ... at most this many seconds (default 3600)
+         onfail   notify.sh              run when the pass has failed for good (a name without a slash: in the BBS directory);
+                                         arguments: the id, the result, the number of tries
+
+     mk itself ignores these lines.
+
+     Nothing is checked when there are none (the default).  A refused reply packet is not deleted and the pointers are
+     not moved back: nothing new is made until it has gone, so nothing is lost or sent twice.
 }
 
 
 Interface
 
+
+Var
+  QwkNetDry: Boolean;                    {mk -G<id> -D: only say what a pass would send, change nothing}
 
 Function QwkNetPass(RemoteId: String): Integer;
 
@@ -71,10 +104,16 @@ Uses MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
 
 
 Var
+  Ledger: Array[1..30000] Of Int64;     {the messages that came from the hub: Area * 2^32 + number, sorted}
+  NumLedger: LongInt;
+  LedgerSkipped: LongInt;
+  DryArea: Word;
   ConfArea: Array[0..65535] Of Word;     {conference of the system -> area here (0 = none)}
   AreaConf: Array[1..OffAreas] Of LongInt; {area -> conference (-1 = none)}
   Inbound, Outbound, UserName, MapDir: String;
   HubHost, HubProfile, HubScript, HubLogin, HubPass, HubProto, HubLog: String;
+  ReplyErr, ReplyOk: Array[1..8] Of String[80];   {what the hub says after the reply packet: refused / accepted}
+  NumErr, NumOk: Word;
   HubPort: Word;
   SelIdx: Word;
 
@@ -134,6 +173,8 @@ Function LoadMap(Id: String): Boolean;
   HubPass := '';
   HubProto := 'Z';
   HubLog := '';
+  NumErr := 0;
+  NumOk := 0;
   MapDir := Config^.FindBbsFile(Id + '.map');
   FileName := MapDir + Id + '.map';
   If Not FileExist(FileName) Then
@@ -185,6 +226,16 @@ Function LoadMap(Id: String): Boolean;
         HubProto := UpCase(Rest[1])
       Else If Key = 'transcript' Then
         HubLog := Rest
+      Else If (Key = 'reply-error') And (NumErr < 8) And (Rest <> '') Then
+        Begin
+        Inc(NumErr);
+        ReplyErr[NumErr] := Lower(Rest);
+        End
+      Else If (Key = 'reply-ok') And (NumOk < 8) And (Rest <> '') Then
+        Begin
+        Inc(NumOk);
+        ReplyOk[NumOk] := Lower(Rest);
+        End
       Else If Key = 'conf' Then
         Begin
         Conf := Str2Long(ExtractWord(Rest, 1));
@@ -251,6 +302,158 @@ Function PackerNum: Word;
   End;
 
 
+{ ---- the messages that came from the hub are not sent back }
+
+Procedure LedgerSort(Lo, Hi: LongInt);
+  Var
+    I, J: LongInt;
+    Pv, T: Int64;
+
+  Begin
+  I := Lo;
+  J := Hi;
+  Pv := Ledger[(Lo + Hi) Div 2];
+  Repeat
+    While Ledger[I] < Pv Do Inc(I);
+    While Ledger[J] > Pv Do Dec(J);
+    If I <= J Then
+      Begin
+      T := Ledger[I];
+      Ledger[I] := Ledger[J];
+      Ledger[J] := T;
+      Inc(I);
+      Dec(J);
+      End;
+  Until I > J;
+  If Lo < J Then LedgerSort(Lo, J);
+  If I < Hi Then LedgerSort(I, Hi);
+  End;
+
+
+Function LedgerKey(Area: Word; Num: LongInt): Int64;
+  Begin
+  LedgerKey := Int64(Area) * 4294967296 + Num;
+  End;
+
+
+Function DayCount(Ymd: LongInt): LongInt;
+  {days since 0000-03-01 of a date as YYYYMMDD (enough to subtract two of them)}
+  Var
+    Y, M, D: LongInt;
+
+  Begin
+  Y := Ymd Div 10000;
+  M := (Ymd Div 100) Mod 100;
+  D := Ymd Mod 100;
+  If M <= 2 Then
+    Begin
+    Dec(Y);
+    Inc(M, 12);
+    End;
+  DayCount := 365 * Y + Y Div 4 - Y Div 100 + Y Div 400 + (153 * (M - 3) + 2) Div 5 + D;
+  End;
+
+
+Procedure LoadLedger(Id: String);
+  {Id.imp next to the map file: a line "area number day" for every message posted from the packets of the hub (written by the
+   import, MKOffQwk).  Entries older than 60 days are dropped from the file; the newest 30000 are used.}
+  Var
+    F, T: Text;
+    Line, Name: String;
+    A, N, Day, Today: LongInt;
+    P, Q: Word;
+    Y, M, D, W: Word;
+    Dropped: Boolean;
+
+  Begin
+  NumLedger := 0;
+  LedgerSkipped := 0;
+  Name := MapDir + Id + '.imp';
+  Assign(F, Name);
+  Reset(F);
+  If IoResult <> 0 Then
+    Exit;
+  Assign(T, Name + '.new');
+  Rewrite(T);
+  Dropped := False;
+  Dos.GetDate(Y, M, D, W);
+  Today := DayCount(Y * 10000 + M * 100 + D);
+  While Not Eof(F) Do
+    Begin
+    ReadLn(F, Line);
+    P := Pos(' ', Line);
+    If P > 0 Then
+      Begin
+      A := Str2Long(Copy(Line, 1, P - 1));
+      Q := Pos(' ', Copy(Line, P + 1, 40));
+      If Q > 0 Then
+        Begin
+        N := Str2Long(Copy(Line, P + 1, Q - 1));
+        Day := DayCount(Str2Long(Copy(Line, P + Q + 1, 12)));
+        End
+      Else
+        Begin
+        N := Str2Long(Copy(Line, P + 1, 12));
+        Day := Today;
+        End;
+      If (A >= 1) And (A <= OffAreas) And (N > 0) And (Today - Day <= 60) Then
+        Begin
+        WriteLn(T, Line);
+        If NumLedger >= 30000 Then
+          Begin
+          Move(Ledger[2], Ledger[1], (NumLedger - 1) * SizeOf(Int64));     {the oldest goes}
+          Dec(NumLedger);
+          End;
+        Inc(NumLedger);
+        Ledger[NumLedger] := LedgerKey(A, N);
+        End
+      Else
+        Dropped := True;
+      End;
+    End;
+  Close(F);
+  Close(T);
+  If IoResult <> 0 Then;
+  If Dropped Then
+    Begin
+    Erase(F);
+    Rename(T, Name);
+    End
+  Else
+    Erase(T);
+  If IoResult <> 0 Then;
+  If NumLedger > 1 Then
+    LedgerSort(1, NumLedger);
+  End;
+
+
+Function LedgerSkip(Area: Word; MsgNum: LongInt): Boolean;
+  Var
+    Lo, Hi, Mid: LongInt;
+    K: Int64;
+
+  Begin
+  LedgerSkip := False;
+  K := LedgerKey(Area, MsgNum);
+  Lo := 1;
+  Hi := NumLedger;
+  While Lo <= Hi Do
+    Begin
+    Mid := (Lo + Hi) Div 2;
+    If Ledger[Mid] = K Then
+      Begin
+      LedgerSkip := True;
+      Inc(LedgerSkipped);
+      Exit;
+      End
+    Else If Ledger[Mid] < K Then
+      Lo := Mid + 1
+    Else
+      Hi := Mid - 1;
+    End;
+  End;
+
+
 Function DoReply(Id: String): Boolean;
   {the reply packet; False when it could not be made}
   Var
@@ -292,7 +495,12 @@ Function DoReply(Id: String): Boolean;
       P.AreaMax := Config^.GetOffConfMax;
     P.OwnMsgs := True;
     P.CheckUser := False;
+    LoadLedger(Id);
+    OffSkip := LedgerSkip;
     Cont := OffExport(Offline, P, R);
+    OffSkip := Nil;
+    If LedgerSkipped > 0 Then
+      User.DisplayStrLn(Long2Str(LedgerSkipped) + ' message(s) that came from the hub are not sent back');
     If Offline^.ClosePacket <> 0 Then
       Cont := False;
     End;
@@ -318,6 +526,111 @@ Function DoReply(Id: String): Boolean;
     Begin
     User.DisplayStrLn('The reply packet could not be made');
     DoReply := False;
+    End;
+  Dispose(Offline, Done);
+  ChDir(StripTrail(StartUpPath, '/'));
+  If IoResult <> 0 Then;
+  If Length(WorkPath) > 0 Then
+    Begin
+    CleanDir(WithBackSlash(WorkPath));
+    RmDir(StripTrail(WorkPath, '/'));
+    If IoResult <> 0 Then;
+    End;
+  End;
+
+
+{ ---- a dry run: what would the reply packet hold (it is written to StdErr: the standard output of mk is the screen of the caller) }
+
+Procedure DryEv(What: Word; Area: Word; N: LongInt);
+  Begin
+  If What = oeArea Then
+    DryArea := Area
+  Else If What = oeAreaEnd Then
+    If N > 0 Then
+      WriteLn(StdErr, '  area ', Area, ' ', Config^.GetMsgName(Area), ' (conference ', AreaConf[Area], '): ', N,
+        ' message(s) after number ', OffUserLR(Area));
+  End;
+
+
+Function DryRun(Id: String): Integer;
+  {Does what DoReply does up to the packet (the messages are looked at, nothing is written but a work directory that is
+   removed again) and does not move any last read pointer, call the hub or touch a file of the BBS.  mk -G<id> -D}
+  Var
+    Offline: QwkOffPtr;
+    WorkPath, ArcName, Found: String;
+    P: OffDLParams;
+    R: OffDLResult;
+    Cont: Boolean;
+    i, Subscribed: Word;
+
+  Begin
+  DryRun := 0;
+  WriteLn(StdErr, 'Dry run of the pass with ', Id, ': nothing is sent, called, moved or written.');
+  WriteLn(StdErr, 'User ', UserName, '; reply packets would go to ', Outbound, ', packets from the hub come to ', Inbound);
+  If HubHost <> '' Then
+    WriteLn(StdErr, 'Hub ', HubHost, ':', HubPort, ', profile ', HubProfile, ' ', HubScript)
+  Else
+    WriteLn(StdErr, 'No hub: the files are moved by something else');
+  Offline := New(QwkOffPtr, Init);
+  Offline^.SetLink(Id, NetConfOf, NetAreaOf);
+  Offline^.SetQwke(True);
+  ArcName := Offline^.GetArchiveName(0);
+  Found := OffFindNoCase(Outbound, ArcName);
+  If Found <> '' Then
+    Begin
+    WriteLn(StdErr, ArcName, ' is waiting in the outbound directory (', Found, '): it goes first, no new reply packet is made until it has gone.');
+    Dispose(Offline, Done);
+    Exit;
+    End;
+  Found := OffFindNoCase(Inbound, Id + '.qwk');
+  If Found <> '' Then
+    WriteLn(StdErr, 'A packet from the hub is waiting in the inbound directory (', Found, '): the pass would post it before any call.');
+  Subscribed := 0;
+  For i := 1 To OffAreas Do
+    If (AreaConf[i] >= 0) And ((User.GetUserOffline(i) And Config^.GetMsgAllowOffline(i)) Or Config^.GetMsgForceOffline(i)) Then
+      Inc(Subscribed);
+  WriteLn(StdErr, Subscribed, ' area(s) with a conference number are chosen by the user (and so looked at):');
+  WorkPath := CreateTempDir(Config^.GetTempPath);
+  Cont := Length(WorkPath) > 0;
+  If Cont Then
+    Begin
+    Offline^.SetPath(WorkPath);
+    Cont := Offline^.StartPacket = 0;
+    End;
+  If Cont Then
+    Begin
+    P.Sel := NetSel;
+    P.Ev := DryEv;
+    P.MaxMsgs := User.GetUserOffMax;
+    If (P.MaxMsgs = 0) Or (Config^.GetOffMax < P.MaxMsgs) Then
+      P.MaxMsgs := Config^.GetOffMax;
+    P.AreaMax := User.GetUserOffConfMax;
+    If (P.AreaMax = 0) Or (Config^.GetOffConfMax < P.AreaMax) Then
+      P.AreaMax := Config^.GetOffConfMax;
+    P.OwnMsgs := True;
+    P.CheckUser := False;
+    LoadLedger(Id);
+    OffSkip := LedgerSkip;
+    Cont := OffExport(Offline, P, R);
+    OffSkip := Nil;
+    Offline^.ClosePacket;
+    End;
+  If Not Cont Then
+    Begin
+    WriteLn(StdErr, 'The messages could not be looked at.');
+    DryRun := 3;
+    End
+  Else If R.NumMsgs = 0 Then
+    Begin
+    If LedgerSkipped > 0 Then
+      WriteLn(StdErr, LedgerSkipped, ' message(s) that came from the hub are not sent back.');
+    WriteLn(StdErr, 'Nothing new: no reply packet would be made.');
+    End
+  Else
+    Begin
+    If LedgerSkipped > 0 Then
+      WriteLn(StdErr, LedgerSkipped, ' message(s) that came from the hub are not sent back.');
+    WriteLn(StdErr, R.NumMsgs, ' message(s) would go up in ', ArcName, '.  Last read pointers are NOT moved by this run.');
     End;
   Dispose(Offline, Done);
   ChDir(StripTrail(StartUpPath, '/'));
@@ -416,8 +729,41 @@ Function LoadHubScript(Var Text: AnsiString): Boolean;
   End;
 
 
+Function ReplyRefused(Heard: String; Var Why: String): Boolean;
+  {The hub said something after it got the reply packet: did it refuse it?  "reply-error" texts of the map file (any one seen
+   in what the hub said means it did) and "reply-ok" texts (when there are any, one of them has to be seen)}
+  Var
+    L: String;
+    i: Word;
+    Seen: Boolean;
+
+  Begin
+  ReplyRefused := False;
+  L := Lower(Heard);
+  For i := 1 To NumErr Do
+    If Pos(ReplyErr[i], L) > 0 Then
+      Begin
+      Why := 'it said "' + ReplyErr[i] + '"';
+      ReplyRefused := True;
+      Exit;
+      End;
+  If NumOk > 0 Then
+    Begin
+    Seen := False;
+    For i := 1 To NumOk Do
+      If Pos(ReplyOk[i], L) > 0 Then
+        Seen := True;
+    If Not Seen Then
+      Begin
+      Why := 'it did not say "' + ReplyOk[1] + '"' + Copy(' (or another text of reply-ok)', 1, 30 * Ord(NumOk > 1));
+      ReplyRefused := True;
+      End;
+    End;
+  End;
+
+
 Function DoHub(Id: String): Integer;
-  {0 done, 5 not reached, 6 the script failed}
+  {0 done, 5 not reached, 6 the script failed, 7 the hub did not accept the reply packet}
   Var
     S, OldSess: AbsComPtr;
     Err: ShortString;
@@ -429,9 +775,12 @@ Function DoHub(Id: String): Integer;
     OldPort: Word;
     OldRate: LongInt;
     F: File;
+    Refused: Boolean;
+    Why: String;
 
   Begin
   DoHub := 0;
+  Refused := False;
   If OffFindNoCase(Inbound, Id + '.qwk') <> '' Then
     Begin
     User.DisplayStrLn(Id + '.qwk is still in the inbound directory: no call before it is posted');
@@ -491,6 +840,13 @@ Function DoHub(Id: String): Integer;
     Ok := H.Load(Text) And H.Run;
     If Not Ok Then
       User.DisplayStrLn('The call to the hub failed: ' + H.ErrText);
+    If HubSent And (Rep <> '') And ((NumErr > 0) Or (NumOk > 0)) Then
+      If ReplyRefused(H.Heard, Why) Then
+        Begin
+        Refused := True;
+        HubSent := False;                     {the reply packet stays: the next pass sends it again}
+        User.DisplayStrLn('The hub did not accept the reply packet: ' + Why + '; it stays in the outbound directory');
+        End;
     H.Done;
     S^.Hangup;
     Dispose(S, Done);
@@ -525,7 +881,9 @@ Function DoHub(Id: String): Integer;
         Ok := False;
       End;
     If Not Ok Then
-      DoHub := 6;
+      DoHub := 6
+    Else If Refused Then
+      DoHub := 7;
     End;
   CleanDir(WithBackSlash(HubRcvDir));
   RmDir(StripTrail(HubRcvDir, '/'));
@@ -583,7 +941,9 @@ Function DoPacket(Id: String): Boolean;
     ImpO.ReDate := False;
     ImpO.DupeFile := MapDir + Id + '.dup';
     Offline^.SetImportOpts(ImpO);
+    QwkImportLedger := MapDir + Id + '.imp';
     Offline^.ImportPacket;
+    QwkImportLedger := '';
     User.DisplayStrLn(Long2Str(Offline^.GetImported) + ' message(s) posted from ' + Id);
     {the messages just posted are not for the system: its last read goes past them where it can (nothing of
      the area was waiting to be sent, and the new messages follow each other)}
@@ -643,6 +1003,11 @@ Function QwkNetPass(RemoteId: String): Integer;
     Begin
     User.DisplayStrLn('No user ' + UserName + ' with the QWK Node flag');
     QwkNetPass := 2;
+    Exit;
+    End;
+  If QwkNetDry Then
+    Begin
+    QwkNetPass := DryRun(RemoteId);          {nothing else: no WriteUser either}
     Exit;
     End;
   If Not DoReply(RemoteId) Then

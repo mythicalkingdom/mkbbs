@@ -70,6 +70,8 @@ Type HubScriptObj = Object
   LogOpen: Boolean;
   LogF: Text;
   LogLine: String;                     {received text not yet in the transcript}
+  Capturing: Boolean;                  {a transfer up went well: what the hub says afterwards is kept in Heard}
+  Heard: AnsiString;                   {... for the reply of the hub to the reply packet (at most 8000 characters)}
   ErrText: String;
   ErrLine: Word;
   Constructor Init(S: AbsComPtr);
@@ -122,6 +124,8 @@ Constructor HubScriptObj.Init(S: AbsComPtr);
   LogName := '';
   LogOpen := False;
   LogLine := '';
+  Capturing := False;
+  Heard := '';
   ErrText := '';
   ErrLine := 0;
   End;
@@ -252,6 +256,8 @@ Procedure HubScriptObj.Feed(C: Char);
            If Length(Txt) >= MaxTxt Then
              Delete(Txt, 1, 100);
            Txt := Txt + C;
+           If Capturing And (Length(Heard) < 8000) And (C <> #13) Then
+             Heard := Heard + C;
            If LogName <> '' Then
              Begin
              If C = #10 Then
@@ -755,7 +761,14 @@ Function HubScriptObj.Run: Boolean;
       Else If Not Xfer(Cmd = 'upload', Arg(A1)) Then
         Fail('the ' + Cmd + ' did not work')
       Else
+        Begin
         Note('-- ' + Cmd + ' done');
+        If Cmd = 'upload' Then
+          Begin
+          Capturing := True;
+          Heard := '';
+          End;
+        End;
       End
     Else If Cmd = 'set' Then
       SetVar(Arg(A1), Arg(A2))

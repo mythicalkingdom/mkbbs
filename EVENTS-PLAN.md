@@ -112,7 +112,7 @@ involved in finding it; what the script does is the sysop's own.
    changes), `mklisten` ticks, the command and mailer actions, exclusive and overlapping events, the `events.sh` errorlevel script,
    `LastDueU` / `LastRunU` written, log lines.  For tests a hidden clock offset
    (`"events": {"clock": ...}` or an environment variable) so that a test does not wait for real time.
-4. **Hub pass action** together with hub scheduling and failure handling (roadmap items 2 and 7): the hub section of the QWK
+4. **Hub pass action** (DONE 2026-11-20, uncommitted: action 3 runs `mk -G<id>`; the map file has `retries`, `retry`, `retry-max`, `onfail`; `reply-error` / `reply-ok` and exit code 7 for a refused reply packet, which stays; `mkevents` prints the MAP line; tests in `eventlistentest.py` and `hubpasstest.py`; what the hub said after the upload is kept by `MKHubScr` in `Heard`): together with hub scheduling and failure handling (roadmap items 2 and 7): the hub section of the QWK
    configuration holds the settings (retry, back-off, what to do on failure); the event only names the hub and says "when".  Its own small plan before it is built.
 5. **Warning the callers** of an exclusive event: `-T` for `mk` (a caller's time is cut so they are off before it), a message to the nodes before the time.
 6. **mkmon**: an events screen (next run, last run, last result, run now), through a small control file or socket of `mklisten`.

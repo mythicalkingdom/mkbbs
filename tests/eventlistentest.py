@@ -85,7 +85,7 @@ os.chmod(mk_script, 0o755)
 n_port = [24920]
 
 
-def start(name, cfg, clock_secs, port_nodes='1-4', extra=None, run=None):
+def start(name, cfg, clock_secs, port_nodes='1-4', extra=None, run=None, mk=None):
     """mklisten with the events of cfg, the clock showing today at clock_secs (seconds after 00:00 local time)"""
     run = run or os.path.join(cfgpatch.short_dir(), 'r')
     log = os.path.join(work, name + '.log')
@@ -93,7 +93,7 @@ def start(name, cfg, clock_secs, port_nodes='1-4', extra=None, run=None):
     n_port[0] += 1
     ev = {'config': cfg, 'mkevents': os.path.join(build, 'mkevents'), 'interval': 1, 'clock': today + clock_secs, 'closed': 'Closed for maintenance.'}
     ev.update(extra or {})
-    c = {'mk': mk_script, 'rundir': run, 'logfile': log, 'nodes': port_nodes,
+    c = {'mk': mk or mk_script, 'rundir': run, 'logfile': log, 'nodes': port_nodes,
          'ports': [{'port': port, 'type': 'raw', 'bind': '127.0.0.1', 'config': cfg}], 'events': ev}
     cf = os.path.join(work, name + '.json')
     json.dump(c, open(cf, 'w'))
@@ -274,6 +274,47 @@ try:
     check('... the others ended with 0', read(log).count('ended (0)') == 4)
     stop(p)
     srv.close()
+    # ---------------------------------------------------------------- hub passes: mk -G<id>, tried again after a failure, onfail
+    hubdir = os.path.join(work, 'hub')
+    os.makedirs(hubdir)
+    hubmk = os.path.join(work, 'hubmk')
+    open(hubmk, 'w').write('#!/bin/sh\n'
+                           'id=${1#-G}\n'
+                           'd=%s\n'
+                           'n=$(cat "$d/$id.count" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$d/$id.count"\n'
+                           'echo "$(date +%%s) $id try $n" >> "$d/tries.out"\n'
+                           'rc=$(sed -n "${n}p" "$d/$id.codes"); [ -z "$rc" ] && rc=$(tail -n 1 "$d/$id.codes")\n'
+                           'exit $rc\n' % hubdir)
+    os.chmod(hubmk, 0o755)
+    for hid, codes in (('HUBA', '5\n6\n0\n'), ('HUBB', '5\n5\n'), ('HUBC', '1\n'), ('HUBD', '0\n')):
+        open(os.path.join(hubdir, hid + '.codes'), 'w').write(codes)
+    onfail = os.path.join(work, 'onfail.sh')
+    open(onfail, 'w').write('#!/bin/sh\necho "$@" >> %s/onfail.out\n' % hubdir)
+    os.chmod(onfail, 0o755)
+    cfg = make_cfg('s6', {1: dict(action=3, cmd='HUBA'), 2: dict(action=3, cmd='HUBB', el=4), 3: dict(action=3, cmd='HUBC'),
+                          4: dict(action=3, cmd='HUBD')})
+    for hid, extra in (('HUBA', 'retry 1\nretry-max 2\nretries 3\nonfail %s\n' % onfail), ('HUBB', 'retry 1\nretries 1\nonfail %s\n' % onfail),
+                       ('HUBC', 'retries 3\nretry 1\nonfail %s\n' % onfail), ('HUBD', 'retry 1\n')):
+        open(os.path.join(cfg, hid + '.map'), 'w').write('; map\ninbound /tmp\n' + extra)
+    script = os.path.join(cfg, 'events.sh')
+    open(script, 'w').write('#!/bin/sh\necho "$@" >> %s/script.out\n' % hubdir)
+    os.chmod(script, 0o755)
+    p, log, port, run = start('s6', cfg, hms(2, 59, 55), mk=hubmk)
+    check('hub pass: runs mk -G<id> (the id of the map file)', wait(lambda: 'HUBD try 1' in read(os.path.join(hubdir, 'tries.out')), 20))
+    check('... a pass that works (0) is not repeated and gives no onfail', wait(lambda: 'ended (0)' in read(log), 5))
+    check('failed with 5 then 6, then 0: tried again after 1 s and after 2 s (retry-max 2), three tries',
+          wait(lambda: read(os.path.join(hubdir, 'HUBA.count')).strip() == '3', 20) and 'trying again in 1 seconds (try 2 of 4)' in read(log)
+          and 'trying again in 2 seconds (try 3 of 4)' in read(log))
+    check('... it worked in the end: no onfail for it', 'HUBA' not in read(os.path.join(hubdir, 'onfail.out')))
+    check('retries 1 and 5, 5: two tries, then onfail with the id, the result and the number of tries',
+          wait(lambda: 'HUBB 5 2' in read(os.path.join(hubdir, 'onfail.out')), 20) and read(os.path.join(hubdir, 'HUBB.count')).strip() == '2')
+    check('a code that is not retried (1): one try, then onfail at once',
+          wait(lambda: 'HUBC 1 1' in read(os.path.join(hubdir, 'onfail.out')), 5) and read(os.path.join(hubdir, 'HUBC.count')).strip() == '1')
+    check('events.sh (errorlevel 4) is run once, after the last try, with the result 5: "4 2 5"',
+          wait(lambda: read(os.path.join(hubdir, 'script.out')).strip() == '4 2 5', 10))
+    time.sleep(1.5)
+    check('nothing is tried again after the end', read(os.path.join(hubdir, 'HUBA.count')).strip() == '3' and read(os.path.join(hubdir, 'HUBB.count')).strip() == '2')
+    stop(p)
 finally:
     for q in procs:
         if q.poll() is None:

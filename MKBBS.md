@@ -103,6 +103,7 @@ bar (Alt-key shortcuts, `F1` for help, `Esc` to leave).
 | `-U<set>` | character set of the caller: `AUTO`, `CP437`, `UTF8` |
 | `-Q` | the QWK network login (`Login:`, `Password:`, `QWK:`) |
 | `-G<id>` | a pass with the QWK network system `<id>`, no caller |
+| `-D` | with `-G`: a dry run, it says what would be sent and changes nothing |
 | `-C<port>`, `-E<level>`, `-P`, `-R`, `-T<min>`, `-V`, `-Z<baud>` | as in the DOS version: port, exit level, log to printer, reload, minutes to the next event, 80x25, forced baud |
 
 ## Setting up a BBS in short

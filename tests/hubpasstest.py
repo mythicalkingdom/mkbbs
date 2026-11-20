@@ -3,7 +3,7 @@
 (mklisten with a "qwk" port: mk -Q), the node is the second one: its pass logs in with the mk profile, sends its reply packet
 (a local message), receives the packet of the hub and posts it, without anybody moving a file.
 usage: hubpasstest.py <build dir> <work dir>"""
-import json, os, shutil, subprocess, sys, time
+import json, os, re, shutil, subprocess, sys, time
 
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, here)
@@ -72,6 +72,17 @@ open(node_ra + '/' + hub_id + '.map', 'w').write(
 cfg = {'mk': build + '/mk', 'rundir': work + '/run', 'logfile': work + '/listen.log', 'workdir': hub_ra, 'nodes': '1-2',
        'ports': [{'port': port, 'type': 'qwk', 'bind': '127.0.0.1', 'config': hub_ra}]}
 json.dump(cfg, open(work + '/listen.json', 'w'))
+# a dry run first: it says what would go, and changes nothing (the real pass below still finds the message, so no pointer moved)
+p = subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+check('dry run (-D): exit 0, says it is a dry run and how many messages would go up from area 6',
+      p.returncode == 0 and 'Dry run' in p.stderr and 'message(s) would go up' in p.stderr and 'area 6 ' in p.stderr, (p.returncode, p.stderr[-400:]))
+dry1 = re.search(r'(\d+) message\(s\) would go up', p.stderr)
+check('... nothing was made: no reply packet in the outbound directory, no transcript, nothing in the inbound directory',
+      not os.listdir(node_ra + '/out') and not os.path.exists(node_ra + '/' + hub_id + '.hub.log') and not os.listdir(node_ra + '/in'),
+      (os.listdir(node_ra + '/out'), os.listdir(node_ra + '/in')))
+p = subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+dry2 = re.search(r'(\d+) message\(s\) would go up', p.stderr)
+check('... and again: the same number (the pointer did not move)', dry1 and dry2 and dry1.group(1) == dry2.group(1) and int(dry1.group(1)) >= 1, p.stderr[-300:])
 lst = subprocess.Popen([build + '/mklisten', '-c', work + '/listen.json'], stdout=subprocess.DEVNULL)
 time.sleep(1)
 before_hub, before_node = dump(hub_env, 6), dump(node_env, 6)
@@ -97,6 +108,43 @@ finally:
     lst.terminate()
     lst.wait()
 check('a second pass: exit 0, nothing is posted twice', p.returncode == 0 and dump(node_env, 6).count('Message from the hub') == n1 and dump(hub_env, 6).count('Message from the node') == 1, p.returncode)
+# the hub says something after the reply packet: "reply-ok" / "reply-error" in the map file decide whether it was accepted
+def pass_(extra_map):
+    mp = node_ra + '/' + hub_id + '.map'
+    base = open(mp).read().split('reply-')[0]
+    open(mp, 'w').write(base + extra_map)
+    l = subprocess.Popen([build + '/mklisten', '-c', work + '/listen.json'], stdout=subprocess.DEVNULL)
+    time.sleep(1)
+    try:
+        return subprocess.run([build + '/mk', '-L', '-G' + hub_id], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=240, stdin=subprocess.DEVNULL)
+    finally:
+        l.terminate()
+        l.wait()
+
+
+subprocess.run([build + '/postmsg', '6', 'Node Poster', 'All', 'Second from the node', 'written on the node'], env=node_env, capture_output=True, text=True)
+p = pass_('reply-ok zzz-never-said\n')
+reps = [f for f in os.listdir(node_ra + '/out') if f.lower().endswith('.rep')]
+check('a hub that does not say what reply-ok wants: exit 7, the reply packet stays', p.returncode == 7 and reps, (p.returncode, reps, p.stdout[-300:]))
+p = pass_('reply-error zzz-never-said\n')
+reps = [f for f in os.listdir(node_ra + '/out') if f.lower().endswith('.rep')]
+check('nothing of reply-error in what the hub says: accepted, exit 0, the reply packet is gone', p.returncode == 0 and not reps, (p.returncode, reps, p.stdout[-300:]))
+# the messages that came from the hub are not sent back, even when the last read pointer is put behind them
+led = node_ra + '/' + hub_id + '.imp'
+check('the pass wrote down the messages it posted from the hub (MythKing.imp: area and number)', os.path.exists(led) and open(led).read().split()[:1] == ['6'] or os.path.exists(led) and '6 ' in open(led).read(), open(led).read() if os.path.exists(led) else None)
+r = subprocess.run([build + '/setlr', 'Chuck Ebenschweiger', '6', '0'], env=node_env, capture_output=True, text=True)
+p = subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+m1 = re.search(r'(\d+) message\(s\) would go up', p.stderr)
+sk = re.search(r'(\d+) message\(s\) that came from the hub are not sent back', p.stderr)
+check('pointer back at 0: the dry run leaves the messages of the hub out and says how many', m1 and sk and int(sk.group(1)) >= 1, p.stderr[-400:])
+os.rename(led, led + '.off')
+p = subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+m0 = re.search(r'(\d+) message\(s\) would go up', p.stderr)
+check('without the file they would have gone: %s more' % (sk.group(1) if sk else '?'), m0 and m1 and sk and int(m0.group(1)) == int(m1.group(1)) + int(sk.group(1)), p.stderr[-300:])
+os.rename(led + '.off', led)
+open(led, 'a').write('6 4999 20200101\n')               # an entry from years ago
+subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+check('an entry older than 60 days is dropped from the file, the others stay', '20200101' not in open(led).read() and '6 ' in open(led).read(), open(led).read())
 # a hub that is not there
 open(node_ra + '/' + hub_id + '.map', 'a').write('hub 127.0.0.1:1\n')
 p = subprocess.run([build + '/mk', '-L', '-G' + hub_id], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=240, stdin=subprocess.DEVNULL)

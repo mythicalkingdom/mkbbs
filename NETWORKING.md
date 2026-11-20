@@ -134,11 +134,41 @@ Do this on your system when you want to take mail from a hub.
    The pass: makes the reply packet (new messages of the subscribed areas), logs in to the hub, sends the reply packet,
    downloads its packet, and posts it.  Duplicates are skipped.  The packet is kept as `<id>.QWK.old`; the reply file is
    deleted when the hub has it.
+   **Look before you send:** `MK=/bbs/ra mk -G<id> -D` is a dry run.  It prints (on the error output) what the reply packet would
+   hold, area by area and from which message number on, and whether a reply packet or a packet of the hub is waiting.  It makes no
+   packet, moves no pointer, does not call the hub and writes no file of the BBS.  Do it before the first pass, and whenever you
+   moved a last read pointer by hand: everything after a hub user's pointer goes up to the hub, including mail that was
+   imported from it earlier if the pointer was left behind it.
 6. **Schedule it** with cron or a systemd timer (every 15 or 30 minutes is typical).
 7. **Exit codes** (for scripts): 0 done, 1 no map file, 2 the user is missing or is not a QWK node, 3 the reply packet
    could not be made, 4 the hub's packet could not be read, 5 the hub could not be reached, 6 the login or transfer
-   failed.
-8. **Check the transcript** `<id>.hub.log` (next to the map file, unless you named another) when something does not work.
+   failed, 7 the hub did not accept the reply packet (see below).
+8. **Let the BBS schedule it** (instead of cron): in `mkconfig`, Events, make an event for the time (or times: one event
+   each) with the action **Hub pass** and the id of the hub as the command, and run `mklisten` with an `"events"` section (see
+   `MKLISTEN.md`).  A pass that fails with 5, 6 or 7 is tried again: the map file says how often and how soon:
+
+   ```
+   retries   3        # new tries after the first (default 3, 0 = none)
+   retry     300      # seconds before the first new try, doubled each time (default 300)
+   retry-max 3600     # ... at most this long between tries (default 3600)
+   onfail    notify.sh   # run when it has failed for good: <id> <result> <tries>  (in the BBS directory, or a full path)
+   ```
+
+   What the hub says after it got the reply packet can show that it refused it (a sub-board that is not there, for
+   example).  Look in the transcript for the text, and tell the map file:
+
+   ```
+   reply-error  not found      # any of these in what the hub said = refused (up to 8)
+   reply-ok     unpacked       # when there are any, one of these has to be there
+   ```
+
+   **What came from the hub does not go back.**  The messages a pass posts from the hub's packet are written down in
+   `<id>.imp` next to the map file (area, number, day).  They are left out of every reply packet, even when a last read pointer is
+   put back behind them by hand (the dry run says how many it leaves out); entries are dropped after 60 days.  Without this a pointer that
+   lags makes a gate send a newsgroup's own posts back to it.
+   A refused reply packet stays in the outbound directory (exit 7) and goes again with the next pass; nothing new is
+   made before it has gone, so nothing is lost or sent twice.  With neither line nothing is checked.
+9. **Check the transcript** `<id>.hub.log` (next to the map file, unless you named another) when something does not work.
 
 If you move the files yourself (FTP, a different program) leave out the `hub` line: `mk -G<id>` then only reads
 `<id>.QWK` from the inbound directory and writes `<id>.REP` to the outbound directory.

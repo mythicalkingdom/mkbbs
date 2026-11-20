@@ -11,6 +11,10 @@ Program MKEvents;
         EVENT <TAB> n <TAB> status <TAB> minutes <TAB> days <TAB> errorlevel <TAB> forced <TAB> action <TAB> flags <TAB>
               late <TAB> latemin <TAB> latemax <TAB> timeout <TAB> command
 
+     for every event that is not deleted, and, before it, for a hub pass (action 3) its map file:
+
+        MAP <TAB> n <TAB> /directory/ID.map
+
      for every event that is not deleted.  status 1 = enabled, 2 = disabled; minutes = the time of day in minutes (0..1440);
      days = the bit mask (Sunday = 1); forced 0 normal, 1 forced, 2 delayable; the rest as EventExtType (MKGlobT, Events.Mk).
      Exit status 1 when the configuration cannot be loaded.  See EVENTS-PLAN.md.
@@ -53,6 +57,8 @@ If Max > MaxEventExt Then
 For n := 1 To Max Do
   If Config^.GetEventStatus(n) <> esDeleted Then
     Begin
+    If Ext^.Ev[n].Action = eaHubPass Then            {the map file of the hub: its retry settings are read by mklisten}
+      WriteLn('MAP', Tab, n, Tab, Config^.FindBbsFile(Ext^.Ev[n].Cmd + '.map'), Ext^.Ev[n].Cmd, '.map');
     T := Config^.GetEventTime(n);
     WriteLn('EVENT', Tab, n, Tab, Config^.GetEventStatus(n), Tab, Hi(T) * 60 + Lo(T), Tab, Config^.GetEventDays(n), Tab,
       Config^.GetEventEL(n), Tab, Config^.GetEventForced(n), Tab, Ext^.Ev[n].Action, Tab, Ext^.Ev[n].Flags, Tab,

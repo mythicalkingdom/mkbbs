@@ -46,6 +46,10 @@ Const
 
 Type OffSelProc = Function(N: Word; Var Area: Word; Var Mode: Byte): Boolean;
 Type OffEvProc = Procedure(What: Word; Area: Word; N: LongInt);
+Type OffSkipProc = Function(Area: Word; MsgNum: LongInt): Boolean;
+
+Const
+  OffSkip: OffSkipProc = Nil;           {when set: a message it says True for is not put in the packet (the last read still goes past it)}
 
 
 Type OffDLParams = Record
@@ -192,6 +196,9 @@ Function OffExport(Offline: AbsOffPtr; Var P: OffDLParams; Var R: OffDLResult): 
               End;
             If FromYou And (Not P.OwnMsgs) Then
               MsgOk := False;
+            If MsgOk And Assigned(OffSkip) Then
+              If OffSkip(Area, Num) Then
+                MsgOk := False;
             If MsgOk Then
               Begin
               If Not Offline^.AddMsg(CMsg^, Area, ToYou) Then

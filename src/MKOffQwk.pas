@@ -58,6 +58,10 @@ Type QwkIdxArray = Array[1..MaxQwkMsgs] Of QwkIdxType;
 Type QwkIdxPtr = ^QwkIdxArray;
 
 
+Const
+  QwkImportLedger: String = '';        {when set: the area and number of every message posted from a packet is added to this file
+                                        (a QWK network pass keeps it so that these messages are not sent back)}
+
 Type QwkConfFunc = Function(N: LongInt): LongInt;   {the conference of a message area at the other end (-1 = none)}
 
 
@@ -970,6 +974,27 @@ Function ImpControl(Conf: LongInt; Subj: String): Boolean;
   End;
 
 
+Procedure LedgerAdd(Area: LongInt; Num: LongInt);
+  Var
+    F: Text;
+    Y, M, D, W: Word;
+
+  Begin
+  Assign(F, QwkImportLedger);
+  If FileExist(QwkImportLedger) Then
+    Append(F)
+  Else
+    Rewrite(F);
+  If IoResult = 0 Then
+    Begin
+    Dos.GetDate(Y, M, D, W);
+    WriteLn(F, Area, ' ', Num, ' ', Long2Str(Y * 10000 + M * 100 + D));      {the day: entries are kept 60 days}
+    Close(F);
+    End;
+  If IoResult <> 0 Then;
+  End;
+
+
 Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
   Var
     A: LongInt;
@@ -988,6 +1013,8 @@ Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
                     ImpQI^.ImpFirst[A] := Msg^.GetMsgNum;
                   If Msg^.GetMsgNum > ImpQI^.ImpLast[A] Then
                     ImpQI^.ImpLast[A] := Msg^.GetMsgNum;
+                  If QwkImportLedger <> '' Then
+                    LedgerAdd(A, Msg^.GetMsgNum);
                   End;
                 End;
               End;
