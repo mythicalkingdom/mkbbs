@@ -166,6 +166,8 @@ Do this on your system when you want to take mail from a hub.
    `<id>.imp` next to the map file (area, number, day).  They are left out of every reply packet, even when a last read pointer is
    put back behind them by hand (the dry run says how many it leaves out); entries are dropped after 60 days.  Without this a pointer that
    lags makes a gate send a newsgroup's own posts back to it.
+   (A Synchronet hub says `Invalid Conference 9999` after it unpacks a reply packet with a message for a conference it does not have; with
+   `profile synchronet` that is a `reply-error` by default.)
    A refused reply packet stays in the outbound directory (exit 7) and goes again with the next pass; nothing new is
    made before it has gone, so nothing is lost or sent twice.  With neither line nothing is checked.
 9. **Check the transcript** `<id>.hub.log` (next to the map file, unless you named another) when something does not work.

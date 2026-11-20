@@ -80,7 +80,8 @@ Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<Remo
 
      mk itself ignores these lines.
 
-     Nothing is checked when there are none (the default).  A refused reply packet is not deleted and the pointers are
+     Nothing is checked when there are none, except with "profile synchronet": it says "Invalid Conference <n>" for a message
+     to a conference it does not have (seen on Synchronet 3.19), so that is the default reply-error there.  A refused reply packet is not deleted and the pointers are
      not moved back: nothing new is made until it has gone, so nothing is lost or sent twice.
 }
 
@@ -252,6 +253,11 @@ Function LoadMap(Id: String): Boolean;
     End;
   Close(F);
   If IoResult <> 0 Then;
+  If (Lower(HubProfile) = 'synchronet') And (NumErr = 0) And (NumOk = 0) Then
+    Begin                              {what a Synchronet hub says to a message for a conference it does not have: "Invalid Conference 9999"}
+    NumErr := 1;
+    ReplyErr[1] := 'invalid conference';
+    End;
   LoadMap := True;
   End;
 
