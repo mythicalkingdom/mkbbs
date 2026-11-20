@@ -7,8 +7,8 @@ the listener `MKLISTEN.md`, and for the Fido tosser `TOSSER.md`.  `GETTING-START
 
 ## What a caller gets
 
-* **Logon and users.**  Login by name and password, new user questionnaire, per-user security level and flags, time
-  limits, and a user record with the settings a caller can change.
+* **Logon and users.**  Login by name and password (kept plain, as in the DOS days, or as a hash: `PASSWORDS.md`), new user
+  questionnaire, per-user security level and flags, time limits, and a user record with the settings a caller can change.
 * **Menus and screens.**  Every menu is a text file (`*.mnu`) of commands, each with a key, a security requirement and
   an argument.  Screens are ANSI, AVATAR or plain ASCII files.  The text of every prompt comes from a language file
   (`*.lc`), so a BBS can have several languages.
@@ -57,7 +57,7 @@ caller --- mklisten --- mk (one process per caller) --- files on disk
 | `echocfg.mk` | Fido echo systems and echo areas |
 | `mailer.mk` | mailer settings, links, routes |
 | `bbsconfig.json` | the whole configuration in one JSON file (optional; every setting has a place in it) |
-| `users.bbs`, `lastread.bbs`, `userson.bbs` ... | users, last read pointers, who is online |
+| `users.bbs`, `extusers.bbs`, `lastread.bbs`, `useron.bbs` ... | users, their extended records (including a hashed password), last read pointers, who is online |
 | `*.mnu`, `*.lc`, screens | menus, language files, display files |
 
 `mkcfgcvt` converts a configuration between the formats: MK (1), Remote Access (2), QuickBBS (3), SuperBBS (4) and MK as
@@ -82,6 +82,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
 | `mkqwk`, `mkqwkcfg` | the older offline mail door and its configuration |
+| `mkpwconv` | expands `extusers.bbs` (`-x`) and converts plain passwords to hashes (`-h`); see `PASSWORDS.md` |
 
 The programs that edit (`mkconfig`, `mkmenu`, `mkusered`, `mkdraw`, `mkqwkcfg`) use a full screen text interface with a menu
 bar (Alt-key shortcuts, `F1` for help, `Esc` to leave).
@@ -135,4 +136,5 @@ of the sample BBS, never on the sample itself.
 | `MKBBS.md` | this document |
 | `MKLISTEN.md` | the listener: ports, nodes, monitor, mailer, systemd |
 | `NETWORKING.md` | QWK and Fido networking set-up |
+| `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |

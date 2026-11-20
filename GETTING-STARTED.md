@@ -10,6 +10,7 @@ part has a document with the details; this one does not repeat them.
 | **`MKBBS.md`** | know what the BBS does, the files it uses, the programs, the `mk` options, doors |
 | **`MKLISTEN.md`** | let callers in: ports (Telnet, raw, web socket, QWK, sysop), nodes, the sysop monitor, systemd, TLS |
 | **`NETWORKING.md`** | join networks: QWK (as a hub or a node) and Fido |
+| **`PASSWORDS.md`** | keep passwords plain or as hashes, and convert the user base |
 | **`TOSSER.md`** | understand the Fido tosser: toss, scan, pack, areafix, routing, file attach |
 | `mklisten.example.json` | a starting configuration for the listener |
 
@@ -65,6 +66,8 @@ part has a document with the details; this one does not repeat them.
   after you copy it, run `mklower` and keep the case you use.
 * **One process per caller.**  A crash of one caller does not touch another, and restarting `mklisten` does not hang up
   anybody.
+* **Passwords can be hashed** (an option, MK configurations only; nothing is forced).  `mkpwconv -x` must be run once on a BBS
+  that has an `extusers.bbs` from before: `mk` tells you.  See `PASSWORDS.md`.
 * **The configuration can live in one JSON file** (`bbsconfig.json`, `mkcfgcvt` converts to and from it), handy for
   keeping it under version control.
 * **No modem layer.**  A caller is a network connection.  Baud rates are only emulated (a port can slow the connection

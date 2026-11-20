@@ -3,7 +3,7 @@ program pwusertest;
 {$H+}
 { The password of a user (DoorUser): plain and hashed, saved and read back from the user files.
   pwusertest <dir>   MK=<a private copy of the BBS (extusers.bbs of the new size)>; the users it makes are called PWT-... }
-uses Dos, MKString, MKCfgAbs, MKRCfgMK, MKCfgNew, MKGlobT, MKDoor, MKDos, MKPwd;
+uses Dos, MKString, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKGlobT, MKDoor, MKDos, MKPwd, MKShell;
 
 var Fails: Integer;
 
@@ -31,7 +31,7 @@ begin
   User.ReadUser;
 end;
 
-var Sec: SecType; H: PwHashType; n: LongInt;
+var Sec: SecType; H: PwHashType; n: LongInt; T: Text; L, Doors: String; k: Word;
 begin
   Fails := 0;
   Config := NewMKConfig(True);
@@ -82,6 +82,26 @@ begin
   User.WriteUser;
   Reload('PWT-Hash');
   Check(User.CheckUserPwd('Another One'), 'hash: the change is saved');
+
+  { DOOR.SYS: the 11th line is the password: the word unavailable for a hash, the password for a plain account }
+  ChDir(GetEnv('MK'));
+  Doors := '';
+  Check(WriteDoorSys = 0, 'DOOR.SYS is written');
+  Assign(T, 'door.sys'); Reset(T);
+  k := 0;
+  While Not Eof(T) Do begin ReadLn(T, L); Inc(k); Doors := Doors + '|' + L; end;
+  Close(T);
+  Check(Pos('|unavailable|', Doors) > 0, 'DOOR.SYS (hashed): the password line says unavailable');
+  Check((Pos('Another One', Doors) = 0) and (Pos('ANOTHER ONE', Doors) = 0) and (Pos('|*|', Doors) = 0), 'DOOR.SYS (hashed): neither the password nor the marker');
+  Reload('PWT-Plain');
+  User.SetUserPwd('PLAINDOOR');
+  Check(WriteDoorSys = 0, 'DOOR.SYS is written for a plain account');
+  Assign(T, 'door.sys'); Reset(T);
+  Doors := '';
+  While Not Eof(T) Do begin ReadLn(T, L); Doors := Doors + '|' + L; end;
+  Close(T);
+  Check(Pos('|PLAINDOOR|', Doors) > 0, 'DOOR.SYS (plain): the password as before');
+  Reload('PWT-Hash');
 
   { a hash missing: nobody gets in }
   User.SetUserPwd('*');
