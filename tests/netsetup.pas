@@ -2,8 +2,8 @@ program netsetup;
 {$mode tp}
 {$H+}
 { netsetup <user name> <area> [area ...]   makes the user a QWK node (flag), ZIP packer, the areas in its offline mail,
-  limits as the BBS has them; environment NETSEC=<level> sets the security level (all flags), NETPWD / NETPROT the password and protocol (tests/qwknettest.py).  MK=<config dir> }
-uses Dos, MKString, MKCfgAbs, MKRCfgMK, MKCfgNew, MKName, MKGlobT;
+  limits as the BBS has them; environment NETSEC=<level> sets the security level (all flags), NETPWD / NETPROT the password and protocol (tests/qwknettest.py), NETPWMODE=1 keeps the password as a hash.  MK=<config dir> }
+uses Dos, MKString, MKCfgAbs, MKRCfgMK, MKCfgNew, MKName, MKGlobT, MKPwd;
 
 var N: NameObj; i: Integer; Ok: Boolean; Sec: SecType;
 begin
@@ -18,6 +18,7 @@ begin
   if GetEnv('NETPWD') <> '' then N.SetOffOwn(True);
   N.SetOffMax(2000); N.SetOffConfMax(900);
   for i := 2 to ParamCount do N.SetUserOffline(Str2Long(ParamStr(i)), True);
+  if GetEnv('NETPWMODE') <> '' then PwdMode := Str2Long(GetEnv('NETPWMODE'));   { 1: the password is stored as a hash }
   if GetEnv('NETPWD') <> '' then N.SetPwd(GetEnv('NETPWD'));
   if GetEnv('NETPROT') <> '' then N.SetProt(GetEnv('NETPROT')[1]);
   if GetEnv('NETSEC') <> '' then begin Sec.Level := Str2Long(GetEnv('NETSEC')); Sec.Flags := 255; N.SetSec(Sec); end;

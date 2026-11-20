@@ -24,7 +24,7 @@ Const
 Type
   UserRecord = Record
     Name: String[35];
-    Password: String[15];
+    Password: String[50];
     Handle: String[35];
     HomePhone: String[12];
     Location: String[25];
@@ -458,7 +458,7 @@ Function EditUser: Boolean;
     F.AddString('Name:', UR.Name, 35, 'User name');
     F.At(1, 49, 1, 59);
     F.Hidden;
-    F.AddString('Password:', UR.Password, 15, 'Password (shown as stars)');
+    F.AddString('Password:', UR.Password, NameSearch.PwdMaxLen, 'Password (shown as stars; * is a hash: type a new password to replace it)');
     F.At(2, 3, 2, 11);
     F.AddString('Handle:', UR.Handle, 35, 'Handle');
     F.At(2, 49, 2, 61);

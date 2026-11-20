@@ -53,7 +53,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -68,6 +68,11 @@ build/doortest build/work | grep -E 'FAIL|failures'
 build/pwdtest | grep -E 'FAIL|failures'
 mkdir -p build/work/pwconv
 python3 tests/pwconvtest.py build build/work/pwconv | grep -E '^(ok|FAIL|skip|failures)'
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  rm -rf build/work/pwuser; mkdir -p build/work/pwuser; cp -r bbs/bbsc/ra/. build/work/pwuser/ 2>/dev/null
+  MK=$PWD/build/work/pwuser build/pwusertest | grep -E 'FAIL|failures'
+  python3 tests/pwlogintest.py build build/work/pwlogin | grep -E '^(FAIL|skip|failures)'
+fi
 build/opentest build/work | grep -E 'FAIL|failures'
 build/syntest selftest build/work | grep -E 'FAIL|failures'
 build/teltest | grep -E "FAIL|failures"

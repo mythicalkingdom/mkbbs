@@ -161,6 +161,11 @@ Type AbsUsrObj = Object
   Procedure SetUserCity(CStr: String); Virtual; {Set users city}
   Function  GetUserPwd: String; Virtual; {Get users password}
   Procedure SetUserPwd(PwdStr: String); Virtual; {Set users password}
+  Function  UserPwdIsHashed: Boolean; Virtual; {The password is kept as a hash (MK configurations only)}
+  Function  UserPwdMaxLen: Byte; Virtual; {Longest password to ask for: 15, or 50 when it will be a hash}
+  Function  CheckUserPwd(Typed: String): Boolean; Virtual; {Is this the password?  (plain or hashed; may convert or rehash it)}
+  Function  ChangeUserPwd(Typed: String): Boolean; Virtual; {A new password as typed; False when it cannot be used}
+  Function  GetUserPwdShown: String;     {For doors and displays: the password, or the word unavailable for a hash}
   Function  GetUserDataPhone: String; Virtual; {Get users data phone}
   Procedure SetUserDataPhone(Phone: String); Virtual; {Set users data phone}
   Function  GetUserVoicePhone: String; Virtual; {Get users voice phone}
@@ -1949,6 +1954,40 @@ Function AbsUsrObj.GetUserPwd: String;        {Get users password}
 
 Procedure AbsUsrObj.SetUserPwd(PwdStr: String);{Set users password}
   Begin
+  End;
+
+
+Function AbsUsrObj.UserPwdIsHashed: Boolean;
+  Begin
+  UserPwdIsHashed := False;
+  End;
+
+
+Function AbsUsrObj.UserPwdMaxLen: Byte;
+  Begin
+  UserPwdMaxLen := 15;
+  End;
+
+
+Function AbsUsrObj.CheckUserPwd(Typed: String): Boolean;
+  Begin
+  CheckUserPwd := (Upper(Typed) = Upper(GetUserPwd));
+  End;
+
+
+Function AbsUsrObj.ChangeUserPwd(Typed: String): Boolean;
+  Begin
+  SetUserPwd(Copy(Upper(Typed), 1, 15));
+  ChangeUserPwd := True;
+  End;
+
+
+Function AbsUsrObj.GetUserPwdShown: String;
+  Begin
+  If UserPwdIsHashed Then
+    GetUserPwdShown := 'unavailable'
+  Else
+    GetUserPwdShown := GetUserPwd;
   End;
 
 

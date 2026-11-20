@@ -126,7 +126,7 @@ Procedure BbsDisplayObj.DisplayStr(Var DStr: String);
                 End;
            'A': User.DisplayStr(User.GetUserName);
            'B': User.DisplayStr(User.GetUserCity);
-           'C': User.DisplayStr(User.GetUserPwd);
+           'C': User.DisplayStr(User.GetUserPwdShown);
            'D': User.DisplayStr(User.GetUserDataPhone);
            'E': User.DisplayStr(User.GetUserVoicePhone);
            'F': User.DisplayStr(User.GetUserLastDate);

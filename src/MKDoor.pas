@@ -57,6 +57,7 @@ Type UserInfoType = Record
   ULToday: Word;
   LastStatus: Word;
   AnsiDet: Boolean;
+  PwHash: PwHashType;                   {the hashed password of the user (ExtUsers.Bbs), not in ExitInfo.Bbs}
   End;
 
 
@@ -149,6 +150,11 @@ Type DoorUser = Object
   Procedure SetUserCity(CStr: String); {Set users city}
   Function  GetUserPwd: String;        {Get users password}
   Procedure SetUserPwd(PwdStr: String); {Set users password}
+  Function  UserPwdIsHashed: Boolean;  {The password is kept as a hash (MK configurations only)}
+  Function  UserPwdMaxLen: Byte;       {Longest password to ask for: 15, or 50 when it will be a hash}
+  Function  CheckUserPwd(Typed: String): Boolean; {Is this the password?  (plain or hashed; may convert or rehash it)}
+  Function  ChangeUserPwd(Typed: String): Boolean; {A new password as typed; False when it cannot be used}
+  Function  GetUserPwdShown: String;   {For doors and displays: the password, or unavailable for a hash}
   Function  GetUserDataPhone: String;  {Get users data phone}
   Procedure SetUserDataPhone(Phone: String); {Set users data phone}
   Function  GetUserVoicePhone: String; {Get users voice phone}
@@ -1781,6 +1787,7 @@ Procedure DoorUser.Init;
   New(UserInfo);
   FillChar(UserInfo^.ExitInfo, SizeOf(UserInfo^.ExitInfo), 0);
   FillChar(UserInfo^.Extra, SizeOf(UserInfo^.Extra), 0);
+  PwdHashClear(UserInfo^.PwHash);
   UserInfo^.UserLoaded := False;
   UserInfo^.Ok := True;
   UserInfo^.NotOkReason := 0;
@@ -1856,8 +1863,14 @@ Procedure DoorUser.ReadUser;
        If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
          ExtUsersBad := True
        Else
+       Begin
+       PwdHashClear(UserInfo^.PwHash);
        If LoadFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
-         UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserBaseType), i) = 0 Then;   {only the old part: the hash stays on disk}
+         UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserBaseType), i) = 0 Then;   {the old part: the part of ExitInfo.Bbs}
+       If LoadFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
+         UserInfo^.PwHash, SizeOf(PwHashType), i + SizeOf(ExtUserBaseType)) <> 0 Then
+         PwdHashClear(UserInfo^.PwHash);
+       End;
        End;
     2: Begin
        RaExitPtr := @UserInfo^.ExitInfo;
@@ -1907,8 +1920,12 @@ Procedure DoorUser.WriteUser;
          If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
            ExtUsersBad := True
          Else
+         Begin
          If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
            UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserBaseType), UPos) = 0 Then;
+         If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
+           UserInfo^.PwHash, SizeOf(PwHashType), UPos + SizeOf(ExtUserBaseType)) = 0 Then;
+         End;
          End;
       2: Begin                    {Update UsersXi.Bbs}
          RaExitPtr := @UserInfo^.ExitInfo;
@@ -2153,6 +2170,100 @@ Function DoorUser.GetUserPwd: String;        {Get users password}
 Procedure DoorUser.SetUserPwd(PwdStr: String);{Set users password}
   Begin
   UserInfo^.ExitInfo.User.Pwd := Copy(PwdStr,1,15);
+  End;
+
+
+Function DoorUser.GetUserPwdShown: String;
+  Begin
+  If UserPwdIsHashed Then
+    GetUserPwdShown := 'unavailable'
+  Else
+    GetUserPwdShown := GetUserPwd;
+  End;
+
+
+Function DoorUser.UserPwdIsHashed: Boolean;
+  {"*" in the Pwd field of an MK user: the password is the hash (the block in ExtUsers.Bbs).  Other BBS formats have none.}
+  Begin
+  UserPwdIsHashed := (UserInfo^.BbsType = 1) And (UserInfo^.ExitInfo.User.Pwd = '*');
+  End;
+
+
+Function DoorUser.UserPwdMaxLen: Byte;
+  Begin
+  If (UserInfo^.BbsType = 1) And ((UserInfo^.ExitInfo.User.Pwd = '*') Or (PwdMode <> pmPlain)) Then
+    UserPwdMaxLen := PwdMaxHashed
+  Else
+    UserPwdMaxLen := PwdMaxPlain;
+  End;
+
+
+Function DoorUser.CheckUserPwd(Typed: String): Boolean;
+  Var
+    Good: Boolean;
+    H: PwHashType;
+
+  Begin
+  Good := False;
+  If UserInfo^.BbsType = 1 Then
+    Begin
+    If UserInfo^.ExitInfo.User.Pwd = '*' Then
+      Begin
+      {a hash, nothing else: with no (usable) hash nobody gets in}
+      If PwdHashIsSet(UserInfo^.PwHash) Then
+        Begin
+        Good := PwdHashCheck(UserInfo^.PwHash, Typed);
+        If Good And PwdNeedsRehash(UserInfo^.PwHash) Then
+          If PwdHashSet(H, Typed, (UserInfo^.PwHash.Flags And phUpper) <> 0) Then
+            UserInfo^.PwHash := H;
+        End;
+      CheckUserPwd := Good;
+      Exit;
+      End;
+    End;
+  Good := (Upper(Typed) = Upper(UserInfo^.ExitInfo.User.Pwd));
+  If Good And (UserInfo^.BbsType = 1) And (PwdMode = pmConvert) And (UserInfo^.ExitInfo.User.Pwd <> '') Then
+    Begin
+    {the plain password was compared in upper case: the hash is of the upper case form}
+    If PwdHashSet(H, Typed, True) Then
+      Begin
+      UserInfo^.PwHash := H;
+      UserInfo^.ExitInfo.User.Pwd := '*';
+      End;
+    End;
+  CheckUserPwd := Good;
+  End;
+
+
+Function DoorUser.ChangeUserPwd(Typed: String): Boolean;
+  Var
+    H: PwHashType;
+
+  Begin
+  ChangeUserPwd := False;
+  If Length(Typed) = 0 Then
+    Exit;
+  If (UserInfo^.BbsType = 1) And ((UserInfo^.ExitInfo.User.Pwd = '*') Or (PwdMode <> pmPlain)) Then
+    Begin
+    {a hash, as typed.  "*" is the marker, so it cannot be a password}
+    If (Typed = '*') Or (Length(Typed) > PwdMaxHashed) Then
+      Exit;
+    If PwdHashSet(H, Typed, False) Then
+      Begin
+      UserInfo^.PwHash := H;
+      UserInfo^.ExitInfo.User.Pwd := '*';
+      ChangeUserPwd := True;
+      End;
+    End
+  Else
+    Begin
+    If (Length(Typed) > PwdMaxPlain) Or ((UserInfo^.BbsType = 1) And (Typed = '*')) Then
+      Exit;
+    UserInfo^.ExitInfo.User.Pwd := Upper(Typed);
+    If UserInfo^.BbsType = 1 Then
+      PwdHashClear(UserInfo^.PwHash);
+    ChangeUserPwd := True;
+    End;
   End;
 
 

@@ -15,7 +15,7 @@ Procedure DoLanguage;
 Implementation
 
 
-Uses MKFile, MKString, MKCfgAbs, MKDoor, MKGlobT, MKComAbs, MKLogEnt,
+Uses MKFile, MKString, MKCfgAbs, MKDoor, MKGlobT, MKComAbs, MKLogEnt, MKPwd,
   MKMiscB, MKDos, MKMRead, MKCodes, MKRCfgMK,
     MKVCrt,
   Dos;
@@ -24,6 +24,7 @@ Uses MKFile, MKString, MKCfgAbs, MKDoor, MKGlobT, MKComAbs, MKLogEnt,
 Var
   NewUser: Boolean;
   PassStr: String[50];
+  PassRaw: String[50];                 {what was typed after the name (name;password): the whole text}
   DoorStr: String[15];
 
 
@@ -283,8 +284,10 @@ Procedure GetNewUserPassword;
     TmpStr2: String;
     SectionDone: Boolean;
     POK: Boolean;
+    Hashed: Boolean;
 
   Begin
+  Hashed := False;
   SectionDone := False;
   While ((User.Ok) and (Not SectionDone)) Do
     Begin
@@ -295,10 +298,12 @@ Procedure GetNewUserPassword;
       If BbsDisplay.DisplayBbsFile('password', '') = '' Then;
       User.DisplayNewLine;
       User.DisplayStr(Prompts.GetString(036) + ' ');
-      TmpStr := Upper(User.InputPwd(15));
-      TmpStr := ExtractWord(ParsePass(TmpStr), 1);
+      Hashed := (User.UserPwdMaxLen > PwdMaxPlain);   {kept as a hash: as typed, blanks and all}
+      TmpStr := User.InputPwd(User.UserPwdMaxLen);
+      If Not Hashed Then
+        TmpStr := ExtractWord(ParsePass(Upper(TmpStr)), 1);
       User.DisplayNewLine;
-      If Length(TmpStr) >= Config^.GetMinPwd Then
+      If (Length(TmpStr) >= Config^.GetMinPwd) And (TmpStr <> '*') Then
         POK := True
       Else
         Begin
@@ -307,11 +312,11 @@ Procedure GetNewUserPassword;
         End;
       End;
     User.DisplayStr(Prompts.GetString(037) + ' ');
-    TmpStr2 := Upper(User.InputPwd(15));
-    TmpStr2 := ExtractWord(ParsePass(TmpStr2), 1);
-    If TmpStr = TmpStr2 Then
+    TmpStr2 := User.InputPwd(User.UserPwdMaxLen);
+    If Not Hashed Then
+      TmpStr2 := ExtractWord(ParsePass(Upper(TmpStr2)), 1);
+    If (TmpStr = TmpStr2) And User.ChangeUserPwd(TmpStr) Then
       Begin
-      User.SetUserPwd(TmpStr);
       SectionDone := True;
       End
     Else
@@ -515,6 +520,25 @@ Procedure ProcessNewUser;
   End;
 
 
+Function TryPassword(Raw, Parsed: String): Boolean;
+  {The text as it was typed is tried first (a password of a hashed account may have blanks or a slash), then the first
+   word without a "/door" after it, which is what the DOS version took}
+  Var
+    Hashed, Ok: Boolean;
+
+  Begin
+  Hashed := User.UserPwdIsHashed;
+  Ok := (Length(Raw) > 0) And User.CheckUserPwd(Raw);
+  If Ok Then
+    DoorStr := ''
+  Else
+    Ok := User.CheckUserPwd(Parsed);
+  If Ok And (Not Hashed) And User.UserPwdIsHashed Then
+    LogEntry.WriteEntry('The password of ' + User.GetUserName + ' was converted to a hash');
+  TryPassword := Ok;
+  End;
+
+
 Function CheckPassword: Boolean;
   Var
     PassTries: Word;
@@ -528,8 +552,7 @@ Function CheckPassword: Boolean;
     Begin
     PassStr := ExtractWord(PassStr, 1);
     Inc(PassTries);
-    If Upper(PassStr) = Upper(User.GetUserPwd) Then
-      PassOk := True;
+    PassOk := TryPassword(PassRaw, PassStr);
     If Not PassOk Then
       Begin
       User.DisplayNewLine;
@@ -541,13 +564,14 @@ Function CheckPassword: Boolean;
     User.DisplayNewLine;
     User.DisplayStr(Prompts.GetString(21) + ' ');
     TempPass := User.InputPwd(50);
+    PassRaw := Copy(TempPass, 1, 50);
     PassStr := ExtractWord(ParsePass(TempPass), 1);
-    If Upper(PassStr) = Upper(User.GetUserPwd) Then
+    If TryPassword(PassRaw, PassStr) Then
       PassOk := True
     Else
       Begin
       User.DisplayStrLn(Prompts.GetString(39));
-      LogEntry.WriteEntry('Incorrect Password : ' + PassStr);
+      LogEntry.WriteEntry('Incorrect Password');    {what was typed is not written down}
       End;
     Inc(PassTries);
     User.CheckInput;
@@ -707,6 +731,7 @@ Function ParseName(NameStr: String): String;
     End
   Else
     TmpPass := '';
+  PassRaw := Copy(TmpPass, 1, 50);
   PassStr := ParsePass(TmpPass);
   i := Pos('/', TmpStr);
   If i > 0 Then
@@ -731,6 +756,7 @@ Function AskName: String;
 
   Begin
   PassStr := '';
+  PassRaw := '';
   DoorStr := '';
   TempName := '';
   NameTries := 0;

@@ -32,7 +32,15 @@ Type
   Sha256Digest = Array[0..31] Of Byte;
 
 
+Const
+  pmPlain = 0;                           {passwords stay as they are (the default)}
+  pmHashNew = 1;                         {a new or changed password is stored as a hash}
+  pmConvert = 2;                         {as pmHashNew, and a plain password is converted when its owner logs in}
+  PwdMaxPlain = 15;                      {longest plain password (the Pwd field of Users.Bbs)}
+  PwdMaxHashed = 50;
+
 Var
+  PwdMode: Byte;                         {pmPlain, pmHashNew or pmConvert: MK configurations only}
   PwdIterations: LongInt;                {iterations for a new hash (default 20000)}
   ExtUsersBad: Boolean;                  {set when extusers.bbs was left alone because it has the old record size}
 
@@ -438,4 +446,5 @@ Function ExtUsersFormat(FileName: String): Integer;
 
 Begin
 PwdIterations := 20000;
+PwdMode := pmPlain;
 End.

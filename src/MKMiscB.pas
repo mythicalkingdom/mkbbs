@@ -19,7 +19,7 @@ Procedure DisplayVersion;
 Implementation
 
 
-Uses MKFile, MKString, MKName, MKDoor, MKCfgAbs, MKComAbs, MKQuest,
+Uses MKFile, MKString, MKName, MKDoor, MKCfgAbs, MKComAbs, MKQuest, MKLogEnt, MKPwd,
   MKMRead, MKCodes, MKDos, MKRCfgMK, MKMisc, MKGlobT, MKCFile, CompDt,
     MKVCrt,
   MKScrn, Dos;
@@ -133,29 +133,36 @@ Procedure ChangePwd;
   Var
     TmpStr: String;
     TmpStr2: String;
+    Hashed: Boolean;
 
   Begin
   If User.GetUserScrnClr Then
     User.ClearScreen;
   User.DisplayNewLine;
   User.DisplayStr(Prompts.GetString(110) + ' ');
-  TmpStr := Upper(User.InputPwd(15));
+  TmpStr := User.InputPwd(PwdMaxHashed);
   User.DisplayNewLine;
   User.DisplayNewLine;
-  If TmpStr = Upper(User.GetUserPwd) Then
+  If User.CheckUserPwd(TmpStr) Then
     Begin
+    Hashed := (User.UserPwdMaxLen > PwdMaxPlain);   {a hash keeps the password as typed}
     User.DisplayStr(Prompts.GetString(061) + ' ');
-    TmpStr := Upper(User.InputPwd(15));
+    TmpStr := User.InputPwd(User.UserPwdMaxLen);
     User.DisplayNewLine;
     User.DisplayNewLine;
     User.DisplayStr(Prompts.GetString(037) + ' ');
-    TmpStr2 := Upper(User.InputPwd(15));
+    TmpStr2 := User.InputPwd(User.UserPwdMaxLen);
     User.DisplayNewLine;
     User.DisplayNewLine;
-    If TmpStr = TmpStr2 Then
+    If Not Hashed Then
+      Begin
+      TmpStr := Upper(TmpStr);
+      TmpStr2 := Upper(TmpStr2);
+      End;
+    If (TmpStr = TmpStr2) And (Length(TmpStr) >= Config^.GetMinPwd) And User.ChangeUserPwd(TmpStr) Then
       Begin
       User.DisplayStrLn(Prompts.GetString(191));
-      User.SetUserPwd(TmpStr);
+      LogEntry.WriteEntry('Password changed');
       End
     Else
       Begin

@@ -59,6 +59,15 @@ Function StarStr(S: String): String;
   End;
 
 
+Function HashedOrStars(S: String): String;
+  Begin
+  If S = '*' Then
+    HashedOrStars := '(hashed)'
+  Else
+    HashedOrStars := StarStr(S);
+  End;
+
+
 {------------------------------------------------ the record on the screen}
 
 {------------------------------------------------ lines of text}
@@ -117,7 +126,7 @@ Procedure BuildLines;
 
   Begin
   NLines := 0;
-  Add(' Name:      ' + Pad2(UR.Name, 36) + ' Password:  ' + StarStr(UR.Password));
+  Add(' Name:      ' + Pad2(UR.Name, 36) + ' Password:  ' + HashedOrStars(UR.Password));
   Add(' Handle:    ' + Pad2(UR.Handle, 36) + ' Home Phone: ' + UR.HomePhone);
   Add(' Location:  ' + Pad2(UR.Location, 36) + ' Data Phone: ' + UR.DataPhone);
   Add('');

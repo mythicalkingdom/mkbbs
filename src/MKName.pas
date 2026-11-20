@@ -63,7 +63,8 @@ Type NameObj = Object
   Function  GetFirstDate: String;
   Procedure SetName(Name: String); {set name}
   Procedure SetLocation(Loc: String); {set location}
-  Procedure SetPwd(Pwd: String);
+  Procedure SetPwd(Pwd: String); {a new password as typed by the sysop: a hash in an MK configuration that has them on; "*" leaves a hash alone}
+  Function  PwdMaxLen: Byte; {longest password the editor takes}
   Procedure SetDataPhone(DP: String);
   Procedure SetVoicePhone(VP: String);
   Procedure SetLastDate(LD: String); {set last called date}
@@ -814,8 +815,39 @@ Function  NameObj.GetScrnLen: Word;
   End;
 
 
-Procedure NameObj.SetPwd(Pwd: String);
+Function NameObj.PwdMaxLen: Byte;
   Begin
+  If User^.BbsType = 1 Then
+    PwdMaxLen := PwdMaxHashed
+  Else
+    PwdMaxLen := PwdMaxPlain;
+  End;
+
+
+Procedure NameObj.SetPwd(Pwd: String);
+  Var
+    Cur: String;
+
+  Begin
+  Cur := User^.UserBuffer[User^.CurrentPos].Pwd;
+  If User^.BbsType = 1 Then
+    Begin
+    If Pwd = Cur Then                   {unchanged ("*": the hash stays)}
+      Exit;
+    If Pwd = '*' Then                   {the marker is not a password}
+      Exit;
+    If (Cur = '*') Or ((PwdMode <> pmPlain) And (Length(Pwd) > 0)) Then
+      Begin
+      {the new password is a hash, as typed}
+      If (Length(Pwd) = 0) Or (Length(Pwd) > PwdMaxHashed) Then
+        Exit;
+      If Not User^.ExtraLoaded Then
+        LoadExtra;
+      If PwdHashSet(User^.MKExtra^.PwHash, Pwd, False) Then
+        User^.UserBuffer[User^.CurrentPos].Pwd := '*';
+      Exit;
+      End;
+    End;
   User^.UserBuffer[User^.CurrentPos].Pwd := Pwd;
   End;
 

@@ -196,7 +196,7 @@ Function WriteDoorSys: Word;
     End;
   If Error = 0 Then
     Begin
-    WriteLn(DorFile, User.GetUserPwd);
+    WriteLn(DorFile, User.GetUserPwdShown);
     Error := IoResult;
     End;
   If Error = 0 Then
@@ -354,7 +354,7 @@ Function WriteCallInfo: Word;
     End;
   If Error = 0 Then
     Begin
-    WriteLn(DorFile, User.GetUserPwd);
+    WriteLn(DorFile, User.GetUserPwdShown);
     Error := IoResult;
     End;
   If Error = 0 Then

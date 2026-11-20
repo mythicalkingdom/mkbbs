@@ -54,7 +54,7 @@ Function QwkLogin: Boolean;
       If User.UserFound Then
         Begin
         User.ReadUser;
-        Ok := User.GetUserQwkNode And (Upper(Pwd) = Upper(User.GetUserPwd));
+        Ok := User.GetUserQwkNode And User.CheckUserPwd(Pwd);
         End;
       End;
     If Not Ok Then
