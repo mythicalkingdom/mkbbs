@@ -135,6 +135,20 @@ try:
     real = os.path.join(work, 'real')
     shutil.copytree(sample, real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(real)
+    # two small nodelists in a private directory: Fidonet's zone 1 and a network with a zone of its own (77), both with binkp hosts
+    nl = os.path.join(work, 'nl'); os.makedirs(nl)
+    open(os.path.join(nl, 'nodelist.322'), 'w', newline='').write(
+        ';A Test Nodelist -- Day number 322 : 12345\r\nZone,1,Fidonet,Somewhere,Zed,-Unpublished-,300,CM,XA,IBN\r\n'
+        'Host,110,Test_Net,Town,Hoster,-Unpublished-,300,CM\r\nPvt,201,Quiet,Town,Quiet,-Unpublished-,300,CM\r\n'
+        'Hub,202,Hubby,Town,Hubby,-Unpublished-,300,CM,IBN:127.0.0.1:24851\r\n\x1a')
+    open(os.path.join(nl, 'fsxlist.322'), 'w', newline='').write(
+        ';A Other Nodelist -- Day number 322 : 54321\r\nZone,77,Other_Net,Elsewhere,Zed,-Unpublished-,300,CM\r\n'
+        'Host,7701,Other_Host,Town,Hoster,-Unpublished-,300,CM\r\nNode,1,Far,Town,Faraway,-Unpublished-,300,CM,IBN:far.example.org:24860\r\n\x1a')
+    srcnl = os.path.join(repo, 'bbs', 'bbsd', 'nodelist')
+    cfgpatch.patch(os.path.join(real, 'config.mk'), (repo + '/bbs/').encode(), lambda x: (nl + '/').encode() if x == (srcnl + '/').encode() else x)
+    r = subprocess.run([os.path.join(repo, 'build', 'mknodeidx'), 'nodelist.322', 'fsxlist.322'], env={'PATH': os.environ['PATH'], 'MK': real},
+                       capture_output=True, text=True)
+    check('mknodeidx built an index of two nodelists (zones 1 and 77)', r.returncode == 0)
     ec = os.path.join(real, 'echocfg.mk')
     d = bytearray(open(ec, 'rb').read())
     for off, text in ((0, 'files/in'), (51, 'mail/out')):
@@ -238,6 +252,40 @@ try:
     check('H again releases the link', t.until(lambda: re.search(r'1:110/100\s+Hub B\s+(idle|waiting)', t.screen()) is not None))
     t.send('a')
     check('A with no mail waiting says so', t.until(lambda: 'no link has mail waiting' in t.screen()))
+    t.send('f')
+    check('F opens the request dialog with the chosen link filled in', t.until(lambda: 'Ask for files' in t.screen() and 'System address' in t.screen() and '1:110/100' in t.screen()))
+    t.send('\x1b')
+    check('Esc closes it without asking', t.until(lambda: 'Ask for files' not in t.screen()))
+    t.send('f')
+    t.until(lambda: 'Ask for files' in t.screen())
+    t.send('\r\r\r')
+    t.send('one.zip !pw two.zip +599634000')
+    t.send('\r\r')
+    check('F then Enter through the fields sends REQ: queued and called', t.until(lambda: 'calling 1:110/100' in t.screen() or 'queued' in t.screen(), 10))
+    check('... the dialog is gone', t.until(lambda: 'Ask for files' not in t.screen()))
+    def ask(addr, host, files='x.zip'):
+        t.send('f')
+        t.until(lambda: 'Ask for files' in t.screen())
+        for _ in range(20):
+            t.send('\x7f')                 # clear the address, then type
+        t.send(addr + '\r' + host + '\r\r' + files + '\r\r')
+    ask('77:7701/1', '')
+    check('F with no host for a system in the second nodelist (zone 77): the host comes from the nodelist',
+          t.until(lambda: 'far.example.org:24860' in t.screen(), 10))
+    ask('1:110/202', '')
+    check('... and one of the first nodelist (zone 1)', t.until(lambda: '127.0.0.1:24851' in t.screen(), 10))
+    ask('1:110/201', '')
+    check('a system with no IBN flag: refused, the dialog stays open',
+          t.until(lambda: 'No host for 1:110/201' in t.screen() and 'Ask for files' in t.screen(), 10))
+    t.send('\x1b')
+    t.until(lambda: 'Ask for files' not in t.screen())
+    time.sleep(0.3)
+    ask('1:110/999', '')
+    ok = t.until(lambda: 'not in the nodelist' in t.screen(), 10)
+    if not ok: print(t.screen())
+    check('a system that is not in the nodelist: refused, with the reason', ok)
+    t.send('\x1b')
+    t.until(lambda: 'Ask for files' not in t.screen())
     t.send('q')
     check('Q goes back to the node list', t.until(lambda: 'MK sysop monitor' in t.screen() and 'MkBink' not in t.screen()))
     t.send('q')

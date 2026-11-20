@@ -230,6 +230,19 @@ request for a node behind a route goes out as an ordinary netmail.  A password o
 name, a password after the time, a time of more than 10 digits and an empty subject are refused: the netmail stays unsent and
 the log says why.  (`mkbink queue -R name [!password] [+time|-time] ...` does the same from the command line.)
 
+**From the sysop monitor.**  On the mailer screen of `mkmon`, **F** asks a system for files at once: the address (the chosen link at
+first), a host (empty: the host of the link, else the nodelist's), a session password (empty: none, an unsecure session), the names
+(`name [!password] [+time|-time]`, blank separated) and whether to call now.  The system need not be a link: its host is found in the
+nodelist index (`mknodeidx`; IBN and INA flags; every nodelist in the index is searched and the zone number picks the list, so a network
+with a zone of its own works next to Fidonet; two networks that use the same zone number cannot be told apart).  `mkbink` writes the
+`.req`, calls, and the answer comes back in the same session when both sides offer multiple batches.
+
+**Strangers.**  `accept-unknown yes` (mkconfig: Mailer > Accept unknown) lets a system that is not in the links list call; give it
+no password for an anonymous (unsecure) session, and turn on "unsecure" on File Requests so that it can ask for files, as the anonymous
+file requests of the BBS days.  What it may take is the same list as for everyone else: the areas with Allow file requests, the
+unsecure security profile and the magic names.  What it sends goes to `inbound-unsecure`.  Without `accept-unknown`, mkbink refuses a
+caller that is not a link ("Bad address").
+
 **Answering requests.**
 
 1. The mailer must be on (`EchoMail > Mailer`).

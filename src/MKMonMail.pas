@@ -24,6 +24,7 @@ Unit MKMonMail;   {The mailer (mkbink) screen of the sysop monitor, in the style
             P  call the chosen link now     A  call every link that has mail waiting
             H  hold / release the link      R  look at the outbound again
             L  read the settings again      X  end the chosen session
+            F  ask a system for files (names, host, call now)
             Q or Esc  back to the node list
 
      The screen is drawn from a table of cells and only what changed is sent.  Colours always give the
@@ -39,7 +40,7 @@ Function MailerScreen(RunDir: String): String;
 Implementation
 
 Uses
-  BaseUnix, Sockets, Dos, MKString, MKGlobT, MKComAbs, MKSess, MKCp437;
+  BaseUnix, Sockets, Dos, MKString, MKGlobT, MKComAbs, MKSess, MKCp437, MKNodeHost;
 
 
 Const
@@ -988,10 +989,12 @@ Procedure Draw;
     PutAt(Rows, 30, aKey, 'escan  ');
     PutAt(Rows, 37, aKeyHi, 'L');
     PutAt(Rows, 38, aKey, 'oad settings  ');
-    PutAt(Rows, 52, aKeyHi, 'X');
-    PutAt(Rows, 53, aKey, ' end session  ');
-    PutAt(Rows, 67, aKeyHi, 'Q');
-    PutAt(Rows, 68, aKey, 'uit');
+    PutAt(Rows, 52, aKeyHi, 'F');
+    PutAt(Rows, 53, aKey, 'ile request  ');
+    PutAt(Rows, 66, aKeyHi, 'X');
+    PutAt(Rows, 67, aKey, ' end  ');
+    PutAt(Rows, 73, aKeyHi, 'Q');
+    PutAt(Rows, 74, aKey, 'uit');
     End;
   End;
 
@@ -1044,6 +1047,204 @@ Function GetKey(Ms: Word): Char;
     Exit;
     End;
   GetKey := C;
+  End;
+
+
+Function RequestLine(Const Files: String): String;
+  {The names, "!password" and "+time" / "-time" typed on one line, as the mailer wants them: one request
+   for each name, separated by |}
+  Var
+    i: Word;
+    T, R: String;
+    Up: Boolean;
+
+  Begin
+  R := '';
+  i := 1;
+  While i <= Length(Files) Do
+    Begin
+    While (i <= Length(Files)) And (Files[i] = ' ') Do
+      Inc(i);
+    T := '';
+    While (i <= Length(Files)) And (Files[i] <> ' ') Do
+      Begin
+      T := T + Files[i];
+      Inc(i);
+      End;
+    If T = '' Then
+      Break;
+    Up := (Length(T) >= 2) And (T[1] In ['+', '-']) And (T[2] In ['0'..'9']);
+    If (T[1] = '!') Or Up Then
+      R := R + ' ' + T
+    Else If R = '' Then
+      R := T
+    Else
+      R := R + '|' + T;
+    End;
+  RequestLine := R;
+  End;
+
+
+Function ResolveHost(Const AddrS: String; Var Host: String): Boolean;
+  {The host to call when none was typed: '' stays '' (the mailer uses the link's host) for a link that has one; any
+   other system is looked up in the nodelist (IBN / INA flags).  False, with a message, when there is none.}
+  Var
+    k: Word;
+    A, Cur, Zero: AddrType;
+    Why, H: ShortString;
+    Port: Word;
+
+  Begin
+  ResolveHost := True;
+  If Host <> '' Then
+    Exit;
+  For k := 1 To NumLinks Do
+    If Links[k].Addr = AddrS Then
+      If Links[k].Host <> '' Then
+        Exit;
+  FillChar(Zero, SizeOf(Zero), 0);
+  If Not ParseAddr(MeAddr, Zero, Cur) Then
+    Cur := Zero;
+  If Not ParseAddr(AddrS, Cur, A) Then
+    Begin
+    Msg := AddrS + ' is not an address';
+    MsgUntil := fpTime + 5;
+    ResolveHost := False;
+    Exit;
+    End;
+  If NodelistHost(A, H, Port, Why) Then
+    Begin
+    Host := H;
+    If Port <> 0 Then
+      Host := Host + ':' + Num(Port);
+    Msg := 'Calling ' + Host + ' (from the nodelist)';
+    MsgUntil := fpTime + 5;
+    End
+  Else
+    Begin
+    Msg := 'No host for ' + AddrS + ': ' + Why + '; type one';
+    MsgUntil := fpTime + 6;
+    ResolveHost := False;
+    End;
+  End;
+
+
+Procedure RequestDialog;
+  {F: ask a system for files (FTS-0006): the address (the chosen link at first), a host to call if it is not a link
+   (or empty for the host of the link), the session password (empty for none), the names, and whether to call now}
+  Const
+    NF = 5;
+    Lab: Array[1..NF] Of String[18] =
+      ('System address', 'Host[:port]', 'Session password', 'Files', 'Call now (Y/N)');
+  Var
+    V: Array[1..NF] Of String;
+    Cur, i, W: Word;
+    C: Char;
+    Done: Boolean;
+    T, Show: String;
+    Ack: Boolean;
+
+  Begin
+  For i := 1 To NF Do
+    V[i] := '';
+  If (NumLinks > 0) And (SelLink >= 1) And (SelLink <= NumLinks) Then
+    V[1] := Links[SelLink].Addr;
+  V[5] := 'Y';
+  Cur := 1;
+  Done := False;
+  Ack := False;
+  W := 70;
+  Repeat
+    Draw;
+    Box(7, 4, 17, 4 + W + 1, 'Ask for files');
+    PutAt(8, 6, aDim, 'Names, then !password and +time / -time for each, as in a .req (FTS-0006).');
+    For i := 1 To NF Do
+      Begin
+      PutAt(9 + i, 6, aNorm, Pad(Lab[i], 18));
+      Show := V[i];
+      If i = 3 Then
+        FillAt(9 + i, 25, 25 + Length(Show), aNorm, ' ');
+      If i = 3 Then
+        Begin
+        T := '';
+        While Length(T) < Length(Show) Do
+          T := T + '*';
+        Show := T;
+        End;
+      If Length(Show) > 48 Then
+        Show := Copy(Show, Length(Show) - 47, 48);
+      If i = Cur Then
+        Begin
+        FillAt(9 + i, 25, 25 + 49, aSel, ' ');
+        PutAt(9 + i, 25, aSel, Show + '_');
+        End
+      Else
+        Begin
+        FillAt(9 + i, 25, 25 + 49, aNorm, ' ');
+        PutAt(9 + i, 25, aNorm, Show);
+        End;
+      End;
+    PutAt(15, 6, aDim, 'Host empty: the link''s, else the nodelist''s.  Password empty: none (unsecure).');
+    PutAt(16, 6, aKeyHi, 'Enter');
+    PutAt(16, 11, aNorm, ' next / send    ');
+    PutAt(16, 27, aKeyHi, 'Up/Down');
+    PutAt(16, 34, aNorm, ' field    ');
+    PutAt(16, 44, aKeyHi, 'Esc');
+    PutAt(16, 47, aNorm, ' cancel');
+    Flush;
+    C := GetKey(200);
+    Case C Of
+      #0: ;
+      #27, #24, #3: Done := True;
+      #1: If Cur > 1 Then Dec(Cur);
+      #2, #9: If Cur < NF Then Inc(Cur);
+      #8, #127:
+        If Length(V[Cur]) > 0 Then
+          Delete(V[Cur], Length(V[Cur]), 1);
+      #13, #10:
+        If Cur < NF Then
+          Inc(Cur)
+        Else
+          Ack := True;
+      Else
+        If (C >= ' ') And (Length(V[Cur]) < 150) Then
+          Begin
+          If Cur = 5 Then
+            V[5] := UpCase(C)
+          Else
+            V[Cur] := V[Cur] + C;
+          End;
+    End;
+    If Ack Then
+      Begin
+      Ack := False;
+      If (V[1] = '') Or (RequestLine(V[4]) = '') Then
+        Begin
+        Msg := 'The address and at least one file name are needed';
+        MsgUntil := fpTime + 4;
+        Cur := 1;
+        If V[1] <> '' Then
+          Cur := 4;
+        End
+      Else If Not ResolveHost(V[1], V[2]) Then
+        Cur := 2
+      Else
+        Begin
+        If V[2] = '' Then V[2] := '-';
+        If V[3] = '' Then V[3] := '-';
+        T := '0';
+        If V[5] = 'Y' Then T := '1';
+        SendCmd('REQ ' + V[1] + ' ' + V[2] + ' ' + V[3] + ' ' + T + ' ' + RequestLine(V[4]));
+        Msg := 'Request sent';
+        MsgUntil := fpTime + 6;
+        Done := True;
+        End;
+      End;
+    If Not Gone Then
+      ReadSock;
+  Until Done Or Gone;
+  ForceAll := True;
+  Dirty := True;
   End;
 
 
@@ -1136,6 +1337,7 @@ Function MailerScreen(RunDir: String): String;
                Else
                  SendCmd('HOLD ' + Links[SelLink].Addr);
                End;
+        'F': RequestDialog;
         'R': SendCmd('RESCAN');
         'L': SendCmd('RELOAD');
         'X': If (SelSess >= 1) And (SelSess <= NumSess) Then

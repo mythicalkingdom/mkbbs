@@ -28,7 +28,7 @@ Program MKBinkCfg;
 }
 
 Uses
-  BaseUnix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKNSrch;
+  BaseUnix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKNSrch, MKNodeHost;
 
 
 Const
@@ -46,8 +46,8 @@ Var
   Addrs: Array[1..10] Of AddrType;
   Enabled: Boolean;
   Res: Word;
-  Nodes: NodeListObj;
-  NodesTried, NodesOk: Boolean;
+  NodeNote: Boolean;
+  Why: String;
 
 
 Procedure Fail(Msg: String);
@@ -96,84 +96,6 @@ Function TosserProg: String;
     TosserProg := Copy(Me, 1, p) + 'mktoss'
   Else
     TosserProg := 'mktoss';
-  End;
-
-
-Function NodelistHost(Var A: AddrType; Var Host: String; Var Port: Word): Boolean;
-  {The internet address of a node from its nodelist line: the flags IBN (binkp), IBN:port, IBN:host, IBN:host:port
-   and INA:host.  False when the nodelist has no index, no such node or no host name for it.}
-  Var
-    Line, Flag, Up, P1, P2, P3, INA: String;
-    k, p: Word;
-    HasIbn: Boolean;
-    V: LongInt;
-
-  Begin
-  NodelistHost := False;
-  Host := '';
-  Port := 0;
-  If A.Point <> 0 Then
-    Exit;
-  If Not NodesTried Then
-    Begin
-    NodesTried := True;
-    Nodes.Init;
-    Nodes.Load;
-    NodesOk := Nodes.GetError = 0;
-    If Not NodesOk Then
-      WriteLn(StdErr, 'mkbinkcfg: note: no nodelist index (' + Config^.GetNodeListPath + Config^.GetNodeIdxName +
-        '), links without a host are not looked up (mknodeidx builds it)');
-    End;
-  If Not NodesOk Then
-    Exit;
-  Line := Nodes.NodeStr(A);
-  If Pos('Address Not Found', Line) > 0 Then
-    Exit;
-  HasIbn := False;
-  INA := '';
-  k := 7;
-  Repeat
-    Flag := GetNodeSection(Line, k);
-    Inc(k);
-    If Flag = '' Then
-      Continue;
-    Up := Upper(Flag);
-    p := Pos(':', Up);
-    If p = 0 Then
-      Begin
-      If Up = 'IBN' Then
-        HasIbn := True;
-      Continue;
-      End;
-    P1 := Copy(Up, 1, p - 1);
-    P2 := Copy(Flag, p + 1, 255);
-    P3 := '';
-    p := Pos(':', P2);
-    If p > 0 Then
-      Begin
-      P3 := Copy(P2, p + 1, 255);
-      P2 := Copy(P2, 1, p - 1);
-      End;
-    If P1 = 'INA' Then
-      INA := P2
-    Else If P1 = 'IBN' Then
-      Begin
-      HasIbn := True;
-      Val(P2, V, p);
-      If (p = 0) And (V > 0) And (V < 65536) Then
-        Port := V
-      Else If P2 <> '' Then
-        Begin
-        Host := P2;
-        Val(P3, V, p);
-        If (p = 0) And (V > 0) And (V < 65536) Then
-          Port := V;
-        End;
-      End;
-  Until (Flag = '') Or (k > 60);
-  If Host = '' Then
-    Host := INA;
-  NodelistHost := HasIbn And (Host <> '') And (Pos(' ', Host) = 0) And (Pos('#', Host) = 0);
   End;
 
 
@@ -343,14 +265,21 @@ Procedure Generate;
     FromList := False;
     If (S = '') And ((M^.Links[n].Flags And mlAnswerOnly) = 0) Then
       Begin
-      If NodelistHost(A, S, NPort) Then
+      If NodelistHost(A, S, NPort, Why) Then
         Begin
         FromList := True;
         If Pt = 0 Then
           Pt := NPort;
         End
       Else
+        Begin
         S := '';
+        If (Copy(Why, 1, 11) = 'no nodelist') And Not NodeNote Then
+          Begin
+          NodeNote := True;
+          WriteLn(StdErr, 'mkbinkcfg: note: ' + Why + ', links without a host are not looked up');
+          End;
+        End;
       End;
     If S <> '' Then
       Begin
@@ -422,8 +351,7 @@ Function SameFile(A, B: String): Boolean;
 
 Begin
 Errors := 0;
-NodesTried := False;
-NodesOk := False;
+NodeNote := False;
 OutName := '';
 ToScreen := False;
 Force := False;
