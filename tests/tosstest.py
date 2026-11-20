@@ -373,16 +373,18 @@ if have_mkbink:
     nw = new_in(before, after)
     req = outb + '/006e00c8.req'
     check('file request: the names and the password go to the .req of system 2 (1:110/200), spec format',
-          os.path.exists(req) and open(req, 'rb').read() == b'this.arc !that\r\nnodelist.*\r\n')
+          os.path.exists(req) and open(req, 'rb').read() == b'this.arc !that\r\nnodelist.*\r\nupd.zip +599634000\r\nlate.zip !abc -599634000\r\n')
     check('... the netmail is marked sent and was not packed', re.search(r'subj=this.arc !that nodelist.\* .*sent=TRUE', run('tossdump', '4').stdout) is not None
           and not [m for m in packets_of(nw) if 'subj=this.arc' in m[0]])
-    check('... said in the log, and counted in the summary', 'file request #' in out and '2 name(s) added to its .req' in out and '1 file request(s) made' in out)
+    check('... said in the log, and counted in the summary', 'file request #' in out and '2 name(s) added to its .req' in out and '3 file request(s) made' in out)
     d4 = run('tossdump', '4').stdout
-    check('... a password of more than 6 characters, an update request and a bare password: refused, logged, left unsent',
-          'the password for long.zip is longer than 6 characters' in out and 'update requests (+599634000) are not supported yet' in out
-          and 'a password (!pw) comes before any name' in out
-          and re.search(r'subj=long.zip !toolong7 .*sent=FALSE', d4) is not None and re.search(r'subj=upd.zip \+599634000 .*sent=FALSE', d4) is not None
-          and re.search(r'subj=!pw .*sent=FALSE', d4) is not None and b'long.zip' not in open(req, 'rb').read() and b'upd.zip' not in open(req, 'rb').read())
+    check('... update requests (+time, -time after the name and the password) are accepted',
+          'upd.zip +599634000' in open(req).read() and 'late.zip !abc -599634000' in open(req).read()
+          and re.search(r'subj=upd.zip \+599634000 .*sent=TRUE', d4) is not None and re.search(r'subj=late.zip !abc -599634000 .*sent=TRUE', d4) is not None)
+    check('... refused, logged, left unsent: a password of more than 6 characters, a bare password, a time of more than 10 digits, a password after the time, a time before any name',
+          'the password for long.zip is longer than 6 characters' in out and 'a password (!pw) comes before any name' in out
+          and 'has more than 10 digits' in out and 'must come before the time (+5)' in out and 'an update request (+5) comes before any name' in out
+          and all(re.search(r'subj=%s .*sent=FALSE' % re.escape(x), d4) is not None for x in ('long.zip !toolong7', '!pw', 'toolate.zip +12345678901', 'after.zip +5 !pw', '+5 first.zip')))
     check('... a request for a node that is routed (2:250/1, through system 1) goes out as an ordinary netmail with its flag, and no .req is made for it',
           re.search(r'subj=routed.zip .*sent=TRUE', d4) is not None and not os.path.exists(outb + '/006e00c9.req')
           and not [f for f in os.listdir(outb) if f.endswith('.req') and f != '006e00c8.req'])
@@ -396,8 +398,9 @@ if have_mkbink:
     after = flo_now()
     nw = new_in(before, after)
     pk = [m for m in packets_of(nw) if 'subj=Your file request to 1:110/290' in m[0]]
-    check('a note of mkfreq becomes a netmail to the requester, sent through its system, and the note is removed',
+    check('a note of mkfreq becomes a hold netmail to the requester (picked up, not called for), and the note is removed',
           'file request note for 1:110/200 posted as a netmail' in r.stdout and len(pk) == 1 and 'dest=1:110/200.0' in pk[0][0]
+          and '006e00c8.hlo' in nw and not [x for x in nw.get('006e00c8.flo', []) if x.endswith('.pkt')]
           and not os.listdir(outb + '/mktoss/freq'))
     before_req = open(req, 'rb').read()
     r = run('mktoss', '-b', mkbink)

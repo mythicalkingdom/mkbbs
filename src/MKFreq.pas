@@ -11,7 +11,9 @@ Program MKFreq;
 
        requester      the address of the system that asked (1:110/290)
        secure         the session had a password (unsecure: it had none)
-       request file   one request per line:  name [!password]   (a sign and a time after it is an update request: not yet)
+       request file   one request per line:  name [!password] [+time | -time]
+                      (the time is an update request, UNIX seconds: + = the files that match and are newer than that time,
+                      - = those dated up to and including it; the dates are those of the files)
        answer file    what this program writes for mkbink: tab separated lines
                         SEND<TAB>/absolute/path          send the file, keep it
                         SEND<TAB>/absolute/path<TAB>^    send it, delete it after (a list made for this request)
@@ -31,14 +33,14 @@ Program MKFreq;
        * Otherwise the name (wildcards * and ?, not case sensitive) is looked for in the files of those file areas.
        * Limits: files and kilobytes per request (the Mailer page); what is over is not sent and said so.  mkbink keeps its own
          limits as well.
-       * A name with a slash or a backslash, or that starts with a dot, is not a file name and is refused.
+       * A name with a slash or a backslash, or that starts with a dot, a plus or a minus, is not a file name and is refused.
 
      Output on standard output is the log of mkbink (one line per request, passwords are not written).  Exit status: 0 answered
      (also when nothing was found), 1 the configuration or the files of the request could not be read.
 }
 
 Uses
-  Dos, MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKWild;
+  BaseUnix, Dos, MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKWild;
 
 
 Const
@@ -62,6 +64,9 @@ Var
   MagicName: Array[1..60] Of String[20];
   MagicPath: Array[1..60] Of String[120];
   MagicPwd: Array[1..60] Of String[20];
+  CurSign: Char;                                 {the request line asks for files + newer than, - up to and including, CurTime}
+  CurTime: Int64;
+  NameMatches: Word;                             {files whose name matched, before the date was looked at}
   Report: Array[1..MaxReport] Of String[100];   {what was refused or not found: the text of the netmail}
   NReport: Word;
 
@@ -177,6 +182,29 @@ Function AddFile(Const Path: String; Delete: Boolean; Const Req: String): Boolea
   End;
 
 
+{ the modification time of a file, UNIX seconds (UTC) }
+Function FileTime(Const P: String): Int64;
+  Var
+    St: Stat;
+
+  Begin
+  FileTime := 0;
+  If fpStat(P, St) = 0 Then
+    FileTime := St.st_mtime;
+  End;
+
+
+{ does the date of the file fit the update request of the line (none: always)? }
+Function DateOk(Const P: String): Boolean;
+  Begin
+  DateOk := True;
+  If CurSign = '+' Then
+    DateOk := FileTime(P) > CurTime
+  Else If CurSign = '-' Then
+    DateOk := FileTime(P) <= CurTime;
+  End;
+
+
 { the files of one directory (or the one file) that match Pattern, which may have * and ? in its last part }
 Function AddMatching(Dir, Pattern, Req: String): Word;
   Var
@@ -194,8 +222,12 @@ Function AddMatching(Dir, Pattern, Req: String): Word;
     If (SR.Attr And Directory) = 0 Then
       If DosMatch(Upper(Pattern), Upper(SR.Name)) Then
         Begin
-        Inc(Found);
-        More := AddFile(Dir + SR.Name, False, Req);
+        Inc(NameMatches);
+        If DateOk(Dir + SR.Name) Then
+          Begin
+          Inc(Found);
+          More := AddFile(Dir + SR.Name, False, Req);
+          End;
         End;
     FindNext(SR);
     End;
@@ -352,7 +384,7 @@ Function ValidName(Const N: String): Boolean;
 
   Begin
   ValidName := False;
-  If (N = '') Or (N[1] = '.') Then
+  If (N = '') Or (N[1] = '.') Or (N[1] = '+') Or (N[1] = '-') Then
     Exit;
   For i := 1 To Length(N) Do
     If (N[i] = '/') Or (N[i] = '\') Or (N[i] < ' ') Then
@@ -433,7 +465,8 @@ Procedure DoRequest(Line: String);
     ListPath: String;
     p: Word;
     Dir, Pat: String;
-    Update: Boolean;
+    Digits: Boolean;
+    k: Word;
 
   Begin
   Line := StripBoth(Line, ' ');
@@ -442,21 +475,32 @@ Procedure DoRequest(Line: String);
   Shown := Mask(Line);
   Name := ExtractWord(Line, 1);
   Pwd := '';
-  Update := False;
+  CurSign := ' ';
+  CurTime := 0;
   For i := 2 To WordCount(Line) Do
     Begin
     Tok := ExtractWord(Line, i);
     If Tok[1] = '!' Then
       Pwd := Copy(Tok, 2, 20)
-    Else If ((Tok[1] = '+') Or (Tok[1] = '-')) And (Length(Tok) > 1) Then
-      Update := True;
+    Else If (Tok[1] = '+') Or (Tok[1] = '-') Then
+      Begin
+      Digits := (Length(Tok) >= 2) And (Length(Tok) <= 11);
+      For k := 2 To Length(Tok) Do
+        If Not (Tok[k] In ['0'..'9']) Then
+          Digits := False;
+      If Not Digits Then
+        Begin
+        Note(Name + ': the update request ' + Tok + ' is not a sign and a time (at most 10 digits)');
+        LogLine(Shown + ': a bad update request');
+        Exit;
+        End;
+      CurSign := Tok[1];
+      CurTime := 0;
+      For k := 2 To Length(Tok) Do
+        CurTime := CurTime * 10 + (Ord(Tok[k]) - Ord('0'));
+      End;
     End;
-  If Update Then
-    Begin
-    Note(Name + ': update requests (+ or - and a time) are not supported here: ask for the file by name');
-    LogLine(Shown + ': update request, not supported');
-    Exit;
-    End;
+  NameMatches := 0;
   If Not ValidName(Name) Then
     Begin
     Note(Name + ': not a file name that can be requested');
@@ -498,15 +542,16 @@ Procedure DoRequest(Line: String);
       Dec(p);
     Dir := Copy(Pat, 1, p);
     Found := AddMatching(Dir, Copy(Pat, p + 1, 120), Name);
-    If Found = 0 Then
+    If (Found = 0) And (NameMatches = 0) Then
       Note(Name + ': not found');
-    LogLine(Shown + ': magic name, ' + Long2Str(Found) + ' file(s)');
+    LogLine(Shown + ': magic name, ' + Long2Str(Found) + ' file(s)' + Copy(' (nothing that fits the date)', 1, 29 * Ord((Found = 0) And (NameMatches > 0))));
     Exit;
     End;
   Found := SearchAreas(Name, Name);
-  If Found = 0 Then
+  {an update request that finds nothing new is no problem, and no note: only a name that matches nothing is "not found"}
+  If (Found = 0) And (NameMatches = 0) Then
     Note(Name + ': not found');
-  LogLine(Shown + ': ' + Long2Str(Found) + ' file(s)');
+  LogLine(Shown + ': ' + Long2Str(Found) + ' file(s)' + Copy(' (nothing that fits the date)', 1, 29 * Ord((Found = 0) And (NameMatches > 0))));
   End;
 
 

@@ -1,6 +1,6 @@
 # FTN file requests (FREQ): plan
 
-Status: **built except the deferred parts** (2026-11-19): phases 1-8 done, see the notes at the phases.  Not done: update requests (`+time` / `-time`) and sending the answer in the same session that brought the request (needs a second batch in mkbink's session engine).  Written 2026-11-19.  Decisions marked *(decided)* come from the discussion with the
+Status: **built except the deferred parts** (2026-11-19): phases 1-8 done, see the notes at the phases.  Update requests (`+time` / `-time`) were added afterwards (all three sides).  Not done: sending the answer in the same session that brought the request (needs a second batch in mkbink's session engine).  Written 2026-11-19.  Decisions marked *(decided)* come from the discussion with the
 sysop; the rest are proposals to confirm.
 
 File requests let one system ask another for files by name.  Two directions:
@@ -38,7 +38,7 @@ configuration, a new hook utility).  They talk through files and one hook comman
 
   (The spec's example says 1 January 1989 00:00 on the East Coast and "GMT+06"; 599634000 is 05:00 UTC, which is 00:00 at
   GMT-5.  The number is what counts: seconds since 1970-01-01 UTC.)
-  **Deferred** *(decided 2026-11-19)*: the first version writes and reads only `name [!password]`.  When it is added: the
+  **Done after the first version** *(2026-11-19)*; the text below was the plan for it.  Written first: only `name [!password]`.  When it is added: the
   send side takes `+time` / `-time` tokens after the name (and password) in the netmail subject and in `mkbink queue -R`
   (`-time` must not be read as an option there); the receive side passes the sign and time to the hook as part of the request
   line, and `mkfreq` compares the file dates.  A line with a sign and time that the first version does not understand is
@@ -164,7 +164,7 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
    `mkbink queue -R` (request lines, locking, no duplicates) → `mkbink` treats a waiting `.req` as mail and sends it →
    `mktoss` converts the netmail.  Test with two mkbink instances: the second one only logs what the `.req` said (a stub
    hook).
-3. **Receive side in mkbink** (done 2026-11-19 in the mkbink repo, uncommitted: `freq`, `freq-unsecure`, `on-freq`, `freq-max-files`, `freq-max-kb`, `DoFreq`, `tests/freqtest.py` 29 checks; answers are queued and sent at the next call, **not in the same session**: the engine has one batch per session, see mkbink `NOTES.md`): read the `.req`, run the hook, queue the answer, same-session sending, limits, policy keys.
+3. **Receive side in mkbink** (done 2026-11-19 in the mkbink repo, uncommitted: `freq`, `freq-unsecure`, `on-freq`, `freq-max-files`, `freq-max-kb`, `DoFreq`, `tests/freqtest.py` 29 checks; answers are queued as **hold mail** (decided 2026-11-19: the requester picks them up; we do not call for them), **not in the same session**: the engine has one batch per session, see mkbink `NOTES.md`): read the `.req`, run the hook, queue the answer, same-session sending, limits, policy keys.
    Test with a stub hook that returns fixed paths.
 4. **`mkfreq`** (done: `src/MKFreq.pas`, `tests/mkfreqtest.py` 24 checks; the `faFreq` bit of the area, `GetFileFreq`): area search, magic names, security profile, passwords, limits, notes.  Test on the private copy of the sample
    BBS (its file areas), with all the refusal cases.
@@ -196,4 +196,4 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
    unsent `.req` of that node.
 5. **Attach-style outbound** (mkbink's FrontDoor-style mode): the netmail with the request flag is left alone today.  Leave
    it so: file requests are BSO only for now.
-6. **Update requests** (`+time` / `-time`): spec text now in hand (see the format section); deferred to a later version.
+6. **Update requests** (`+time` / `-time`): done (mkbink `queue -R`, `mktoss` subject parsing, `mkfreq` file dates).

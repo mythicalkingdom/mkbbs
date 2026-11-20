@@ -140,21 +140,33 @@ check('... and not in a session without a password, whatever is given; ordinary 
 check('... no password is in the output', 'pw1' not in r.stdout and 'pw1' not in r.stderr)
 
 # refusals
-r, s, n = ask('1:110/290', 'secure', ['../etc/passwd', 'a/b.zip', '.hidden', 'x\\y.zip', 'bad.zip +599634000', 'other.zip -599634000'])
-check('names with slashes, a leading dot, backslashes: refused; update requests: not supported, said so',
-      s == [] and sum('not a file name' in x for x in n) == 4 and sum('update requests' in x for x in n) == 2)
+r, s, n = ask('1:110/290', 'secure', ['../etc/passwd', 'a/b.zip', '.hidden', 'x\\y.zip', '+5 first.zip'])
+check('names with slashes, a leading dot, backslashes or a sign: refused', s == [] and sum('not a file name' in x for x in n) == 5)
 
-# the note for the netmail (Tell by netmail): only when something could not be sent
-notes = lambda: sorted(os.listdir(outb + '/mktoss/freq')) if os.path.isdir(outb + '/mktoss/freq') else []
-shutil.rmtree(outb + '/mktoss/freq', ignore_errors=True)
-r, s, n = ask('1:110/290', 'secure', ['this.arc'])
-check('nothing to report: no note for the requester', notes() == [])
-r, s, n = ask('1:110/290', 'secure', ['this.arc', 'nothere.zip', 'hidden.zip'])
-nf = notes()
-body = open(outb + '/mktoss/freq/' + nf[0], encoding='latin-1').read() if len(nf) == 1 else ''
-check('something not sent: a note for mktoss to post as a netmail to the requester (TO, SUBJECT, the refusals, how many files go)',
-      len(nf) == 1 and nf[0].endswith('.note') and body.startswith('TO 1:110/290\nSUBJECT Your file request to ') and 'Not sent:' in body
-      and 'nothere.zip: not found' in body and 'hidden.zip: not found' in body and '1 file(s) are sent to you apart from these.' in body and 'this.arc:' not in body)
+# update requests: + = the files that match and are newer than the time, - = those dated up to and including it
+for name, t in (('a1.zip', 1000000000), ('a2.zip', 1100000000), ('a3.zip', 1200000000), ('a4.zip', 1300000000), ('a5.zip', 1400000000)):
+    os.utime(fa + '/pub/' + name, (t, t))
+os.utime(fa + '/nl/nodelist.001', (1000, 1000))
+os.utime(fa + '/nl/nodelist.002', (2000, 2000))
+r, s, n = ask('1:110/290', 'secure', ['a?.zip +1050000000'])
+check('update +: the files newer than the time', names(s) == ['a2.zip', 'a3.zip', 'a4.zip', 'a5.zip'] and n == [])
+r, s, n = ask('1:110/290', 'secure', ['a?.zip +1100000000'])
+check('... newer, not equal: a file dated exactly then is not sent', names(s) == ['a3.zip', 'a4.zip', 'a5.zip'])
+r, s, n = ask('1:110/290', 'secure', ['a?.zip -1100000000'])
+check('update -: the files up to and including the time (a file dated exactly then is sent)', names(s) == ['a1.zip', 'a2.zip'] and n == [])
+r, s, n = ask('1:110/290', 'secure', ['a?.zip +9999999999', 'zzz.zip +5'])
+check('nothing newer is no problem (no file, no note); a name that matches nothing is still "not found"',
+      s == [] and len(n) == 1 and n[0].startswith('zzz.zip: not found') and 'nothing that fits the date' in r.stdout)
+r, s, n = ask('1:110/290', 'secure', ['NODELIST +1500'])
+check('a magic name takes the update request too', names(s) == ['nodelist.002'])
+r, s, n = ask('1:110/290', 'secure', ['SECRETS !pw1 +5', 'this.arc !x -9999999999'])
+check('a password and an update request together (password first)', names(s) == ['private.zip', 'this.arc'])
+r, s, n = ask('1:110/290', 'secure', ['FILES +5'])
+check('FILES (@LIST) is made whatever the request says', len(s) == 1 and s[0][1] == '^')
+r, s, n = ask('1:110/290', 'secure', ['x.zip +12345678901', 'y.zip +12a', 'z.zip -'])
+check('a bad update request is said so (no more than 10 digits)', s == [] and sum('not a sign and a time' in x for x in n) == 3)
+r, s, n = ask('1:110/290', 'secure', ['readme.txt +5', 'this.arc'], eol='\r\n')
+check('update requests and CR LF line ends', names(s) == ['readme.txt', 'this.arc'])
 
 # the request that is not readable
 r = subprocess.run([build + '/mkfreq', '1:110/290', 'secure', work + '/nothere', work + '/ans'], env=env, capture_output=True, text=True)

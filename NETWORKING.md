@@ -216,15 +216,19 @@ systems you link.
 ### File requests (FREQ)
 
 File requests (FTS-0006) let one system ask another for files by name.  A request is a `.req` file with one line per request,
-`name` or `name !password` (the password is 6 characters or fewer).  Update requests (a `+` or `-` and a time after the name)
-are not supported yet.  The plan and the details are in `FREQ-PLAN.md`.
+`name`, `name !password` (the password is 6 characters or fewer), and, after them, an **update request**: `+time` asks for the
+files that match the name and are *newer* than the time, `-time` for those dated *up to and including* it (the time is UNIX
+seconds, up to 10 digits; the dates are those of the files).  Example line: `NEWOPUS.* !pw +599634000`.  The plan and the
+details are in `FREQ-PLAN.md`.
 
 **Asking another system.**  Write a netmail to it with the file request option set (the netmail options of the editor) and
-the names in the subject, blank separated, with `!password` after the name it is for: `THIS.ARC !THAT NODELIST.*`.  `mktoss`
+the names in the subject, blank separated, with `!password` and then `+time` or `-time` after the name they are for:
+`THIS.ARC !THAT NODELIST.* +599634000`.  `mktoss`
 turns it into the names of that system's `.req` in the BSO outbound and marks the netmail sent; the mailer calls the system, and
 the files arrive in the inbound like any file.  This works for a system you call directly (in the echo systems list); a
-request for a node behind a route goes out as an ordinary netmail.  A password of more than 6 characters, a password before a
-name, an empty subject and an update request are refused: the netmail stays unsent and the log says why.
+request for a node behind a route goes out as an ordinary netmail.  A password of more than 6 characters, a password or a time before a
+name, a password after the time, a time of more than 10 digits and an empty subject are refused: the netmail stays unsent and
+the log says why.  (`mkbink queue -R name [!password] [+time|-time] ...` does the same from the command line.)
 
 **Answering requests.**
 
@@ -242,10 +246,12 @@ name, an empty subject and an update request are refused: the netmail stays unse
    system may request.  A name with a password is only given in a session with a password and with `!password` after it.
 6. Restart the mailer (`mklisten` writes the settings with `mkbinkcfg` and `mkbink` runs `mkfreq` for each request that arrives).
 
-What `mkfreq` does with a name: wildcards and upper case are fine; names with a slash, a backslash or a leading dot are refused;
+What `mkfreq` does with a name (an update request filters the matches by their date; a request that finds nothing newer is no
+problem and no note, only a name that matches nothing is "not found"): wildcards and upper case are fine; names with a slash, a backslash or a leading dot are refused;
 a name that nothing matches is "not found" (the same words for a file the system may not have, so a refusal does not tell what
-exists).  Passwords are never written to the log.  The files are queued for the requester and go with the next call (the
-answering system calls the requester when it has a host for it); they are not sent in the session that brought the request.
+exists).  Passwords are never written to the log.  The files are queued for the requester as **hold mail**: they are
+sent when the requester calls to pick them up, and your mailer does not call the requester for them.  (They are not sent in the
+session that brought the request.)  The netmail of "Tell by netmail" is hold mail too.
 
 ### Things that end up in `bad/bad.pkt`
 

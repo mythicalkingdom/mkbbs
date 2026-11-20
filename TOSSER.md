@@ -102,18 +102,20 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
 6. **File requests, send side (done; the plan is `FREQ-PLAN.md`)**: a local netmail with the file request attribute for a system we
    call directly (its address is the destination) is not packed.  Its subject names the files, blank separated, with `!password`
    (6 characters at most, FTS-0006) after the name it is for; they are added to the system's `.req` in the BSO outbound
-   (`mkbink queue -R`, which writes `name !password` lines, CR LF, no duplicates, and makes the mailer call), the netmail is
+   (`mkbink queue -R`, which writes `name [!password] [+time|-time]` lines, CR LF, no duplicates, and makes the mailer call), the netmail is
    marked sent (and killed with Kill/Sent) and the log says so.  Refused, logged and left unsent: a password over 6 characters,
-   a password before any name, a subject without a name, an update request (`+time` / `-time`, not supported yet), more than 20
-   names.  A request for a node behind a route goes out as an ordinary netmail with its flag.  Tests: `tests/tosstest.py`
+   a password or a time before any name, a password after the time, a time of more than 10 digits, a subject without a name, more
+   than 20 names.  A request for a node behind a route goes out as an ordinary netmail with its flag.  Tests: `tests/tosstest.py`
    (needs `../mkbink/build/mkbink`), `../mkbink/tests/freqtest.py`.
    Answering requests: `mkbink` receives the `.req` and runs `mkfreq` (`src/MKFreq.pas`, see `FREQ-PLAN.md`): the requester's
    security profile (its link's, else the global file request user), file areas with the option "Allow file requests" whose
    view and download security it meets, magic names (a file of `NAME path [password]`, `@LIST`), per-name passwords, limits.
    What could not be sent goes into a note in `<outbound>/mktoss/freq/` (setting "Tell by netmail"); `PostFreqNotes` in `mktoss`
-   makes it a netmail to the requester in the scan.  Tests: `tests/mkfreqtest.py`, `tests/freqroundtrip.py` (a real `mkbink` asks the
+   makes it a hold netmail to the requester in the scan (picked up, like the files: the answering system does not call).  Tests: `tests/mkfreqtest.py`, `tests/freqroundtrip.py` (a real `mkbink` asks the
    BBS, the files and the netmail come back).
-   Not done: update requests, and sending the answer in the session that brought the request.
+   Update requests (`+time` / `-time`, UNIX seconds, FTS-0006) are done on all three sides: `mktoss` takes them from the subject,
+   `mkbink queue -R` writes them (`name [!password] [+time|-time]`), `mkfreq` compares the dates of the files (`+` newer, `-` up to
+   and including).  Not done: sending the answer in the session that brought the request.
 7. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` answering and update requests.
 
 ## Known fixes made on the way

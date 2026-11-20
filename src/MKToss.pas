@@ -32,9 +32,10 @@ Program MKToss;
             and says so (exit status 3), so a cron job or the mailer's hook can call it all the time
 
      - file requests: a local netmail with the file request attribute for a system we call directly is not packed: its
-       subject names the files ("name !password", 6 characters at most) and they are added to that system's .req
-       (mkbink queue -R); the netmail is marked sent.  Refused and left unsent: a long password, no name, an update
-       request (+/-time).  See FREQ-PLAN.md.
+       subject names the files ("name [!password] [+time|-time]", 6 characters at most for the password, the time is an
+       update request) and they are added to that system's .req (mkbink queue -R); the netmail is marked sent.
+       Refused and left unsent: a long password, no name, an update
+       request without a name before it.  See FREQ-PLAN.md.
 
      File names given (as the mailer's on-inbound hook does) are ignored: the whole inbound is tossed.  Runs one at a
      time: a second mktoss waits until the first is done (lock file mktoss.lock in the inbound directory).
@@ -1162,6 +1163,13 @@ Procedure AfterChange(Area: Word);
   End;
 
 
+Const
+  FreqFrom = 'File requests';           {the sender of the netmail that tells a requester what was not sent: always hold mail}
+
+Var
+  PostHold: Boolean;                   {the netmail that PostNetmail writes is hold mail (the answer to a file request: picked up)}
+
+
 Procedure PostNetmail(FromName, ToName, Subj: String; Var Orig, Dest: AddrType; Lines: Word; Hub: Word);
   {a netmail from the tosser into the netmail area, for the scanner to send: the text is Rep (Lines of it) or, for
    a request to a hub, the lines of HubReq[Hub]}
@@ -1198,6 +1206,7 @@ Procedure PostNetmail(FromName, ToName, Subj: String; Var Orig, Dest: AddrType; 
   M^.SetTime(Z2(H) + ':' + Z2(Mi));
   M^.SetPriv(True);
   M^.SetKillSent(True);
+  M^.SetHold(PostHold);
   M^.SetLocal(True);
   M^.SetSent(False);
   M^.SetRcvd(False);
@@ -2347,14 +2356,17 @@ Function FileRequest(M: AbsMsgPtr; Var C: MsgCopy; Sys: Word; Var D: AddrType): 
     N: Word;
     Names: Array[1..20] Of String[80];
     Pws: Array[1..20] Of String[12];
-    i: Word;
+    Upds: Array[1..20] Of String[12];
+    i, k: Word;
     Bad: String;
+    IsUpd: Boolean;
     Rc: LongInt;
 
   Begin
   FileRequest := False;
   FillChar(Names, SizeOf(Names), 0);
   FillChar(Pws, SizeOf(Pws), 0);
+  FillChar(Upds, SizeOf(Upds), 0);
   Config^.GetEchoToAddr(Sys, A);
   If A.Zone = 0 Then
     A.Zone := Ours[1].Zone;
@@ -2375,10 +2387,17 @@ Function FileRequest(M: AbsMsgPtr; Var C: MsgCopy; Sys: Word; Var D: AddrType): 
       Subj := Subj + ' ';
     If Tok = '' Then
       Continue;
+    IsUpd := ((Tok[1] = '+') Or (Tok[1] = '-')) And (Length(Tok) > 1);
+    If IsUpd Then
+      For k := 2 To Length(Tok) Do
+        If Not (Tok[k] In ['0'..'9']) Then
+          IsUpd := False;
     If Tok[1] = '!' Then
       Begin
       If N = 0 Then
         Bad := 'a password (' + Tok + ') comes before any name'
+      Else If Upds[N] <> '' Then
+        Bad := 'the password for ' + Names[N] + ' must come before the time (' + Upds[N] + ')'
       Else If Pws[N] <> '' Then
         Bad := 'two passwords for ' + Names[N]
       Else If Length(Tok) = 1 Then
@@ -2388,8 +2407,19 @@ Function FileRequest(M: AbsMsgPtr; Var C: MsgCopy; Sys: Word; Var D: AddrType): 
       Else
         Pws[N] := Copy(Tok, 2, 10);
       End
-    Else If ((Tok[1] = '+') Or (Tok[1] = '-')) And (Length(Tok) > 1) And (Tok[2] In ['0'..'9']) Then
-      Bad := 'update requests (' + Tok + ') are not supported yet'
+    Else If IsUpd Then
+      Begin
+      If N = 0 Then
+        Bad := 'an update request (' + Tok + ') comes before any name'
+      Else If Upds[N] <> '' Then
+        Bad := 'two update requests for ' + Names[N]
+      Else If Length(Tok) > 11 Then
+        Bad := 'the time of the update request ' + Tok + ' has more than 10 digits'
+      Else
+        Upds[N] := Tok;
+      End
+    Else If (Tok[1] = '+') Or (Tok[1] = '-') Then
+      Bad := 'the name ' + Tok + ' cannot be requested (a sign and a time are an update request)'
     Else If N >= 20 Then
       Bad := 'more than 20 names'
     Else
@@ -2414,6 +2444,8 @@ Function FileRequest(M: AbsMsgPtr; Var C: MsgCopy; Sys: Word; Var D: AddrType): 
     Cmd := Cmd + ' ' + ShellQuote(Names[i]);
     If Pws[i] <> '' Then
       Cmd := Cmd + ' ' + ShellQuote('!' + Pws[i]);
+    If Upds[i] <> '' Then
+      Cmd := Cmd + ' ' + ShellQuote(Upds[i]);
     End;
   Rc := fpSystem(Cmd + ' >/dev/null 2>&1');
   If Rc <> 0 Then
@@ -2490,8 +2522,8 @@ Procedure ScanNetArea(Area: Word);
             Begin
             If C.Crash Then
               Flav := 'C'
-            Else If C.Hold Then
-              Flav := 'H'
+            Else If C.Hold Or (Upper(C.From) = Upper(FreqFrom)) Then
+              Flav := 'H'      {hold for pickup; the notes of mkfreq are, whatever the base can store}
             Else
               Flav := FlavourOf(Sys);
             End;
@@ -2626,7 +2658,9 @@ Procedure PostFreqNotes;
     FillChar(Dst, SizeOf(Dst), 0);
     If (ToS <> '') And ParseAddr(ToS, Orig, Dst) And (Dst.Net <> 0) Then
       Begin
-      PostNetmail('File requests', 'Sysop', SubjS, Orig, Dst, NumRep, 0);
+      PostHold := True;                    {the answer waits for the requester to call}
+      PostNetmail(FreqFrom, 'Sysop', SubjS, Orig, Dst, NumRep, 0);
+      PostHold := False;
       Log('file request note for ' + AddrStr(Dst) + ' posted as a netmail');
       End
     Else

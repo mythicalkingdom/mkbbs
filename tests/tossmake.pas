@@ -56,6 +56,10 @@ begin
     Net('long.zip !toolong7', B, False, False, True);
     Net('upd.zip +599634000', B, False, False, True);
     Net('!pw', B, False, False, True);
+    Net('late.zip !abc -599634000', B, False, False, True);
+    Net('toolate.zip +12345678901', B, False, False, True);
+    Net('after.zip +5 !pw', B, False, False, True);
+    Net('+5 first.zip', B, False, False, True);
     B.Node := 201;
     Net('not.direct.zip', B, False, False, True);
     B.Zone := 2; B.Net := 250; B.Node := 1;
