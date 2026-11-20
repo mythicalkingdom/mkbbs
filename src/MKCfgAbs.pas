@@ -161,6 +161,8 @@ Type CfgObj = Object
   Procedure SetFilePvtSecurity(Area: Word; Var Sec: SecType); Virtual; {Private sec}
   Function  GetFileNoUl(Area: Word): Boolean; Virtual; {Area disallows ULs}
   Function  GetFileNoNew(Area: Word): Boolean; Virtual; {Exclude area from new files}
+  Function  GetFileFreq(Area: Word): Boolean; Virtual; {The files may be requested by other systems (FTN file requests; MK only)}
+  Procedure SetFileFreq(Area: Word; St: Boolean); Virtual;
   Function  GetFileFree(Area: Word): Boolean; Virtual; {Area contains free files}
   Function  GetFileNoTime(Area: Word): Boolean; Virtual; {Ignore time remaining}
   Function  GetFileNoBaud(Area: Word): Boolean; Virtual; {Ignore min baud limits}
@@ -1031,6 +1033,17 @@ Procedure CfgObj.SetFilePvtSecurity(Area: Word; Var Sec: SecType); {Private sec}
 Function CfgObj.GetFileNoUl(Area: Word): Boolean; {Area disallows ULs}
   Begin
   End;
+
+Function CfgObj.GetFileFreq(Area: Word): Boolean;
+  Begin
+  GetFileFreq := False;
+  End;
+
+
+Procedure CfgObj.SetFileFreq(Area: Word; St: Boolean);
+  Begin
+  End;
+
 
 Function CfgObj.GetFileNoNew(Area: Word): Boolean; {Exclude area from new files}
   Begin

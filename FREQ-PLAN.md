@@ -1,6 +1,6 @@
 # FTN file requests (FREQ): plan
 
-Status: **plan only**, nothing built.  Written 2026-11-19.  Decisions marked *(decided)* come from the discussion with the
+Status: **built except the deferred parts** (2026-11-19): phases 1-8 done, see the notes at the phases.  Not done: update requests (`+time` / `-time`) and sending the answer in the same session that brought the request (needs a second batch in mkbink's session engine).  Written 2026-11-19.  Decisions marked *(decided)* come from the discussion with the
 sysop; the rest are proposals to confirm.
 
 File requests let one system ask another for files by name.  Two directions:
@@ -166,14 +166,14 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
    hook).
 3. **Receive side in mkbink** (done 2026-11-19 in the mkbink repo, uncommitted: `freq`, `freq-unsecure`, `on-freq`, `freq-max-files`, `freq-max-kb`, `DoFreq`, `tests/freqtest.py` 29 checks; answers are queued and sent at the next call, **not in the same session**: the engine has one batch per session, see mkbink `NOTES.md`): read the `.req`, run the hook, queue the answer, same-session sending, limits, policy keys.
    Test with a stub hook that returns fixed paths.
-4. **`mkfreq`**: area search, magic names, security profile, passwords, limits, notes.  Test on the private copy of the sample
+4. **`mkfreq`** (done: `src/MKFreq.pas`, `tests/mkfreqtest.py` 24 checks; the `faFreq` bit of the area, `GetFileFreq`): area search, magic names, security profile, passwords, limits, notes.  Test on the private copy of the sample
    BBS (its file areas), with all the refusal cases.
-5. **Configuration screens and JSON** for the reserved fields and the new bits; `mkbinkcfg` writes the keys; tests in the
+5. **Configuration screens and JSON** (done: `EchoMail > File Requests`, link field, area box, `mkbinkcfg` keys; JSON needed nothing new, the fields were in the records; `tests/mailertest.py`): for the reserved fields and the new bits; `mkbinkcfg` writes the keys; tests in the
    existing mailer config tests.
-6. **Answer netmail** and the optional "requested files" notice.
-7. **Round trip test:** two MK systems; the first sends a netmail with the flag and a password; the second answers from its
+6. **Answer netmail** (done: `mkfreq` writes a note, `PostFreqNotes` in `mktoss` posts it; only when something was not sent): and the optional "requested files" notice.
+7. **Round trip test** (done: `tests/freqroundtrip.py`): two MK systems; the first sends a netmail with the flag and a password; the second answers from its
    file area; the files arrive in the first one's inbound; the wrong password and an over-limit request give the right notes.
-8. **Docs:** `NETWORKING.md` (a Fido file requests section), `TOSSER.md`, mkbink's `NOTES.md`.
+8. **Docs** (done: `NETWORKING.md`, `TOSSER.md`, `MKBBS.md`, mkbink `NOTES.md`): `NETWORKING.md` (a Fido file requests section), `TOSSER.md`, mkbink's `NOTES.md`.
 
 ## Tests (summary)
 

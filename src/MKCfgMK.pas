@@ -149,6 +149,8 @@ Type MKCfgObj = Object(CfgObj)
   Procedure SetFilePvtSecurity(Area: Word; Var Sec: SecType); Virtual; {Private sec}
   Function  GetFileNoUl(Area: Word): Boolean; Virtual; {Area disallows ULs}
   Function  GetFileNoNew(Area: Word): Boolean; Virtual; {Exclude area from new files}
+  Function  GetFileFreq(Area: Word): Boolean; Virtual;
+  Procedure SetFileFreq(Area: Word; St: Boolean); Virtual;
   Function  GetFileFree(Area: Word): Boolean; Virtual; {Area contains free files}
   Function  GetFileNoTime(Area: Word): Boolean; Virtual; {Ignore time remaining}
   Function  GetFileNoBaud(Area: Word): Boolean; Virtual; {Ignore min baud limits}
@@ -1983,6 +1985,25 @@ Function MKCfgObj.GetFileNoUl(Area: Word): Boolean; {Area disallows ULs}
     GetFileNoUl := (MKFile^[Area].Attr And faNoUl) <> 0
   Else
     GetFileNoUl := True;
+  End;
+
+
+Function MKCfgObj.GetFileFreq(Area: Word): Boolean;
+  Begin
+  If ((Area > 0) And (Area <= GetMaxFileAreas)) Then
+    GetFileFreq := (MKFile^[Area].Attr And faFreq) <> 0
+  Else
+    GetFileFreq := False;
+  End;
+
+
+Procedure MKCfgObj.SetFileFreq(Area: Word; St: Boolean);
+  Begin
+  If ((Area > 0) And (Area <= GetMaxFileAreas)) Then
+    If St Then
+      MKFile^[Area].Attr := MKFile^[Area].Attr or faFreq
+    Else
+      MKFile^[Area].Attr := MKFile^[Area].Attr and (Not faFreq);
   End;
 
 

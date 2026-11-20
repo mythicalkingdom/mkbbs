@@ -25,6 +25,7 @@ Type UserRecord = Record
   FreeArea: Boolean;
   IgnoreTime: Boolean;
   IgnoreBaud: Boolean;
+  Freq: Boolean;
   ShortName: String[12];
   End;
 
@@ -51,8 +52,9 @@ Procedure DoCfgFile(Area: Word);
   UR^.FreeArea := Config^.GetFileFree(Area);
   UR^.IgnoreTime := Config^.GetFileNoTime(Area);
   UR^.IgnoreBaud := Config^.GetFileNoBaud(Area);
+  UR^.Freq := Config^.GetFileFreq(Area);
   F.Init('File Area ' + Long2Str(UR^.AreaNum) + ' Configuration');
-  F.Window(5, 6, 74, 18);
+  F.Window(5, 6, 74, 20);
   F.At(2, 4, 2, 10);
   F.AddString('Name:', UR^.Name, 30, 'Name');
   F.At(2, 45, 2, 53);
@@ -83,6 +85,11 @@ Procedure DoCfgFile(Area: Word);
   F.AddYesNo('Include in New Files:', UR^.NewFiles, 'Include in New Files');
   F.At(12, 30, 12, 42);
   F.AddString('Short Name:', UR^.ShortName, 12, 'Short Name');
+  If DetectBbsType = 1 Then
+    Begin
+    F.At(14, 4, 14, 26);
+    F.AddYesNo('Allow file requests:', UR^.Freq, 'Other systems may request the files of this area (FTN file requests; see EchoMail > File Requests)');
+    End;
   If F.Execute Then
     Begin
     Config^.SetFileAreaName(Area, UR^.Name);
@@ -98,6 +105,7 @@ Procedure DoCfgFile(Area: Word);
     Config^.SetFileFree(Area, UR^.FreeArea);
     Config^.SetFileNoTime(Area, UR^.IgnoreTime);
     Config^.SetFileNoBaud(Area, UR^.IgnoreBaud);
+    Config^.SetFileFreq(Area, UR^.Freq);
     End;
     Dispose(UR);
   End;

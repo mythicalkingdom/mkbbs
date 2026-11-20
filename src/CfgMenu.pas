@@ -66,6 +66,7 @@ Const
   cmMailer = 1043;
   cmMailLinks = 1044;
   cmRoutes = 1045;
+  cmFreq = 1046;
   cmQuitCfg = 1042;
   cmQuitDlg = 2000;
 
@@ -153,6 +154,7 @@ Function CfgStatus.Hint(AHelpCtx: Word): String;
     cmMailer: Hint := 'Mailer (binkp) Settings';
     cmMailLinks: Hint := 'Systems the Mailer Calls and Answers';
     cmRoutes: Hint := 'Where Netmail for Other Systems is Sent';
+    cmFreq: Hint := 'Answering File Requests from Other Systems';
     cmQuitCfg: Hint := 'Quit and Save Changes';
     End;
   End;
@@ -236,7 +238,8 @@ Procedure CfgApp.InitMenuBar;
             NewItem('~M~ailer', '', kbNoKey, cmMailer, cmMailer,
             NewItem('Mailer ~L~inks', '', kbNoKey, cmMailLinks, cmMailLinks,
             NewItem('~R~outing', '', kbNoKey, cmRoutes, cmRoutes,
-            Nil)))))),
+            NewItem('~F~ile Requests', '', kbNoKey, cmFreq, cmFreq,
+            Nil))))))),
         NewItem('~Q~uit', '', kbNoKey, cmQuitCfg, cmQuitCfg,
         Nil))))))
     )));
@@ -323,6 +326,7 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmMailer: DoCfgMailer;
       cmMailLinks: DoCfgMailLinks;
       cmRoutes: DoCfgRoutes;
+      cmFreq: DoCfgFreq;
       Else Exit;
       End;
     ClearEvent(Event);

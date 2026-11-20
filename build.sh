@@ -39,6 +39,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkread src/MKRead.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmenu src/MKMenu.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkusered src/MKUserEd.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkpwconv src/MKPwConv.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfreq src/MKFreq.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklist src/MKList.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -202,6 +203,13 @@ fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/tosshooktest.py build build/hookwork | grep -E "^(ok|FAIL|skip)" | tee build/hookresult.txt
   if grep -q FAIL build/hookresult.txt; then exit 1; fi
+fi
+# file requests: mkfreq (areas, profiles, magic names, passwords, limits), and the whole way in with mkbink
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  mkdir -p build/work/mkfreq build/work/freqrt
+  python3 tests/mkfreqtest.py build build/work/mkfreq | grep -E "^(FAIL|skip|failures)" | tee build/freqresult.txt
+  python3 tests/freqroundtrip.py build build/work/freqrt | grep -E "^(FAIL|skip|failures)" | tee -a build/freqresult.txt
+  if grep -q FAIL build/freqresult.txt; then exit 1; fi
 fi
 # message packets: the unit's own tests and a comparison with javascript/MessagePacket.js (node)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true

@@ -13,10 +13,11 @@ Interface
 Procedure DoCfgMailer;
 Procedure DoCfgMailLinks;
 Procedure DoCfgRoutes;
+Procedure DoCfgFreq;
 
 Implementation
 
-Uses MKString, MKGlobT, MKCfgAbs, CfgForm, CfgList, CfgBox;
+Uses MKString, MKGlobT, MKCfgAbs, CfgForm, CfgList, CfgBox, CfgSec2;
 
 
 Var
@@ -151,7 +152,7 @@ Procedure EditLink(Item: Word);
   If L^.Port = 0 Then
     L^.Port := 24554;
   F.Init('Link ' + Long2Str(Item));
-  F.Window(3, 4, 76, 18);
+  F.Window(3, 4, 76, 20);
   F.At(2, 3, 2, 9);
   F.AddNumber('Zone:', L^.Addr.Zone, 2, 0, 65535, 'Zone of the link (0 = this entry is not used)');
   F.At(2, 16, 2, 21);
@@ -180,6 +181,10 @@ Procedure EditLink(Item: Word);
   F.AddChoice('PLZ:', PlzC, 1, 0, 'Default|Off|On', 'Compression with this link (Space or arrows change it)');
   F.At(12, 40, 12, 54);
   F.AddChoice('NR mode:', NrC, 1, 0, 'Default|Off|On', 'Non-reliable mode with this link (Space or arrows change it)');
+  F.At(14, 3, 14, 23);
+  F.AddNumber('File request level:', L^.ReqSec.Level, 2, 0, 65535,
+    'Security of this system for file requests (File Requests page); 0 = the file request user.  F2 sets the flags');
+  F.OnF2(EditSecurity, @L^.ReqSec, '[ File request access of this system ]');
   If F.Execute Then
     Begin
     L^.Flags := 0;
@@ -194,6 +199,57 @@ Procedure EditLink(Item: Word);
     Mail^.Links[Item] := L^;
     End;
   Dispose(L);
+  End;
+
+
+
+Procedure DoCfgFreq;
+  Var
+    F: CfgFormObj;
+    On, Unsecure, Netmail: Boolean;
+    M: ^MailerCfgType;
+
+  Begin
+  If Not Config^.HasMailer Then
+    Begin
+    MsgBox('The mailer settings are kept by the MK configuration only');
+    Exit;
+    End;
+  New(M);
+  Config^.GetMailer(M^);
+  On := (M^.Flags And mcFileReq) <> 0;
+  Unsecure := (M^.ReqAttr And rqUnsecure) <> 0;
+  Netmail := (M^.ReqAttr And rqAnswerMail) <> 0;
+  F.Init('File Requests');
+  F.Window(3, 4, 76, 17);
+  F.At(2, 3, 2, 28);
+  F.AddYesNo('Answer file requests:', On, 'Answer FTN file requests (mkbink runs mkfreq for each request file that arrives)');
+  F.At(3, 3, 3, 28);
+  F.AddYesNo('Without a password:', Unsecure, 'Also answer systems that called without a session password (never password protected names)');
+  F.At(4, 3, 4, 28);
+  F.AddYesNo('Tell by netmail:', Netmail, 'Send a netmail to the requester saying what was found and what was refused');
+  F.At(6, 3, 6, 28);
+  F.AddNumber('File request user:', M^.ReqSec.Level, 2, 0, 65535,
+    'Security of a system that has none of its own (Mailer Links); level 0 and no flags = such systems get nothing.  F2 sets the flags');
+  F.OnF2(EditSecurity, @M^.ReqSec, '[ File request user ]');
+  F.At(8, 3, 8, 28);
+  F.AddString('Magic names file:', M^.ReqMagicFile, 60, 'Text file with lines  NAME path [password]  (@LIST = a list of the files); blank = none');
+  F.At(10, 3, 10, 28);
+  F.AddNumber('Most files:', M^.ReqMaxFiles, 2, 0, 65535, 'Files sent for one request, 0 = 20');
+  F.At(11, 3, 11, 28);
+  F.AddNumber('Most KB:', M^.ReqMaxKb, 4, 0, 100000000, 'Kilobytes sent for one request, 0 = no limit');
+  F.At(13, 3, 13, 76);
+  F.AddText('Files come from file areas with "Allow file requests".');
+  If F.Execute Then
+    Begin
+    M^.Flags := M^.Flags And Not mcFileReq;
+    If On Then M^.Flags := M^.Flags Or mcFileReq;
+    M^.ReqAttr := M^.ReqAttr And Not (rqUnsecure Or rqAnswerMail);
+    If Unsecure Then M^.ReqAttr := M^.ReqAttr Or rqUnsecure;
+    If Netmail Then M^.ReqAttr := M^.ReqAttr Or rqAnswerMail;
+    Config^.SetMailer(M^);
+    End;
+  Dispose(M);
   End;
 
 

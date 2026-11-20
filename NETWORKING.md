@@ -17,7 +17,8 @@ of `src/MKQwkNet.pas` has the full description of the QWK pass.
 | `mklisten` | Listens on ports and starts `mk` for each caller.  A port of type `"qwk"` is the door for QWK systems; the `"mailer"` section runs the Fido mailer. |
 | `mkbink` | The binkp mailer (a separate program).  Calls and answers Fido systems and keeps the BSO outbound. |
 | `mkbinkcfg` | Makes the mailer's settings from the BBS configuration. |
-| `mktoss` | The Fido tosser: toss incoming mail into the areas, scan new local messages, pack them, hand them to the mailer, answer areafix requests. |
+| `mktoss` | The Fido tosser: toss incoming mail into the areas, scan new local messages, pack them, hand them to the mailer, answer areafix requests, turn file request netmail into `.req` files. |
+| `mkfreq` | Answers file requests: `mkbink` runs it for each `.req` that arrives (security profile, file areas, magic names, passwords, limits). |
 | `mkqwk` | The older offline mail door for users (not needed for networking; `mk` does not depend on it). |
 
 Which BBS a program works on comes from the environment variable `MK` (the directory of the configuration), for
@@ -211,6 +212,40 @@ systems you link.
     commands in the text: `%LIST`, `%QUERY`, `%UNLINKED`, `%HELP`, `+AREA`, `-AREA` (`*` and `?` work).  Your answer is a
     netmail.  When you carry an area from a hub, the hub is asked for it when your first downlink takes it, and the
     request is withdrawn when the last one leaves (pass-through areas).
+
+### File requests (FREQ)
+
+File requests (FTS-0006) let one system ask another for files by name.  A request is a `.req` file with one line per request,
+`name` or `name !password` (the password is 6 characters or fewer).  Update requests (a `+` or `-` and a time after the name)
+are not supported yet.  The plan and the details are in `FREQ-PLAN.md`.
+
+**Asking another system.**  Write a netmail to it with the file request option set (the netmail options of the editor) and
+the names in the subject, blank separated, with `!password` after the name it is for: `THIS.ARC !THAT NODELIST.*`.  `mktoss`
+turns it into the names of that system's `.req` in the BSO outbound and marks the netmail sent; the mailer calls the system, and
+the files arrive in the inbound like any file.  This works for a system you call directly (in the echo systems list); a
+request for a node behind a route goes out as an ordinary netmail.  A password of more than 6 characters, a password before a
+name, an empty subject and an update request are refused: the netmail stays unsent and the log says why.
+
+**Answering requests.**
+
+1. The mailer must be on (`EchoMail > Mailer`).
+2. `EchoMail > File Requests`: switch **Answer file requests** on.  **File request user** is the security (level, flags with F2)
+   of a system that has none of its own; level 0 with no flags means such systems get nothing.  **Without a password** also
+   answers callers that did not use a session password (they never get password protected names).  **Tell by netmail** sends
+   the requester a netmail that lists what could not be sent.  **Most files** and **Most KB** limit one request (0 = 20 files, no
+   size limit).
+3. `EchoMail > Mailer Links`: a link can have its own **File request level** (F2 for flags); 0 means the file request user.
+4. `Files > Areas`: only the file areas with **Allow file requests** are searched, and only when the security of the system meets
+   the area's *view* and *download* security.  A system gets what a caller with that security could download.
+5. Magic names (optional): the **Magic names file** has lines `NAME path [password]` (`;` or `#` starts a comment).  The path can
+   have `*` and `?` in its last part (`NODELIST /bbs/nodelist/nodelist.*`); `@LIST` (`FILES @LIST`) makes a list of the files the
+   system may request.  A name with a password is only given in a session with a password and with `!password` after it.
+6. Restart the mailer (`mklisten` writes the settings with `mkbinkcfg` and `mkbink` runs `mkfreq` for each request that arrives).
+
+What `mkfreq` does with a name: wildcards and upper case are fine; names with a slash, a backslash or a leading dot are refused;
+a name that nothing matches is "not found" (the same words for a file the system may not have, so a refusal does not tell what
+exists).  Passwords are never written to the log.  The files are queued for the requester and go with the next call (the
+answering system calls the requester when it has a host for it); they are not sent in the session that brought the request.
 
 ### Things that end up in `bad/bad.pkt`
 

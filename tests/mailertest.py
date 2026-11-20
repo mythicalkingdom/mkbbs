@@ -2,7 +2,7 @@
 """Mailer settings: the mkconfig pages (Mailer, Mailer Links) save mailer.mk, and mkbinkcfg turns the configuration into
 the settings file of mkbink (checked with "mkbink check" when the mkbink project is built next to this one).
 usage: mailertest.py <work dir>"""
-import os, shutil, stat, subprocess, sys, time
+import os, re, shutil, stat, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cfgpatch
@@ -202,6 +202,39 @@ check('tosser on and a command set: the command wins', rc == 0 and 'on-inbound /
 patched(lambda d: d.__setitem__(2, d[2] & ~128))
 rc, out, err = tool('-n')
 check('tosser off: no on-inbound', rc == 0 and 'on-inbound' not in out)
+
+# ---- file requests (EchoMail > File Requests): the page saves, mkbinkcfg writes the keys for mkbink; the link and the file area have their fields
+rc, out, err = tool('-n')
+check('file requests off (the default): no freq lines', rc == 0 and 'freq' not in out)
+s = screen('\x1bc', 'f')
+check('EchoMail > File Requests shows the page', 'File Requests' in s and 'Answer file requests:' in s and 'Magic names file:' in s and 'File request user:' in s)
+screen('\x1bc', 'f', ' ', '\t', ' ', '\t', ' ', '\t', '80', '\t', 'magic.txt', '\t', '7', '\t', '300', '\r', '\x1bx', 'y')
+rc, out, err = tool('-n')
+check('switched on with limits: mkbinkcfg writes freq yes, freq-unsecure yes, on-freq (mkfreq next to it), freq-max-files 7, freq-max-kb 300',
+      rc == 0 and 'freq yes' in out and 'freq-unsecure yes' in out and ('on-freq %s' % os.path.join(repo, 'build', 'mkfreq')) in out
+      and 'freq-max-files 7' in out and 'freq-max-kb 300' in out)
+s = screen('\x1bc', 'f')
+check('the page shows what was saved (user level 80, the magic names file, the limits)', 'magic.txt' in s and re.search(r'File request user:\s+80', s) is not None
+      and re.search(r'Most files:\s+7', s) and re.search(r'Most KB:\s+300', s))
+s = screen('\x1bc', 'l', '\r')
+check('a link has "File request level"', 'File request level:' in s)
+screen('\x1bc', 'm', '\t' * 19, ' ', '\r', '\x1bx', 'y')            # (nothing to do with requests: the page still saves)
+patched(lambda d: d.__setitem__(2, d[2] & ~64))
+rc, out, err = tool('-n')
+check('switched off again: no freq lines', rc == 0 and 'freq' not in out)
+
+s = screen('\x1bf', 'a', '\r')
+check('a file area has "Allow file requests"', 'Allow file requests:' in s)
+import json
+def area_attr(n):
+    cj = os.path.join(work, 'cjfa')
+    shutil.rmtree(cj, ignore_errors=True)
+    os.makedirs(cj)
+    subprocess.run([os.path.join(repo, 'build', 'mkcfgcvt'), '-y', '1', '5'], env=dict(env, MKJSON=cj), check=True, capture_output=True)
+    return json.load(open(cj + '/bbsconfig.json', encoding='utf-8'))['files'][str(n)]['Attr']
+before = area_attr(1)
+screen('\x1bf', 'a', '\r', *(['\t'] * 13), ' ', '\r', '\x1b', '\x1bx', 'y')
+check('... the box is saved in the area (bit 32 of Attr), the other bits are as they were', area_attr(1) == (before ^ 32))
 
 check('the sample BBS itself was not touched', guard == {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in guard})
 print('failures: %d' % fails)

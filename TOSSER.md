@@ -107,7 +107,13 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    a password before any name, a subject without a name, an update request (`+time` / `-time`, not supported yet), more than 20
    names.  A request for a node behind a route goes out as an ordinary netmail with its flag.  Tests: `tests/tosstest.py`
    (needs `../mkbink/build/mkbink`), `../mkbink/tests/freqtest.py`.
-   Not done: answering requests (mkbink hook + `mkfreq`), update requests.
+   Answering requests: `mkbink` receives the `.req` and runs `mkfreq` (`src/MKFreq.pas`, see `FREQ-PLAN.md`): the requester's
+   security profile (its link's, else the global file request user), file areas with the option "Allow file requests" whose
+   view and download security it meets, magic names (a file of `NAME path [password]`, `@LIST`), per-name passwords, limits.
+   What could not be sent goes into a note in `<outbound>/mktoss/freq/` (setting "Tell by netmail"); `PostFreqNotes` in `mktoss`
+   makes it a netmail to the requester in the scan.  Tests: `tests/mkfreqtest.py`, `tests/freqroundtrip.py` (a real `mkbink` asks the
+   BBS, the files and the netmail come back).
+   Not done: update requests, and sending the answer in the session that brought the request.
 7. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` answering and update requests.
 
 ## Known fixes made on the way

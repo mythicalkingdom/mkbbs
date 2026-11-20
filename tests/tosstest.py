@@ -388,6 +388,17 @@ if have_mkbink:
           and not [f for f in os.listdir(outb) if f.endswith('.req') and f != '006e00c8.req'])
     check('... and one with no route at all (1:110/201) is as any netmail with no route: unsent, said so',
           'to 1:110/201: no route' in out and re.search(r'subj=not.direct.zip .*sent=FALSE', d4) is not None)
+    # the note mkfreq leaves for a requester becomes a netmail to it, sent in the same run
+    os.makedirs(outb + '/mktoss/freq', exist_ok=True)
+    open(outb + '/mktoss/freq/1-1.note', 'w').write('TO 1:110/200\nSUBJECT Your file request to 1:110/290\n\nYou asked for files.\n\nNot sent:\n  x.zip: not found\n')
+    before = flo_now()
+    r = run('mktoss', '-b', mkbink)
+    after = flo_now()
+    nw = new_in(before, after)
+    pk = [m for m in packets_of(nw) if 'subj=Your file request to 1:110/290' in m[0]]
+    check('a note of mkfreq becomes a netmail to the requester, sent through its system, and the note is removed',
+          'file request note for 1:110/200 posted as a netmail' in r.stdout and len(pk) == 1 and 'dest=1:110/200.0' in pk[0][0]
+          and not os.listdir(outb + '/mktoss/freq'))
     before_req = open(req, 'rb').read()
     r = run('mktoss', '-b', mkbink)
     check('a second run does not write the requests again', open(req, 'rb').read() == before_req and 'file request(s) made' in r.stdout and '0 file request(s) made' in r.stdout)

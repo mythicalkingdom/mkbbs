@@ -82,6 +82,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
 | `mkqwk`, `mkqwkcfg` | the older offline mail door and its configuration |
+| `mkfreq` | answers FTN file requests for `mkbink` (see `NETWORKING.md`) |
 | `mkpwconv` | expands `extusers.bbs` (`-x`) and converts plain passwords to hashes (`-h`); see `PASSWORDS.md` |
 
 The programs that edit (`mkconfig`, `mkmenu`, `mkusered`, `mkdraw`, `mkqwkcfg`) use a full screen text interface with a menu

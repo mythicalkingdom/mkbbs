@@ -12,6 +12,7 @@ Program MKBinkCfg;
         inbound directory, BSO outbound directory       EchoMail Options (EchoCfg.Mk)
         listening, retry times, links ...               Mailer, Mailer Links (Mailer.Mk)
         the tosser (mktoss) as on-inbound command       Mailer > Tosser, when the command is blank
+        freq, freq-unsecure, on-freq (mkfreq), limits   File Requests (Mailer.Mk), when it is switched on
         host of a link that has none                    the nodelist index (mknodeidx): IBN / INA flags
 
      Relative directories are taken from the BBS directory.  The file is made with mode 600 (it holds the link
@@ -59,6 +60,24 @@ Procedure Fail(Msg: String);
 Function FmtAddr(Var A: AddrType): String;
   Begin
   FmtAddr := AddrStr(A);
+  End;
+
+
+Function FreqProg: String;
+  {mkfreq next to this program, else left to the path}
+  Var
+    Me: String;
+    p: Word;
+
+  Begin
+  Me := ParamStr(0);
+  p := Length(Me);
+  While (p > 0) And (Me[p] <> '/') Do
+    Dec(p);
+  If (p > 0) And FileExist(Copy(Me, 1, p) + 'mkfreq') Then
+    FreqProg := Copy(Me, 1, p) + 'mkfreq'
+  Else
+    FreqProg := 'mkfreq';
   End;
 
 
@@ -269,6 +288,17 @@ Procedure Generate;
     WTxt('on-inbound', M^.OnInbound);
   If M^.HookTimeout > 0 Then
     W('hook-timeout ' + Long2Str(M^.HookTimeout));
+  If (M^.Flags And mcFileReq) <> 0 Then
+    Begin
+    {file requests: mkbink hands each .req to mkfreq; the limits are kept by both}
+    W('freq yes');
+    W('freq-unsecure ' + YesNo((M^.ReqAttr And rqUnsecure) <> 0));
+    W('on-freq ' + FreqProg);
+    If M^.ReqMaxFiles > 0 Then
+      W('freq-max-files ' + Long2Str(M^.ReqMaxFiles));
+    If M^.ReqMaxKb > 0 Then
+      W('freq-max-kb ' + Long2Str(M^.ReqMaxKb));
+    End;
   W('bso ' + OutDir);
   W('listen ' + YesNo((M^.Flags And mcListen) <> 0));
   W('port ' + Long2Str(M^.Port));

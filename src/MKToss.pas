@@ -2567,6 +2567,77 @@ Procedure ScanNetArea(Area: Word);
   End;
 
 
+Procedure PostFreqNotes;
+  {mkfreq leaves a note for each file request that had something to say (the setting "Tell by netmail"): a file in
+   <outbound>/mktoss/freq/ with the lines  TO <address>,  SUBJECT <text>,  a blank line and the text.  It becomes a netmail
+   to that system, which the scan sends in this run.}
+  Var
+    SR: SearchRec;
+    Names: Array[1..40] Of String[40];
+    N, i: Word;
+    T: Text;
+    L, ToS, SubjS: String;
+    Dst, Orig: AddrType;
+    Body: Boolean;
+    Dir: String;
+
+  Begin
+  Dir := SpoolDir + 'freq/';
+  N := 0;
+  FindFirst(Dir + '*.note', AnyFile, SR);
+  While (DosError = 0) And (N < 40) Do
+    Begin
+    Inc(N);
+    Names[N] := SR.Name;
+    FindNext(SR);
+    End;
+  FindClose(SR);
+  For i := 1 To N Do
+    Begin
+    Assign(T, Dir + Names[i]);
+    Reset(T);
+    If IoResult <> 0 Then
+      Continue;
+    If Rep = Nil Then
+      New(Rep);
+    NumRep := 0;
+    ToS := '';
+    SubjS := 'Your file request';
+    Body := False;
+    While Not Eof(T) Do
+      Begin
+      ReadLn(T, L);
+      If Not Body Then
+        Begin
+        If Copy(L, 1, 3) = 'TO ' Then
+          ToS := StripBoth(Copy(L, 4, 60), ' ')
+        Else If Copy(L, 1, 8) = 'SUBJECT ' Then
+          SubjS := Copy(L, 9, 70)
+        Else If L = '' Then
+          Body := True;
+        End
+      Else
+        AddRep(L);
+      End;
+    Close(T);
+    FillChar(Orig, SizeOf(Orig), 0);
+    If NumOurs > 0 Then
+      Orig := Ours[1];
+    FillChar(Dst, SizeOf(Dst), 0);
+    If (ToS <> '') And ParseAddr(ToS, Orig, Dst) And (Dst.Net <> 0) Then
+      Begin
+      PostNetmail('File requests', 'Sysop', SubjS, Orig, Dst, NumRep, 0);
+      Log('file request note for ' + AddrStr(Dst) + ' posted as a netmail');
+      End
+    Else
+      Log('file request note ' + Names[i] + ': no usable address, dropped');
+    Assign(T, Dir + Names[i]);
+    Erase(T);
+    If IoResult <> 0 Then;
+    End;
+  End;
+
+
 Procedure ScanAreas;
   Var
     i: Word;
@@ -2853,7 +2924,10 @@ If DoToss Then
   CountUnsecure;
   End;
 If DoScan Then
+  Begin
+  PostFreqNotes;
   ScanAreas;
+  End;
 PackAll;
 SaveSerial;
 Dupes.CloseFile;

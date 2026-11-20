@@ -80,7 +80,9 @@ Const
   mcPlz           = 8;                 {offer PLZ compression}
   mcNr            = 16;                {ask for non-reliable mode}
   mcAcceptUnknown = 32;                {let a system without a link call, with UnknownPwd}
-  mcFileReq       = 64;                {reserved: answer file requests}
+  mcFileReq       = 64;                {answer file requests (mkfreq; mkbink's on-freq)}
+  rqUnsecure      = 1;                 {ReqAttr: answer file requests also from callers without a password}
+  rqAnswerMail    = 2;                 {ReqAttr: a netmail tells the requester what was found and what was not}
   mcTosser        = 128;               {the tosser (mktoss) runs: after mail arrives (on-inbound) and from mklisten's scan}
 
   mlAnswerOnly = 1;                    {never call this link, only answer its calls}

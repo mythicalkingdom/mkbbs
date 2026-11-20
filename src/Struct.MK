@@ -465,6 +465,7 @@ Const                                  {FileArea.Attr}
   faFree = 04;                         {Do not count in DL}
   faNoTime = 08;                       {Ignore time remain limit}
   faNoBaud = 16;                       {Ignore min baud limit}
+  faFreq = 32;                         {Allow FTN file requests (mkfreq) from the files of this area}
 
 
 Const                                  {MsgArea.Permit}
