@@ -302,7 +302,7 @@ Implementation
 Uses
     MKVCrt,
     MKScrn,
-  MKString, MKFile, MKAvatar, MKComAbs, MKCfgAbs, MKMisc, MKDos, MKCp437, MKSgr;
+  MKString, MKFile, MKAvatar, MKComAbs, MKCfgAbs, MKMisc, MKDos, MKCp437, MKSgr, MKPwd;
 
 
 Type
@@ -1853,8 +1853,11 @@ Procedure DoorUser.ReadUser;
     1: Begin
        i := UserInfo^.ExitInfo.UserRecNum;
        i := i * SizeOf(ExtUserType);
+       If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+         ExtUsersBad := True
+       Else
        If LoadFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
-         UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserType), i) = 0 Then;
+         UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserBaseType), i) = 0 Then;   {only the old part: the hash stays on disk}
        End;
     2: Begin
        RaExitPtr := @UserInfo^.ExitInfo;
@@ -1901,8 +1904,11 @@ Procedure DoorUser.WriteUser;
       1: Begin                    {Update ExtUsers.Bbs}
          UPos := UserInfo^.ExitInfo.UserRecNum;
          UPos := UPos * SizeOf(ExtUserType);
+         If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+           ExtUsersBad := True
+         Else
          If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
-           UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserType), UPos) = 0 Then;
+           UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserBaseType), UPos) = 0 Then;
          End;
       2: Begin                    {Update UsersXi.Bbs}
          RaExitPtr := @UserInfo^.ExitInfo;

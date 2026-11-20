@@ -20,7 +20,7 @@ Program MKUserEd;
 Uses
   Objects, Drivers, Views, Menus, Dialogs, App,
   MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
-  MKName, MKUserFm, CfgBox, CfgPal, MKKbd;
+  MKName, MKUserFm, CfgBox, CfgPal, MKKbd, MKPwd;
 
 
 Const
@@ -523,6 +523,12 @@ If Config^.GetError <> 0 Then
   WriteLn(StdErr, 'Unable to Load BBS Config Info');
   Halt(41);
   End;
+If BbsType = 1 Then
+  If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+    Begin
+    WriteLn(StdErr, 'extusers.bbs has the record of the older version: run  mkpwconv -x  once (it keeps the old file as extusers.bbs.old)');
+    Halt(43);
+    End;
 LoadCfg;
 NameSearch.Init;
 NameSearch.SetBbsType(BbsType);

@@ -7,7 +7,7 @@ Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
 MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
-MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, Dos
+MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, Dos
   ;
 
 
@@ -152,6 +152,12 @@ If Config^.GetError <> 0 Then
   WriteLn(StdErr, Long2Str(Config^.GetError) + ': Error loading config files');
   Halt(0);
   End;
+If BbsType = 1 Then
+  If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+    Begin
+    WriteLn(StdErr, 'extusers.bbs has the record of the older version: run  mkpwconv -x  once (it keeps the old file as extusers.bbs.old)');
+    Halt(43);
+    End;
 DirectVideo := Config^.GetDirectWrite;
 CheckSnow := Config^.GetSnowCheck;
 User.Init;

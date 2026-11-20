@@ -171,7 +171,7 @@ Var
 Implementation
 
 
-Uses MKFile, MKString, MKCfgAbs,
+Uses MKFile, MKString, MKCfgAbs, MKPwd,
   Dos;
 
 
@@ -849,6 +849,9 @@ Procedure NameObj.LoadExtra;
        i := GetPos;
        i := i * SizeOf(ExtUserType);
        FillChar(User^.MKExtra^, SizeOf(ExtUserType),0);
+       If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+         ExtUsersBad := True               {the file is of the old size: not read (mkpwconv -x)}
+       Else
        If LoadFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
          User^.MKExtra^, SizeOf(ExtUserType), i) = 0 Then;
        End;
@@ -883,6 +886,9 @@ Procedure NameObj.SaveExtra;
       1: Begin
          i := GetPos;
          i := i * SizeOf(ExtUserType);
+         If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+           ExtUsersBad := True             {never written in the wrong size}
+         Else
          If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
            User^.MKExtra^, SizeOf(ExtUserType), i) = 0 Then;
          End;
