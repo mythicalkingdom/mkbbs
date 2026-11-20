@@ -1,6 +1,6 @@
 # Events: plan (events.mk, the scheduler in mklisten)
 
-Status: **plan only** (2026-11-20).  Nothing is built.  The sysop's decisions of 2026-11-20 are marked *(decided)*; items marked
+Status: **built** (2026-11-20): all seven phases are done, see the notes at each phase.  The sysop's decisions of 2026-11-20 are marked *(decided)*; items marked
 *(proposal)* are still for the sysop to confirm.
 
 ## Where we are
@@ -115,8 +115,8 @@ involved in finding it; what the script does is the sysop's own.
 4. **Hub pass action** (DONE 2026-11-20, uncommitted: action 3 runs `mk -G<id>`; the map file has `retries`, `retry`, `retry-max`, `onfail`; `reply-error` / `reply-ok` and exit code 7 for a refused reply packet, which stays; `mkevents` prints the MAP line; tests in `eventlistentest.py` and `hubpasstest.py`; what the hub said after the upload is kept by `MKHubScr` in `Heard`): together with hub scheduling and failure handling (roadmap items 2 and 7): the hub section of the QWK
    configuration holds the settings (retry, back-off, what to do on failure); the event only names the hub and says "when".  Its own small plan before it is built.
 5. **Warning the callers** (DONE 2026-11-20, uncommitted: `mk -T` is used: `SetTimeToEvent` / `SecsToEvent` in MKGlobT, the cap and the login message in MKLogOn, `-T` from mklisten, the `lead` setting; tests in `eventlistentest.py` and `eventclosetest.py`; no message to a caller already on, the cut of his time does it): of an exclusive event: `-T` for `mk` (a caller's time is cut so they are off before it), a message to the nodes before the time.
-6. **mkmon**: an events screen (next run, last run, last result, run now), through a small control file or socket of `mklisten`.
-7. **Docs**: `MKLISTEN.md` (the `events` object), `MKBBS.md`, `GETTING-STARTED.md` (a cron replacement note), this plan's status.
+6. **mkmon** (DONE 2026-11-20: `E` in the node list, `EventsScreen` in `MKMonMail.pas`; `mklisten` writes `events.info` and reads `events.cmd` in its run directory; `tests/eventsmontest.py`): an events screen (next run, last run, last result, run now), through a small control file or socket of `mklisten`.
+7. **Docs** (DONE 2026-11-20: `MKLISTEN.md`, `MKBBS.md`, `GETTING-STARTED.md`, `NETWORKING.md`): `MKLISTEN.md` (the `events` object), `MKBBS.md`, `GETTING-STARTED.md` (a cron replacement note), this plan's status.
 
 Every phase ends with its tests, then the full build, as usual.
 

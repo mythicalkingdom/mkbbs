@@ -265,6 +265,7 @@ Var
   EvNextLoad: Int64 = 0;
   EvStateDirty: Boolean = False;
   EvScriptWarned: Boolean = False;
+  EvLastInfo: String = '';
 
 
 Type
@@ -803,6 +804,8 @@ Procedure PrepareRunDir;
     Until FindNext(SR) <> 0;
     FindClose(SR);
     End;
+  DeleteFile(RunDir + '/events.info');         {stale as well}
+  DeleteFile(RunDir + '/events.cmd');
   Log('node files in ' + RunDir);
   End;
 
@@ -2268,6 +2271,121 @@ Procedure KickNode(Node: Integer);
   End;
 
 
+Procedure EvWriteInfo(RealNow: Int64);
+  {events.info in the run directory: what mkmon shows (rewritten when it changed)}
+  Var
+    L: TStringList;
+    n, k: Integer;
+    St, Cmd, Info: String;
+    Nx: LongInt;
+    T: Int64;
+    F: Text;
+
+  Begin
+  T := EvNowLocal;
+  L := TStringList.Create;
+  Try
+    L.Add('# written by mklisten for mkmon');
+    L.Add('now=' + IntToStr(EvNowReal));
+    L.Add('blocked=' + IntToStr(Ord(EventsBlockLogins)));
+    L.Add('queue=' + IntToStr(Length(EvQueue)));
+    L.Add('running=' + IntToStr(Length(EvRuns)));
+    L.Add('callers=' + IntToStr(CallerCount));
+    For n := 1 To MaxEv Do
+      If EvDefs[n].Defined Then
+        Begin
+        St := 'idle';
+        If EvDefs[n].Status <> 1 Then
+          St := 'disabled';
+        For k := 0 To High(EvQueue) Do
+          If EvQueue[k].N = n Then
+            Begin
+            If EvQueue[k].NotBefore > RealNow Then St := 'retry' Else St := 'waiting';
+            End;
+        If EvRunning(n) Then
+          St := 'running';
+        Cmd := EvDefs[n].Cmd;
+        Case EvDefs[n].Action Of
+          1: Cmd := 'run ' + Cmd;
+          3: Cmd := 'hub ' + Cmd;
+          4: Cmd := 'poll ' + Cmd;
+          5: Cmd := 'hold ' + Cmd;
+          6: Cmd := 'free ' + Cmd;
+          Else
+            If EvDefs[n].EL > 0 Then Cmd := 'errorlevel only' Else Cmd := '';
+        End;
+        Nx := -1;
+        If EvDefs[n].Status = 1 Then
+          Nx := MKEvent.MinutesToNext(EvDefs[n].Minutes, EvDefs[n].Days, T);
+        L.Add('E' + #9 + IntToStr(n) + #9 + IntToStr(EvDefs[n].Status) + #9 + IntToStr(EvDefs[n].Minutes) + #9 + IntToStr(EvDefs[n].Days) +
+          #9 + St + #9 + IntToStr(Ord(EvIsExclusive(n))) + #9 + IntToStr(Nx) + #9 + IntToStr(EvDefs[n].LastRun) + #9 +
+          IntToStr(EvDefs[n].LastResult) + #9 + IntToStr(EvDefs[n].EL) + #9 + StringReplace(Cmd, #9, ' ', [rfReplaceAll]));
+        End;
+    Info := L.Text;
+  Finally
+    L.Free;
+  End;
+  If Info = EvLastInfo Then
+    Exit;
+  EvLastInfo := Info;
+  Assign(F, RunDir + '/events.info.new');
+  {$I-}
+  Rewrite(F);
+  If IoResult = 0 Then
+    Begin
+    Write(F, Info);
+    Close(F);
+    RenameFile(RunDir + '/events.info.new', RunDir + '/events.info');
+    End;
+  {$I+}
+  If IoResult <> 0 Then;
+  End;
+
+
+Procedure EvReadCommands;
+  {events.cmd in the run directory: "RUN n" lines from mkmon (run an event now); the file is taken away}
+  Var
+    L: TStringList;
+    i, n, Job: Integer;
+    Line: String;
+
+  Begin
+  If Not FileExists(RunDir + '/events.cmd') Then
+    Exit;
+  L := TStringList.Create;
+  Try
+    Try
+      L.LoadFromFile(RunDir + '/events.cmd');
+    Except
+    End;
+    DeleteFile(RunDir + '/events.cmd');
+    For i := 0 To L.Count - 1 Do
+      Begin
+      Line := Trim(L[i]);
+      If Copy(UpperCase(Line), 1, 4) = 'RUN ' Then
+        Begin
+        n := StrToIntDef(Trim(Copy(Line, 5, 10)), 0);
+        If (n >= 1) And (n <= MaxEv) And EvDefs[n].Defined Then
+          Begin
+          Log('events: ' + EvName(n) + ' is run now (asked for by the sysop monitor)');
+          Job := Length(EvQueue);
+          SetLength(EvQueue, Job + 1);
+          EvQueue[Job].N := n;
+          EvQueue[Job].Due := EvNowLocal;
+          EvQueue[Job].Expires := 0;
+          EvQueue[Job].Kicked := 0;
+          EvQueue[Job].Termed := False;
+          EvQueue[Job].NotBefore := 0;
+          EvQueue[Job].Attempt := 0;
+          End;
+        End;
+      End;
+  Finally
+    L.Free;
+  End;
+  End;
+
+
 Procedure EventsTick;
   Var
     T, RealNow: Int64;
@@ -2297,6 +2415,7 @@ Procedure EventsTick;
     End;
   If Not EvLoaded Then
     Exit;
+  EvReadCommands;
   T := EvNowLocal;
   { new occurrences }
   For n := 1 To MaxEv Do
@@ -2432,6 +2551,7 @@ Procedure EventsTick;
     End;
   If EvStateDirty Then
     EvWriteState;
+  EvWriteInfo(RealNow);
   End;
 
 

@@ -23,7 +23,10 @@ the listener `MKLISTEN.md`, and for the Fido tosser `TOSSER.md`.  `GETTING-START
   `DORINFO1.DEF`, `CALLINFO.BBS`); on Linux a program can run on a pseudo terminal (with a terminal type and size that
   match the caller) or get the connection directly.  Commands 169 and 170 run a BASIC or a Pascal program inside the
   BBS for the caller, locked to its own directory.
-* **Chat, paging, bulletins, questionnaires, events.**  As the menus are set up.
+* **Chat, paging, bulletins, questionnaires.**  As the menus are set up.
+* **Events.**  `mkconfig` > Events: a time, the days, and what it does (a command, a poll / hold / free of the mailer, a hub pass), what
+  to do when it was missed, and whether it needs the BBS quiet (exclusive).  `mklisten` runs them (`MKLISTEN.md`), and `mkmon` shows them
+  (E).  The old errorlevel runs the script `events.sh` in the BBS directory.  Details and the file (`events.mk`): `EVENTS-PLAN.md`.
 * **Terminals.**  ANSI and AVATAR; text is CP437 and is shown as UTF-8 to terminals that want it (decided by the terminal
   type, or set on the port).  Callers can come by Telnet, plain TCP or a web socket.
 
@@ -104,7 +107,7 @@ bar (Alt-key shortcuts, `F1` for help, `Esc` to leave).
 | `-Q` | the QWK network login (`Login:`, `Password:`, `QWK:`) |
 | `-G<id>` | a pass with the QWK network system `<id>`, no caller |
 | `-D` | with `-G`: a dry run, it says what would be sent and changes nothing |
-| `-C<port>`, `-E<level>`, `-P`, `-R`, `-T<min>`, `-V`, `-Z<baud>` | as in the DOS version: port, exit level, log to printer, reload, minutes to the next event, 80x25, forced baud |
+| `-C<port>`, `-E<level>`, `-P`, `-R`, `-T<min>`, `-V`, `-Z<baud>` | as in the DOS version: port, exit level, log to printer, reload, minutes to the next exclusive event (`mklisten` sets it: the call ends then), 80x25, forced baud |
 
 ## Setting up a BBS in short
 

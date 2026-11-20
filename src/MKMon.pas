@@ -22,7 +22,8 @@ Program MKMon;
 
      In the node list: L runs the BBS in local mode (mk -L -N<node>, the node of "localnode" in the mklisten
      configuration, mk from MKMON_MK) on this connection and returns here when it ends (it asks for the sysop's login
-     as usual; one at a time); M shows the mailer (the binkp mailer mkbink that mklisten runs, see MKMonMail);
+     as usual; one at a time); M shows the mailer (the binkp mailer mkbink that mklisten runs, see MKMonMail); E shows the events
+     mklisten runs (when, what, state, next and last run; R runs one now);
      a node number and Enter watch the node, the number and
      K disconnect it, C chat with the caller (watches the node, the chat starts
      when the BBS is ready), + / - give / take 5 minutes.  While
@@ -385,7 +386,7 @@ Procedure ShowNodes(Typed: String);
     SayLn('(nobody is online)');
   SayLn('');
   SayLn('Type a node number, then:  Enter watch   C chat   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
-  Say('R refresh, M mailer, L local BBS, Q quit: ' + Typed);
+  Say('R refresh, M mailer, E events, L local BBS, Q quit: ' + Typed);
   CommFlushOut;
   End;
 
@@ -1049,6 +1050,18 @@ Procedure Monitor;
         'M': Begin
              Typed := '';
              Msg := MailerScreen(RunDir);       {the binkp mailer (mkbink), if mklisten runs it}
+             ShowNodes('');
+             If Msg <> '' Then
+               Begin
+               SayLn('');
+               SayLn(Msg);
+               CommFlushOut;
+               Msg := '';
+               End;
+             End;
+        'E': Begin
+             Typed := '';
+             Msg := EventsScreen(RunDir);       {the events mklisten runs}
              ShowNodes('');
              If Msg <> '' Then
                Begin

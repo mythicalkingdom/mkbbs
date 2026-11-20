@@ -10,6 +10,7 @@ part has a document with the details; this one does not repeat them.
 | **`MKBBS.md`** | know what the BBS does, the files it uses, the programs, the `mk` options, doors |
 | **`MKLISTEN.md`** | let callers in: ports (Telnet, raw, web socket, QWK, sysop), nodes, the sysop monitor, systemd, TLS |
 | **`NETWORKING.md`** | join networks: QWK (as a hub or a node) and Fido |
+| **`EVENTS-PLAN.md`** | schedule work: events that run commands, mailer polls and hub passes, maintenance that needs the BBS quiet |
 | **`PASSWORDS.md`** | keep passwords plain or as hashes, and convert the user base |
 | **`TOSSER.md`** | understand the Fido tosser: toss, scan, pack, areafix, routing, file attach |
 | `mklisten.example.json` | a starting configuration for the listener |
@@ -57,7 +58,10 @@ part has a document with the details; this one does not repeat them.
      `mklisten`.
 
    Both are in `NETWORKING.md`; the tosser in more depth is in `TOSSER.md`.
-8. **Run it**: make a service of `mklisten` (systemd unit installed by `make install`), keep the logs (`/var/log/mkbbs`),
+8. **Schedule the routine work** with events instead of cron: `mkconfig` > Events, with an `"events"` section in `mklisten.json`
+   (`MKLISTEN.md`): the hub pass (`NETWORKING.md`), polls of the mailer, packing the message base (an *exclusive* event, which keeps callers
+   out), your own commands.
+9. **Run it**: make a service of `mklisten` (systemd unit installed by `make install`), keep the logs (`/var/log/mkbbs`),
    back up the BBS directory, and use `mkmon` to see who is on.
 
 ## A few things to know early

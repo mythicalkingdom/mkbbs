@@ -216,6 +216,10 @@ The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.
             "closed": "Closed for maintenance." }   what a refused caller sees
 ```
 
+* **The monitor:** `E` in the node list of `mkmon` shows the events (time, days, what, state, next and last run, and a `!` for an
+  exclusive one); `R` then `Y` runs the chosen event now.  `mklisten` writes `events.info` in its run directory for this and reads
+  `events.cmd` from it.
+
 Times are the wall clock of the machine.  `mkevents` prints the events as `mklisten` reads them.
 
 ## Signals

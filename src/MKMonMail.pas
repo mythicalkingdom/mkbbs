@@ -1,4 +1,4 @@
-Unit MKMonMail;   {The mailer (mkbink) screen of the sysop monitor, in the style of the old FrontDoor status screen}
+Unit MKMonMail;   {The mailer (mkbink) screen and the events screen of the sysop monitor, in the style of the old FrontDoor status screen}
 
 {$I MKB.Def}
 {$H+}                      {long strings: a frame line can be longer than 255 characters}
@@ -35,6 +35,9 @@ Interface
 
 Function MailerScreen(RunDir: String): String;
   {Shows the screen until the sysop leaves; the result is a message for the node list ('' = none)}
+
+Function EventsScreen(RunDir: String): String;
+  {The events mklisten runs (events.info of the run directory); R runs one now.  The result is a message for the node list}
 
 
 Implementation
@@ -1245,6 +1248,287 @@ Procedure RequestDialog;
   Until Done Or Gone;
   ForceAll := True;
   Dirty := True;
+  End;
+
+
+{------------------------------------------------------------ the events screen}
+
+Type
+  EvRow = Record
+    N: Word;
+    Status: Byte;
+    Minutes: Word;
+    Days: Byte;
+    State: String[10];
+    Excl: Boolean;
+    NextMin: LongInt;
+    LastRun: LongInt;
+    LastRes: LongInt;
+    EL: Word;
+    What: String[60];
+    End;
+
+Var
+  EvRows: Array[1..30] Of EvRow;
+  EvCount: Word;
+  EvBlocked, EvCallers, EvQueue, EvRunning: LongInt;
+  EvNowU: LongInt;
+  EvStale: Boolean;
+
+
+Function EvLoad(RunDir: String): Boolean;
+  {events.info of mklisten; False when there is none}
+  Var
+    F: Text;
+    Line, W: String;
+    Fl: Array[1..14] Of String;
+    k, p: Word;
+    St: Stat;
+
+  Begin
+  EvLoad := False;
+  EvCount := 0;
+  EvBlocked := 0;
+  EvCallers := 0;
+  EvQueue := 0;
+  EvRunning := 0;
+  EvNowU := 0;
+  Assign(F, RunDir + '/events.info');
+  Reset(F);
+  If IoResult <> 0 Then
+    Exit;
+  While Not Eof(F) Do
+    Begin
+    ReadLn(F, Line);
+    If Copy(Line, 1, 4) = 'now=' Then EvNowU := Str2Long(Copy(Line, 5, 12))
+    Else If Copy(Line, 1, 8) = 'blocked=' Then EvBlocked := Str2Long(Copy(Line, 9, 3))
+    Else If Copy(Line, 1, 6) = 'queue=' Then EvQueue := Str2Long(Copy(Line, 7, 5))
+    Else If Copy(Line, 1, 8) = 'running=' Then EvRunning := Str2Long(Copy(Line, 9, 5))
+    Else If Copy(Line, 1, 8) = 'callers=' Then EvCallers := Str2Long(Copy(Line, 9, 5))
+    Else If (Copy(Line, 1, 2) = 'E' + #9) And (EvCount < 30) Then
+      Begin
+      W := Line;
+      For k := 1 To 12 Do
+        Begin
+        p := Pos(#9, W);
+        If p = 0 Then
+          Begin
+          Fl[k] := W;
+          W := '';
+          End
+        Else
+          Begin
+          Fl[k] := Copy(W, 1, p - 1);
+          W := Copy(W, p + 1, 1000);
+          End;
+        End;
+      Inc(EvCount);
+      EvRows[EvCount].N := Str2Long(Fl[2]);
+      EvRows[EvCount].Status := Str2Long(Fl[3]);
+      EvRows[EvCount].Minutes := Str2Long(Fl[4]);
+      EvRows[EvCount].Days := Str2Long(Fl[5]);
+      EvRows[EvCount].State := Fl[6];
+      EvRows[EvCount].Excl := Fl[7] = '1';
+      EvRows[EvCount].NextMin := Str2Long(Fl[8]);
+      If Copy(Fl[8], 1, 1) = '-' Then EvRows[EvCount].NextMin := -1;
+      EvRows[EvCount].LastRun := Str2Long(Fl[9]);
+      EvRows[EvCount].LastRes := Str2Long(Fl[10]);
+      If Copy(Fl[10], 1, 1) = '-' Then EvRows[EvCount].LastRes := -1;
+      EvRows[EvCount].EL := Str2Long(Fl[11]);
+      EvRows[EvCount].What := Fl[12];
+      End;
+    End;
+  Close(F);
+  If IoResult <> 0 Then;
+  EvStale := (fpStat(RunDir + '/events.info', St) = 0) And (fpTime - LongInt(St.st_mtime) > 15);
+  EvLoad := True;
+  End;
+
+
+Function EvDays(D: Byte): String;
+  Var
+    i: Word;
+    S: String;
+
+  Begin
+  S := '';
+  For i := 0 To 6 Do
+    If (D And (1 Shl i)) <> 0 Then
+      S := S + Copy('SMTWTFS', i + 1, 1)
+    Else
+      S := S + '.';
+  EvDays := S;
+  End;
+
+
+Function EvIn(M: LongInt): String;
+  Begin
+  If M < 0 Then
+    EvIn := '-'
+  Else If M < 60 Then
+    EvIn := 'in ' + Num(M) + 'm'
+  Else If M < 1440 Then
+    EvIn := 'in ' + Num(M Div 60) + 'h' + Two(M Mod 60)
+  Else
+    EvIn := 'in ' + Num(M Div 1440) + 'd' + Num((M Mod 1440) Div 60) + 'h';
+  End;
+
+
+Function EventsScreen(RunDir: String): String;
+  {Shows the events mklisten runs: when, what, state, next and last run.  R runs one now (events.cmd in the run directory)}
+  Var
+    C: Char;
+    Idle: Word;
+    Cols_, Rows_: Word;
+    LastLoad: Int64;
+    Sel, Top, Vis: Integer;
+    Msg2: String;
+    MsgU: LongInt;
+    S, T: String;
+    At: Byte;
+    F: Text;
+    Ask: Char;
+
+  Procedure DrawEv;
+    Var
+      i, r: Integer;
+
+    Begin
+    Clear;
+    FillAt(1, 1, Cols, aTitle, ' ');
+    PutAt(1, 2, aTitle, 'mklisten events');
+    If EvStale Then
+      PutAt(1, 30, aTitle, 'no news from mklisten for a while');
+    PutAt(1, 60, aTitle, 'callers ' + Num(EvCallers));
+    Box(2, 1, Rows - 1, Cols, 'Events');
+    PutAt(3, 3, aLabel, Pad('#', 4) + Pad('Time', 6) + Pad('Days', 9) + Pad('What', 28) + Pad('State', 9) + Pad('Next', 9) + Pad('Last run', 12));
+    FillAt(4, 2, Cols - 1, aBox, bH);
+    Vis := Rows - 7;
+    If Sel < Top Then Top := Sel;
+    If Sel > Top + Vis - 1 Then Top := Sel - Vis + 1;
+    For i := Top To Top + Vis - 1 Do
+      If (i >= 1) And (i <= EvCount) Then
+        Begin
+        r := 5 + i - Top;
+        At := aNorm;
+        If EvRows[i].Status <> 1 Then At := aDim
+        Else If EvRows[i].State = 'running' Then At := aGood
+        Else If (EvRows[i].State = 'waiting') Or (EvRows[i].State = 'retry') Then At := aWarn;
+        S := Pad(Num(EvRows[i].N), 4) + Pad(Two(EvRows[i].Minutes Div 60) + ':' + Two(EvRows[i].Minutes Mod 60), 6) +
+          Pad(EvDays(EvRows[i].Days), 9);
+        T := EvRows[i].What;
+        If EvRows[i].EL > 0 Then
+          T := T + ' [EL ' + Num(EvRows[i].EL) + ']';
+        If EvRows[i].Excl Then
+          T := '! ' + T;
+        S := S + Pad(Copy(T, 1, 27), 28) + Pad(EvRows[i].State, 9) + Pad(EvIn(EvRows[i].NextMin), 9);
+        If EvRows[i].LastRun > 0 Then
+          S := S + Pad(ClockOf(EvRows[i].LastRun) + ' ' + Copy(Num(EvRows[i].LastRes), 1, 4), 12)
+        Else
+          S := S + Pad('never', 12);
+        If i = Sel Then
+          Begin
+          FillAt(r, 2, Cols - 1, aSel, ' ');
+          PutAt(r, 3, aSel, S);
+          End
+        Else
+          PutAt(r, 3, At, S);
+        End;
+    If EvCount = 0 Then
+      PutAt(6, 3, aDim, 'No events are set up (mkconfig: Events).');
+    PutAt(Rows - 2, 3, aDim, '! = exclusive (no callers while it runs).  Last run: time and result (0 = good).');
+    If EvBlocked <> 0 Then
+      PutAt(Rows - 2, 3, aBad, 'The BBS is closed to new callers (an exclusive event is waiting or running).' + '                    ');
+    FillAt(Rows, 1, Cols, aKey, ' ');
+    If (Msg2 <> '') And (fpTime < MsgU) Then
+      PutAt(Rows, 2, aKey, Pad(Msg2, 76))
+    Else
+      Begin
+      Msg2 := '';
+      PutAt(Rows, 2, aKeyHi, 'R');
+      PutAt(Rows, 3, aKey, 'un now  ');
+      PutAt(Rows, 12, aKey, 'Up / Down  choose  ');
+      PutAt(Rows, 32, aKeyHi, 'Q');
+      PutAt(Rows, 33, aKey, 'uit');
+      End;
+    End;
+
+  Begin
+  EventsScreen := '';
+  FrameU := fpTime;                    {CurU and ClockOf: the clock of this machine}
+  FrameLocal := fpTime;
+  If Not EvLoad(RunDir) Then
+    Begin
+    EventsScreen := 'No events: mklisten has no "events" section (no ' + RunDir + '/events.info).';
+    Exit;
+    End;
+  Rows := 25;
+  If ComSession^.GetWindowSize(Cols_, Rows_) Then
+    If (Rows_ > 25) And (Rows_ <= MaxRows) Then
+      Rows := Rows_;
+  Utf8 := TermWantsUtf8(ComSession^.GetTermType);
+  ForceAll := True;
+  Sel := 1;
+  Top := 1;
+  Msg2 := '';
+  MsgU := 0;
+  Idle := 0;
+  LastLoad := 0;
+  Repeat
+    If NowMs - LastLoad >= 1000 Then
+      Begin
+      If EvLoad(RunDir) Then;
+      If Sel > EvCount Then
+        Sel := EvCount;
+      If Sel < 1 Then
+        Sel := 1;
+      LastLoad := NowMs;
+      End;
+    DrawEv;
+    Flush;
+    C := GetKey(200);
+    If C = #0 Then
+      Begin
+      Inc(Idle);
+      If Idle > 3000 Then
+        Break;
+      End
+    Else
+      Begin
+      Idle := 0;
+      Case UpCase(C) Of
+        'Q', #27, #24, #3: Break;
+        #1: If Sel > 1 Then Dec(Sel);
+        #2: If Sel < EvCount Then Inc(Sel);
+        'R': If (EvCount > 0) And (Sel >= 1) Then
+               Begin
+               Msg2 := 'Run event ' + Num(EvRows[Sel].N) + ' now?  Y / N';
+               MsgU := fpTime + 30;
+               DrawEv;
+               Flush;
+               Ask := UpCase(GetKey(30000));
+               If Ask = 'Y' Then
+                 Begin
+                 Assign(F, RunDir + '/events.cmd');
+                                If fpAccess(RunDir + '/events.cmd', F_OK) = 0 Then Append(F) Else Rewrite(F);
+                 If IoResult = 0 Then
+                   Begin
+                   WriteLn(F, 'RUN ', EvRows[Sel].N);
+                   Close(F);
+                   Msg2 := 'mklisten was asked to run event ' + Num(EvRows[Sel].N);
+                   End
+                 Else
+                   Msg2 := 'Cannot write ' + RunDir + '/events.cmd';
+                                End
+               Else
+                 Msg2 := 'Not run';
+               If IoResult <> 0 Then;
+               MsgU := fpTime + 4;
+               End;
+        End;
+      End;
+  Until False;
+  ComSession^.SendStr(Esc + '[0;37;40m' + Esc + '[2J' + Esc + '[H');
   End;
 
 
