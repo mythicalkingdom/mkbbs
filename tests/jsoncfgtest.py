@@ -44,7 +44,7 @@ check('MK to JSON (MKJSON is a directory) completed', r.returncode == 0 and 'Con
 jf = os.path.join(jdir, 'bbsconfig.json')
 check('bbsconfig.json is there', os.path.exists(jf))
 d = json.load(open(jf, encoding='utf-8'))
-check('sections: version, config, messages, files, echo, mailer', all(k in d for k in ('version', 'config', 'messages', 'files', 'echo', 'mailer')) and d['version'] == 1)
+check('sections: version, config, messages, files, echo, mailer, events', all(k in d for k in ('version', 'config', 'messages', 'files', 'echo', 'mailer')) and d['version'] == 1)
 check('config has the field names and the sysop', d['config'].get('SysopName') == 'Mark May' and 'ExitEL' in d['config'])
 check('only message and file areas in use are written, named by number',
       0 < len(d['messages']) < 500 and all(k.isdigit() and v['Name'] for k, v in d['messages'].items()) and all(v['Name'] for v in d['files'].values()))
@@ -68,7 +68,7 @@ check('JSON to MK (MKJSON is the file) completed', r.returncode == 0 and 'Conver
 cfgmk = open(os.path.join(mk2, 'config.mk'), 'rb').read()
 check('the .mk file has the text in CP437', b'Caf\x82 \xb0 \xa4' in cfgmk and b'Z\x81rich ?' in cfgmk)
 check('config.mk has the size of the sample (BadMsgArea took bytes of AddOn)', len(cfgmk) == os.path.getsize(os.path.join(sample, 'config.mk')))
-check('all five record files are written', sorted(os.listdir(mk2)) == ['config.mk', 'echocfg.mk', 'files.mk', 'mailer.mk', 'messages.mk'])
+check('all six record files are written', sorted(os.listdir(mk2)) == ['config.mk', 'echocfg.mk', 'events.mk', 'files.mk', 'mailer.mk', 'messages.mk'])
 r = run('mkcfgcvt', '-y', '1', '5', MK=mk2, MKJSON=j2dir)
 d2 = json.load(open(os.path.join(j2dir, 'bbsconfig.json'), encoding='utf-8'))
 check('BadMsgArea went through .mk and back', d2['config'].get('BadMsgArea') == 6 and 'BadMsgArea' in d['config'])

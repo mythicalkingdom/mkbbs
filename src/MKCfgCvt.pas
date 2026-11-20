@@ -139,6 +139,7 @@ If ((InType = 1) Or (InType = 5)) And ((OutType = 1) Or (OutType = 5)) Then
   MKCfgObjPtr(OutRec)^.MKFile^ := MKCfgObjPtr(InRec)^.MKFile^;
   MKCfgObjPtr(OutRec)^.MKEcho^ := MKCfgObjPtr(InRec)^.MKEcho^;
   MKCfgObjPtr(OutRec)^.MKMail^ := MKCfgObjPtr(InRec)^.MKMail^;
+  MKCfgObjPtr(OutRec)^.MKEvents^ := MKCfgObjPtr(InRec)^.MKEvents^;
   End
 Else
   Begin

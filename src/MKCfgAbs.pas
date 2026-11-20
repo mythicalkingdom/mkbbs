@@ -274,6 +274,9 @@ Type CfgObj = Object
   Function  HasMailer: Boolean; Virtual; {The format keeps mailer (mkbink) settings}
   Procedure GetMailer(Var M: MailerCfgType); Virtual; {Mailer settings, defaults if none}
   Procedure SetMailer(Var M: MailerCfgType); Virtual;
+  Function  HasEventExt: Boolean; Virtual; {Events.Mk: what the events do (MK configurations only)}
+  Procedure GetEventExt(Var E: EventsCfgType); Virtual; {Defaults if none}
+  Procedure SetEventExt(Var E: EventsCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
   Procedure SetEchoInPath(EP: String); Virtual; {Set inbound files path}
   Function  GetEchoOutPath: String; Virtual; {Get outbound files path}
@@ -1530,6 +1533,20 @@ Procedure CfgObj.GetMailer(Var M: MailerCfgType);
   End;
 
 Procedure CfgObj.SetMailer(Var M: MailerCfgType);
+  Begin
+  End;
+
+Function CfgObj.HasEventExt: Boolean;
+  Begin
+  HasEventExt := False;
+  End;
+
+Procedure CfgObj.GetEventExt(Var E: EventsCfgType);
+  Begin
+  EventsDefaults(E);
+  End;
+
+Procedure CfgObj.SetEventExt(Var E: EventsCfgType);
   Begin
   End;
 

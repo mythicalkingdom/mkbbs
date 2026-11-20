@@ -150,6 +150,42 @@ Type MailerCfgType = Record
   Expansion: Array[1..56] of Byte;     {room for new settings}
   End;
 
+{What an event does and how it is handled when it is missed.  The times, days and status are in Config.Mk (EventType in
+ Struct.MK); these are in Events.Mk, one record for each event with the same number.  See EVENTS-PLAN.md.}
+Const
+  EventsCfgVersion = 1;
+  MaxEventExt = 30;
+  eaNone = 0;                          {EventExtType.Action: nothing (the errorlevel script, if the errorlevel is set)}
+  eaCommand = 1;                       {run the command line in Cmd}
+  eaHubPass = 3;                       {a QWK hub pass: Cmd names the hub (later)}
+  eaMailPoll = 4;                      {mailer: POLL Cmd (an address or *)}
+  eaMailHold = 5;                      {mailer: HOLD Cmd}
+  eaMailFree = 6;                      {mailer: FREE Cmd}
+  efExclusive = 1;                     {EventExtType.Flags: nothing else runs, and no one logs on, while it runs}
+  efLogOutput = 2;                     {the output of the command goes into the log}
+  elSkip = 0;                          {EventExtType.Late: a missed occurrence is dropped}
+  elWithin = 1;                        {... run once if it was at most LateMin minutes ago}
+  elRun = 2;                           {... run once, however late}
+  elPerMiss = 3;                       {... run once for each missed occurrence, at most LateMax}
+
+Type EventExtType = Record
+  Action: Byte;                        {ea constants}
+  Flags: Word;                         {ef constants}
+  Late: Byte;                          {el constants}
+  LateMin: Word;                       {minutes of grace for elWithin}
+  LateMax: Byte;                       {most runs for elPerMiss}
+  Cmd: String[100];                    {command line, or the address / hub for the other actions}
+  TimeoutMin: Word;                    {killed after this many minutes, 0 = 60}
+  Reserved: Array[1..40] of Byte;
+  End;
+
+Type EventsCfgType = Record
+  Version: Word;                       {EventsCfgVersion}
+  Ev: Array[1..MaxEventExt] of EventExtType;
+  End;
+
+Procedure EventsDefaults(Var E: EventsCfgType);
+
 Procedure MailerDefaults(Var M: MailerCfgType);
 
 Function  AddrStr(Addr: AddrType): String;
@@ -189,6 +225,22 @@ Const
 Implementation
 
 Uses MKString, Crc32, MKMisc;
+
+
+Procedure EventsDefaults(Var E: EventsCfgType);
+  Var
+    i: Word;
+
+  Begin
+  FillChar(E, SizeOf(E), 0);
+  E.Version := EventsCfgVersion;
+  For i := 1 To MaxEventExt Do
+    Begin
+    E.Ev[i].Late := elWithin;
+    E.Ev[i].LateMin := 10;
+    E.Ev[i].LateMax := 5;
+    End;
+  End;
 
 
 Procedure MailerDefaults(Var M: MailerCfgType);

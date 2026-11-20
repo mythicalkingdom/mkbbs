@@ -62,7 +62,7 @@ def parse_type(t):
     raise SystemExit('unknown type %r' % t)
 
 
-need = ['BbsCfg', 'MsgAreaType', 'FileAreaType', 'EchoCfgType', 'MailerCfgType']
+need = ['BbsCfg', 'MsgAreaType', 'FileAreaType', 'EchoCfgType', 'MailerCfgType', 'EventsCfgType']
 used = []
 
 

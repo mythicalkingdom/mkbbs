@@ -26,6 +26,7 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     j: Word;
     Addr: AddrType;
     Mail: ^MailerCfgType;
+    Ev: ^EventsCfgType;
 
   Begin
   If IConfig.HasMailer And OConfig.HasMailer Then
@@ -34,6 +35,13 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     IConfig.GetMailer(Mail^);
     OConfig.SetMailer(Mail^);
     Dispose(Mail);
+    End;
+  If IConfig.HasEventExt And OConfig.HasEventExt Then
+    Begin                              {what the events do, when both formats keep it}
+    New(Ev);
+    IConfig.GetEventExt(Ev^);
+    OConfig.SetEventExt(Ev^);
+    Dispose(Ev);
     End;
   OConfig.SetEchoMaxPkt(IConfig.GetEchoMaxPkt);
   OConfig.SetEchoInPath(IConfig.GetEchoInPath);

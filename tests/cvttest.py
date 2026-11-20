@@ -51,7 +51,8 @@ check('Remote Access to MK completed', r.returncode == 0 and 'Conversion complet
 names = {os.path.basename(f).lower(): os.path.getsize(f) for f in glob.glob(os.path.join(out, '*'))}
 want = {n: os.path.getsize(os.path.join(sample, n)) for n in ('config.mk', 'echocfg.mk', 'files.mk', 'messages.mk')}
 want['mailer.mk'] = 12600            # new: the mailer settings, written with the defaults
-check('the four MK files have the sizes of the real ones, and mailer.mk the size of its record: %s' % names, names == want)
+want['events.mk'] = 4502             # new: what the events do, written with the defaults
+check('the four MK files have the sizes of the real ones, mailer.mk and events.mk the sizes of their records: %s' % names, names == want)
 ra = os.path.join(work, 'ra.txt')
 mk = os.path.join(work, 'mk.txt')
 r1 = run('mklist', ra, RA=inp)

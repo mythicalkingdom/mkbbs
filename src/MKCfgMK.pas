@@ -19,10 +19,12 @@ Type MKCfgObj = Object(CfgObj)
   MKFile: ^FileCfgType;
   MKEcho:   ^EchoCfgType;
   MKMail:   ^MailerCfgType;
+  MKEvents: ^EventsCfgType;
   Procedure Load; Virtual; {Loads Bbs config info}
   Procedure Unload; Virtual; {Not normally called direct - unloads config}
   Procedure MKLoad; Virtual;{Normally internal to load MK config}
   Procedure MKMailLoad;
+  Procedure MKEventsLoad;
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
@@ -259,6 +261,9 @@ Type MKCfgObj = Object(CfgObj)
   Function  GetEchoMaxPkt: LongInt; Virtual; {Get maximum pkt size}
   Procedure SetEchoMaxPkt(MP: LongInt); Virtual; {Set maximum pkt size}
   Function  HasMailer: Boolean; Virtual;
+  Function  HasEventExt: Boolean; Virtual;
+  Procedure GetEventExt(Var E: EventsCfgType); Virtual;
+  Procedure SetEventExt(Var E: EventsCfgType); Virtual;
   Procedure GetMailer(Var M: MailerCfgType); Virtual;
   Procedure SetMailer(Var M: MailerCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
@@ -608,6 +613,29 @@ Procedure MKCfgObj.MKMailLoad;
   End;
 
 
+Procedure MKCfgObj.MKEventsLoad;
+  {Events.Mk is optional too: missing or shorter, what is not in the file keeps the defaults (no action, 10 minutes grace)}
+  Var
+    FN: String;
+    Tmp: ^EventsCfgType;
+
+  Begin
+  FN := FindBbsFile('events.mk') + 'events.mk';
+  If Not FileExist(FN) Then
+    Exit;
+  New(Tmp);
+  EventsDefaults(Tmp^);
+  If LoadFile(FN, Tmp^, SizeOf(Tmp^)) = 0 Then
+    Begin
+    If (Tmp^.Version >= 1) And (Tmp^.Version <= EventsCfgVersion) Then
+      MKEvents^ := Tmp^;
+    End
+  Else
+    Error := 8890;
+  Dispose(Tmp);
+  End;
+
+
 Procedure MKCfgObj.MKLoad;
   Begin
   New(MKCfg);
@@ -616,6 +644,8 @@ Procedure MKCfgObj.MKLoad;
   New(MKEcho);
   New(MKMail);
   MailerDefaults(MKMail^);
+  New(MKEvents);
+  EventsDefaults(MKEvents^);
   FileMode := fmReadWrite + fmDenyNone;
   Error := LoadFile(FindBbsFile('config.mk') + 'config.mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
@@ -627,6 +657,8 @@ Procedure MKCfgObj.MKLoad;
   If Error = 0 Then
     Begin                              {Mailer.Mk is optional (a shorter file keeps the defaults for the rest)}
     MKMailLoad;
+    If Error = 0 Then
+      MKEventsLoad;
     End;
   If Error = 0 Then
     CfgInfo^.Loaded := True
@@ -638,6 +670,7 @@ Procedure MKCfgObj.MKLoad;
     Dispose(MkFile);
     Dispose(MKEcho);
     Dispose(MKMail);
+    Dispose(MKEvents);
     End;
   End;
 
@@ -652,6 +685,8 @@ Procedure MKCfgObj.Allocate;
     New(MKEcho);
     New(MKMail);
     MailerDefaults(MKMail^);
+    New(MKEvents);
+    EventsDefaults(MKEvents^);
     FillChar(MKCfg^, SizeOf(MKCfg^), 0);
     FillChar(MKMsg^, SizeOf(MKMsg^), 0);
     FillChar(MKFile^, SizeOf(MKFile^), 0);
@@ -672,6 +707,7 @@ Procedure MKCfgObj.Unload;
     Dispose(MKFile);
     Dispose(MKEcho);
     Dispose(MKMail);
+    Dispose(MKEvents);
     CfgInfo^.Loaded := False;
     End;
   End;
@@ -720,7 +756,7 @@ Procedure MKCfgObj.Save;
 
 Function MKCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk';
+  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk|events.mk';
   End;
 
 
@@ -759,6 +795,8 @@ Procedure MKCfgObj.MKSave;
     Error := SaveFile(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
   If Error = 0 Then
     Error := SaveFile(SaveFileName('mailer.mk'), MKMail^, SizeOf(MKMail^));
+  If Error = 0 Then
+    Error := SaveFile(SaveFileName('events.mk'), MKEvents^, SizeOf(MKEvents^));
   End;
 
 
@@ -2613,6 +2651,25 @@ Procedure MKCfgObj.SetMailer(Var M: MailerCfgType);
   Begin
   MKMail^ := M;
   MKMail^.Version := MailerCfgVersion;
+  End;
+
+
+Function MKCfgObj.HasEventExt: Boolean;
+  Begin
+  HasEventExt := True;
+  End;
+
+
+Procedure MKCfgObj.GetEventExt(Var E: EventsCfgType);
+  Begin
+  E := MKEvents^;
+  End;
+
+
+Procedure MKCfgObj.SetEventExt(Var E: EventsCfgType);
+  Begin
+  MKEvents^ := E;
+  MKEvents^.Version := EventsCfgVersion;
   End;
 
 
