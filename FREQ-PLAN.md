@@ -1,6 +1,6 @@
 # FTN file requests (FREQ): plan
 
-Status: **built except the deferred parts** (2026-11-19): phases 1-8 done, see the notes at the phases.  Update requests (`+time` / `-time`) were added afterwards (all three sides).  Not done: sending the answer in the same session that brought the request (needs a second batch in mkbink's session engine).  Written 2026-11-19.  Decisions marked *(decided)* come from the discussion with the
+Status: **built except the deferred parts** (2026-11-19): phases 1-8 done, see the notes at the phases.  Update requests (`+time` / `-time`) were added afterwards (all three sides).  The answer in the same session was added too: multiple batches in mkbink (OPT MB).  Written 2026-11-19.  Decisions marked *(decided)* come from the discussion with the
 sysop; the rest are proposals to confirm.
 
 File requests let one system ask another for files by name.  Two directions:

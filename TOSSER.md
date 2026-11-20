@@ -115,7 +115,7 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    BBS, the files and the netmail come back).
    Update requests (`+time` / `-time`, UNIX seconds, FTS-0006) are done on all three sides: `mktoss` takes them from the subject,
    `mkbink queue -R` writes them (`name [!password] [+time|-time]`), `mkfreq` compares the dates of the files (`+` newer, `-` up to
-   and including).  Not done: sending the answer in the session that brought the request.
+   and including).  The answer goes in the same session when both mailers offer multiple batches (mkbink, see its `NOTES.md`), else it waits as hold mail for the requester's next call.
 7. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` answering and update requests.
 
 ## Known fixes made on the way

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A file request, the whole way in: a mkbink asks the mkbink of a BBS (settings made by mkbinkcfg, started like mklisten does it) for
-files, with a password; mkbink hands the .req to mkfreq (on-freq), the files wait as hold mail and the asker picks them up in a call of its own,
-what could not be sent is told in a netmail (the answer is hold mail: the asker picks it up with a call) (Tell by netmail: mkfreq's note, posted and sent by mktoss).
+files, with a password; mkbink hands the .req to mkfreq (on-freq), the the files go in a second batch of the same session,
+what could not be sent is told in a netmail (hold mail: the asker picks it up with a call) (Tell by netmail: mkfreq's note, posted and sent by mktoss).
 needs ../mkbink/build/mkbink.   usage: freqroundtrip.py <build dir> <work dir>"""
 import json, os, shutil, signal, subprocess, sys, time
 
@@ -106,30 +106,23 @@ procs.append(a)
 try:
     got = a_dir + '/in/this.arc'
     check('the request is answered: mkfreq ran and the files were queued', wait(lambda: b'2 file(s) queued' in open(work + '/b.log', 'rb').read(), 60))
-    time.sleep(6)                                      # the BBS has a host for the asker: normal mail would have been brought by now
-    hold = [f for f in os.listdir(outb) if f.endswith('.hlo')]
-    check('the answer is hold mail: it waits in the outbound of the BBS (.hlo), the BBS does not call the asker for it',
-          not os.path.exists(got) and hold == ['006e0064.hlo'])
-    open(a_dir + '/ping0.txt', 'w').write('ping')
-    subprocess.run([mkbink, 'queue', '-O', a_dir + '/out', '-Z', '1', '-t', '1:110/290', '-x', a_dir + '/ping0.txt'], check=True, capture_output=True)
-    check('the asker calls again and picks the files up', wait(lambda: os.path.exists(got) and os.path.exists(a_dir + '/in/other.zip'), 60)
-          and open(got, 'rb').read() == b'THIS ARC DATA' and open(a_dir + '/in/other.zip', 'rb').read() == b'OTHER')
+    check('the files come to the asker in the next batch of the same session (both mailers offered multiple batches), without a second call',
+          wait(lambda: os.path.exists(got) and os.path.exists(a_dir + '/in/other.zip'), 60)
+          and open(got, 'rb').read() == b'THIS ARC DATA' and open(a_dir + '/in/other.zip', 'rb').read() == b'OTHER'
+          and b'starting batch 2' in open(work + '/b.log', 'rb').read())
     bl = open(work + '/b.log', 'rb').read().decode('latin-1')
     check('the BBS log: the request came from 1:110/100 (secure), mkfreq answered it, the files were queued',
           'File request from 1:110/100' in bl and 'mkfreq: 1:110/100 (secure, level 100)' in bl and '2 file(s) queued' in bl)
     check('the passwords are not in the log', 'whtvr' not in bl and 'pw1' not in bl)
     check('the request file is not left in the inbound of the BBS', not [f for f in os.listdir(inb) if f.endswith(('.req', '.ans'))])
 
-    # the netmail that says what was not sent: mkfreq's note, posted and sent by mktoss.  The call that picked the files up brought a file
-    # (the ping), so the tosser (the on-inbound command) may have run already and posted it; if not, it is run here
+    # the netmail that says what was not sent: mkfreq's note, posted and sent by mktoss as hold mail.  The request file was answered
+    # at the end of a batch and is not given to the on-inbound command, so the tosser is run here (as mklisten's scan does)
     check('mkfreq wrote a note (a file was not found)', 'a note for the requester is written' in bl)
-    posted = lambda: b'file request note for 1:110/100 posted as a netmail' in open(work + '/b.log', 'rb').read()
-    if not posted():
-        r = run('mktoss', '-s', '-f', '-b', mkbink)
-        check('mktoss posts it as a netmail to the asker (hold mail)', 'file request note for 1:110/100 posted as a netmail' in r.stdout)
-    else:
-        check('mktoss (the on-inbound command) posted it as a netmail to the asker (hold mail)', True)
-    check('... the note is gone from the spool', not os.path.isdir(outb + '/mktoss/freq') or not os.listdir(outb + '/mktoss/freq'))
+    r = run('mktoss', '-s', '-f', '-b', mkbink)
+    check('mktoss posts it as a netmail to the asker (hold mail) and the note is gone from the spool',
+          'file request note for 1:110/100 posted as a netmail' in r.stdout
+          and (not os.path.isdir(outb + '/mktoss/freq') or not os.listdir(outb + '/mktoss/freq')))
     open(a_dir + '/ping.txt', 'w').write('ping')
     subprocess.run([mkbink, 'queue', '-O', a_dir + '/out', '-Z', '1', '-t', '1:110/290', '-x', a_dir + '/ping.txt'], check=True, capture_output=True)
 
