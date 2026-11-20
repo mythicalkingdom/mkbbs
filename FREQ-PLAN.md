@@ -197,3 +197,9 @@ Everything lives in `Mailer.Mk` and the area records and is mirrored in `bbsconf
 5. **Attach-style outbound** (mkbink's FrontDoor-style mode): the netmail with the request flag is left alone today.  Leave
    it so: file requests are BSO only for now.
 6. **Update requests** (`+time` / `-time`): done (mkbink `queue -R`, `mktoss` subject parsing, `mkfreq` file dates).
+
+## SRIF (2026-11-20)
+
+`mkbink` can run an SRIF request processor (`on-freq-srif`) and `mkfreq -S <srif file>` answers an SRIF request, so binkd and other
+SRIF mailers can use `mkfreq`.  A delete mark in an answer is obeyed only for a file directly in `freq-tmp` (see `NETWORKING.md` and the mkbink
+`NOTES.md`).  Started after a binkd system's own processor deleted the files it offered.

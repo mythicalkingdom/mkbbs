@@ -4,6 +4,7 @@ Program MKFreq;
 
 {
      mkfreq <requester> <secure|unsecure> <request file> <answer file>
+     mkfreq -S <srif file>
 
      Answers an FTN file request (FTS-0006): the command that mkbink runs for each .req it receives (the "on-freq" line of
      its settings, which mkbinkcfg writes when Mailer > File requests is on).  Which BBS it works for comes from the
@@ -18,6 +19,16 @@ Program MKFreq;
                         SEND<TAB>/absolute/path          send the file, keep it
                         SEND<TAB>/absolute/path<TAB>^    send it, delete it after (a list made for this request)
                         NOTE<TAB>text                    what was refused or not found, and why
+
+     mkfreq -S <srif file> is the same for a mailer that speaks SRIF (FSC-0086 / FSP-1040), such as binkd:
+
+          exec "mkfreq -S *S" *.req                       (binkd.cfg: *S is the SRIF file)
+
+     The requester is the first AKA, secure is RemoteStatus PROTECTED, the request file is RequestList and what is found goes
+     to ResponseList, one name a line: "+" in front keeps the file, "=" erases it after it was sent (only the list that this
+     program makes for a "@LIST" name has it; no file of a file area is ever marked).  There are no NOTE lines then; the netmail
+     note of "Tell by netmail" is made as usual.  The environment variable MKBINK_TMP (mkbink sets it) names the directory for
+     the list; without it the list is made next to the response list.
 
      What a system may have:
 
@@ -51,6 +62,7 @@ Const
 Var
   M: ^MailerCfgType;
   Secure: Boolean;
+  SrifMode: Boolean;                   {mkfreq -S: an SRIF file in, a response list out}
   Who, ReqFile, AnsFile: String;
   Requester: AddrType;
   Profile: SecType;
@@ -71,9 +83,61 @@ Var
   NReport: Word;
 
 
+Function ReadSrif(Const Name: String): Boolean;
+  {The SRIF file of the mailer: the first AKA is who asked, RemoteStatus says secure, RequestList and ResponseList the files}
+  Var
+    F: Text;
+    L, Key, Val: String;
+    p: Word;
+    GotAka: Boolean;
+
+  Begin
+  ReadSrif := False;
+  Who := '';
+  ReqFile := '';
+  AnsFile := '';
+  Secure := False;
+  GotAka := False;
+  Assign(F, Name);
+  FileMode := 0;
+  Reset(F);
+  If IoResult <> 0 Then
+    Exit;
+  While Not Eof(F) Do
+    Begin
+    ReadLn(F, L);
+    L := StripBoth(L, ' ');
+    p := Pos(' ', L);
+    If p > 0 Then
+      Begin
+      Key := Upper(Copy(L, 1, p - 1));
+      Val := StripBoth(Copy(L, p + 1, 250), ' ');
+      If (Key = 'AKA') And (Not GotAka) Then
+        Begin
+        p := Pos('@', Val);
+        If p > 0 Then
+          Val := Copy(Val, 1, p - 1);                {the domain is not part of the address here}
+        Who := Val;
+        GotAka := True;
+        End
+      Else If Key = 'REQUESTLIST' Then
+        ReqFile := Val
+      Else If Key = 'RESPONSELIST' Then
+        AnsFile := Val
+      Else If Key = 'REMOTESTATUS' Then
+        Secure := Upper(Val) = 'PROTECTED';
+      End;
+    End;
+  Close(F);
+  If IoResult <> 0 Then;
+  ReadSrif := (Who <> '') And (ReqFile <> '') And (AnsFile <> '');
+  End;
+
+
 Procedure Note(Const S: String);
   Begin
-  WriteLn(Ans, 'NOTE', #9, S);
+  If Not SrifMode Then
+    WriteLn(Ans, 'NOTE', #9, S);
   If NReport < MaxReport Then
     Begin
     Inc(NReport);
@@ -175,10 +239,20 @@ Function AddFile(Const Path: String; Delete: Boolean; Const Req: String): Boolea
   Inc(NSent);
   Sent[NSent] := Path;
   Inc(TotalBytes, Sz);
-  Write(Ans, 'SEND', #9, Path);
-  If Delete Then
-    Write(Ans, #9, '^');
-  WriteLn(Ans);
+  If SrifMode Then
+    Begin
+    If Delete Then
+      WriteLn(Ans, '=', Path)
+    Else
+      WriteLn(Ans, '+', Path);
+    End
+  Else
+    Begin
+    Write(Ans, 'SEND', #9, Path);
+    If Delete Then
+      Write(Ans, #9, '^');
+    WriteLn(Ans);
+    End;
   End;
 
 
@@ -291,6 +365,8 @@ Function MakeList(Name: String; Var ListPath: String): Boolean;
   While (p > 0) And (AnsFile[p] <> '/') Do
     Dec(p);
   Dir := Copy(AnsFile, 1, p);
+  If GetEnv('MKBINK_TMP') <> '' Then
+    Dir := WithSlash(GetEnv('MKBINK_TMP'));       {the one place whose files may be deleted after they were sent}
   ListPath := Dir + Lower(Name) + '.lst';
   Assign(T, ListPath);
   Rewrite(T);
@@ -566,15 +642,29 @@ Var
 Begin
 NReport := 0;
 Randomize;
-If ParamCount < 4 Then
+SrifMode := False;
+If (ParamCount = 2) And (ParamStr(1) = '-S') Then
   Begin
-  WriteLn('Usage: mkfreq <requester> <secure|unsecure> <request file> <answer file>');
-  Halt(1);
+  If Not ReadSrif(ParamStr(2)) Then
+    Begin
+    WriteLn('mkfreq: cannot use the SRIF file ', ParamStr(2));
+    Halt(1);
+    End;
+  SrifMode := True;
+  End
+Else
+  Begin
+  If ParamCount < 4 Then
+    Begin
+    WriteLn('Usage: mkfreq <requester> <secure|unsecure> <request file> <answer file>');
+    WriteLn('       mkfreq -S <srif file>');
+    Halt(1);
+    End;
+  Who := ParamStr(1);
+  Secure := Upper(ParamStr(2)) = 'SECURE';
+  ReqFile := ParamStr(3);
+  AnsFile := ParamStr(4);
   End;
-Who := ParamStr(1);
-Secure := Upper(ParamStr(2)) = 'SECURE';
-ReqFile := ParamStr(3);
-AnsFile := ParamStr(4);
 Config := NewMKConfig(False);                   {the whole configuration (the mailer settings are not in the read-only one)}
 If Config = Nil Then
   Begin
@@ -631,7 +721,7 @@ MaxKb := M^.ReqMaxKb;
 NSent := 0;
 TotalBytes := 0;
 LoadMagic;
-LogLine(Who + ' (' + Lower(ParamStr(2)) + ', level ' + Long2Str(Profile.Level) + ')');
+LogLine(Who + ' (' + Copy('unsecure', 1 + 2 * Ord(Secure), 8 - 2 * Ord(Secure)) + Copy(', SRIF', 1, 6 * Ord(SrifMode)) + ', level ' + Long2Str(Profile.Level) + ')');
 {the request file: lines end in CR (the spec), LF or CR LF}
 Assign(F, ReqFile);
 FileMode := 0;

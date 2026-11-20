@@ -15,9 +15,9 @@ if not os.path.isdir(src) or not os.path.exists(build + '/mkfreq'):
 fails = 0
 
 
-def check(name, ok):
+def check(name, ok, info=''):
     global fails
-    print(('ok   ' if ok else 'FAIL ') + 'mkfreq: ' + name)
+    print(('ok   ' if ok else 'FAIL ') + 'mkfreq: ' + name + ('' if ok else '  ' + str(info)))
     if not ok:
         fails += 1
 
@@ -138,6 +138,41 @@ check('... a wrong or missing one does not', s == [] and len(n) == 2 and all('pa
 r, s, n = ask('1:110/290', 'unsecure', ['SECRETS !pw1', 'this.arc'])
 check('... and not in a session without a password, whatever is given; ordinary files go on', names(s) == ['this.arc'] and any('needs a session with a password' in x for x in n))
 check('... no password is in the output', 'pw1' not in r.stdout and 'pw1' not in r.stderr)
+
+
+# ---- the same through SRIF (mkfreq -S <srif file>): what binkd and other SRIF mailers run
+def srif(aka, status, lines, env_extra=None):
+    req, rsp, sf = work + '/sreq', work + '/srsp', work + '/srif'
+    open(req, 'wb').write(('\r'.join(lines) + '\r').encode())
+    if os.path.exists(rsp):
+        os.remove(rsp)
+    open(sf, 'w').write('Sysop Some Sysop\nAKA %s@fidonet\nAKA 1:1/1\nBaud 115200\nTime -1\nRequestList %s\nResponseList %s\nRemoteStatus %s\n'
+                        'SystemStatus LISTED\n' % (aka, req, rsp, status))
+    r = subprocess.run([build + '/mkfreq', '-S', sf], env=dict(env, **(env_extra or {})), capture_output=True, text=True)
+    out = []
+    if os.path.exists(rsp):
+        out = [l for l in open(rsp, encoding='latin-1').read().split('\n') if l]
+    return r, out
+
+
+r, o = srif('1:110/290', 'PROTECTED', ['this.arc !whatever', 'SECRET.ZIP', 'hidden.zip', 'flagged.zip', 'nothere.zip'])
+check('SRIF: the first AKA (the domain is dropped) is the requester: the link of level 150 gets its files', sorted(os.path.basename(l[1:]) for l in o) == ['secret.zip', 'this.arc'] and r.returncode == 0, (r.stdout, o))
+check('... every line is "+" and an absolute path: nothing is marked for deleting, and there are no NOTE lines',
+      all(l[0] == '+' and l[1] == '/' for l in o) and not any('NOTE' in l for l in o))
+r, o = srif('1:110/290', 'PROTECTED', ['FILES'])
+check('SRIF: FILES (@LIST): one line "=" and the path of the list (erased by the mailer after it was sent), the file exists',
+      len(o) == 1 and o[0][0] == '=' and o[0].endswith('files.lst') and os.path.exists(o[0][1:]), o)
+tmpd = work + '/mkbink-tmp'
+os.makedirs(tmpd, exist_ok=True)
+r, o = srif('1:110/290', 'PROTECTED', ['FILES'], {'MKBINK_TMP': tmpd})
+check('... with MKBINK_TMP the list is made in that directory (the one place mkbink deletes from)', len(o) == 1 and o[0] == '=' + tmpd + '/files.lst' and os.path.exists(tmpd + '/files.lst'), o)
+r, o = srif('1:110/290', 'UNPROTECTED', ['SECRETS !pw1', 'this.arc'])
+check('SRIF: RemoteStatus UNPROTECTED is an unsecure session: a magic name with a password is refused, ordinary files go on',
+      [os.path.basename(l[1:]) for l in o] == ['this.arc'], o)
+r, o = srif('1:110/291', 'PROTECTED', ['this.arc', 'secret.zip'])
+check('SRIF: another link, its own (lower) profile: only what it has the level for', [os.path.basename(l[1:]) for l in o] == ['this.arc'] or o == [], o)
+r = subprocess.run([build + '/mkfreq', '-S', work + '/nonexistent.srif'], env=env, capture_output=True, text=True)
+check('SRIF: a file that is not there: exit 1', r.returncode == 1)
 
 # refusals
 r, s, n = ask('1:110/290', 'secure', ['../etc/passwd', 'a/b.zip', '.hidden', 'x\\y.zip', '+5 first.zip'])

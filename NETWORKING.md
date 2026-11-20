@@ -289,6 +289,23 @@ caller that is not a link ("Bad address").
    system may request.  A name with a password is only given in a session with a password and with `!password` after it.
 6. Restart the mailer (`mklisten` writes the settings with `mkbinkcfg` and `mkbink` runs `mkfreq` for each request that arrives).
 
+**Answering for another mailer (binkd and others, SRIF).**  `mkfreq -S <srif file>` is `mkfreq` for a mailer that speaks SRIF
+(FSC-0086 / FSP-1040).  In `binkd.cfg` of that system, with the BBS configuration in `MK`:
+
+```
+exec "/usr/local/bin/mkfreq -S *S" *.req
+```
+
+The requester is the first AKA, `RemoteStatus PROTECTED` is a secure session, and the names found go to the response list with a `+` (keep the
+file); only the list of a `@LIST` name is marked `=` (erase after it was sent), because the program made it.  You get everything `mkfreq` does
+(file areas with Allow file requests, security profiles, magic names, passwords, update requests, limits); the netmail note of "Tell by netmail"
+is made too.  A request processor must never be able to delete a file it only offers: with the SRIF `=` or `-` in front of a name the mailer erases it.
+
+**The mailer's side of that rule.**  `mkbink` obeys a delete mark of a request answer (`^`, or `=` / `-` of SRIF) only for a regular file directly in its
+`freq-tmp` directory (`freq-tmp` in its settings, default `freq-tmp` in the inbound directory; `mkfreq` makes its lists there through `MKBINK_TMP`).
+For any other file the mark is ignored, the file is sent and kept, and the log says so.  `mkbink` can also use any SRIF processor with
+`on-freq-srif <command>` instead of `on-freq`.
+
 What `mkfreq` does with a name (an update request filters the matches by their date; a request that finds nothing newer is no
 problem and no note, only a name that matches nothing is "not found"): wildcards and upper case are fine; names with a slash, a backslash or a leading dot are refused;
 a name that nothing matches is "not found" (the same words for a file the system may not have, so a refusal does not tell what
