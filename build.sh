@@ -238,6 +238,9 @@ if grep -q FAIL build/mlresult.txt; then exit 1; fi
 # mklisten runs the events: commands, events.sh, mailer actions, missed events, exclusive events
 python3 tests/eventlistentest.py build/work/eventlisten | grep -E "^(ok|FAIL|skip)" | tee build/evresult.txt
 if grep -q FAIL build/evresult.txt; then exit 1; fi
+# a caller before an exclusive event: told when the BBS closes, the call is cut to that (mk -T)
+python3 tests/eventclosetest.py build/work/eventclose | grep -E "^(ok|FAIL|skip)" | tee build/evclose.txt
+if grep -q FAIL build/evclose.txt; then exit 1; fi
 # the Mailer screen of mkmon (needs the real mkbink next to this project)
 python3 tests/mailmontest.py build/mmwork | grep -E "^(ok|FAIL|skip)" | tee build/mmresult.txt
 if grep -q FAIL build/mmresult.txt; then exit 1; fi

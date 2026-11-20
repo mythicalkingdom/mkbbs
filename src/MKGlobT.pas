@@ -205,6 +205,10 @@ Procedure Str2MKD(St: String; Var MKD: MKDateType);
 Function MKD2Str(MKD: MKDateType): String;
 Function GetCompiled: String;
 Function AddrEqual(Addr1: AddrType; Addr2: AddrType):Boolean;
+Procedure SetTimeToEvent(Minutes: LongInt);
+  {mk -T: remembers the minutes and when mk was started}
+Function SecsToEvent: LongInt;
+  {Seconds left until that event, -1 when mk was not told of one (it can be 0 or less when it is due)}
 
 Var
   StartUpPath: String[128];
@@ -219,12 +223,29 @@ Const
   OverRideBaud: Word = 0;
   UserBaud: Word = 0;
   ExitErrorLevel: Byte = 0;
-  TimeToEvent: LongInt = 0;
+  TimeToEvent: LongInt = 0;            {mk -T<min>: minutes from the start of mk to the next event that needs the BBS quiet (an exclusive one)}
+  TimeToEventAt: Int64 = 0;
   ShellToMailer: Boolean = False;
 
 Implementation
 
-Uses MKString, Crc32, MKMisc;
+Uses MKString, Crc32, MKMisc, MKPlat;
+
+
+Procedure SetTimeToEvent(Minutes: LongInt);
+  Begin
+  TimeToEvent := Minutes;
+  TimeToEventAt := MKTicks;
+  End;
+
+
+Function SecsToEvent: LongInt;
+  Begin
+  If TimeToEvent <= 0 Then
+    SecsToEvent := -1
+  Else
+    SecsToEvent := TimeToEvent * 60 - LongInt((MKTicks - TimeToEventAt) Div 1000);
+  End;
 
 
 Procedure EventsDefaults(Var E: EventsCfgType);

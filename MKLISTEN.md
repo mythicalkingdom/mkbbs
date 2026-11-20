@@ -202,12 +202,17 @@ The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.
   refused with the "closed" text; it starts when the callers have left (a *Forced* event disconnects them: the K of the monitor, then
   SIGTERM after 15 seconds) and nothing else runs while it does.  Other events may run at the same time (`parallel`, default 4); the same event
   never overlaps itself.  The sysop monitor port is not closed.
+* **Callers before an exclusive event:** a caller who logs on within 24 hours before one is started with `mk -T<minutes>`: the call is cut
+  to end when the event is due ("The BBS closes for maintenance in N minute(s)" at the login, and the minutes remaining show it).
+  With `"lead": 10` new callers are refused that many minutes before the event instead of when it is due.  Callers already on
+  are cut by the same limit, so a *Forced* event usually finds the BBS empty.
 
 ```
 "events": { "config": "/bbs/ra",                    the BBS configuration directory (default: the mailer's)
             "mkevents": "/usr/local/bin/mkevents",  (default: next to mk)
             "parallel": 4,                          events that may run at once
             "interval": 30,                         seconds between looks for a changed configuration
+            "lead": 10,                             minutes before an exclusive event when new callers are refused (0 = when it is due)
             "closed": "Closed for maintenance." }   what a refused caller sees
 ```
 

@@ -130,12 +130,15 @@ Program MKListen;
      by the listener at their times: a command, or POLL / HOLD / FREE of the mailer's links, and when the errorlevel of
      an event is not 0 the script events.sh of the BBS directory (arguments: errorlevel, event number, result of the
      action).  An exclusive event keeps new callers out (they get "closed"), waits for the callers to leave (a forced
-     one disconnects them) and runs alone.  What the listener remembers goes to events.run in the BBS directory.
+     one disconnects them) and runs alone.  A caller who logs on before it is told how long the BBS is open: mk is started with
+     -T<minutes to the next exclusive event> and the call ends then (at most 24 hours ahead); with "lead" new callers are
+     refused that many minutes earlier.  What the listener remembers goes to events.run in the BBS directory.
 
           "events": { "config": "/bbs/ra",               the BBS configuration directory (default: the mailer's)
                       "mkevents": "/usr/local/bin/mkevents",   (default: next to mk)
                       "parallel": 4,                     events that may run at once (default 4)
                       "interval": 30,                    seconds between looks for a changed configuration
+                      "lead": 10,                        minutes before an exclusive event when new callers are refused
                       "closed": "Closed for maintenance." }   shown to a caller refused for an exclusive event
 
      SIGTERM / SIGINT stop the listener (and the mailer); callers already connected keep running.
@@ -250,6 +253,7 @@ Var
   EvConfig, EvTool, EvBbsDir: String;
   EvParallel: Integer = 4;
   EvInterval: Integer = 30;
+  EvLead: Integer = 0;                 {minutes before an exclusive event: no new callers (0 = until it is due)}
   EvOffset: Int64 = 0;                 {added to the clock (tests: "clock")}
   EvClosedMsg: String = 'The BBS is closed for maintenance. Please try again later.';
   EvDefs: Array[1..MaxEv] Of TEvDef;
@@ -551,6 +555,7 @@ Procedure LoadEvents(O: TJSONObject);
     Else If Key = 'mkevents' Then EvTool := JStr(V, 'events.mkevents')
     Else If Key = 'parallel' Then EvParallel := JInt(V, 'events.parallel', 1, 16)
     Else If Key = 'interval' Then EvInterval := JInt(V, 'events.interval', 1, 86400)
+    Else If Key = 'lead' Then EvLead := JInt(V, 'events.lead', 0, 1440)
     Else If Key = 'clock' Then EvOffset := JInt(V, 'events.clock', 100000, MaxLongint)    {tests: the time the clock shows at the start}
     Else If Key = 'closed' Then EvClosedMsg := JStr(V, 'events.closed')
     Else If Key = 'enabled' Then EvOn := JBool(V, 'events.enabled')
@@ -1877,6 +1882,28 @@ Function EvIsExclusive(N: Integer): Boolean;
   End;
 
 
+Function EvMinutesToExclusive: LongInt;
+  {Minutes to the next occurrence of an enabled exclusive event, -1 when there is none}
+  Var
+    n: Integer;
+    M: LongInt;
+    T: Int64;
+
+  Begin
+  EvMinutesToExclusive := -1;
+  If (Not EvOn) Or (Not EvLoaded) Then
+    Exit;
+  T := EvNowLocal;
+  For n := 1 To MaxEv Do
+    If EvDefs[n].Defined And (EvDefs[n].Status = 1) And EvIsExclusive(n) Then
+      Begin
+      M := MKEvent.MinutesToNext(EvDefs[n].Minutes, EvDefs[n].Days, T);
+      If (M >= 0) And ((EvMinutesToExclusive < 0) Or (M < EvMinutesToExclusive)) Then
+        EvMinutesToExclusive := M;
+      End;
+  End;
+
+
 Function EventsBlockLogins: Boolean;
   {An exclusive event is waiting or running: no one logs on}
   Var
@@ -1892,6 +1919,12 @@ Function EventsBlockLogins: Boolean;
   For i := 0 To High(EvRuns) Do
     If EvIsExclusive(EvRuns[i].N) Then
       EventsBlockLogins := True;
+  If (EvLead > 0) And (Not EventsBlockLogins) Then
+    Begin                              {the lead time: the BBS is closed to new callers shortly before the event}
+    i := EvMinutesToExclusive;
+    If (i >= 0) And (i <= EvLead) Then
+      EventsBlockLogins := True;
+    End;
   End;
 
 
@@ -2515,6 +2548,9 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     Begin
     ArgS.Add(MkPath);
     ArgS.Add('-N' + IntToStr(Node));
+    i := EvMinutesToExclusive;                 {the call ends before the next exclusive event (mk -T)}
+    If (i >= 1) And (i <= 1440) Then
+      ArgS.Add('-T' + IntToStr(i));
     End;
   ArgS.Add('-S' + UpperCase(P.SType));
   If (P.Baud > 0) And (Not P.Sysop) Then

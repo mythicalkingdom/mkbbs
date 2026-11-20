@@ -158,6 +158,7 @@ Procedure LogOnUser;
     TmpStr: String;
     TodayStr: String;
     LDate: LongInt;
+    Left: LongInt;
 
   Begin
   DoSysInfo;
@@ -180,6 +181,17 @@ Procedure LogOnUser;
     End;
   User.SetUserDLLimit(GetKFromLimit(TmpStr, UserBaud));
   User.SetStartTime;
+  If SecsToEvent >= 0 Then
+    Begin                              {an exclusive event is coming (mk -T): the call ends before it}
+    Left := SecsToEvent;
+    If Left < 30 Then
+      Left := 30;
+    If Left < User.GetSessionTimeLimit Then
+      Begin
+      User.SetSessionTimeLimit(Left);
+      User.DisplayStrLn('The BBS closes for maintenance in ' + Long2Str((Left + 59) Div 60) + ' minute(s): this call ends then.');
+      End;
+    End;
   If BbsDisplay.DisplayBbsFile('welcome', '') = '' Then;
   If BbsDisplay.DisplayBbsFile('welcome1', '') = '' Then;
   LDate := LongDate(User.GetUserLastDate);

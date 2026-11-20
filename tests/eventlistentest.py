@@ -19,9 +19,9 @@ fails = 0
 procs = []
 
 
-def check(name, ok):
+def check(name, ok, info=''):
     global fails
-    print(('ok   ' if ok else 'FAIL ') + 'events: ' + name)
+    print(('ok   ' if ok else 'FAIL ') + 'events: ' + name + ('' if ok else '  ' + str(info)))
     if not ok:
         fails += 1
 
@@ -314,6 +314,39 @@ try:
           wait(lambda: read(os.path.join(hubdir, 'script.out')).strip() == '4 2 5', 10))
     time.sleep(1.5)
     check('nothing is tried again after the end', read(os.path.join(hubdir, 'HUBA.count')).strip() == '3' and read(os.path.join(hubdir, 'HUBB.count')).strip() == '2')
+    stop(p)
+    # ---------------------------------------------------------------- an exclusive event ahead: callers get -T, "lead" closes the BBS early
+    argsmk = os.path.join(work, 'argsmk')
+    argsout = os.path.join(work, 'args.out')
+    open(argsmk, 'w').write('#!/bin/sh\necho "$@" >> %s\nexec cat > /dev/null\n' % argsout)
+    os.chmod(argsmk, 0o755)
+    cfg = make_cfg('s7', {1: dict(action=1, cmd='/bin/true', flags=1, time='03:30'), 2: dict(status=2, action=1, cmd='/bin/true', flags=1, time='03:05')})
+    p, log, port, run = start('s7', cfg, hms(3, 0, 0), mk=argsmk)
+    time.sleep(1.5)
+    c1 = socket.create_connection(('127.0.0.1', port), timeout=5)
+    check('a caller before an exclusive event (30 minutes ahead): mk is started with -T30 (a disabled event does not count)',
+          wait(lambda: '-T30' in read(argsout) or '-T29' in read(argsout), 5), read(argsout))
+    c1.close()
+    stop(p)
+    open(argsout, 'w').close()
+    p, log, port, run = start('s7b', cfg, hms(3, 0, 0), mk=argsmk, extra={'lead': 40})
+    time.sleep(1.5)
+    c2 = socket.create_connection(('127.0.0.1', port), timeout=5)
+    c2.settimeout(5)
+    try:
+        data = c2.recv(200)
+    except OSError:
+        data = b''
+    check('"lead": 40 minutes: 30 minutes before the event a new caller is refused (closed), no mk started',
+          b'Closed for maintenance.' in data and read(argsout) == '', (data, read(argsout)))
+    c2.close()
+    stop(p)
+    open(argsout, 'w').close()
+    p, log, port, run = start('s7c', cfg, hms(3, 0, 0), mk=argsmk, extra={'lead': 20})
+    time.sleep(1.5)
+    c3 = socket.create_connection(('127.0.0.1', port), timeout=5)
+    check('"lead": 20 minutes: 30 minutes ahead the caller is still let in', wait(lambda: '-T' in read(argsout), 5), read(argsout))
+    c3.close()
     stop(p)
 finally:
     for q in procs:

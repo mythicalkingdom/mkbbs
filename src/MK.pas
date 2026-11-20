@@ -117,7 +117,7 @@ While i <= ParamCount Do
              NodeNumber := Str2Long(Copy(TmpStr,3,5));
            End;
       'R': Reload := True;
-      'T': TimeToEvent := Str2Long(Copy(TmpStr,3,5));
+      'T': SetTimeToEvent(Str2Long(Copy(TmpStr,3,5)));
       'U': Begin                       {character set of the caller's text}
            If (Copy(TmpStr,3,10) = 'UTF8') Or (Copy(TmpStr,3,10) = 'UTF-8') Then
              CharsetMode := 2
