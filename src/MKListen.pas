@@ -126,12 +126,24 @@ Program MKListen;
      arrives (mkbinkcfg makes it "mktoss" when Mailer > Tosser is on) finds the configuration.
      Whatever happens to the listener (even SIGKILL) takes mkbink with it.
 
+     Events: the events of the BBS configuration (mkconfig: Events; Config.Mk and Events.Mk, see EVENTS-PLAN.md) are run
+     by the listener at their times: a command, or POLL / HOLD / FREE of the mailer's links, and when the errorlevel of
+     an event is not 0 the script events.sh of the BBS directory (arguments: errorlevel, event number, result of the
+     action).  An exclusive event keeps new callers out (they get "closed"), waits for the callers to leave (a forced
+     one disconnects them) and runs alone.  What the listener remembers goes to events.run in the BBS directory.
+
+          "events": { "config": "/bbs/ra",               the BBS configuration directory (default: the mailer's)
+                      "mkevents": "/usr/local/bin/mkevents",   (default: next to mk)
+                      "parallel": 4,                     events that may run at once (default 4)
+                      "interval": 30,                    seconds between looks for a changed configuration
+                      "closed": "Closed for maintenance." }   shown to a caller refused for an exclusive event
+
      SIGTERM / SIGINT stop the listener (and the mailer); callers already connected keep running.
      SIGHUP makes the mailer read its settings again.
 *)
 
 Uses
-  BaseUnix, Sockets, Users, SysUtils, Classes, fpjson, jsonparser;
+  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent;
 
 
 Type
@@ -157,6 +169,34 @@ Type
     PortNo: Integer;
     Addr: String;
     Started: LongInt;
+    End;
+
+Const
+  MaxEv = 30;
+
+Type
+  TEvDef = Record                      {one event: what mkevents prints, and what the daemon remembers}
+    Defined: Boolean;
+    Status, Minutes, Days, EL, Forced, Action, Flags, Late, LateMin, LateMax, Timeout: Integer;
+    Cmd: String;
+    Seen: Boolean;                     {LastDue is valid}
+    LastDue: Int64;                    {local seconds: the last occurrence dealt with}
+    LastRun: Int64;                    {UNIX time of the last start}
+    LastResult: Integer;
+    End;
+
+  TEvJob = Record                      {an occurrence that waits to start}
+    N: Integer;
+    Due, Expires, Kicked: Int64;
+    Termed: Boolean;
+    End;
+
+  TEvRun = Record                      {a running event: its program (phase 1) or events.sh (phase 2)}
+    N: Integer;
+    Pid: TPid;
+    Phase: Integer;
+    Started, Deadline, TermAt: Int64;
+    Result: Integer;
     End;
 
 
@@ -201,6 +241,22 @@ Var
   MailerSig: String = '#';
   NextSync: LongInt = 0;
   SyncNow: Boolean = True;             {SIGHUP, and the start}
+  { the events }
+  EvOn: Boolean = False;               {an "events" section is in the configuration}
+  EvConfig, EvTool, EvBbsDir: String;
+  EvParallel: Integer = 4;
+  EvInterval: Integer = 30;
+  EvOffset: Int64 = 0;                 {added to the clock (tests: "clock")}
+  EvClosedMsg: String = 'The BBS is closed for maintenance. Please try again later.';
+  EvDefs: Array[1..MaxEv] Of TEvDef;
+  EvQueue: Array Of TEvJob;
+  EvRuns: Array Of TEvRun;
+  EvLoaded: Boolean = False;
+  EvLoadFailed: Boolean = False;
+  EvLastSig: String = '#';
+  EvNextLoad: Int64 = 0;
+  EvStateDirty: Boolean = False;
+  EvScriptWarned: Boolean = False;
 
 
 Type
@@ -475,6 +531,33 @@ Procedure LoadMailer(O: TJSONObject);
   End;
 
 
+Procedure LoadEvents(O: TJSONObject);
+  Var
+    i: Integer;
+    Key: String;
+    V: TJSONData;
+
+  Begin
+  EvOn := True;
+  For i := 0 To O.Count - 1 Do
+    Begin
+    Key := LowerCase(O.Names[i]);
+    V := O.Items[i];
+    If Key = 'config' Then EvConfig := JStr(V, 'events.config')
+    Else If Key = 'mkevents' Then EvTool := JStr(V, 'events.mkevents')
+    Else If Key = 'parallel' Then EvParallel := JInt(V, 'events.parallel', 1, 16)
+    Else If Key = 'interval' Then EvInterval := JInt(V, 'events.interval', 1, 86400)
+    Else If Key = 'clock' Then EvOffset := JInt(V, 'events.clock', 100000, MaxLongint)    {tests: the time the clock shows at the start}
+    Else If Key = 'closed' Then EvClosedMsg := JStr(V, 'events.closed')
+    Else If Key = 'enabled' Then EvOn := JBool(V, 'events.enabled')
+    Else If Copy(Key, 1, 1) <> '_' Then
+      Die('events: unknown key "' + O.Names[i] + '"');
+    End;
+  If O.Find('clock') <> Nil Then
+    EvOffset := EvOffset - Int64(fpTime);
+  End;
+
+
 Procedure LoadConfig;
   Var
     Src: TFileStream;
@@ -532,6 +615,12 @@ Procedure LoadConfig;
         Die('"mailer" must be an object');
       LoadMailer(TJSONObject(V));
       End
+    Else If Key = 'events' Then
+      Begin
+      If V.JSONType <> jtObject Then
+        Die('"events" must be an object');
+      LoadEvents(TJSONObject(V));
+      End
     Else If Copy(Key, 1, 1) <> '_' Then
       Die(CfgFile + ': unknown key "' + O.Names[i] + '"');
     End;
@@ -558,6 +647,16 @@ Procedure LoadConfig;
       MonPath := 'mkmon';
     End;
   MonPath := ResolveProg(MonPath);
+  If EvOn Then
+    Begin
+    If EvConfig = '' Then
+      EvConfig := MailConfig;
+    If EvConfig = '' Then
+      Die('events: "config" (the BBS configuration directory) is needed');
+    If EvTool = '' Then
+      EvTool := NextToMk('mkevents');
+    EvTool := ResolveProg(EvTool);
+    End;
   If MailerOn Then
     Begin
     If MailBink = '' Then
@@ -1187,6 +1286,967 @@ Procedure StopMailer;
   End;
 
 
+{------------------------------------------------------------------ events}
+{ The events of the BBS configuration (Config.Mk and Events.Mk, see EVENTS-PLAN.md), read by "mkevents", run here.
+  Times are local seconds (MKEvent.pas): the wall clock as a number. }
+
+Function EvLocal(U: Int64): Int64;
+  Begin
+  EvLocal := DateTimeToUnix(UniversalTimeToLocal(UnixToDateTime(U)));
+  End;
+
+
+Function EvReal(L: Int64): Int64;
+  Begin
+  EvReal := DateTimeToUnix(LocalTimeToUniversal(UnixToDateTime(L)));
+  End;
+
+
+Function EvNowLocal: Int64;
+  Begin
+  EvNowLocal := EvLocal(Int64(fpTime) + EvOffset);
+  End;
+
+
+Function EvNowReal: Int64;
+  Begin
+  EvNowReal := Int64(fpTime) + EvOffset;
+  End;
+
+
+Procedure BuildEnvFor(Var EnvS: TStringList; Var Envv: TPCharArr; Const Dir: String; Const Extra: Array Of String);
+  {the environment of the listener with MK = Dir (the BBS configuration), and the extra NAME=value lines}
+  Var
+    i: Integer;
+    W: String;
+
+  Begin
+  EnvS := TStringList.Create;
+  i := 0;
+  While envp[i] <> Nil Do
+    Begin
+    W := StrPas(envp[i]);
+    If Copy(W, 1, 3) <> 'MK=' Then
+      EnvS.Add(W);
+    Inc(i);
+    End;
+  EnvS.Add('MK=' + Dir);
+  For i := 0 To High(Extra) Do
+    EnvS.Add(Extra[i]);
+  SetLength(Envv, EnvS.Count + 1);
+  For i := 0 To EnvS.Count - 1 Do
+    Envv[i] := PChar(EnvS[i]);
+  Envv[EnvS.Count] := Nil;
+  End;
+
+
+Procedure SplitCmd(Const S: String; L: TStringList);
+  {Words of a command line; ' and " keep blanks together; no shell, no expansion}
+  Var
+    i: Integer;
+    W: String;
+    Q: Char;
+    Have: Boolean;
+
+  Begin
+  W := '';
+  Q := #0;
+  Have := False;
+  For i := 1 To Length(S) Do
+    Begin
+    If Q <> #0 Then
+      Begin
+      If S[i] = Q Then Q := #0 Else W := W + S[i];
+      End
+    Else If (S[i] = '''') Or (S[i] = '"') Then
+      Begin
+      Q := S[i];
+      Have := True;
+      End
+    Else If (S[i] = ' ') Or (S[i] = #9) Then
+      Begin
+      If Have Or (W <> '') Then L.Add(W);
+      W := '';
+      Have := False;
+      End
+    Else
+      W := W + S[i];
+    End;
+  If Have Or (W <> '') Then
+    L.Add(W);
+  End;
+
+
+Function SpawnEvent(Const Prog: String; Parm: TStringList; Const Extra: Array Of String; LogOut: Boolean): TPid;
+  {Starts a program of an event (no shell) in its own session; it does not outlive the listener}
+  Var
+    Pid: TPid;
+    Argv: Array Of PChar;
+    Envv: TPCharArr;
+    ArgS, EnvS: TStringList;
+    i, Nul: Integer;
+    W: String;
+
+  Begin
+  SpawnEvent := -1;
+  Pid := fpFork;
+  If Pid < 0 Then
+    Begin
+    Log('events: fork failed, error ' + IntToStr(fpGetErrno));
+    Exit;
+    End;
+  If Pid > 0 Then
+    Begin
+    SpawnEvent := Pid;
+    Exit;
+    End;
+  c_prctl(1, SIGTERM);
+  If fpGetPPid = 1 Then
+    fpExit(1);
+  For i := 0 To High(Ports) Do
+    If Ports[i].Fd >= 0 Then
+      fpClose(Ports[i].Fd);
+  fpSetsid;
+  Nul := fpOpen('/dev/null', O_RDWR);
+  If Nul >= 0 Then
+    fpDup2(Nul, 0);
+  If LogOut And (LogFd >= 0) Then
+    Begin
+    fpDup2(LogFd, 1);
+    fpDup2(LogFd, 2);
+    End
+  Else If Nul >= 0 Then
+    Begin
+    fpDup2(Nul, 1);
+    If LogFd >= 0 Then fpDup2(LogFd, 2) Else fpDup2(Nul, 2);
+    End;
+  If WorkDir <> '' Then
+    fpChdir(WorkDir);
+  fpSignal(SIGTERM, SignalHandler(SIG_DFL));
+  fpSignal(SIGINT, SignalHandler(SIG_DFL));
+  fpSignal(SIGHUP, SignalHandler(SIG_DFL));
+  fpSignal(SIGCHLD, SignalHandler(SIG_DFL));
+  fpSignal(SIGPIPE, SignalHandler(SIG_DFL));
+  ArgS := TStringList.Create;
+  ArgS.Add(Prog);
+  For i := 0 To Parm.Count - 1 Do
+    ArgS.Add(Parm[i]);
+  SetLength(Argv, ArgS.Count + 1);
+  For i := 0 To ArgS.Count - 1 Do
+    Argv[i] := PChar(ArgS[i]);
+  Argv[ArgS.Count] := Nil;
+  BuildEnvFor(EnvS, Envv, EvConfig, Extra);
+  fpExecve(Prog, PPChar(@Argv[0]), PPChar(@Envv[0]));
+  W := 'mklisten: cannot start ' + Prog + ' (error ' + IntToStr(fpGetErrno) + ')' + #10;
+  fpWrite(2, W[1], Length(W));
+  fpExit(127);
+  End;
+
+
+Function RunCapture(Const Prog: String; Parm: Array Of String; Secs: Integer; Var Output: String): Integer;
+  {Runs a tool of the BBS and collects what it prints; -1 = could not run / took too long}
+  Var
+    Fds: TFilDes;
+    Pid, R: TPid;
+    Status: cInt;
+    Argv: Array Of PChar;
+    Envv: TPCharArr;
+    ArgS, EnvS: TStringList;
+    i, N: Integer;
+    Buf: Array[0..4095] Of Char;
+    P: TPollFd;
+    T: LongInt;
+    W: String;
+
+  Begin
+  RunCapture := -1;
+  Output := '';
+  If fpPipe(Fds) <> 0 Then
+    Exit;
+  Pid := fpFork;
+  If Pid < 0 Then
+    Begin
+    fpClose(Fds[0]);
+    fpClose(Fds[1]);
+    Exit;
+    End;
+  If Pid = 0 Then
+    Begin
+    fpClose(Fds[0]);
+    fpDup2(Fds[1], 1);
+    If Fds[1] > 2 Then
+      fpClose(Fds[1]);
+    If LogFd >= 0 Then
+      fpDup2(LogFd, 2);
+    For i := 0 To High(Ports) Do
+      If Ports[i].Fd >= 0 Then
+        fpClose(Ports[i].Fd);
+    If WorkDir <> '' Then
+      fpChdir(WorkDir);
+    ArgS := TStringList.Create;
+    ArgS.Add(Prog);
+    For i := 0 To High(Parm) Do
+      ArgS.Add(Parm[i]);
+    SetLength(Argv, ArgS.Count + 1);
+    For i := 0 To ArgS.Count - 1 Do
+      Argv[i] := PChar(ArgS[i]);
+    Argv[ArgS.Count] := Nil;
+    BuildEnvFor(EnvS, Envv, EvConfig, []);
+    fpExecve(Prog, PPChar(@Argv[0]), PPChar(@Envv[0]));
+    W := 'mklisten: cannot start ' + Prog + ' (error ' + IntToStr(fpGetErrno) + ')' + #10;
+    fpWrite(2, W[1], Length(W));
+    fpExit(127);
+    End;
+  fpClose(Fds[1]);
+  T := Now_ + Secs;
+  Repeat
+    P.fd := Fds[0];
+    P.events := POLLIN;
+    P.revents := 0;
+    If fpPoll(@P, 1, 200) > 0 Then
+      Begin
+      N := fpRead(Fds[0], Buf, SizeOf(Buf));
+      If N <= 0 Then
+        Break;
+      SetLength(W, N);
+      Move(Buf[0], W[1], N);
+      Output := Output + W;
+      End;
+  Until Now_ > T;
+  fpClose(Fds[0]);
+  R := fpWaitPid(Pid, @Status, WNOHANG);
+  If R = 0 Then
+    Begin
+    If Now_ > T Then
+      Begin
+      fpKill(Pid, SIGKILL);
+      Log('events: ' + Prog + ' took more than ' + IntToStr(Secs) + ' seconds and was stopped');
+      End;
+    fpWaitPid(Pid, @Status, 0);
+    End;
+  If Now_ > T Then
+    Exit;
+  If wifexited(Status) Then
+    RunCapture := wexitstatus(Status)
+  Else
+    RunCapture := 128 + wtermsig(Status);
+  End;
+
+
+Function EvSock(Const Path: String): LongInt;
+  {A connected Unix socket, -1 when there is none}
+  Var
+    S: LongInt;
+    A: TUnixSockAddr;
+
+  Begin
+  EvSock := -1;
+  If Length(Path) > 100 Then
+    Exit;
+  S := fpSocket(AF_UNIX, SOCK_STREAM, 0);
+  If S < 0 Then
+    Exit;
+  FillChar(A, SizeOf(A), 0);
+  A.family := AF_UNIX;
+  Move(Path[1], A.path, Length(Path));
+  If fpConnect(S, @A, SizeOf(A)) <> 0 Then
+    Begin
+    fpClose(S);
+    Exit;
+    End;
+  EvSock := S;
+  End;
+
+
+Function SockLine(S: LongInt; Var Buf: String; Secs: Integer; Var Line: String): Boolean;
+  {The next line from a socket; Buf holds what was read ahead}
+  Var
+    P: TPollFd;
+    N, K: Integer;
+    Tmp: Array[0..1023] Of Char;
+    W: String;
+    T: LongInt;
+
+  Begin
+  SockLine := False;
+  T := Now_ + Secs;
+  Repeat
+    K := Pos(#10, Buf);
+    If K > 0 Then
+      Begin
+      Line := Copy(Buf, 1, K - 1);
+      Delete(Buf, 1, K);
+      SockLine := True;
+      Exit;
+      End;
+    P.fd := S;
+    P.events := POLLIN;
+    P.revents := 0;
+    If fpPoll(@P, 1, 200) > 0 Then
+      Begin
+      N := fpRead(S, Tmp, SizeOf(Tmp));
+      If N <= 0 Then
+        Exit;
+      SetLength(W, N);
+      Move(Tmp[0], W[1], N);
+      Buf := Buf + W;
+      End;
+  Until Now_ > T;
+  End;
+
+
+Function MailerDo(Const Verb, Arg: String; Var Msg: String): Integer;
+  {POLL / HOLD / FREE through the control socket of the mailer.  Arg * is every link for HOLD and FREE (POLL * is the
+   mailer's own).  0 = the mailer said ACK, 1 = ERR or no mailer}
+  Var
+    S: LongInt;
+    Buf, Line, Reply: String;
+    Addrs: TStringList;
+    i, K: Integer;
+    C: String;
+
+  Begin
+  MailerDo := 1;
+  Msg := 'the mailer is not running (no ' + RunDir + '/mailer.sock)';
+  S := EvSock(RunDir + '/mailer.sock');
+  If S < 0 Then
+    Exit;
+  Buf := '';
+  Addrs := TStringList.Create;
+  Try
+    If (Arg = '*') And (Verb <> 'POLL') Then
+      Begin
+      {the links are in the first state frame: LINK <address><TAB>...}
+      While SockLine(S, Buf, 5, Line) Do
+        Begin
+        If Copy(Line, 1, 5) = 'LINK ' Then
+          Begin
+          K := Pos(#9, Line);
+          If K = 0 Then K := Length(Line) + 1;
+          Addrs.Add(Copy(Line, 6, K - 6));
+          End
+        Else If Line = 'END' Then
+          Break;
+        End;
+      End
+    Else
+      Addrs.Add(Arg);
+    MailerDo := 0;
+    Msg := '';
+    For i := 0 To Addrs.Count - 1 Do
+      Begin
+      C := Verb + ' ' + Addrs[i] + #10;
+      fpSend(S, @C[1], Length(C), MSG_NOSIGNAL);
+      Reply := '';
+      While SockLine(S, Buf, 5, Line) Do
+        If (Copy(Line, 1, 3) = 'ACK') Or (Copy(Line, 1, 3) = 'ERR') Then
+          Begin
+          Reply := Line;
+          Break;
+          End;
+      If Copy(Reply, 1, 3) <> 'ACK' Then
+        Begin
+        MailerDo := 1;
+        If Reply = '' Then Reply := 'no answer from the mailer';
+        End;
+      If Msg <> '' Then Msg := Msg + '; ';
+      Msg := Msg + Reply;
+      End;
+    If Addrs.Count = 0 Then
+      Msg := 'no links';
+  Finally
+    Addrs.Free;
+    fpClose(S);
+  End;
+  End;
+
+
+Function EvField(L: TStringList; K: Integer): Integer;
+  Begin
+  If K < L.Count Then
+    EvField := StrToIntDef(L[K], 0)
+  Else
+    EvField := 0;
+  End;
+
+
+Procedure EvWriteState;
+  {events.run in the BBS directory: what the daemon remembers (UNIX times); read by mkmon, never by mkconfig}
+  Var
+    L: TStringList;
+    i: Integer;
+    D: Int64;
+
+  Begin
+  EvStateDirty := False;
+  If EvBbsDir = '' Then
+    Exit;
+  L := TStringList.Create;
+  Try
+    L.Add('# written by mklisten: event, last occurrence dealt with, last start, last result (UNIX times)');
+    For i := 1 To MaxEv Do
+      If EvDefs[i].Defined And EvDefs[i].Seen Then
+        Begin
+        D := EvReal(EvDefs[i].LastDue);
+        L.Add(IntToStr(i) + #9 + IntToStr(D) + #9 + IntToStr(EvDefs[i].LastRun) + #9 + IntToStr(EvDefs[i].LastResult));
+        End;
+    Try
+      L.SaveToFile(EvBbsDir + 'events.run.new');
+      RenameFile(EvBbsDir + 'events.run.new', EvBbsDir + 'events.run');
+    Except
+      Log('events: cannot write ' + EvBbsDir + 'events.run');
+    End;
+  Finally
+    L.Free;
+  End;
+  End;
+
+
+Procedure EvReadState;
+  Var
+    L, F: TStringList;
+    i, N: Integer;
+
+  Begin
+  If (EvBbsDir = '') Or (Not FileExists(EvBbsDir + 'events.run')) Then
+    Exit;
+  L := TStringList.Create;
+  F := TStringList.Create;
+  Try
+    F.Delimiter := #9;
+    F.StrictDelimiter := True;
+    Try
+      L.LoadFromFile(EvBbsDir + 'events.run');
+    Except
+      Exit;
+    End;
+    For i := 0 To L.Count - 1 Do
+      If (L[i] <> '') And (L[i][1] <> '#') Then
+        Begin
+        F.DelimitedText := L[i];
+        N := EvField(F, 0);
+        If (N >= 1) And (N <= MaxEv) And (F.Count >= 4) Then
+          Begin
+          EvDefs[N].LastDue := EvLocal(StrToInt64Def(F[1], 0));
+          EvDefs[N].LastRun := StrToInt64Def(F[2], 0);
+          EvDefs[N].LastResult := EvField(F, 3);
+          EvDefs[N].Seen := EvDefs[N].LastDue > 86400;
+          End;
+        End;
+  Finally
+    L.Free;
+    F.Free;
+  End;
+  End;
+
+
+Procedure EvLoad;
+  {Run mkevents and take the definitions; what the daemon remembers (LastDue ...) stays}
+  Var
+    Out_, Line: String;
+    Rc, i, N, K: Integer;
+    L, F: TStringList;
+    Seen: Array[1..MaxEv] Of Boolean;
+
+  Begin
+  Rc := RunCapture(EvTool, [], 20, Out_);
+  If Rc <> 0 Then
+    Begin
+    If Not EvLoadFailed Then
+      Log('events: mkevents failed (' + IntToStr(Rc) + '); keeping the events as they were');
+    EvLoadFailed := True;
+    Exit;
+    End;
+  EvLoadFailed := False;
+  FillChar(Seen, SizeOf(Seen), 0);
+  L := TStringList.Create;
+  F := TStringList.Create;
+  Try
+    F.Delimiter := #9;
+    F.StrictDelimiter := True;
+    L.Text := Out_;
+    For i := 0 To L.Count - 1 Do
+      Begin
+      Line := L[i];
+      F.DelimitedText := Line;
+      If (F.Count >= 2) And (F[0] = 'BBS') Then
+        Begin
+        If EvBbsDir = '' Then
+          Begin
+          EvBbsDir := F[1];
+          EvReadState;
+          End
+        Else
+          EvBbsDir := F[1];
+        End
+      Else If (F.Count >= 13) And (F[0] = 'EVENT') Then
+        Begin
+        N := EvField(F, 1);
+        If (N >= 1) And (N <= MaxEv) Then
+          Begin
+          Seen[N] := True;
+          EvDefs[N].Defined := True;
+          EvDefs[N].Status := EvField(F, 2);
+          EvDefs[N].Minutes := EvField(F, 3);
+          EvDefs[N].Days := EvField(F, 4);
+          EvDefs[N].EL := EvField(F, 5);
+          EvDefs[N].Forced := EvField(F, 6);
+          EvDefs[N].Action := EvField(F, 7);
+          EvDefs[N].Flags := EvField(F, 8);
+          EvDefs[N].Late := EvField(F, 9);
+          EvDefs[N].LateMin := EvField(F, 10);
+          EvDefs[N].LateMax := EvField(F, 11);
+          EvDefs[N].Timeout := EvField(F, 12);
+          If F.Count > 13 Then
+            Begin
+            EvDefs[N].Cmd := F[13];
+            For K := 14 To F.Count - 1 Do
+              EvDefs[N].Cmd := EvDefs[N].Cmd + #9 + F[K];
+            End
+          Else
+            EvDefs[N].Cmd := '';
+          End;
+        End;
+      End;
+  Finally
+    L.Free;
+    F.Free;
+  End;
+  For i := 1 To MaxEv Do
+    If Not Seen[i] Then
+      EvDefs[i].Defined := False;
+  End;
+
+
+Function EvSig: String;
+  Var
+    SR: TSearchRec;
+    N: String;
+
+  Begin
+  EvSig := '';
+  If FindFirst(WithSlash(EvConfig) + '*', faAnyFile, SR) = 0 Then
+    Begin
+    Repeat
+      N := SR.Name;
+      If (N = 'config.mk') Or (N = 'events.mk') Or (N = 'bbsconfig.json') Then
+        EvSig := EvSig + N + ':' + IntToStr(SR.Size) + ':' + IntToStr(SR.Time) + ' ';
+    Until FindNext(SR) <> 0;
+    FindClose(SR);
+    End;
+  End;
+
+
+Function CallerCount: Integer;
+  Var
+    i: Integer;
+
+  Begin
+  CallerCount := 0;
+  For i := 0 To High(Children) Do
+    If Children[i].Node > 0 Then
+      Inc(CallerCount);
+  End;
+
+
+Function EvTimeout(N: Integer): Integer;
+  Begin
+  EvTimeout := EvDefs[N].Timeout;
+  If EvTimeout <= 0 Then
+    EvTimeout := 60;
+  End;
+
+
+Function EvIsExclusive(N: Integer): Boolean;
+  Begin
+  EvIsExclusive := (EvDefs[N].Flags And 1) <> 0;
+  End;
+
+
+Function EventsBlockLogins: Boolean;
+  {An exclusive event is waiting or running: no one logs on}
+  Var
+    i: Integer;
+
+  Begin
+  EventsBlockLogins := False;
+  If Not EvOn Then
+    Exit;
+  For i := 0 To High(EvQueue) Do
+    If EvIsExclusive(EvQueue[i].N) Then
+      EventsBlockLogins := True;
+  For i := 0 To High(EvRuns) Do
+    If EvIsExclusive(EvRuns[i].N) Then
+      EventsBlockLogins := True;
+  End;
+
+
+Function EvRunning(N: Integer): Boolean;
+  Var
+    i: Integer;
+
+  Begin
+  EvRunning := False;
+  For i := 0 To High(EvRuns) Do
+    If EvRuns[i].N = N Then
+      EvRunning := True;
+  End;
+
+
+Function EvName(N: Integer): String;
+  Begin
+  EvName := 'event ' + IntToStr(N);
+  Case EvDefs[N].Action Of
+    1: EvName := EvName + ' (' + EvDefs[N].Cmd + ')';
+    4: EvName := EvName + ' (poll ' + EvDefs[N].Cmd + ')';
+    5: EvName := EvName + ' (hold ' + EvDefs[N].Cmd + ')';
+    6: EvName := EvName + ' (free ' + EvDefs[N].Cmd + ')';
+  End;
+  End;
+
+
+Procedure EvEndRun(Idx: Integer);
+  Var
+    N: Integer;
+
+  Begin
+  N := EvRuns[Idx].N;
+  EvDefs[N].LastRun := EvRuns[Idx].Started;
+  EvDefs[N].LastResult := EvRuns[Idx].Result;
+  Log('events: ' + EvName(N) + ' ended (' + IntToStr(EvRuns[Idx].Result) + ')');
+  Delete(EvRuns, Idx, 1);
+  EvStateDirty := True;
+  End;
+
+
+Procedure EvStartScript(Idx: Integer);
+  {After the action of an event with an errorlevel: events.sh in the BBS directory, with the errorlevel, the event
+   number and the result of the action}
+  Var
+    N: Integer;
+    Path: String;
+    P: TStringList;
+    Pid: TPid;
+
+  Begin
+  N := EvRuns[Idx].N;
+  Path := EvBbsDir + 'events.sh';
+  If fpAccess(Path, X_OK) <> 0 Then
+    Begin
+    If Not EvScriptWarned Then
+      Log('events: ' + Path + ' is missing or not executable: the errorlevel of ' + EvName(N) + ' (and any other) is ignored');
+    EvScriptWarned := True;
+    EvEndRun(Idx);
+    Exit;
+    End;
+  P := TStringList.Create;
+  Try
+    P.Add(IntToStr(EvDefs[N].EL));
+    P.Add(IntToStr(N));
+    P.Add(IntToStr(EvRuns[Idx].Result));
+    Pid := SpawnEvent(Path, P, ['MKEVENT=' + IntToStr(N), 'MKERRORLEVEL=' + IntToStr(EvDefs[N].EL),
+      'MKRESULT=' + IntToStr(EvRuns[Idx].Result)], True);
+  Finally
+    P.Free;
+  End;
+  If Pid <= 0 Then
+    Begin
+    EvEndRun(Idx);
+    Exit;
+    End;
+  Log('events: ' + EvName(N) + ': events.sh ' + IntToStr(EvDefs[N].EL) + ' ' + IntToStr(N) + ' ' + IntToStr(EvRuns[Idx].Result));
+  EvRuns[Idx].Pid := Pid;
+  EvRuns[Idx].Phase := 2;
+  EvRuns[Idx].Deadline := Now_ + Int64(EvTimeout(N)) * 60;
+  EvRuns[Idx].TermAt := 0;
+  End;
+
+
+Procedure EvActionDone(Idx: Integer; Rc: Integer);
+  Begin
+  EvRuns[Idx].Result := Rc;
+  EvRuns[Idx].Pid := 0;
+  If (EvDefs[EvRuns[Idx].N].EL > 0) And (EvRuns[Idx].Phase = 1) Then
+    EvStartScript(Idx)
+  Else
+    EvEndRun(Idx);
+  End;
+
+
+Procedure EvStart(N: Integer);
+  Var
+    Idx: Integer;
+    P: TStringList;
+    Prog, Msg: String;
+    Pid: TPid;
+    Rc: Integer;
+
+  Begin
+  Idx := Length(EvRuns);
+  SetLength(EvRuns, Idx + 1);
+  EvRuns[Idx].N := N;
+  EvRuns[Idx].Pid := 0;
+  EvRuns[Idx].Phase := 1;
+  EvRuns[Idx].Started := EvNowReal;
+  EvRuns[Idx].Deadline := Now_ + Int64(EvTimeout(N)) * 60;
+  EvRuns[Idx].TermAt := 0;
+  EvRuns[Idx].Result := 0;
+  Log('events: starting ' + EvName(N) + Copy(' (exclusive: the BBS is closed)', 1, 32 * Ord(EvIsExclusive(N))));
+  Case EvDefs[N].Action Of
+    1: Begin
+       P := TStringList.Create;
+       Try
+         SplitCmd(EvDefs[N].Cmd, P);
+         If P.Count = 0 Then
+           Begin
+           Log('events: ' + EvName(N) + ' has no command');
+           EvActionDone(Idx, 1);
+           Exit;
+           End;
+         Prog := P[0];
+         P.Delete(0);
+         If Pos('/', Prog) = 0 Then
+           Begin
+           If (Pos('/', MkPath) > 0) And FileExists(ExtractFilePath(MkPath) + Prog) Then
+             Prog := ExtractFilePath(MkPath) + Prog
+           Else
+             Prog := ResolveProg(Prog);
+           End;
+         Pid := SpawnEvent(Prog, P, ['MKEVENT=' + IntToStr(N), 'MKERRORLEVEL=' + IntToStr(EvDefs[N].EL)],
+           (EvDefs[N].Flags And 2) <> 0);
+       Finally
+         P.Free;
+       End;
+       If Pid <= 0 Then
+         EvActionDone(Idx, 127)
+       Else
+         EvRuns[Idx].Pid := Pid;
+       End;
+    4, 5, 6:
+       Begin
+       Rc := MailerDo(Copy('POLL HOLD FREE', 1 + 5 * (EvDefs[N].Action - 4), 4), Trim(EvDefs[N].Cmd), Msg);
+       If Msg <> '' Then
+         Log('events: ' + EvName(N) + ': ' + Msg);
+       EvActionDone(Idx, Rc);
+       End;
+    3: Begin
+       Log('events: ' + EvName(N) + ': hub passes are not available yet');
+       EvActionDone(Idx, 1);
+       End;
+    Else
+      EvActionDone(Idx, 0);
+  End;
+  End;
+
+
+Function EventPidEnded(Pid: TPid; Status: cInt): Boolean;
+  {ReapChildren asks: was it the program of an event?}
+  Var
+    i, Rc: Integer;
+
+  Begin
+  EventPidEnded := False;
+  For i := 0 To High(EvRuns) Do
+    If (EvRuns[i].Pid = Pid) And (Pid > 0) Then
+      Begin
+      EventPidEnded := True;
+      If wifexited(Status) Then
+        Rc := wexitstatus(Status)
+      Else
+        Rc := -1;
+      If (EvRuns[i].TermAt > 0) And (Rc <> 0) Then
+        Rc := -1;
+      If EvRuns[i].Phase = 2 Then
+        Begin
+        Log('events: ' + EvName(EvRuns[i].N) + ': events.sh ended (' + IntToStr(Rc) + ')');
+        EvRuns[i].Pid := 0;
+        EvEndRun(i);
+        End
+      Else
+        EvActionDone(i, Rc);
+      Exit;
+      End;
+  End;
+
+
+Procedure KickNode(Node: Integer);
+  {The sysop's K of mkmon: the caller is disconnected}
+  Var
+    S: LongInt;
+    C: Char;
+
+  Begin
+  S := EvSock(RunDir + '/node' + IntToStr(Node) + '.snoop');
+  If S < 0 Then
+    Exit;
+  C := 'K';
+  fpSend(S, @C, 1, MSG_NOSIGNAL);
+  fpClose(S);
+  End;
+
+
+Procedure EventsTick;
+  Var
+    T, RealNow: Int64;
+    i, n, k: Integer;
+    Runs: Word;
+    NewDue, Latest: Int64;
+    Sig: String;
+    Idx: Integer;
+    Stop: Boolean;
+    Msg: String;
+
+  Begin
+  If Not EvOn Then
+    Exit;
+  RealNow := Now_;
+  If (RealNow >= EvNextLoad) Or SyncNow Then
+    Begin
+    EvNextLoad := RealNow + EvInterval;
+    Sig := EvSig;
+    If (Sig <> EvLastSig) Or EvLoadFailed Or (Not EvLoaded) Then
+      Begin
+      EvLastSig := Sig;
+      EvLoad;
+      If Not EvLoadFailed Then
+        EvLoaded := True;
+      End;
+    End;
+  If Not EvLoaded Then
+    Exit;
+  T := EvNowLocal;
+  { new occurrences }
+  For n := 1 To MaxEv Do
+    If EvDefs[n].Defined Then
+      Begin
+      If (EvDefs[n].Status <> 1) Or (Not EvDefs[n].Seen) Then
+        Begin
+        EvDefs[n].LastDue := T;               {nothing counts as missed before it was seen enabled}
+        EvDefs[n].Seen := EvDefs[n].Status = 1;
+        If EvDefs[n].Status = 1 Then EvStateDirty := True;
+        Continue;
+        End;
+      MKEvent.Decide(EvDefs[n].Late, EvDefs[n].LateMin, EvDefs[n].LateMax, EvDefs[n].Minutes, EvDefs[n].Days,
+        EvDefs[n].LastDue, T, Runs, NewDue, Latest);
+      If NewDue <> EvDefs[n].LastDue Then
+        Begin
+        EvDefs[n].LastDue := NewDue;
+        EvStateDirty := True;
+        End;
+      If Runs > 0 Then
+        Begin
+        Msg := 'events: ' + EvName(n) + ' is due';
+        If T - Latest > MKEvent.OnTimeSecs Then
+          Msg := Msg + ' (late)';
+        If Runs > 1 Then
+          Msg := Msg + ', ' + IntToStr(Runs) + ' runs for the missed times';
+        Log(Msg);
+        For k := 1 To Runs Do
+          Begin
+          SetLength(EvQueue, Length(EvQueue) + 1);
+          EvQueue[High(EvQueue)].N := n;
+          EvQueue[High(EvQueue)].Due := Latest;
+          EvQueue[High(EvQueue)].Expires := MKEvent.ExpiresAt(EvDefs[n].Late, EvDefs[n].LateMin, Latest);
+          EvQueue[High(EvQueue)].Kicked := 0;
+          EvQueue[High(EvQueue)].Termed := False;
+          End;
+        End;
+      End;
+  { runs that took too long }
+  For i := High(EvRuns) DownTo 0 Do
+    If (EvRuns[i].Pid > 0) And (RealNow > EvRuns[i].Deadline) Then
+      Begin
+      If EvRuns[i].TermAt = 0 Then
+        Begin
+        Log('events: ' + EvName(EvRuns[i].N) + ' took more than ' + IntToStr(EvTimeout(EvRuns[i].N)) + ' minutes, stopping it');
+        fpKill(EvRuns[i].Pid, SIGTERM);
+        EvRuns[i].TermAt := RealNow;
+        End
+      Else If RealNow - EvRuns[i].TermAt > 10 Then
+        Begin
+        fpKill(EvRuns[i].Pid, SIGKILL);
+        EvRuns[i].TermAt := RealNow;
+        End;
+      End;
+  { what has waited too long is dropped }
+  For i := High(EvQueue) DownTo 0 Do
+    If (EvQueue[i].Expires > 0) And (T > EvQueue[i].Expires) Then
+      Begin
+      Log('events: ' + EvName(EvQueue[i].N) + ' could not start in time and is skipped');
+      Delete(EvQueue, i, 1);
+      End;
+  { start what can start, in order }
+  i := 0;
+  Stop := False;
+  While (i <= High(EvQueue)) And (Not Stop) Do
+    Begin
+    n := EvQueue[i].N;
+    If EvIsExclusive(n) Then
+      Begin
+      If (Length(EvRuns) > 0) Then
+        Stop := True                           {it waits for the others; nothing behind it starts}
+      Else If CallerCount > 0 Then
+        Begin
+        If EvDefs[n].Forced = 1 Then
+          Begin
+          If EvQueue[i].Kicked = 0 Then
+            Begin
+            Log('events: ' + EvName(n) + ' is forced: disconnecting the callers');
+            For k := 0 To High(Children) Do
+              If Children[k].Node > 0 Then
+                KickNode(Children[k].Node);
+            EvQueue[i].Kicked := RealNow;
+            End
+          Else If (Not EvQueue[i].Termed) And (RealNow - EvQueue[i].Kicked > 15) Then
+            Begin
+            For k := 0 To High(Children) Do
+              If Children[k].Node > 0 Then
+                fpKill(Children[k].Pid, SIGTERM);
+            EvQueue[i].Termed := True;
+            End;
+          End;
+        Stop := True;
+        End
+      Else If EvRunning(n) Then
+        Stop := True
+      Else
+        Begin
+        Idx := i;
+        Delete(EvQueue, Idx, 1);
+        EvStart(n);
+        Stop := True;
+        End;
+      End
+    Else
+      Begin
+      If EvRunning(n) Then
+        Inc(i)                                 {an event never overlaps itself}
+      Else If (Length(EvRuns) >= EvParallel) Then
+        Stop := True
+      Else
+        Begin
+        k := 0;
+        Idx := 0;
+        While Idx <= High(EvRuns) Do
+          Begin
+          If EvIsExclusive(EvRuns[Idx].N) Then k := 1;
+          Inc(Idx);
+          End;
+        If k = 1 Then
+          Stop := True
+        Else
+          Begin
+          Delete(EvQueue, i, 1);
+          EvStart(n);
+          End;
+        End;
+      End;
+    End;
+  If EvStateDirty Then
+    EvWriteState;
+  End;
+
+
 Procedure ReapChildren;
   Var
     Pid: TPid;
@@ -1204,6 +2264,8 @@ Procedure ReapChildren;
       ScanPid := 0;
       Continue;
       End;
+    If EventPidEnded(Pid, Status) Then
+      Continue;
     If (Pid = MailerPid) And (MailerPid > 0) Then
       Begin
       If wifexited(Status) Then
@@ -1359,13 +2421,16 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
   End;
 
 
-Procedure Refuse(Client: LongInt; Const Why: String; Const Addr: String);
+Procedure Refuse(Client: LongInt; Const Why: String; Const Addr: String; Const Msg: String = '');
   Var
     M: String;
 
   Begin
   Log('refused ' + Addr + ': ' + Why);
-  M := #13#10 + BusyMsg + #13#10;
+  If Msg <> '' Then
+    M := #13#10 + Msg + #13#10
+  Else
+    M := #13#10 + BusyMsg + #13#10;
   fpWrite(Client, M[1], Length(M));
   fpShutdown(Client, 2);
   fpClose(Client);
@@ -1389,6 +2454,11 @@ Procedure Accept(PortNo: Integer);
   If (Ports[PortNo].MaxPerIp > 0) And (CountFrom(PortNo, Addr) >= Ports[PortNo].MaxPerIp) Then
     Begin
     Refuse(C, 'too many callers from this address', Addr);
+    Exit;
+    End;
+  If (Not Ports[PortNo].Sysop) And EventsBlockLogins Then
+    Begin
+    Refuse(C, 'closed for an event', Addr, EvClosedMsg);
     Exit;
     End;
   If Ports[PortNo].Sysop Then
@@ -1445,6 +2515,7 @@ Procedure MainLoop;
     R := fpPoll(@Fds[0], Length(Fds), 1000);
     ReapChildren;
     MailerTick;
+    EventsTick;
     If R > 0 Then
       For i := 0 To High(Ports) Do
         If (Fds[i].revents And POLLIN) <> 0 Then
@@ -1502,6 +2573,11 @@ Begin
       WriteLn('          settings ', MailSettings, ' (made from ', MailConfig, ')');
       If MailScan > 0 Then
         WriteLn('          tosser scan every ', MailScan, ' s: ', MailToss, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MailToss)), 11));
+      End;
+    If EvOn Then
+      Begin
+      WriteLn('  events: ', EvTool, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(EvTool)), 11));
+      WriteLn('          configuration ', EvConfig, ', at most ', EvParallel, ' at once');
       End;
     Halt(0);
     End;

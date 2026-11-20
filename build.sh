@@ -40,6 +40,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmenu src/MKMenu.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkusered src/MKUserEd.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkpwconv src/MKPwConv.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfreq src/MKFreq.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkevents src/MKEvents.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklist src/MKList.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -54,7 +55,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest eventtest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -67,6 +68,8 @@ build/comtest | grep -E 'FAIL|failures'
 build/dupetest build/work | grep -E 'FAIL|failures'
 build/doortest build/work | grep -E 'FAIL|failures'
 build/pwdtest | grep -E 'FAIL|failures'
+# events: when an event is due (days, occurrences, the four ways to handle a missed one)
+build/eventtest | grep -E 'FAIL|failures'
 mkdir -p build/work/pwconv
 python3 tests/pwconvtest.py build build/work/pwconv | grep -E '^(ok|FAIL|skip|failures)'
 if [ -f bbs/bbsc/ra/config.mk ]; then
@@ -232,6 +235,9 @@ fi
 # mklisten runs the mailer (fake programs, then the real ones when mkbink is built next to this project)
 python3 tests/mailerlistentest.py build/mlwork | grep -E "^(ok|FAIL|skip)" | tee build/mlresult.txt
 if grep -q FAIL build/mlresult.txt; then exit 1; fi
+# mklisten runs the events: commands, events.sh, mailer actions, missed events, exclusive events
+python3 tests/eventlistentest.py build/work/eventlisten | grep -E "^(ok|FAIL|skip)" | tee build/evresult.txt
+if grep -q FAIL build/evresult.txt; then exit 1; fi
 # the Mailer screen of mkmon (needs the real mkbink next to this project)
 python3 tests/mailmontest.py build/mmwork | grep -E "^(ok|FAIL|skip)" | tee build/mmresult.txt
 if grep -q FAIL build/mmresult.txt; then exit 1; fi

@@ -184,6 +184,35 @@ normal ports are not affected.
 * Other keys: `mkbink`, `mkbinkcfg`, `mktoss` (program paths; default next to `mk`), `settings`, `logfile`, `interval`.
 * Whatever happens to the listener, even SIGKILL, takes `mkbink` with it.
 
+### Events
+
+The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.  Each event has a time, the days it runs, a status
+(enabled / disabled), and, in `events.mk`, what it does (see `EVENTS-PLAN.md`):
+
+* **Action:** *Command* (a program and its arguments, no shell, at most 100 characters; put longer ones in a script), or *Mailer poll /
+  hold / free* of a link or `*` (every link), which talk to the mailer through its control socket.  The hub pass action is not
+  built yet.
+* **If it was missed** (`mklisten` was down at the time): *Skip*, run *Within N minutes* (default 10), *Run* once however late, or *Run per
+  miss* (once for each time it was missed, at most "Most runs", default 5).  What `mklisten` remembers is in `events.run` in the
+  BBS directory; delete it and nothing counts as missed.
+* **Errorlevel:** when it is not 0, the script `events.sh` in the BBS directory is run after the action, with the errorlevel, the event
+  number and the result of the action as arguments (`MKEVENT`, `MKERRORLEVEL`, `MKRESULT` are set too).  It needs the execute bit and a `#!`
+  line, and it does what the batch file of the DOS front end did, for example `case "$1" in 5) mktoss ;; esac`.
+* **Exclusive:** for work that needs the BBS quiet (packing the message base or the users).  From the moment it is due, new callers are
+  refused with the "closed" text; it starts when the callers have left (a *Forced* event disconnects them: the K of the monitor, then
+  SIGTERM after 15 seconds) and nothing else runs while it does.  Other events may run at the same time (`parallel`, default 4); the same event
+  never overlaps itself.  The sysop monitor port is not closed.
+
+```
+"events": { "config": "/bbs/ra",                    the BBS configuration directory (default: the mailer's)
+            "mkevents": "/usr/local/bin/mkevents",  (default: next to mk)
+            "parallel": 4,                          events that may run at once
+            "interval": 30,                         seconds between looks for a changed configuration
+            "closed": "Closed for maintenance." }   what a refused caller sees
+```
+
+Times are the wall clock of the machine.  `mkevents` prints the events as `mklisten` reads them.
+
 ## Signals
 
 | Signal | Effect |

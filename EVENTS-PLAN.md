@@ -108,7 +108,7 @@ involved in finding it; what the script does is the sysop's own.
    an old configuration without `events.mk`, JSON round trip, the other formats unaffected.
 2. **mkconfig editor** (DONE 2026-11-20, uncommitted: `CfgEvent.pas`, `tests/eventsedittest.py`): Action (choice), Command, Timeout, Late (skip / within N minutes / run / run per miss, with minutes and maximum) and Exclusive on the event form, MK configurations only; the list shows
    the action.  Test with `cfgshot.py`.
-3. **The scheduler**: `MKEvent.pas` (with a test program over many clocks: days, midnight, `24:00`, each Late mode, the cap, restart, DST
+3. **The scheduler** (DONE 2026-11-20, uncommitted: `MKEvent.pas`, `mkevents`, `mklisten` events section, `tests/eventtest.pas`, `tests/eventlistentest.py`; forced events disconnect with the K frame of the monitor then SIGTERM after 15 s, exclusive waits are bounded by the Late mode (Skip 1 minute, Within the grace, Run / Per miss never)): `MKEvent.pas` (with a test program over many clocks: days, midnight, `24:00`, each Late mode, the cap, restart, DST
    changes), `mklisten` ticks, the command and mailer actions, exclusive and overlapping events, the `events.sh` errorlevel script,
    `LastDueU` / `LastRunU` written, log lines.  For tests a hidden clock offset
    (`"events": {"clock": ...}` or an environment variable) so that a test does not wait for real time.
