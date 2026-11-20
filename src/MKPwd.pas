@@ -57,6 +57,7 @@ Function  PwdHashIsSet(Const H: PwHashType): Boolean;
 Procedure PwdHashClear(Var H: PwHashType);
 Function  PwdNeedsRehash(Const H: PwHashType): Boolean;
 
+Procedure PwdModeFromConfig;                           {PwdMode := what the configuration says (always plain for RA, QuickBBS, SuperBBS)}
 Function  ExtUsersFormat(FileName: String): Integer;   {0 fine (or no file), 1 DOS size (expand it), 2 a size that fits neither}
 Function  ExtUsersOldSize: Word;                       {the size of the old record}
 Function  ExtUsersNewSize: Word;
@@ -65,7 +66,7 @@ Function  ExtUsersNewSize: Word;
 Implementation
 
 
-Uses MKString, MKFile;
+Uses MKString, MKFile, MKCfgAbs;
 
 
 Const
@@ -411,6 +412,16 @@ Function PwdHashCheck(Const H: PwHashType; Const Typed: String): Boolean;
 Function PwdNeedsRehash(Const H: PwHashType): Boolean;
   Begin
   PwdNeedsRehash := PwdHashIsSet(H) And (H.Iter < PwdIterations);
+  End;
+
+
+Procedure PwdModeFromConfig;
+  Begin
+  PwdMode := pmPlain;
+  If Config <> Nil Then
+    PwdMode := Config^.GetPwdMode;
+  If PwdMode > pmConvert Then
+    PwdMode := pmPlain;
   End;
 
 

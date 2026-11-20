@@ -168,6 +168,7 @@ Type MKRCfgObj = Object(CfgObj)
   Function  GetMinPwd: Byte; Virtual; {Get min password length}
   Function  GetMinPhone: Byte; Virtual; {Get min phone num length}
   Function  GetStrictPwd: Boolean; Virtual; {Get strict password checking}
+  Function  GetPwdMode: Byte; Virtual;
   Function  GetRemoteSysop: Boolean; Virtual; {Get allow remote sysop}
   Function  GetFastLocal: Boolean; Virtual; {Get fast local log on}
   Procedure GetNewUserSec(Var Sec: SecType); Virtual; {Get new user security}
@@ -1714,6 +1715,17 @@ Function MKRCfgObj.GetMinPwd: Byte;
 Function MKRCfgObj.GetMinPhone: Byte;
   Begin
   GetMinPhone := MKCfg^.MinPhone;
+  End;
+
+
+Function MKRCfgObj.GetPwdMode: Byte;
+  Begin
+  If (MKCfg^.COption2 And csPwdConvert) <> 0 Then
+    GetPwdMode := 2
+  Else If (MKCfg^.COption2 And csPwdHash) <> 0 Then
+    GetPwdMode := 1
+  Else
+    GetPwdMode := 0;
   End;
 
 

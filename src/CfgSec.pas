@@ -20,6 +20,7 @@ Type UserRecord = Record
   MinPwd: Byte;
   MinPhone: Byte;
   StrictPwd: Boolean;
+  PwdHash: Byte;
   SysopRemote: Boolean;
   FastLogIn: Boolean;
   End;
@@ -40,10 +41,11 @@ Procedure DoCfgSec;
   UR^.MinPwd := Config^.GetMinPwd;
   UR^.MinPhone := Config^.GetMinPhone;
   UR^.StrictPwd := Config^.GetStrictPwd;
+  UR^.PwdHash := Config^.GetPwdMode;
   UR^.SysopRemote := Config^.GetRemoteSysop;
   UR^.FastLogIn := Config^.GetFastLocal;
   F.Init('Security');
-  F.Window(9, 6, 71, 16);
+  F.Window(9, 6, 71, 18);
   F.At(2, 3, 2, 19);
   F.AddNumber('Password Tries:', UR^.PassTries, 1, 0, 255, 'Password Tries');
   F.At(2, 33, 2, 54);
@@ -62,6 +64,12 @@ Procedure DoCfgSec;
   F.AddYesNo('Allow Remote Sysop:', UR^.SysopRemote, 'Allow Remote Sysop');
   F.At(10, 3, 10, 22);
   F.AddYesNo('Fast Local Log-in:', UR^.FastLogIn, 'Fast Local Log-in');
+  If DetectBbsType = 1 Then
+    Begin
+    F.At(12, 3, 12, 22);
+    F.AddChoice('Hashed Passwords:', UR^.PwdHash, 1, 0, 'No|New|All',
+      'No: passwords stay as they are.  New: a new or changed password is stored as a hash.  All: and a plain password becomes a hash when its owner logs on.');
+    End;
   If F.Execute Then
     Begin
     Config^.SetPwdTries(UR^.PassTries);
@@ -73,6 +81,7 @@ Procedure DoCfgSec;
     Config^.SetStrictPwd(UR^.StrictPwd);
     Config^.SetRemoteSysop(UR^.SysopRemote);
     Config^.SetFastLocal(UR^.FastLogIn);
+    Config^.SetPwdMode(UR^.PwdHash);
     End;
     Dispose(UR);
   End;

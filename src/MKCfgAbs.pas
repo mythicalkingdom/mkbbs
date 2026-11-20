@@ -290,6 +290,8 @@ Type CfgObj = Object
   Procedure SetMinPhone(MP: Byte); Virtual; {Set min phone num length}
   Function  GetStrictPwd: Boolean; Virtual; {Get strict password checking}
   Procedure SetStrictPwd(SP: Boolean); Virtual; {Set strict password checking}
+  Function  GetPwdMode: Byte; Virtual; {Hashed passwords: 0 plain, 1 new and changed ones are hashes, 2 and plain ones are converted at log-on (MK configurations only; 0 for every other)}
+  Procedure SetPwdMode(PM: Byte); Virtual; {Set hashed passwords mode}
   Function  GetRemoteSysop: Boolean; Virtual; {Get allow remote sysop}
   Procedure SetRemoteSysop(RS: Boolean); Virtual; {Set allow remote sysop}
   Function  GetFastLocal: Boolean; Virtual; {Get fast local log on}
@@ -1587,6 +1589,17 @@ Function CfgObj.GetStrictPwd: Boolean; {Get strict password checking}
   End;
 
 Procedure CfgObj.SetStrictPwd(SP: Boolean); {Set strict password checking}
+  Begin
+  End;
+
+
+Function CfgObj.GetPwdMode: Byte;
+  Begin
+  GetPwdMode := 0;
+  End;
+
+
+Procedure CfgObj.SetPwdMode(PM: Byte);
   Begin
   End;
 

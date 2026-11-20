@@ -158,6 +158,7 @@ If BbsType = 1 Then
     WriteLn(StdErr, 'extusers.bbs has the record of the older version: run  mkpwconv -x  once (it keeps the old file as extusers.bbs.old)');
     Halt(43);
     End;
+PwdModeFromConfig;
 DirectVideo := Config^.GetDirectWrite;
 CheckSnow := Config^.GetSnowCheck;
 User.Init;

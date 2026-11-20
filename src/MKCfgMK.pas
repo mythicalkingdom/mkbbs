@@ -277,6 +277,8 @@ Type MKCfgObj = Object(CfgObj)
   Procedure SetMinPhone(MP: Byte); Virtual; {Set min phone num length}
   Function  GetStrictPwd: Boolean; Virtual; {Get strict password checking}
   Procedure SetStrictPwd(SP: Boolean); Virtual; {Set strict password checking}
+  Function  GetPwdMode: Byte; Virtual;
+  Procedure SetPwdMode(PM: Byte); Virtual;
   Function  GetRemoteSysop: Boolean; Virtual; {Get allow remote sysop}
   Procedure SetRemoteSysop(RS: Boolean); Virtual; {Set allow remote sysop}
   Function  GetFastLocal: Boolean; Virtual; {Get fast local log on}
@@ -2717,6 +2719,27 @@ Procedure MKCfgObj.SetStrictPwd(SP: Boolean);
     MKCfg^.COption := MKCfg^.COption or coStrictPwd
   Else
     MKCfg^.COption := MKCfg^.COption and (Not coStrictPwd);
+  End;
+
+
+Function MKCfgObj.GetPwdMode: Byte;
+  Begin
+  If (MKCfg^.COption2 And csPwdConvert) <> 0 Then
+    GetPwdMode := 2
+  Else If (MKCfg^.COption2 And csPwdHash) <> 0 Then
+    GetPwdMode := 1
+  Else
+    GetPwdMode := 0;
+  End;
+
+
+Procedure MKCfgObj.SetPwdMode(PM: Byte);
+  Begin
+  MKCfg^.COption2 := MKCfg^.COption2 And (Not (csPwdHash Or csPwdConvert));
+  If PM = 1 Then
+    MKCfg^.COption2 := MKCfg^.COption2 Or csPwdHash
+  Else If PM >= 2 Then
+    MKCfg^.COption2 := MKCfg^.COption2 Or csPwdConvert;
   End;
 
 

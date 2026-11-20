@@ -162,5 +162,42 @@ check('BBS: the password was changed (plain account)', 'Password has been change
 check('BBS: plain, the new password gets in, in any case', in_(bbs('PWT Old', 'NewPw')))
 check('BBS: plain, the old one does not', badlogin('PWT Old', 'oldpw'))
 check('BBS: the plain account is still plain (the new password is in the file)', b'NEWPW' in open(ra + '/users.bbs', 'rb').read())
+
+# the setting: Security > Options > Hashed Passwords (mkconfig); "New": a changed password is a hash, "All": a plain one is converted at log-on
+def setting(presses):
+    e = dict(env, CFGDIR=ra, CFGDELAY='0.3')
+    r = subprocess.run([sys.executable, os.path.join(here, 'cfgshot.py'), '\\x1bg', 's', 'o'] + ['\\t'] * 9 + [' '] * presses + ['\\r', '\\x1bx', 'y'],
+                       capture_output=True, text=True, env=e)
+    return r.stdout
+
+
+def users_has(text):
+    return text.encode() in open(ra + '/users.bbs', 'rb').read().upper()
+
+
+check('mkconfig: the Security screen has "Hashed Passwords"',
+      'Hashed Passwords' in subprocess.run([sys.executable, os.path.join(here, 'cfgshot.py'), '\\x1bg', 's', 'o'], capture_output=True, text=True,
+                                          env=dict(env, CFGDIR=ra, CFGDELAY='0.3')).stdout)
+setting(1)                                          # No -> New
+subprocess.run([build + '/useradd', 'PWT New', 'x'], env=env, capture_output=True, text=True)
+subprocess.run([build + '/netsetup', 'PWT New', '6'], env=dict(env, NETPWD='plainnew'), capture_output=True, text=True)
+check('setting New: a plain account is still plain when it logs in', in_(bbs('PWT New', 'plainnew')) and users_has('PLAINNEW'))
+out = change('PWT New', 'plainnew', 'Brand New 1')
+check('setting New: the changed password is a hash (not in users.bbs)', 'Password has been changed' in out and not users_has('PLAINNEW') and not users_has('BRAND NEW'))
+check('... it takes the new password as typed', in_(bbs('PWT New', 'Brand New 1')))
+check('... and not another case', badlogin('PWT New', 'brand new 1'))
+setting(1)                                          # New -> All
+subprocess.run([build + '/useradd', 'PWT Conv', 'x'], env=env, capture_output=True, text=True)
+subprocess.run([build + '/netsetup', 'PWT Conv', '6'], env=dict(env, NETPWD='plainall'), capture_output=True, text=True)
+check('setting All: before the log-on the password is plain', users_has('PLAINALL'))
+check('... a wrong password converts nothing', badlogin('PWT Conv', 'plainalx') and users_has('PLAINALL'))
+check('... the right one (any case) gets in', in_(bbs('PWT Conv', 'PlainAll')))
+check('... and the password is no longer in users.bbs', not users_has('PLAINALL'))
+check('... the next log-on works in any case, as before', in_(bbs('PWT Conv', 'plainall')) and in_(bbs('PWT Conv', 'PLAINALL')))
+check('... a wrong one does not', badlogin('PWT Conv', 'plainalx'))
+setting(1)                                          # All -> No (the choice wraps)
+check('setting No again: a hashed account stays hashed and works', in_(bbs('PWT Conv', 'plainall')) and not users_has('PLAINALL'))
+out = change('PWT Conv', 'plainall', 'Still Hashed')
+check('... a changed password is still a hash', 'Password has been changed' in out and in_(bbs('PWT Conv', 'Still Hashed')) and not users_has('STILL HASHED'))
 print('failures:', fails)
 sys.exit(1 if fails else 0)

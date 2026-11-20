@@ -302,6 +302,8 @@ Const                                  {ConfigMK.Bbs COption2}
   csChatCapture = 32;                  {Automatically log chats}
   csMailCheckDetail = 64;              {Show detail during scan}
   csMailCheckTotal = 128;              {Show totals after scan}
+  csPwdHash = 256;                     {Passwords: a new or changed one is stored as a hash (MKPwd)}
+  csPwdConvert = 512;                  {Passwords: ... and a plain one is converted to a hash when its owner logs on}
 
 
 Const                                  {Config.MK LogAttr}
