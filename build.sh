@@ -69,7 +69,7 @@ build/pwdtest | grep -E 'FAIL|failures'
 mkdir -p build/work/pwconv
 python3 tests/pwconvtest.py build build/work/pwconv | grep -E '^(ok|FAIL|skip|failures)'
 if [ -f bbs/bbsc/ra/config.mk ]; then
-  rm -rf build/work/pwuser; mkdir -p build/work/pwuser; cp -r bbs/bbsc/ra/. build/work/pwuser/ 2>/dev/null
+  rm -rf build/work/pwuser; mkdir -p build/work/pwuser; cp -r bbs/bbsc/ra/. build/work/pwuser/ 2>/dev/null || true
   MK=$PWD/build/work/pwuser build/pwusertest | grep -E 'FAIL|failures'
   python3 tests/pwlogintest.py build build/work/pwlogin | grep -E '^(FAIL|skip|failures)'
 fi
