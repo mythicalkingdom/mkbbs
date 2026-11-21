@@ -192,6 +192,21 @@ check('inbound-unsecure (relative to the BBS directory), on-inbound and hook-tim
       rc == 0 and ('inbound-unsecure %s/files/unsec' % cfg) in out and 'on-inbound /usr/bin/toss -x' in out and 'hook-timeout 45' in out)
 check('the file stays the size it was', os.path.getsize(mailer) == SIZE)
 
+# ---- multiple batches: offered unless the Mailer page says no (bit 256 of the flags)
+patched(lambda d: d.__setitem__(3, d[3] & ~1))
+rc, out, err = tool('-n')
+check('multiple batches: on by default (a file with the bit clear): multi-batch yes', rc == 0 and 'multi-batch yes' in out and 'multi-batch no' not in out)
+patched(lambda d: d.__setitem__(3, d[3] | 1))
+rc, out, err = tool('-n')
+check('multiple batches: switched off in the Mailer page: multi-batch no', rc == 0 and 'multi-batch no' in out)
+patched(lambda d: d.__setitem__(3, d[3] & ~1))
+s = screen('\x1bc', 'm')
+check('the Mailer page has "Multi batch:"', 'Multi batch:' in s)
+screen('\x1bc', 'm', '\t' * 20, ' ', '\r', '\x1bx', 'y')
+d = open(mailer, 'rb').read()
+check('switching Multi batch off in mkconfig sets bit 256 in mailer.mk and keeps the size', d[3] & 1 == 1 and len(d) == SIZE)
+patched(lambda d: d.__setitem__(3, d[3] & ~1))
+
 # ---- the tosser as the command mkbink runs after mail arrives
 patched(lambda d: d.__setitem__(2, d[2] | 128))
 rc, out, err = tool('-n')

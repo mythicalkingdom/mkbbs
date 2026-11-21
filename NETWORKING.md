@@ -349,7 +349,7 @@ What `mkfreq` does with a name (an update request filters the matches by their d
 problem and no note, only a name that matches nothing is "not found"): wildcards and upper case are fine; names with a slash, a backslash or a leading dot are refused;
 a name that nothing matches is "not found" (the same words for a file the system may not have, so a refusal does not tell what
 exists).  Passwords are never written to the log.  The files are queued for the requester as **hold mail**.  When both mailers
-offer *multiple batches* (the default, `multi-batch` in the mailer's settings), the request is answered at the end of the batch that
+offer *multiple batches* (the default; `EchoMail > Mailer > Multi batch` in `mkconfig`, `multi-batch` in the mailer's settings), the request is answered at the end of the batch that
 brought it and the files go in the next batch of the same session.  Otherwise, or when you called the requester, they are sent when
 the requester calls to pick them up; your mailer does not call it for them.  The netmail of "Tell by netmail" is hold mail and is
 picked up the same way.

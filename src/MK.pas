@@ -25,6 +25,18 @@ Function SysopCommand(Cmd: Char; Arg: LongInt): String;
          LogEntry.WriteEntry('Sysop disconnected the caller');
          SysopCommand := 'Node ' + Long2Str(NodeNumber) + ' disconnected';
          End;
+    'E': Begin
+         MaintWarnMin := 0;                {an exclusive event waits for the callers: said at the next key}
+         If Arg > 0 Then
+           Begin
+           MaintWarnMin := Arg;
+           Left := User.TimeRemain;
+           If Arg * 60 < Left Then
+             User.AdjustTime(Arg * 60 - Left);   {the call ends then}
+           End;
+         LogEntry.WriteEntry('An exclusive event is waiting: the caller is told');
+         SysopCommand := 'Caller told';
+         End;
     'C': Begin
          SysopChatWanted := True;
          LogEntry.WriteEntry('Sysop asked for a chat');

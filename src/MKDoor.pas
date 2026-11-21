@@ -300,7 +300,9 @@ Var
   ShellError: Word;                    {what DoShell could not do: 0 = it ran the program, 2 = no such program, else the DOS error}
   CharsetMode: Byte;                   {0 = by the terminal type, 1 = CP437 as it is, 2 = UTF-8 (mk -U, the menu command)}
   SysopChatWanted: Boolean;            {the sysop (mkmon) asked for a chat; DoChat starts at the next InputChr}
+  MaintWarnMin: LongInt;               {mklisten: an exclusive event is waiting; said to the caller at the next InputChr (0 = log off, else minutes left)}
 
+Function PromptOr(N: Word; Const Default: String): String; {A prompt of the language file, or this English text when it has none}
 Function SysopWaiting: Boolean;        {the sysop asked for a chat, or typed a key for the chat / the page}
 Function CallerUtf8: Boolean;          {text for the caller is sent as UTF-8 (CP437 translated)}
 
@@ -1231,9 +1233,37 @@ Function DoorUser.WasAnsiDetected: Boolean;
   End;
 
 
+Function PromptOr(N: Word; Const Default: String): String;
+  {A prompt of the language file; its English text when the file has none (a file from before the prompt was added)}
+  Var
+    S: String;
+
+  Begin
+  S := Prompts.GetString(N);
+  If S = '' Then
+    S := Default;
+  PromptOr := S;
+  End;
+
+
 Function DoorUser.InputChr(Var Ch:Char): Boolean;
   Begin
   InputChr := False;
+  If MaintWarnMin >= 0 Then
+    Begin                                {an exclusive event is waiting for the callers (mklisten)}
+    If MaintWarnMin = 0 Then
+      Begin
+      DisplayNewLine;
+      DisplayStrLn(PromptOr(536, 'The BBS is about to close for maintenance. Please finish and log off.'));
+      End
+    Else
+      Begin
+      DisplayNewLine;
+      DisplayStrLn(PromptOr(534, 'The BBS closes for maintenance in') + ' ' + Long2Str(MaintWarnMin) + ' ' +
+        PromptOr(535, 'minute(s): this call ends then.'));
+      End;
+    MaintWarnMin := -1;
+    End;
   If SysopChatWanted Then
     Begin                                {the sysop asked for a chat (mkmon)}
     SysopChatWanted := False;
@@ -4163,4 +4193,6 @@ Function DoorUser.GetNotOkReason: Word;
   End;
 
 
+Begin
+MaintWarnMin := -1;
 End.

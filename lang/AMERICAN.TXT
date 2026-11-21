@@ -450,3 +450,6 @@
 ; Added for MK (events): the login message before an exclusive event, in two parts around the number of minutes
 534 The BBS closes for maintenance in
 535 minute(s): this call ends then.
+;
+; Added for MK (events): said to a caller who is online when an exclusive event is waiting for the callers to leave
+536 The BBS is about to close for maintenance. Please finish and log off.

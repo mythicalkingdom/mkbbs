@@ -249,6 +249,9 @@ if grep -q FAIL build/evresult.txt; then exit 1; fi
 # a caller before an exclusive event: told when the BBS closes, the call is cut to that (mk -T)
 python3 tests/eventclosetest.py build/work/eventclose | grep -E "^(ok|FAIL|skip)" | tee build/evclose.txt
 if grep -q FAIL build/evclose.txt; then exit 1; fi
+# a caller who is on when an exclusive event waits is told (plain, and forced with "warn")
+( python3 tests/eventwarntest.py build/work/eventwarn0 0; python3 tests/eventwarntest.py build/work/eventwarn1 1 ) | grep -E "^(ok|FAIL|skip)" | tee build/evwarn.txt
+if grep -q FAIL build/evwarn.txt; then exit 1; fi
 # the events screen of mkmon
 python3 tests/eventsmontest.py build/work/eventsmon | grep -E "^(ok|FAIL|skip)" | tee build/evmon.txt
 if grep -q FAIL build/evmon.txt; then exit 1; fi

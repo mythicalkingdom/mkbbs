@@ -23,6 +23,8 @@ Unit MKSnoop;   {Lets the sysop watch a session: a filter that copies the output
                          they are not the caller's input
         'C'              the sysop asks for a chat (SnoopHandler 'C')
         'K'              disconnect the caller (hang up)
+        'E' m            an exclusive event is waiting (from mklisten): tell the caller; m = 0 only says it, m = 1..255
+                         minutes: the call ends then (SnoopHandler 'E')
         '+' m / '-' m    give / take m minutes (1..255) of the caller's time
                          (done by SnoopHandler, which the BBS supplies)
 
@@ -343,6 +345,11 @@ Procedure SnoopComObj.Command(i: Word; Cmd: Char; Arg: LongInt);
            Msg := 'This BBS cannot chat';
          Reply(i, Msg);
          End;
+    'E': Begin
+         If @SnoopHandler <> Nil Then
+           Msg := SnoopHandler(Cmd, Arg);
+         Reply(i, Msg);
+         End;
     '+', '-': Begin
               If @SnoopHandler <> Nil Then
                 Msg := SnoopHandler(Cmd, Arg)
@@ -361,7 +368,7 @@ Procedure SnoopComObj.Feed(i: Word; B: Byte);
        CTag[i] := Chr(B);
        Case CTag[i] Of
          'D', 'S': CSt[i] := 1;
-         '+', '-': CSt[i] := 3;
+         '+', '-', 'E': CSt[i] := 3;
          'K': Command(i, 'K', 0);
          'C': Command(i, 'C', 0);
          End;
@@ -393,7 +400,7 @@ Procedure SnoopComObj.Feed(i: Word; B: Byte);
        End;
     3: Begin                           {minutes}
        CSt[i] := 0;
-       If B > 0 Then
+       If (B > 0) Or (CTag[i] = 'E') Then
          Command(i, CTag[i], B);
        End;
     End;

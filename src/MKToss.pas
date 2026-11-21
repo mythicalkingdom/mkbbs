@@ -28,18 +28,20 @@ Program MKToss;
 
        -t   only toss (and pass on), no scan       -s   only scan (and pack), no toss
        -b   the mkbink program (default: next to mktoss, else in the path)
-       -R   scan every echo area from its first message and make the high-water marks again (see below)
-       -V   say where the scan of each echo area starts
+       -R   scan every echo and netmail area from its first message and make the high-water marks again (see below)
+       -V   say where the scan of each echo and netmail area starts
        -f   run although the tosser is not switched on (EchoMail > Mailer > Tosser); without it mktoss does nothing then
             and says so (exit status 3), so a cron job or the mailer's hook can call it all the time
 
-     - the high-water mark: the scan of an echo area does not read the whole message base every time.  After a scan the number of the
+     - the high-water mark: the scan of an echo or netmail area does not read the whole message base every time.  After a scan the number of the
        last message looked at (and a check sum of its header) is kept in scanhw.dat in the inbound directory, and the next scan starts
        after it.  When the message with that number is not there any more or is another one (the base was packed and renumbered, a
        message was deleted and the numbers moved ...), the area is scanned from the start again and the mark is made anew: no
        message is lost and none is sent twice, since an exported message is marked sent.  Only a message that is made exportable
        again BELOW the mark (its flags changed by hand, a message that was put back) is not seen: run mktoss -s -R once for that
        (-R ignores all the marks, scans everything and makes them again).  Deleting scanhw.dat does the same.
+       In a netmail area the mark stops before the first message that is still waiting (no route, a file that is not there, a
+       file request that was refused): that message and the ones after it are looked at again until it is sent or deleted.
      - file requests: a local netmail with the file request attribute for a system we call directly is not packed: its
        subject names the files ("name [!password] [+time|-time]", 6 characters at most for the password, the time is an
        update request) and they are added to that system's .req (mkbink queue -R); the netmail is marked sent.
@@ -2657,6 +2659,10 @@ Procedure ScanNetArea(Area: Word);
     FilesOk: Boolean;
     NewSubj: String;
     Handled: Boolean;
+    Hw: Word;
+    Start, LastNum, LastCrc, ThisCrc: LongInt;
+    Id: String;
+    Stale, Blocked: Boolean;
 
   Begin
   If Not OpenMsgArea(M, Config^.GetMsgAreaId(Area)) Then
@@ -2666,10 +2672,38 @@ Procedure ScanNetArea(Area: Word);
     Exit;
     End;
   OurAka(Area, Us);
-  M^.SeekFirst(1);
+  {where to start: after the high-water mark, when the message it names is still there, unchanged.  The mark of a netmail area
+   stops before the first message that is still waiting (no route, a file that is not there ...): that one is looked at again}
+  Id := Config^.GetMsgAreaId(Area);
+  Hw := HwFind(Id);
+  Start := 1;
+  If Hw > 0 Then
+    Begin
+    Stale := True;
+    M^.SeekFirst(HwNum[Hw]);
+    If M^.SeekFound Then
+      Begin
+      M^.MsgStartUp;
+      If (M^.GetMsgNum = HwNum[Hw]) And (MsgCrc(M) = HwCrc[Hw]) Then
+        Begin
+        Start := HwNum[Hw] + 1;
+        Stale := False;
+        End;
+      End;
+    If Stale Then
+      Log(Config^.GetMsgName(Area) + ': the message base is not as it was (message #' + Long2Str(HwNum[Hw]) +
+        ' is gone or another one: packed?): scanning from the start');
+    End;
+  If Verbose Then
+    Log('scan netmail area ' + Config^.GetMsgName(Area) + ' from #' + Long2Str(Start));
+  LastNum := 0;
+  LastCrc := 0;
+  Blocked := False;
+  M^.SeekFirst(Start);
   While M^.SeekFound Do
     Begin
     M^.MsgStartUp;
+    ThisCrc := MsgCrc(M);
     M^.GetDest(D);
     If D.Zone = 0 Then
       D.Zone := Us.Zone;
@@ -2769,7 +2803,35 @@ Procedure ScanNetArea(Area: Word);
         CopyFree(C);
         End;
       End;
+    If Not Blocked Then
+      Begin
+      If M^.IsSent Or M^.IsDeleted Or (D.Net = 0) Or IsOurs(D) Then
+        Begin                                {done with: the mark goes on}
+        LastNum := M^.GetMsgNum;
+        LastCrc := ThisCrc;
+        End
+      Else
+        Blocked := True;                     {still waiting: it is looked at again, and what follows with it}
+      End;
     M^.SeekNext;
+    End;
+  If LastNum > 0 Then
+    Begin
+    If Hw = 0 Then
+      Begin
+      If NumHw < MaxHw Then
+        Begin
+        Inc(NumHw);
+        Hw := NumHw;
+        HwId[Hw] := Id;
+        End;
+      End;
+    If Hw > 0 Then
+      Begin
+      HwNum[Hw] := LastNum;
+      HwCrc[Hw] := LastCrc;
+      HwChanged := True;
+      End;
     End;
   If Not CloseMsgArea(M) Then;
   End;
@@ -2855,7 +2917,7 @@ Procedure ScanAreas;
   Begin
   HwLoad;
   If RescanAll Then
-    Log('-R: every echo area is scanned from its first message, the high-water marks are made again');
+    Log('-R: every echo and netmail area is scanned from its first message, the high-water marks are made again');
   For i := 1 To Config^.GetMaxMsgAreas Do
     If Config^.GetMsgName(i) <> '' Then
       Case Config^.GetMsgType(i) Of

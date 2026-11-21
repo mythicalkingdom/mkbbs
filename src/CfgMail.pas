@@ -27,7 +27,7 @@ Var
 Procedure DoCfgMailer;
   Var
     F: CfgFormObj;
-    Enabled, Listen, Cram, Plz, Nr, Unknown, Tosser: Boolean;
+    Enabled, Listen, Cram, Plz, Nr, Unknown, Tosser, Multi: Boolean;
     M: ^MailerCfgType;
 
   Begin
@@ -45,6 +45,7 @@ Procedure DoCfgMailer;
   Nr := (M^.Flags And mcNr) <> 0;
   Unknown := (M^.Flags And mcAcceptUnknown) <> 0;
   Tosser := (M^.Flags And mcTosser) <> 0;
+  Multi := (M^.Flags And mcNoMultiBatch) = 0;
   F.Init('Mailer');
   F.Window(3, 4, 76, 21);
   F.At(2, 3, 2, 24);
@@ -87,9 +88,11 @@ Procedure DoCfgMailer;
   F.AddNumber('Command limit (s):', M^.HookTimeout, 2, 0, 65535, 'Seconds before that command is stopped, 0 = 300');
   F.At(15, 3, 15, 24);
   F.AddYesNo('Tosser:', Tosser, 'Run mktoss: after mail arrives (when the command above is blank) and from mklisten''s scan');
+  F.At(15, 40, 15, 56);
+  F.AddYesNo('Multi batch:', Multi, 'Offer several batches in one session (OPT MB): a file request is answered in the same call. Off for a partner that cannot take it');
   If F.Execute Then
     Begin
-    M^.Flags := M^.Flags And Not (mcEnabled Or mcListen Or mcRequireCram Or mcPlz Or mcNr Or mcAcceptUnknown Or mcTosser);
+    M^.Flags := M^.Flags And Not (mcEnabled Or mcListen Or mcRequireCram Or mcPlz Or mcNr Or mcAcceptUnknown Or mcTosser Or mcNoMultiBatch);
     If Enabled Then M^.Flags := M^.Flags Or mcEnabled;
     If Listen Then M^.Flags := M^.Flags Or mcListen;
     If Cram Then M^.Flags := M^.Flags Or mcRequireCram;
@@ -97,6 +100,7 @@ Procedure DoCfgMailer;
     If Nr Then M^.Flags := M^.Flags Or mcNr;
     If Unknown Then M^.Flags := M^.Flags Or mcAcceptUnknown;
     If Tosser Then M^.Flags := M^.Flags Or mcTosser;
+    If Not Multi Then M^.Flags := M^.Flags Or mcNoMultiBatch;
     If M^.RetryMax < M^.RetryMin Then
       M^.RetryMax := M^.RetryMin;
     Config^.SetMailer(M^);

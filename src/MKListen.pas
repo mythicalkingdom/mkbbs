@@ -139,6 +139,7 @@ Program MKListen;
                       "parallel": 4,                     events that may run at once (default 4)
                       "interval": 30,                    seconds between looks for a changed configuration
                       "lead": 10,                        minutes before an exclusive event when new callers are refused
+                      "warn": 5,                         a forced exclusive event gives the callers this many minutes (default 0: at once)
                       "closed": "Closed for maintenance." }   shown to a caller refused for an exclusive event
 
      SIGTERM / SIGINT stop the listener (and the mailer); callers already connected keep running.
@@ -191,7 +192,7 @@ Type
 
   TEvJob = Record                      {an occurrence that waits to start}
     N: Integer;
-    Due, Expires, Kicked: Int64;
+    Due, Expires, Kicked, Warned: Int64;
     NotBefore: Int64;                  {a hub pass that failed waits until then (real time)}
     Attempt: Integer;                  {0 = the first try}
     Termed: Boolean;
@@ -253,6 +254,7 @@ Var
   EvConfig, EvTool, EvBbsDir: String;
   EvParallel: Integer = 4;
   EvInterval: Integer = 30;
+  EvWarn: Integer = 0;                 {minutes a caller still has when a forced exclusive event is waiting (0 = the callers are disconnected at once)}
   EvLead: Integer = 0;                 {minutes before an exclusive event: no new callers (0 = until it is due)}
   EvOffset: Int64 = 0;                 {added to the clock (tests: "clock")}
   EvClosedMsg: String = 'The BBS is closed for maintenance. Please try again later.';
@@ -556,6 +558,7 @@ Procedure LoadEvents(O: TJSONObject);
     Else If Key = 'mkevents' Then EvTool := JStr(V, 'events.mkevents')
     Else If Key = 'parallel' Then EvParallel := JInt(V, 'events.parallel', 1, 16)
     Else If Key = 'interval' Then EvInterval := JInt(V, 'events.interval', 1, 86400)
+    Else If Key = 'warn' Then EvWarn := JInt(V, 'events.warn', 0, 255)
     Else If Key = 'lead' Then EvLead := JInt(V, 'events.lead', 0, 1440)
     Else If Key = 'clock' Then EvOffset := JInt(V, 'events.clock', 100000, MaxLongint)    {tests: the time the clock shows at the start}
     Else If Key = 'closed' Then EvClosedMsg := JStr(V, 'events.closed')
@@ -2090,6 +2093,7 @@ Function HubFailed(Idx: Integer; Rc: Integer): Boolean;
     EvQueue[Job].Expires := 0;
     EvQueue[Job].Kicked := 0;
     EvQueue[Job].Termed := False;
+    EvQueue[Job].Warned := 0;
     EvQueue[Job].NotBefore := Now_ + Wait;
     EvQueue[Job].Attempt := EvRuns[Idx].Attempt + 1;
     Log('events: ' + EvName(N) + ' failed (' + IntToStr(Rc) + '), trying again in ' + IntToStr(Wait) + ' seconds (try ' +
@@ -2271,6 +2275,45 @@ Procedure KickNode(Node: Integer);
   End;
 
 
+Procedure WarnNode(Node: Integer; Minutes: Integer);
+  {An exclusive event waits for the callers: the caller is told (0 = only that; 1..255 = the call ends in that many minutes)}
+  Var
+    S: LongInt;
+    B: Array[0..1] Of Char;
+    Buf, Line: String;
+    P: TPollFd;
+    N: Integer;
+    T: LongInt;
+    Tmp: Array[0..1023] Of Char;
+
+  Begin
+  S := EvSock(RunDir + '/node' + IntToStr(Node) + '.snoop');
+  If S < 0 Then
+    Exit;
+  B[0] := 'E';
+  B[1] := Chr(Minutes);
+  fpSend(S, @B, 2, MSG_NOSIGNAL);
+  Buf := '';
+  T := Now_ + 2;                        {stay until the node has answered: a monitor that leaves at once is dropped with its commands}
+  While (Pos('Caller told', Buf) = 0) And (Now_ <= T) Do
+    Begin
+    P.fd := S;
+    P.events := POLLIN;
+    P.revents := 0;
+    If fpPoll(@P, 1, 200) > 0 Then
+      Begin
+      N := fpRead(S, Tmp, SizeOf(Tmp));
+      If N <= 0 Then
+        Break;
+      SetLength(Line, N);
+      Move(Tmp[0], Line[1], N);
+      Buf := Copy(Buf + Line, Length(Buf + Line) - 300, 400);
+      End;
+    End;
+  fpClose(S);
+  End;
+
+
 Procedure EvWriteInfo(RealNow: Int64);
   {events.info in the run directory: what mkmon shows (rewritten when it changed)}
   Var
@@ -2375,6 +2418,7 @@ Procedure EvReadCommands;
           EvQueue[Job].Expires := 0;
           EvQueue[Job].Kicked := 0;
           EvQueue[Job].Termed := False;
+          EvQueue[Job].Warned := 0;
           EvQueue[Job].NotBefore := 0;
           EvQueue[Job].Attempt := 0;
           End;
@@ -2451,6 +2495,7 @@ Procedure EventsTick;
           EvQueue[High(EvQueue)].Expires := MKEvent.ExpiresAt(EvDefs[n].Late, EvDefs[n].LateMin, Latest);
           EvQueue[High(EvQueue)].Kicked := 0;
           EvQueue[High(EvQueue)].Termed := False;
+          EvQueue[High(EvQueue)].Warned := 0;
           EvQueue[High(EvQueue)].NotBefore := 0;
           EvQueue[High(EvQueue)].Attempt := 0;
           End;
@@ -2493,9 +2538,20 @@ Procedure EventsTick;
         Stop := True                           {it waits for the others; nothing behind it starts}
       Else If CallerCount > 0 Then
         Begin
+        If EvQueue[i].Warned = 0 Then
+          Begin                                {the callers who are online are told}
+          For k := 0 To High(Children) Do
+            If Children[k].Node > 0 Then
+              If (EvDefs[n].Forced = 1) And (EvWarn > 0) Then
+                WarnNode(Children[k].Node, EvWarn)
+              Else
+                WarnNode(Children[k].Node, 0);
+          EvQueue[i].Warned := RealNow;
+          Log('events: ' + EvName(n) + ' is waiting: the callers are told');
+          End;
         If EvDefs[n].Forced = 1 Then
           Begin
-          If EvQueue[i].Kicked = 0 Then
+          If (EvQueue[i].Kicked = 0) And (RealNow - EvQueue[i].Warned >= EvWarn * 60) Then
             Begin
             Log('events: ' + EvName(n) + ' is forced: disconnecting the callers');
             For k := 0 To High(Children) Do
@@ -2503,7 +2559,7 @@ Procedure EventsTick;
                 KickNode(Children[k].Node);
             EvQueue[i].Kicked := RealNow;
             End
-          Else If (Not EvQueue[i].Termed) And (RealNow - EvQueue[i].Kicked > 15) Then
+          Else If (EvQueue[i].Kicked > 0) And (Not EvQueue[i].Termed) And (RealNow - EvQueue[i].Kicked > 15) Then
             Begin
             For k := 0 To High(Children) Do
               If Children[k].Node > 0 Then

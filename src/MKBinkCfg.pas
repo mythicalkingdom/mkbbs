@@ -231,6 +231,7 @@ Procedure Generate;
   W('require-cram ' + YesNo((M^.Flags And mcRequireCram) <> 0));
   W('plz ' + YesNo((M^.Flags And mcPlz) <> 0));
   W('nr ' + YesNo((M^.Flags And mcNr) <> 0));
+  W('multi-batch ' + YesNo((M^.Flags And mcNoMultiBatch) = 0));
   W('accept-unknown ' + YesNo((M^.Flags And mcAcceptUnknown) <> 0));
   If (M^.Flags And mcAcceptUnknown) <> 0 Then
     WTxt('password', M^.UnknownPwd);

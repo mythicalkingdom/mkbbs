@@ -437,10 +437,20 @@ if have_mkbink:
     check('... and the mark is made again (a real check sum now)', all(l.split('\t')[2] != '1' for l in open(hw).read().split('\n') if l.count('\t') == 2))
     r7 = run('mktoss', '-s', '-V', '-R', '-b', mkbink)
     check('-R: every area from #1, said so, and nothing sent twice (sent messages are marked sent)',
-          'every echo area is scanned from its first message' in r7.stdout and re.search(r'from #1\b', r7.stdout) and '0 scanned' in r7.stdout, r7.stdout[-400:])
+          'every echo and netmail area is scanned from its first message' in r7.stdout and re.search(r'from #1\b', r7.stdout) and '0 scanned' in r7.stdout, r7.stdout[-400:])
     os.remove(hw)
     r8 = run('mktoss', '-s', '-V', '-b', mkbink)
     check('without scanhw.dat the scan starts at #1 and makes it again', re.search(r'from #1\b', r8.stdout) and os.path.exists(hw))
+    # the netmail areas have a mark too: it stops before the first message that is still waiting (here: no route)
+    nets = re.findall(r'scan netmail area (.+?) from #(\d+)', r8.stdout)
+    check('the netmail area is scanned from #1 when there is no mark (said with -V)', nets and all(int(n) == 1 for t, n in nets), r8.stdout[-300:])
+    r9 = run('mktoss', '-s', '-V', '-b', mkbink)
+    nets = re.findall(r'scan netmail area (.+?) from #(\d+)', r9.stdout)
+    hwt = open(hw).read()
+    nm = [l for l in hwt.split('\n') if l.startswith('H004') and l.count('\t') == 2]      # area 4 is the netmail area
+    check('the next scan of the netmail area starts after the settled messages (the one for us, the sent ones), not at #1', nets and any(int(n) > 1 for t, n in nets), (nets, r9.stdout[-300:]))
+    check('... the messages with no route are still looked at (said again), they hold the mark back', ': no route (' in r9.stdout and 'to 1:120/9: no route' in r9.stdout, r9.stdout[-400:])
+    check('scanhw.dat has the netmail area as well', len(nm) >= 1, hwt)
 
 
 print('failures: %d' % fails)

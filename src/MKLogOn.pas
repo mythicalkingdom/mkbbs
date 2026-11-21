@@ -152,19 +152,6 @@ Procedure LogOffSysInfo;
   End;
 
 
-Function PromptOr(N: Word; Const Default: String): String;
-  {A prompt of the language file; its English text when the file has none (a file from before the prompt was added)}
-  Var
-    S: String;
-
-  Begin
-  S := Prompts.GetString(N);
-  If S = '' Then
-    S := Default;
-  PromptOr := S;
-  End;
-
-
 Procedure LogOnUser;
   Var
     Sec: SecType;

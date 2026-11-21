@@ -121,7 +121,9 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    renumbered, a delete moved the numbers) the area is scanned from the start again and the mark made anew; nothing is lost and nothing is
    sent twice (an exported message is marked sent).  A message made exportable again *below* the mark (flags changed by hand) is not seen: run
    `mktoss -s -R` once (it ignores all marks and makes them again; deleting `scanhw.dat` does the same).  `-V` says where each scan starts.
-   Netmail areas are still scanned whole (a netmail without a route has to be looked at again).  Test: `tests/tosstest.py`.
+   A netmail area has a mark too, but it stops before the first message that is still waiting (no route, an attached file that is not there, a refused
+   file request): that message and the ones after it are looked at again on every scan until it is sent or deleted; what is before it (sent, deleted, for
+   us) is not read again.  `-R` and `scanhw.dat` work for it as for the echo areas.  Test: `tests/tosstest.py`.
 8. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, `.req` answering and update requests.
 
 ## Known fixes made on the way

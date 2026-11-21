@@ -205,8 +205,11 @@ The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.
 * **Callers before an exclusive event:** a caller who logs on within 24 hours before one is started with `mk -T<minutes>`: the call is cut
   to end when the event is due ("The BBS closes for maintenance in N minute(s)" at the login, and the minutes remaining show it).
   With `"lead": 10` new callers are refused that many minutes before the event instead of when it is due.  Callers already on
-  are cut by the same limit, so a *Forced* event usually finds the BBS empty.  The login message is in the language files, prompts 534
-  and 535 (the text before and after the number of minutes); `lang/AMERICAN.TXT` and `lang/ENGLISH.TXT` have them in English (they are
+  are cut by the same limit, so a *Forced* event usually finds the BBS empty.  A caller who is on when an exclusive event starts to wait (run
+  now from `mkmon`, or late) is told too: "The BBS is about to close for maintenance. Please finish and log off." (prompt 536) and nothing else
+  changes; for a *Forced* event, `"warn": 5` gives the callers that many minutes first ("The BBS closes for maintenance in 5 minute(s): this
+  call ends then", the call is cut to it) before they are disconnected (default 0: at once, as before).  The login message is in the language files, prompts 534
+  and 535 (the text before and after the number of minutes) and 536 (the plain warning); `lang/AMERICAN.TXT` and `lang/ENGLISH.TXT` have them in English (they are
   the sample files with the two lines added; `make lang` compiles them to `lang/AMERICAN.lc` and `ENGLISH.lc`, to be copied to the BBS
   directory as `american.lc` and `english.lc`).  A language file without them gives the English text built in.
 
@@ -216,6 +219,7 @@ The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.
             "parallel": 4,                          events that may run at once
             "interval": 30,                         seconds between looks for a changed configuration
             "lead": 10,                             minutes before an exclusive event when new callers are refused (0 = when it is due)
+            "warn": 5,                              minutes a forced exclusive event gives the callers who are on (0 = none: they are disconnected at once)
             "closed": "Closed for maintenance." }   what a refused caller sees
 ```
 
