@@ -135,7 +135,7 @@ Type MailerCfgType = Record
   ScanInterval: Word;                  {seconds between looks at the outbound}
   Domain: String[20];                  {network domain for addresses, e.g. fidonet}
   UnknownPwd: String[30];              {password for systems without a link (mcAcceptUnknown)}
-  ReqSec: SecType;                     {reserved: access of the file request user (level and flags)}
+  ReqSec: SecType;                     {reserved: file request security (level and flags): the access of a system that has none of its own}
   ReqMagicFile: String[60];            {reserved: file with the magic names and their passwords}
   ReqMaxFiles: Word;                   {reserved}
   ReqMaxKb: LongInt;                   {reserved}

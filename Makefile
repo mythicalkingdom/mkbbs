@@ -47,6 +47,8 @@ build/.built: $(wildcard src/*.pas src/*.MK src/*.Def) build.sh
 # language files from lang/*.TXT (lang/MKMENU.LC goes into the BBS directory)
 lang: build/.built
 	build/mklc lang/MKMENU.TXT
+	build/mklc lang/AMERICAN.TXT
+	build/mklc lang/ENGLISH.TXT
 
 test:
 	./build.sh

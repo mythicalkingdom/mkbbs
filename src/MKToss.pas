@@ -3,7 +3,7 @@ Program MKToss;
 {$I MKB.Def}
 
 {
-     mktoss [-q] [-t | -s] [-f] [-b mkbink] [file ...]
+     mktoss [-q] [-t | -s] [-f] [-R] [-V] [-b mkbink] [file ...]
 
      The mail tosser: takes the mail that came in (the inbound directory of EchoMail Options) into
      the message areas of the BBS.  Which BBS it works for comes from the environment variable MK, as
@@ -28,9 +28,18 @@ Program MKToss;
 
        -t   only toss (and pass on), no scan       -s   only scan (and pack), no toss
        -b   the mkbink program (default: next to mktoss, else in the path)
+       -R   scan every echo area from its first message and make the high-water marks again (see below)
+       -V   say where the scan of each echo area starts
        -f   run although the tosser is not switched on (EchoMail > Mailer > Tosser); without it mktoss does nothing then
             and says so (exit status 3), so a cron job or the mailer's hook can call it all the time
 
+     - the high-water mark: the scan of an echo area does not read the whole message base every time.  After a scan the number of the
+       last message looked at (and a check sum of its header) is kept in scanhw.dat in the inbound directory, and the next scan starts
+       after it.  When the message with that number is not there any more or is another one (the base was packed and renumbered, a
+       message was deleted and the numbers moved ...), the area is scanned from the start again and the mark is made anew: no
+       message is lost and none is sent twice, since an exported message is marked sent.  Only a message that is made exportable
+       again BELOW the mark (its flags changed by hand, a message that was put back) is not seen: run mktoss -s -R once for that
+       (-R ignores all the marks, scans everything and makes them again).  Deleting scanhw.dat does the same.
      - file requests: a local netmail with the file request attribute for a system we call directly is not packed: its
        subject names the files ("name [!password] [+time|-time]", 6 characters at most for the password, the time is an
        update request) and they are added to that system's .req (mkbink queue -R); the netmail is marked sent.
@@ -739,6 +748,124 @@ Procedure SaveSerial;
   BlockWrite(F, LastSerial, 1);
   Close(F);
   If IoResult <> 0 Then;
+  End;
+
+
+{---------------------------------------------------------------- the high-water marks of the scan}
+
+Const
+  MaxHw = 600;
+
+Var
+  HwId: Array[1..MaxHw] Of String[40];       {the message base (the id of the area)}
+  HwNum: Array[1..MaxHw] Of LongInt;         {the number of the last message looked at}
+  HwCrc: Array[1..MaxHw] Of LongInt;         {check sum of its header: another message under that number = renumbered}
+  NumHw: Word;
+  HwChanged: Boolean;
+  RescanAll: Boolean;
+  Verbose: Boolean;
+
+
+Procedure HwLoad;
+  Var
+    F: Text;
+    L: String;
+    p, q: Word;
+
+  Begin
+  NumHw := 0;
+  HwChanged := False;
+  If RescanAll Then
+    Begin
+    HwChanged := True;
+    Exit;
+    End;
+  Assign(F, InDir + 'scanhw.dat');
+  FileMode := fmReadOnly + fmDenyNone;
+  Reset(F);
+  If IoResult <> 0 Then
+    Exit;
+  While (Not Eof(F)) And (NumHw < MaxHw) Do
+    Begin
+    ReadLn(F, L);
+    p := Pos(#9, L);
+    If p > 1 Then
+      Begin
+      q := Pos(#9, Copy(L, p + 1, 100));
+      If q > 0 Then
+        Begin
+        Inc(NumHw);
+        HwId[NumHw] := Copy(L, 1, p - 1);
+        HwNum[NumHw] := Str2Long(Copy(L, p + 1, q - 1));
+        HwCrc[NumHw] := Str2Long(Copy(L, p + q + 1, 20));
+        End;
+      End;
+    End;
+  Close(F);
+  If IoResult <> 0 Then;
+  End;
+
+
+Procedure HwSave;
+  Var
+    F: Text;
+    i: Word;
+
+  Begin
+  If Not HwChanged Then
+    Exit;
+  Assign(F, InDir + 'scanhw.dat.new');
+  Rewrite(F);
+  If IoResult <> 0 Then
+    Exit;
+  For i := 1 To NumHw Do
+    WriteLn(F, HwId[i], #9, HwNum[i], #9, HwCrc[i]);
+  Close(F);
+  If IoResult <> 0 Then
+    Exit;
+  Assign(F, InDir + 'scanhw.dat.new');
+  Rename(F, InDir + 'scanhw.dat');
+  If IoResult <> 0 Then;
+  HwChanged := False;
+  End;
+
+
+Function HwFind(Const Id: String): Word;
+  Var
+    i: Word;
+
+  Begin
+  HwFind := 0;
+  For i := 1 To NumHw Do
+    If HwId[i] = Id Then
+      HwFind := i;
+  End;
+
+
+Procedure CrcStr(Var C: LongInt; Const S: String);
+  Var
+    i: Word;
+
+  Begin
+  For i := 1 To Length(S) Do
+    C := UpdC32(Ord(S[i]), C);
+  C := UpdC32(0, C);                         {a separator: "ab" + "c" is not "a" + "bc"}
+  End;
+
+
+Function MsgCrc(M: AbsMsgPtr): LongInt;
+  {check sum of what identifies a message: names, subject, date and time}
+  Var
+    C: LongInt;
+
+  Begin
+  C := -1;
+  CrcStr(C, M^.GetFrom);
+  CrcStr(C, M^.GetTo);
+  CrcStr(C, M^.GetSubj);
+  CrcStr(C, M^.GetDate);
+  CrcStr(C, M^.GetTime);
+  MsgCrc := C;
   End;
 
 
@@ -2169,6 +2296,10 @@ Procedure ScanEchoArea(Area: Word);
     S: Word;
     Net, Node: Word;
     Sent: Word;
+    Hw: Word;
+    Start, LastNum, LastCrc: LongInt;
+    Id: String;
+    Stale: Boolean;
 
   Begin
   If Not OpenMsgArea(M, Config^.GetMsgAreaId(Area)) Then
@@ -2177,10 +2308,37 @@ Procedure ScanEchoArea(Area: Word);
     Problems := True;
     Exit;
     End;
-  M^.SeekFirst(1);
+  {where to start: after the high-water mark, when the message it names is still there, unchanged}
+  Id := Config^.GetMsgAreaId(Area);
+  Hw := HwFind(Id);
+  Start := 1;
+  If Hw > 0 Then
+    Begin
+    Stale := True;
+    M^.SeekFirst(HwNum[Hw]);
+    If M^.SeekFound Then
+      Begin
+      M^.MsgStartUp;
+      If (M^.GetMsgNum = HwNum[Hw]) And (MsgCrc(M) = HwCrc[Hw]) Then
+        Begin
+        Start := HwNum[Hw] + 1;
+        Stale := False;
+        End;
+      End;
+    If Stale Then
+      Log(Config^.GetEchoAreaTag(Area) + ': the message base is not as it was (message #' + Long2Str(HwNum[Hw]) +
+        ' is gone or another one: packed?): scanning from the start');
+    End;
+  If Verbose Then
+    Log('scan ' + Config^.GetEchoAreaTag(Area) + ' from #' + Long2Str(Start));
+  LastNum := 0;
+  LastCrc := 0;
+  M^.SeekFirst(Start);
   While M^.SeekFound Do
     Begin
     M^.MsgStartUp;
+    LastNum := M^.GetMsgNum;
+    LastCrc := MsgCrc(M);
     If M^.IsLocal And M^.IsEchoed And (Not M^.IsSent) And (Not M^.IsDeleted) Then
       Begin
       CopyInit(C);
@@ -2212,6 +2370,24 @@ Procedure ScanEchoArea(Area: Word);
       CopyFree(C);
       End;
     M^.SeekNext;
+    End;
+  If LastNum > 0 Then
+    Begin                                {what was looked at is not looked at again}
+    If Hw = 0 Then
+      Begin
+      If NumHw < MaxHw Then
+        Begin
+        Inc(NumHw);
+        Hw := NumHw;
+        HwId[Hw] := Id;
+        End;
+      End;
+    If Hw > 0 Then
+      Begin
+      HwNum[Hw] := LastNum;
+      HwCrc[Hw] := LastCrc;
+      HwChanged := True;
+      End;
     End;
   If Not CloseMsgArea(M) Then;
   End;
@@ -2677,6 +2853,9 @@ Procedure ScanAreas;
     i: Word;
 
   Begin
+  HwLoad;
+  If RescanAll Then
+    Log('-R: every echo area is scanned from its first message, the high-water marks are made again');
   For i := 1 To Config^.GetMaxMsgAreas Do
     If Config^.GetMsgName(i) <> '' Then
       Case Config^.GetMsgType(i) Of
@@ -2684,6 +2863,7 @@ Procedure ScanAreas;
                     ScanEchoArea(i);
         NetMail: ScanNetArea(i);
         End;
+  HwSave;
   End;
 
 
@@ -2842,6 +3022,8 @@ Quiet := False;
 DoToss := True;
 DoScan := True;
 Force := False;
+RescanAll := False;
+Verbose := False;
 BinkProg := '';
 i := 1;
 While i <= ParamCount Do
@@ -2854,6 +3036,10 @@ While i <= ParamCount Do
     DoToss := False
   Else If ParamStr(i) = '-f' Then
     Force := True
+  Else If ParamStr(i) = '-R' Then
+    RescanAll := True
+  Else If ParamStr(i) = '-V' Then
+    Verbose := True
   Else If ParamStr(i) = '-b' Then
     Begin
     Inc(i);
@@ -2863,7 +3049,7 @@ While i <= ParamCount Do
     {a file name, as the mailer's hook passes them: the whole inbound is tossed}
   Else
     Begin
-    WriteLn(StdErr, 'Usage: mktoss [-q] [-t | -s] [-f] [-b mkbink] [file ...]');
+    WriteLn(StdErr, 'Usage: mktoss [-q] [-t | -s] [-f] [-R] [-V] [-b mkbink] [file ...]');
     Halt(1);
     End;
   Inc(i);

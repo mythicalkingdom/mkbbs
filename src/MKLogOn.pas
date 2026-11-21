@@ -152,6 +152,19 @@ Procedure LogOffSysInfo;
   End;
 
 
+Function PromptOr(N: Word; Const Default: String): String;
+  {A prompt of the language file; its English text when the file has none (a file from before the prompt was added)}
+  Var
+    S: String;
+
+  Begin
+  S := Prompts.GetString(N);
+  If S = '' Then
+    S := Default;
+  PromptOr := S;
+  End;
+
+
 Procedure LogOnUser;
   Var
     Sec: SecType;
@@ -189,7 +202,8 @@ Procedure LogOnUser;
     If Left < User.GetSessionTimeLimit Then
       Begin
       User.SetSessionTimeLimit(Left);
-      User.DisplayStrLn('The BBS closes for maintenance in ' + Long2Str((Left + 59) Div 60) + ' minute(s): this call ends then.');
+      User.DisplayStrLn(PromptOr(534, 'The BBS closes for maintenance in') + ' ' + Long2Str((Left + 59) Div 60) + ' ' +
+        PromptOr(535, 'minute(s): this call ends then.'));
       End;
     End;
   If BbsDisplay.DisplayBbsFile('welcome', '') = '' Then;

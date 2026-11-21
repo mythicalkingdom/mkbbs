@@ -108,7 +108,7 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    than 20 names.  A request for a node behind a route goes out as an ordinary netmail with its flag.  Tests: `tests/tosstest.py`
    (needs `../mkbink/build/mkbink`), `../mkbink/tests/freqtest.py`.
    Answering requests: `mkbink` receives the `.req` and runs `mkfreq` (`src/MKFreq.pas`, see `FREQ-PLAN.md`): the requester's
-   security profile (its link's, else the global file request user), file areas with the option "Allow file requests" whose
+   security profile (its link's, else the global file request security), file areas with the option "Allow file requests" whose
    view and download security it meets, magic names (a file of `NAME path [password]`, `@LIST`), per-name passwords, limits.
    What could not be sent goes into a note in `<outbound>/mktoss/freq/` (setting "Tell by netmail"); `PostFreqNotes` in `mktoss`
    makes it a hold netmail to the requester in the scan (picked up, like the files: the answering system does not call).  Tests: `tests/mkfreqtest.py`, `tests/freqroundtrip.py` (a real `mkbink` asks the
@@ -116,7 +116,13 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    Update requests (`+time` / `-time`, UNIX seconds, FTS-0006) are done on all three sides: `mktoss` takes them from the subject,
    `mkbink queue -R` writes them (`name [!password] [+time|-time]`), `mkfreq` compares the dates of the files (`+` newer, `-` up to
    and including).  The answer goes in the same session when both mailers offer multiple batches (mkbink, see its `NOTES.md`), else it waits as hold mail for the requester's next call.
-7. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, a high-water mark for the scan, `.req` answering and update requests.
+7. **High-water mark of the scan (done)**: the scan of an echo area starts after the last message it looked at, kept with a check sum of that
+   message's header in `scanhw.dat` in the inbound directory.  When the message under the mark is gone or is another one (the base was packed and
+   renumbered, a delete moved the numbers) the area is scanned from the start again and the mark made anew; nothing is lost and nothing is
+   sent twice (an exported message is marked sent).  A message made exportable again *below* the mark (flags changed by hand) is not seen: run
+   `mktoss -s -R` once (it ignores all marks and makes them again; deleting `scanhw.dat` does the same).  `-V` says where each scan starts.
+   Netmail areas are still scanned whole (a netmail without a route has to be looked at again).  Test: `tests/tosstest.py`.
+8. Later: file echoes (TIC), `%PAUSE`, `%RESCAN`, `.req` answering and update requests.
 
 ## Known fixes made on the way
 

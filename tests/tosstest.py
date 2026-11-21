@@ -31,9 +31,9 @@ env = dict(os.environ, MK=cfg, TOSSATTACH=attach)
 fails = 0
 
 
-def check(name, ok):
+def check(name, ok, info=''):
     global fails
-    print(('ok   ' if ok else 'FAIL ') + 'toss: ' + name)
+    print(('ok   ' if ok else 'FAIL ') + 'toss: ' + name + ('' if ok else '  ' + str(info)))
     if not ok:
         fails += 1
 
@@ -205,6 +205,7 @@ if have_mkbink:
     r2 = run('mktoss', '-b', mkbink)
     check('a second run: nothing scanned, nothing sent, the outbound is the same',
           '0 scanned, 0 netmail sent' in r2.stdout and snap == (names(), sizes()))
+
 else:
     print('skip: mkbink is not built (../mkbink/build/mkbink): the outbound is not checked')
 
@@ -407,6 +408,39 @@ if have_mkbink:
     check('a second run does not write the requests again', open(req, 'rb').read() == before_req and 'file request(s) made' in r.stdout and '0 file request(s) made' in r.stdout)
 else:
     print('skip: no mkbink, routing and file attach are not checked')
+
+
+if have_mkbink:
+    # ---- the high-water mark of the scan
+    hw = inb + '/scanhw.dat'
+    hwt = open(hw).read() if os.path.exists(hw) else ''
+    check('scanhw.dat (inbound directory) has a mark for the echo area: id, last message looked at, check sum', len(hwt.split('\n')[0].split('\t')) == 3 and hwt.count('\t') >= 2, hwt)
+    marks = {l.split('\t')[0]: int(l.split('\t')[1]) for l in hwt.split('\n') if l.count('\t') == 2}
+    r3 = run('mktoss', '-s', '-V', '-b', mkbink)
+    scans = re.findall(r'scan (\S+) from #(\d+)', r3.stdout)
+    check('the next scan of an area that has a mark starts after it (MK: not from #1), the empty ones at #1; nothing is taken for "packed"',
+          any(t == 'MK' and int(n) > 1 for t, n in scans) and 'scanning from the start' not in r3.stdout, (scans[:4], r3.stdout[-300:]))
+    subprocess.run([os.path.join(build, 'postmsg'), '6', 'Local Poster', 'All', 'new after the mark', 'written after the scan'], capture_output=True, text=True,
+                   env=dict(env, POSTTYPE='echo'))
+    r4 = run('mktoss', '-s', '-V', '-b', mkbink)
+    check('a message written after the mark is looked at (sent, or - when no system is linked to the area any more - said so)',
+          '1 scanned' in r4.stdout or re.search(r'no system is linked to MK: #\d+ was not sent anywhere', r4.stdout) is not None, r4.stdout[-400:])
+    r5 = run('mktoss', '-s', '-V', '-b', mkbink)
+    check('... and not looked at again', '0 scanned' in r5.stdout and 'was not sent anywhere' not in r5.stdout, r5.stdout[-300:])
+    # the base was packed (renumbered): the message under the mark is another one; a changed check sum has the same effect
+    t = open(hw).read().split('\n')
+    t = [('\t'.join(l.split('\t')[:2] + ['1']) if l.count('\t') == 2 else l) for l in t]
+    open(hw, 'w').write('\n'.join(t))
+    r6 = run('mktoss', '-s', '-V', '-b', mkbink)
+    check('the message under the mark is not the same (packed?): the area is scanned from the start, said so, nothing is sent twice',
+          'scanning from the start' in r6.stdout and re.search(r'from #1\b', r6.stdout) and '0 scanned' in r6.stdout, r6.stdout[-400:])
+    check('... and the mark is made again (a real check sum now)', all(l.split('\t')[2] != '1' for l in open(hw).read().split('\n') if l.count('\t') == 2))
+    r7 = run('mktoss', '-s', '-V', '-R', '-b', mkbink)
+    check('-R: every area from #1, said so, and nothing sent twice (sent messages are marked sent)',
+          'every echo area is scanned from its first message' in r7.stdout and re.search(r'from #1\b', r7.stdout) and '0 scanned' in r7.stdout, r7.stdout[-400:])
+    os.remove(hw)
+    r8 = run('mktoss', '-s', '-V', '-b', mkbink)
+    check('without scanhw.dat the scan starts at #1 and makes it again', re.search(r'from #1\b', r8.stdout) and os.path.exists(hw))
 
 
 print('failures: %d' % fails)

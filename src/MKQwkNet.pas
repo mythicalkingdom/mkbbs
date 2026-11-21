@@ -3,6 +3,9 @@ Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<Remo
 {$I MKB.Def}
 
 {
+     strip-ctrla yes     take the Ctrl-A codes (colours and attributes of a Synchronet hub) out of the text of the messages that
+                         are posted; a line that began with one stays (default no)
+
      The messages the pass posts from the hub's packet are written down (RemoteId.imp next to the map file: area and message
      number) and are not put in a reply packet, whatever the last read pointer says: they do not go back to where they came from.
      An entry is kept 60 days (a last read pointer put back by hand within that time is safe; message numbers of a base that is
@@ -99,7 +102,7 @@ Implementation
 
 
 Uses MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
-  MKOffAbs, MKOffQwk, MKOffDL, MKOffXfer, MKOfflin,
+  MKOffAbs, MKOffQwk, MKQwkImp, MKOffDL, MKOffXfer, MKOfflin,
   MKComAbs, MKComClient, MKHubScr, MKProt, MKVideo, MKPlat,
   Dos;
 
@@ -113,6 +116,7 @@ Var
   AreaConf: Array[1..OffAreas] Of LongInt; {area -> conference (-1 = none)}
   Inbound, Outbound, UserName, MapDir: String;
   HubHost, HubProfile, HubScript, HubLogin, HubPass, HubProto, HubLog: String;
+  StripA: Boolean;                       {strip-ctrla: the Ctrl-A codes of the hub's messages are taken out}
   ReplyErr, ReplyOk: Array[1..8] Of String[80];   {what the hub says after the reply packet: refused / accepted}
   NumErr, NumOk: Word;
   HubPort: Word;
@@ -176,6 +180,7 @@ Function LoadMap(Id: String): Boolean;
   HubLog := '';
   NumErr := 0;
   NumOk := 0;
+  StripA := False;
   MapDir := Config^.FindBbsFile(Id + '.map');
   FileName := MapDir + Id + '.map';
   If Not FileExist(FileName) Then
@@ -227,6 +232,8 @@ Function LoadMap(Id: String): Boolean;
         HubProto := UpCase(Rest[1])
       Else If Key = 'transcript' Then
         HubLog := Rest
+      Else If Key = 'strip-ctrla' Then
+        StripA := Lower(ExtractWord(Rest, 1)) = 'yes'
       Else If (Key = 'reply-error') And (NumErr < 8) And (Rest <> '') Then
         Begin
         Inc(NumErr);
@@ -948,8 +955,10 @@ Function DoPacket(Id: String): Boolean;
     ImpO.DupeFile := MapDir + Id + '.dup';
     Offline^.SetImportOpts(ImpO);
     QwkImportLedger := MapDir + Id + '.imp';
+    QwkStripCtrlA := StripA;
     Offline^.ImportPacket;
     QwkImportLedger := '';
+    QwkStripCtrlA := False;
     User.DisplayStrLn(Long2Str(Offline^.GetImported) + ' message(s) posted from ' + Id);
     {the messages just posted are not for the system: its last read goes past them where it can (nothing of
      the area was waiting to be sent, and the new messages follow each other)}

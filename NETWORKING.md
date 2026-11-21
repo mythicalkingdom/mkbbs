@@ -168,6 +168,10 @@ Do this on your system when you want to take mail from a hub.
    lags makes a gate send a newsgroup's own posts back to it.
    (A Synchronet hub says `Invalid Conference 9999` after it unpacks a reply packet with a message for a conference it does not have; with
    `profile synchronet` that is a `reply-error` by default.)
+   **Colour codes of a Synchronet hub.**  The messages of a Synchronet hub can carry its Ctrl-A codes (`^Ah^Ac` ... for colours and attributes).
+   Left alone, a line that starts with one is taken for a kludge line and is left out, and the codes inside a line show as odd characters in
+   the reader.  `strip-ctrla yes` in the map file takes the Ctrl-A and the character after it out of every message that is posted from the hub's
+   packet and keeps the lines that began with one; a real kludge line (`^AMSGID: ...`) is dealt with as before.  The default is `no`.
    A refused reply packet stays in the outbound directory (exit 7) and goes again with the next pass; nothing new is
    made before it has gone, so nothing is lost or sent twice.  With neither line nothing is checked.
 9. **Check the transcript** `<id>.hub.log` (next to the map file, unless you named another) when something does not work.
@@ -278,12 +282,12 @@ caller that is not a link ("Bad address").
 **Answering requests.**
 
 1. The mailer must be on (`EchoMail > Mailer`).
-2. `EchoMail > File Requests`: switch **Answer file requests** on.  **File request user** is the security (level, flags with F2)
+2. `EchoMail > File Requests`: switch **Answer file requests** on.  **File request security** is the security (level, flags with F2)
    of a system that has none of its own; level 0 with no flags means such systems get nothing.  **Without a password** also
    answers callers that did not use a session password (they never get password protected names).  **Tell by netmail** sends
    the requester a netmail that lists what could not be sent.  **Most files** and **Most KB** limit one request (0 = 20 files, no
    size limit).
-3. `EchoMail > Mailer Links`: a link can have its own **File request level** (F2 for flags); 0 means the file request user.
+3. `EchoMail > Mailer Links`: a link can have its own **File request level** (F2 for flags); 0 means the file request security.
 4. `Files > Areas`: only the file areas with **Allow file requests** are searched, and only when the security of the system meets
    the area's *view* and *download* security.  A system gets what a caller with that security could download.
 5. Magic names (optional): the **Magic names file** has lines `NAME path [password]` (`;` or `#` starts a comment).  The path can
@@ -302,6 +306,11 @@ The requester is the first AKA, `RemoteStatus PROTECTED` is a secure session, an
 file); only the list of a `@LIST` name is marked `=` (erase after it was sent), because the program made it.  You get everything `mkfreq` does
 (file areas with Allow file requests, security profiles, magic names, passwords, update requests, limits); the netmail note of "Tell by netmail"
 is made too.  A request processor must never be able to delete a file it only offers: with the SRIF `=` or `-` in front of a name the mailer erases it.
+
+**When a file is not found,** the requester is only told "not found" (that way a refusal does not say what exists), but the log of `mkfreq`
+(the `mkbink` log, or the screen when you run it by hand) says why: the areas it looked in, the areas that allow requests but whose view or download
+security the system's level does not meet (with their levels), and the areas without "Allow file requests".  A new link's "File request level" and the
+file areas' security are the usual causes: a system of level 1 only gets areas whose view and download security are 1 or less.
 
 **The mailer's side of that rule.**  `mkbink` obeys a delete mark of a request answer (`^`, or `=` / `-` of SRIF) only for a regular file directly in its
 `freq-tmp` directory (`freq-tmp` in its settings, default `freq-tmp` in the inbound directory; `mkfreq` makes its lists there through `MKBINK_TMP`).

@@ -33,7 +33,7 @@ Program MKFreq;
      What a system may have:
 
        * A security profile (level and flags like a caller's): the one of its link in Mailer Links (File request access), or,
-         when that is blank (level 0), the global "file request user" of the Mailer page.  A system gets what a caller with that
+         when that is blank (level 0), the global "file request security" of the File Requests page.  A system gets what a caller with that
          security could list and download: only file areas that have the option "Allow file requests" (mkconfig, Files), whose
          listing and download security the profile meets.
        * Magic names: the file named in the Mailer page ("Magic names file"), lines   NAME  path  [password]   (; or # starts a
@@ -335,16 +335,49 @@ Function AreaAllowed(i: Word): Boolean;
   End;
 
 
+Var
+  Searched, NoFreq, Blocked: String;           {what the last search looked at and why it left areas out (for the log)}
+
+
+Procedure AddName(Var L: String; Const S: String);
+  Begin
+  If Length(L) < 150 Then
+    Begin
+    If L <> '' Then
+      L := L + ', ';
+    L := L + S;
+    End;
+  End;
+
+
 Function SearchAreas(Pattern, Req: String): Word;
   Var
     i: Word;
     Found: Word;
+    V, D: SecType;
 
   Begin
   Found := 0;
+  Searched := '';
+  NoFreq := '';
+  Blocked := '';
   For i := 1 To Config^.GetMaxFileAreas Do
-    If AreaAllowed(i) Then
-      Found := Found + AddMatching(AbsPath(Config^.GetFileAreaPath(i)), Pattern, Req);
+    If (Config^.GetFileAreaName(i) <> '') And (Config^.GetFileAreaPath(i) <> '') Then
+      Begin
+      If Not Config^.GetFileFreq(i) Then
+        AddName(NoFreq, Config^.GetFileAreaName(i))
+      Else If AreaAllowed(i) Then
+        Begin
+        AddName(Searched, Config^.GetFileAreaName(i));
+        Found := Found + AddMatching(AbsPath(Config^.GetFileAreaPath(i)), Pattern, Req);
+        End
+      Else
+        Begin
+        Config^.GetFileViewSecurity(i, V);
+        Config^.GetFileDLSecurity(i, D);
+        AddName(Blocked, Config^.GetFileAreaName(i) + ' (view ' + Long2Str(V.Level) + ', download ' + Long2Str(D.Level) + ')');
+        End;
+      End;
   SearchAreas := Found;
   End;
 
@@ -628,6 +661,18 @@ Procedure DoRequest(Line: String);
   If (Found = 0) And (NameMatches = 0) Then
     Note(Name + ': not found');
   LogLine(Shown + ': ' + Long2Str(Found) + ' file(s)' + Copy(' (nothing that fits the date)', 1, 29 * Ord((Found = 0) And (NameMatches > 0))));
+  If (Found = 0) And (NameMatches = 0) Then
+    Begin                                    {the log says why a file was not found (the requester is told only "not found")}
+    If Searched <> '' Then
+      LogLine('  looked in: ' + Searched)
+    Else
+      LogLine('  no file area could be looked in');
+    If Blocked <> '' Then
+      LogLine('  areas that allow requests but whose security this system does not meet (its level is ' + Long2Str(Profile.Level) +
+        '; Mailer Links: File request level, or the file request security of the File Requests page): ' + Blocked);
+    If NoFreq <> '' Then
+      LogLine('  areas without "Allow file requests" (mkconfig: Files > Areas): ' + NoFreq);
+    End;
   End;
 
 
@@ -694,7 +739,7 @@ If (M^.Flags And mcFileReq) = 0 Then
   Close(Ans);
   Halt(0);
   End;
-{who is asking: the link, its security profile; else the global file request user}
+{who is asking: the link, its security profile; else the global file request security}
 Profile := M^.ReqSec;
 LinkNo := 0;
 If ParseAddr(Who, Requester, Requester) Then

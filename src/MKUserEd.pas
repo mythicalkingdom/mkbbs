@@ -542,6 +542,7 @@ PwdModeFromConfig;
 LoadCfg;
 NameSearch.Init;
 NameSearch.SetBbsType(BbsType);
+NameSearch.SetCreate(True);               {a BBS without users: the file is made when the first one is added}
 NameSearch.GoToPosition(0);
 LoadUser;
 InstallKeyboard;                       {Esc and the Ctrl keys work}

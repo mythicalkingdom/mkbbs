@@ -207,14 +207,14 @@ check('tosser off: no on-inbound', rc == 0 and 'on-inbound' not in out)
 rc, out, err = tool('-n')
 check('file requests off (the default): no freq lines', rc == 0 and 'freq' not in out)
 s = screen('\x1bc', 'f')
-check('EchoMail > File Requests shows the page', 'File Requests' in s and 'Answer file requests:' in s and 'Magic names file:' in s and 'File request user:' in s)
+check('EchoMail > File Requests shows the page', 'File Requests' in s and 'Answer file requests:' in s and 'Magic names file:' in s and 'File request security:' in s)
 screen('\x1bc', 'f', ' ', '\t', ' ', '\t', ' ', '\t', '80', '\t', 'magic.txt', '\t', '7', '\t', '300', '\r', '\x1bx', 'y')
 rc, out, err = tool('-n')
 check('switched on with limits: mkbinkcfg writes freq yes, freq-unsecure yes, on-freq (mkfreq next to it), freq-max-files 7, freq-max-kb 300',
       rc == 0 and 'freq yes' in out and 'freq-unsecure yes' in out and ('on-freq %s' % os.path.join(repo, 'build', 'mkfreq')) in out
       and 'freq-max-files 7' in out and 'freq-max-kb 300' in out)
 s = screen('\x1bc', 'f')
-check('the page shows what was saved (user level 80, the magic names file, the limits)', 'magic.txt' in s and re.search(r'File request user:\s+80', s) is not None
+check('the page shows what was saved (user level 80, the magic names file, the limits)', 'magic.txt' in s and re.search(r'File request security:\s+80', s) is not None
       and re.search(r'Most files:\s+7', s) and re.search(r'Most KB:\s+300', s))
 s = screen('\x1bc', 'l', '\r')
 check('a link has "File request level"', 'File request level:' in s)

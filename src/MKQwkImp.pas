@@ -17,7 +17,8 @@ Unit MKQwkImp;       {the messages of a QWK message file go into message areas}
      QwkImportFile goes through the conferences of the file in turn and writes each message the way mk
      writes one that is entered (MKEnter): the area is opened once per conference, SetMailType by the
      kind of area, StartNewMsg, the fields, the text and WriteMsg.
-       - the text: kludge (^A) lines of the packet are left out (KeepKludges True keeps them); for echomail
+       - the text: kludge (^A) lines of the packet are left out (KeepKludges True keeps them; with QwkStripCtrlA the
+         Ctrl-A colour codes of the other lines are taken out and those lines stay); for echomail
          and netmail areas T.TearLine and T.OriginLine follow the text
        - names: T.ForceFrom replaces the From name (a caller must not post as somebody else), else the
          names are in Proper case (QWK has them in upper case)
@@ -51,6 +52,12 @@ Const
   qiMoved = 6;        {the messages of a conference are put in the area for bad messages}
   qiControl = 7;      {a control message (to SBBS or MK) was taken by QwkControl}
 
+
+Const
+  QwkStripCtrlA: Boolean = False;     {when set: a Ctrl-A and the character after it (the colour and attribute codes of a Synchronet
+                                       packet) are taken out of the text of every message, and a line that began with one is kept
+                                       (without it the whole line goes: it is taken for a kludge).  A real kludge line (^AMSGID: ...)
+                                       is dealt with as before (left out unless KeepKludges).  QWK network passes: "strip-ctrla" in the map file}
 
 Type QwkImpTarget = Record
   AreaId: String[60];             {message area id string, as MKOpen wants it}
@@ -138,6 +145,42 @@ Function IsControl(ToName: String): Boolean;
   End;
 
 
+Function IsKludgeLine(Const L: String): Boolean;
+  {^A, then 2 or more upper case letters or digits, then a colon or a blank: ^AMSGID: ..., ^AFMPT 3, ^AINTL ...}
+  Var
+    i: Word;
+
+  Begin
+  IsKludgeLine := False;
+  If (Length(L) < 4) Or (L[1] <> #1) Then
+    Exit;
+  i := 2;
+  While (i <= Length(L)) And (L[i] In ['A'..'Z', '0'..'9']) Do
+    Inc(i);
+  IsKludgeLine := (i >= 4) And (i <= Length(L)) And (L[i] In [':', ' ']);
+  End;
+
+
+Procedure StripCtrlA(Var L: String);
+  Var
+    i: Word;
+    R: String;
+
+  Begin
+  R := '';
+  i := 1;
+  While i <= Length(L) Do
+    If L[i] = #1 Then
+      Inc(i, 2)
+    Else
+      Begin
+      R := R + L[i];
+      Inc(i);
+      End;
+  L := R;
+  End;
+
+
 Procedure PostOne(Var Q: QwkMsgObj; Msg: AbsMsgPtr; Var T: QwkImpTarget; Conf: LongInt;
   Var Dup: DupeObj; UseDupe: Boolean; Note: QwkImpNoteProc; Var R: QwkImpResult);
   Var
@@ -153,6 +196,8 @@ Procedure PostOne(Var Q: QwkMsgObj; Msg: AbsMsgPtr; Var T: QwkImpTarget; Conf: L
   Procedure Emit(CR: Boolean);
     {Line is a whole line (CR) or a piece of one: kludge lines are left out, the "Subj:" line of a netmail gives the subject}
     Begin
+    If QwkStripCtrlA And (Not IsKludgeLine(Line)) Then
+      StripCtrlA(Line);
     If (Length(Line) > 0) And (Line[1] = #1) And (Not T.KeepKludges) Then
       Line := ''
     Else If First And (T.Kind = mmtNetMail) And (Copy(Line, 1, 6) = 'Subj: ') Then

@@ -30,6 +30,9 @@ the listener `MKLISTEN.md`, and for the Fido tosser `TOSSER.md`.  `GETTING-START
 * **Terminals.**  ANSI and AVATAR; text is CP437 and is shown as UTF-8 to terminals that want it (decided by the terminal
   type, or set on the port).  Callers can come by Telnet, plain TCP or a web socket.
 
+`mkusered` makes `users.bbs` when the BBS has none (the first user is saved, and a save that cannot write says so), and a new user gets the first
+call, last call and new files date of today.
+
 ## How it is built
 
 ```

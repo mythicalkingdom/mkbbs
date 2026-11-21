@@ -22,6 +22,8 @@ Type NameSearchType = Record
   ExactMatch: Boolean;
   UsersFile: File;
   Opened: Boolean;
+  CreateFile: Boolean;                {a program that adds users: the file is made when it is not there}
+  SaveFailed: Boolean;                {the last SaveChanges could not write}
   SearchName: String[35];
   BbsType: Word;
   End;
@@ -32,6 +34,9 @@ Type NameObj = Object
   Procedure Init; {Initialize}
   Procedure Done; {Done}
   Procedure SetBbsType (BT: Word);
+  Procedure SetCreate(B: Boolean);       {make Users.Bbs when it is missing (mkusered)}
+  Function  SaveOk: Boolean;             {the last SaveChanges wrote the record}
+  Function  UsersFileName: String;
   Function  SearchFirst(Name: String): Boolean;
   Function  SearchNext: Boolean;
   Procedure GoToPosition(GP: Word);
@@ -183,6 +188,8 @@ Procedure NameObj.Init;                      {Initialize}
   User^.ExactMatch := False;
   User^.Found := False;
   User^.Opened := False;
+  User^.CreateFile := False;
+  User^.SaveFailed := False;
   User^.ExtraLoaded := False;
   User^.BbsType := 0;
   End;
@@ -225,11 +232,48 @@ Function NameObj.Exact: Boolean;
   End;
 
 
+Procedure NameObj.SetCreate(B: Boolean);
+  Begin
+  User^.CreateFile := B;
+  End;
+
+
+Function NameObj.SaveOk: Boolean;
+  Begin
+  SaveOk := Not User^.SaveFailed;
+  End;
+
+
+Function NameObj.UsersFileName: String;
+  {the Users.Bbs of the BBS; when there is none and a program that adds users asked for it, an empty one is made where the
+   other files of the configuration are (without it a save went nowhere and said nothing)}
+  Var
+    FN: String;
+    F: File;
+
+  Begin
+  FN := Config^.FindBbsFile('users.bbs') + 'users.bbs';
+  If User^.CreateFile And (Not FileExist(FN)) Then
+    Begin
+    FN := Config^.GetBbsPath + 'users.bbs';
+    If Not FileExist(FN) Then
+      Begin
+      Assign(F, FN);
+      Rewrite(F, SizeOf(UsersType));
+      If IoResult = 0 Then
+        Close(F);
+      If IoResult <> 0 Then;
+      End;
+    End;
+  UsersFileName := FN;
+  End;
+
+
 Procedure NameObj.GoToPosition(GP: Word);
   Begin
   If Not User^.Opened Then
     Begin
-    If Not shAssign(User^.UsersFile, Config^.FindBbsFile('users.bbs') + 'users.bbs') Then;
+    If Not shAssign(User^.UsersFile, UsersFileName) Then;
     FileMode := fmReadWrite + fmDenyNone;
     If Not shReset(User^.UsersFile, SizeOf(UsersType)) Then;
     End;
@@ -247,7 +291,7 @@ Function NameObj.SearchFirst(Name: String): Boolean;
   User^.SearchName := Upper(Name);
   If Not User^.Opened Then
     Begin
-    If Not shAssign(User^.UsersFile, Config^.FindBbsFile('users.bbs') + 'users.bbs') Then;
+    If Not shAssign(User^.UsersFile, UsersFileName) Then;
     FileMode := fmReadWrite + fmDenyNone;
     If Not shReset(User^.UsersFile, SizeOf(UsersType)) Then;
     End
@@ -353,11 +397,13 @@ Procedure NameObj.SaveChanges; {Save changed user values}
     Idx: UsersIdxType;
 
   Begin
+  User^.SaveFailed := True;
   TmpPos := FilePos(User^.UsersFile);
   Seek(User^.UsersFile, User^.UsersFilePos + User^.CurrentPos - 1);
   If IoResult = 0 Then
 {    If (User^.CurrentPos <= User^.NumRead + 1) Then }
-  If shWrite(User^.UsersFile, User^.UserBuffer[User^.CurrentPos], 1) Then;
+  If shWrite(User^.UsersFile, User^.UserBuffer[User^.CurrentPos], 1) Then
+    User^.SaveFailed := False;
   Seek(User^.UsersFile, TmpPos);
   If IoResult <> 0 Then;
   Case User^.BBSType of

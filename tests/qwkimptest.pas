@@ -85,6 +85,16 @@ begin
   Q.Done;
 end;
 
+procedure PatchFile(Name, A, B: String);
+{ the first A in the file becomes B (same length): what the packet writer would not write (a line that begins with ^A) }
+var F: File; Buf: String; N, P: LongInt;
+begin
+  Assign(F, Name); Reset(F, 1); N := FileSize(F); SetLength(Buf, N); BlockRead(F, Buf[1], N); Close(F);
+  P := Pos(A, Buf);
+  if P > 0 then Move(B[1], Buf[P], Length(B));
+  Assign(F, Name); Rewrite(F, 1); BlockWrite(F, Buf[1], N); Close(F);
+end;
+
 procedure MakeArea(Name: String);
 var M: AbsMsgPtr;
 begin
@@ -163,6 +173,32 @@ begin
   Check('... from "Alexandria von Hohenzollern-Sigmaringen" (Proper case of the long name), subject whole', M^.SeekFound and
     (M^.GetFrom = 'Alexandria Von Hohenzollern-Sigmaringen') and (M^.GetSubj = 'A subject that is much longer than 25 bytes'));
   S := Esc(AllText(M)); Check('... and the text has no To:/From:/Subject: lines: ' + S, S = 'long name text');
+  CloseMsgArea(M);
+
+  { Ctrl-A codes (the colours of a Synchronet hub): left as they are, or taken out with QwkStripCtrlA }
+  EraseFile(Dir + 'ctrla.msg');
+  Q.Init; Q.SetMsgPath(Dir + 'ctrla.msg'); Q.SetPacketId('MKBBS'); Q.SetRepMode(True);
+  Q.CreateMsgBase(0, 0);
+  Q.StartNewMsg; Q.SetFrom('TEST USER'); Q.SetTo('ALL'); Q.SetSubj('Colours'); Q.SetMsgConf(1);
+  Q.SetDate('03-04-05'); Q.SetTime('06:07');
+  Q.DoStringLn('ZhZcbold cyan'#1'n plain'); Q.DoStringLn('mid'#1'hline'); Q.DoStringLn('ZMSGID: 1:1/1 abc'); Q.DoStringLn('last');
+  Check('ctrl-a REP written', Q.WriteMsg = 0);
+  Q.CloseMsgBase; Q.Done;
+  PatchFile(Dir + 'ctrla.msg', 'ZhZc', #1'h'#1'c');           { a line that begins with colour codes }
+  PatchFile(Dir + 'ctrla.msg', 'ZMSGID', #1'MSGID');          { and a real kludge line }
+  E := QwkImportFile(Dir + 'ctrla.msg', '', MapFree, NoteProc, R);
+  Check('ctrl-a REP imported (the codes are not touched): 1 posted', (E = 0) and (R.Posted = 1));
+  OpenMsgArea(M, 'J' + Dir + 'a1'); M^.SeekFirst(4); M^.MsgStartUp;
+  S := Esc(AllText(M));
+  Check('... as it was: a line that begins with a code is taken for a kludge and goes, a code inside a line stays: ' + S, S = 'mid^hline|last');
+  CloseMsgArea(M);
+  QwkStripCtrlA := True;
+  E := QwkImportFile(Dir + 'ctrla.msg', '', MapFree, NoteProc, R);
+  QwkStripCtrlA := False;
+  Check('imported with QwkStripCtrlA: 1 posted', (E = 0) and (R.Posted = 1));
+  OpenMsgArea(M, 'J' + Dir + 'a1'); M^.SeekFirst(5); M^.MsgStartUp;
+  S := Esc(AllText(M));
+  Check('... the codes are taken out, the coloured line stays, the real kludge line (^AMSGID:) still goes: ' + S, S = 'bold cyan plain|midline|last');
   CloseMsgArea(M);
 
   { errors }

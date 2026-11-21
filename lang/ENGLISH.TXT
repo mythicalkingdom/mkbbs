@@ -1,0 +1,452 @@
+;
+;                    Mythical Kingdom Bbs Language File   (MK: with prompts 534 and 535 added)
+;
+;     Written by Mark May - Mythical Kingdom Software (513) 237-7737
+;                  FidoNet 1:110/290 or RIME ->MYTHKING
+;
+;   Lines starting with a semi-colon are considered as comments.
+;   Do not remove any lines as most all of the prompts are needed.
+;   Any prompt text can be changed, but be sure to watch for any
+;   "key" characters or strings that need to be updated to reflect
+;   changed wording.  Do not embed any "null" characters.
+;
+;
+001 Y
+002 N
+003 Yes
+004 No
+005 Enter =
+006 Press (Enter) to continue
+007 More? (Y)es (N)o (C)ontinuous?
+008 Please wait...
+009 Are you sure
+010 Continuous
+011 C
+012 (
+013 )
+014 ?
+015 Invalid numeric value!
+016 Value must be equal to or larger than
+017 Value must be equal to or smaller than
+018 On
+019 Off
+;   020 Password character
+020 *
+021 Enter Your Password:
+022 Enter Bulletin to be displayed:
+023 Is Now On
+024 Is Now Off
+025 Screen clearing between pages
+026 Full Screen editor
+027 More? Page Pausing
+028 Re-Enter your Answer
+029 Date:
+030 Searching for new files since
+031 Enter date for new file search:
+032 Enter your first and last name:
+033 Enter your last name:
+034 Your name was not found in the user records
+035 Did you type it correctly
+036 Choose a password for this system:
+037 Re-enter your password:
+038 Passwords do not match...try again:
+039 Password is incorrect!
+040 Enter your address:
+041 Enter your city and state:
+042 Enter your zip code:
+043 Enter your voice phone number:
+044 Enter your data phone number:
+045 Enter your gender:
+046 MF
+047 Posting a message in
+048 Do you want ansi graphics
+049 Do you want avatar graphics
+050 Check for your mail...
+051 No mail to you found
+052 Read your mail now
+053 Check for new files
+054 No new files found
+055 Enter your screen length:
+056 Quote original message
+057 Enter your birthdate
+;   058 is the format for displaying and entering dates, it must contain
+;   'MM', 'DD', and either 'YYYY' or 'YY' along with any formatting
+;   characters
+058 MM/DD/YY
+059 Pause after each page
+060 Clear screen between pages
+061 Enter your new password:
+062 Is everything entered correctly
+063 Enter Netmail Destination Address:
+064 Is this message priviledged
+065 Should this message be echoed
+066 To:
+067 From:
+068 Subject:
+069 Priv
+070 Read
+071 Name not found in the user records here!
+072 Do you really want to abort the message
+073 You don't have security to enter a message in this area
+074 You don't have security to read messages in this area
+075 Why do you want to chat?
+076 Sysop is not available at this time
+077 Would you like to leave a message instead
+078 Chat Started
+079 Chat Ended
+080 Message not found!
+081 Insert text before line
+082 Line to edit
+083 Original text
+084 Replacement text
+085 Please wait...while door program loads...
+086 Starting message number
+087 (F)rom (T)o (S)ubject
+088 FTS
+089 First line to delete
+090 Last line to delete
+091 Insufficient Netmail credit!
+092 Private messages not allowed in this area!
+093 Public messages not allowed in this area!
+094 Invalid message area!
+095 ... Paging Sysop Now ...
+096 Time Limit Exceeded!
+097 You have one minute remaining...
+098 You have two minutes remaining...
+099 You are about to be logged off for inactivity...
+100 Chat not allowed in local mode
+;   101 thru 103 are for archive viewing
+101 Contents of
+102 Time
+103 CRC
+104 You
+105 Caller
+106 Sysop
+107 Missing
+108 Message #
+109 in Area
+110 Enter old password:
+111 Press (SpaceBar) to Stop
+112 Enter file(s) to download
+113 Enter file(s) to upload
+114 File not found
+115 File already exists
+116 File not wanted
+117 Enter a description for this file:
+118 Description is too short!
+119 Estimated time is
+120 Minute(s)
+121 Minute(s) remaining
+122 Choose transfer protocol
+123 Files sent
+124 Files received
+125 File(s) for content viewing?
+126 Not enough time remaining
+127 Your baud rate is too slow for file transfers
+128 Goodbye after transfer
+129 Ready to send....
+130 Begin transfer now....
+131 Press (Esc) to abort or (G) to hang-up now
+132 Log-off aborted returning to system
+133 Goodbye
+134 Sorry this system is private
+135 Your baud rate is too slow for this system
+136 Access denied!
+137 Would you like to leave a note to the sysop
+138 Your time has been adjusted for an event
+139 Enter partial name or (Enter) for all users?
+140 File Name
+141 Orig Size
+142 Compr Size
+143 Date
+144 Search for files since
+145 Enter keyword to use for search
+146 Daily limit exceeded
+147 Ratio exceeded
+148 There is not enough free space for uploads
+149 Ansi
+150 Avatar
+151 Reading message area
+152 Messages to sysop not allowed in echo areas
+153 Set crash priority on message
+154 Upload a message
+155 Begin message text - words are wrapped automatically
+156 Enter a blank line to end the message
+157 Address is invalid. Try Again
+158 Please inform sysop of Error in Questionaire
+159 Date entered is invalid...Please re-enter
+160 Choose archive packer
+161 Scan all areas for your mail
+162 Select message area
+163 Do you want message area
+164 Flag messages as read
+165 Select transfer protocol
+166 Do you want this packet
+167 Send packets with no messages
+168 File transfer did not complete successfully
+169 Do you want a new files list included
+170 Do you want bulletins included
+171 Do you want screens included
+172 Sysop does not allow this option to be changed
+173 Flagging messages as read
+174 Creating new files list
+175 Screen file not found
+176 Uploads not supported for this mail type
+177 Do you have a reply file to upload
+178 No messages found
+179 Packet size is
+180 Message moved to default area
+181 Message appears to be a duplicate
+182 Grunged message - skipping
+183 Unsupported mail type
+184 Processing screens now
+185 Processing Bulletins now
+186 Invalid transfer protocol chosen
+187 Invalid archive packer chosen
+188 Uncompressing file
+189 Compressing file
+190 Reset message pointer to
+191 Password has been changed
+192 Entries did not match - Password NOT changed
+193 Do you want to quit the message
+;194 is forced phone number format use 194 with no text for non-forced format
+; ** Note ** format is limitted to 12 characters because of user record field
+194
+;   200 thru 206 relate to timebank door operations
+195 Please inform sysop of error in questionaire file
+196 Re-Enter your answer, the minimum answer length is
+197 Enter filespec to display  (Enter = *.*)
+198 Filespec entered is invalid!
+199 Reset Last-Read Msg Pointer to Msg Number
+200 Your time bank balance is
+201 Kbytes
+202 Minutes
+203 Withdrawn
+204 Deposited
+205 To Withdraw
+206 To Deposit
+;   210 thru 220 relate to choices while reading messages
+207 To (Enter = All)
+208 Verifying Name
+209 Search for user name
+210 (A)gain
+211 (N)ext
+212 (L)ast
+213 (R)eply
+214 (E)nter
+215 (D)elete
+216 (S)top
+217 (<)Orig Msg
+218 (>)Reply Msg
+219 (!*X/U=)
+;   220 Is keys (in order) for choices 210 thru 219
+220 ANLREDS<>!*X/U=
+;   221 thru 229 relate to choices when starting to read messages
+;   219 is Kludges, Sysop adjust, eXport, Forward, User Security, Unreceive
+221 (F)orward
+222 (R)everse
+223 (I)ndividual
+;224 (M)arked
+; Marked message not needed
+225 (N)ew
+226 (S)elected
+227 (H)elp
+228 (Q)uit
+;   229 is keys for choices 221 thru 228 in order
+229 FRINSHQ
+;   230 thru 239 relate to choices while entering a message
+230 (D)elete
+231 (E)dit line
+232 (R)eplace Text
+233 (I)nsert Line
+234 (H)elp
+235 (C)ontinue
+236 (L)ist Msg
+237 (S)ave
+238 (Q)uit
+;   239 is keys for choices 230 thru 238 in order
+239 DERIHCLSQ
+240 Current Date:
+241 Current Time:
+242 Connect Time:
+243 Time Used Today:
+244 Time Remaining Today:
+245 Daily Time Limit:
+246 Enter Area number or (N)ext (B)ack (A)gain (Q)uit?
+247 NBAQ
+248 Invalid Message number
+249 Choose Message area
+250 Nodelist Browsing
+251 ? for Zones    Zone:? for Nets    Zone:Net/? for Nodes    Blank to End
+252 .Type.  Number             Name                    Location          Cost
+253 ------  ------  --------------------------  ----------------------  -----
+254 Search Code (Blank to End):
+255 Msgs in Area
+; Prompts 256 and 257 are "Your" mail search headers
+256  Num              From                         Subject
+257 ----- ------------------------- ----------------------------------------
+258 Scanning for Your Mail
+259 FileName is invalid
+260 Error - unable to save message
+261 Available Transfer Protocols
+262 Insufficient DL bytes remaining
+263 Search Text not found
+264 Please wait - looking up user record...
+265 Exporting messages not allowed!
+266 Filename to export message to?
+267 You are not permitted to adjust this callers security level
+268 Enter new security level for
+269 Message writer is not an active user on this system
+270 Threaded message is priviledged
+271 Message number to delete (Enter=none)?
+272 You are not permitted to delete this message
+; 273 thru 276 are for message forwarding
+273 This message forwarded from area
+274 Which area should msg be forwarded to (Enter for list)?
+275 Originally From:
+276 Originally To:
+; 277 thru 289 are used for sysop message adjustments
+277 Item to change?
+278 {(M)essage Area}
+279 (F)rom:
+280 (T)o:
+281 (S)ubject:
+282 (A)ttributes
+283 (Q)uit
+; 284 is command letters for 279 thru 283
+284 FTSAQ
+285 {(D)eleted:}
+286 (P)riviledged:
+287 (R)eceived:
+288 (L)ocal:
+; 289 is command letters for 286 thru 288
+289 PRL
+290 New message area (Enter for list)?
+291 Files
+292 From: search string?
+293 To: search string?
+294 Subject: search string?
+; Prompts 295 and 296 are for message quick-scanning headers
+295 Msg #         From                  To                     Subject
+296 ------ -------------------- -------------------- ------------------------------
+297 More (Y)es (N)o (C)ontinuous (M)ark (Enter=Yes)?
+298 YNCM
+299 Message Number to Mark
+300 Password is too short - Please choose a longer one.
+301 Phone number is too short - Please re-enter
+302 Name entered is not acceptable on this system!
+303 Handle entered is not acceptable on this system!
+304 Sun
+305 Mon
+306 Tue
+307 Wed
+308 Thu
+309 Fri
+310 Sat
+311 Days Summary of BBS Activity
+312 Percent busy for
+313 No History for summary available
+314 (R)ead
+; 315 is command list for message scanning
+; uses prompts 211 212 216 and 315
+315 NLSR
+316 Turn all areas OFF for combined reading
+317 Turn all available areas ON for combined reading
+; Prompts 318 319 are for CD Rom DIR listing
+318 (D)ownload (R)elist (V)iew or Area #'s to list:
+; (D)ownload (R)elist (V)iew archive
+319 DRV
+; Prompt 320 is the character used as a comma character in separating numbers
+320 ,
+; Prompt 321 is the CD Rom area DIR list header to be displayed
+321 Files in Area #
+322 File
+323 Bytes
+324 Minutes with
+325 Minutes Remaining
+326 Total
+327 Bytes
+328 Minutes
+329 Line        Caller               From           Baud        Activity
+330 ---- -------------------- -------------------- ----- -------------------------
+331 Just Browsing
+332 File Transfer
+333 Reading/Writing msgs
+334 In a door
+335 Chatting
+336 Taking a Questionaire
+337 Offline mail function
+338 Waiting
+339 Select language choice (Enter) = A?
+340 Available Languages
+341 Turn all areas OFF for offline mail
+342 Turn all available areas ON for offline mail
+343 Available compression methods
+344 [Detecting Ansi]
+345 QXBTP
+;Command keys for offline mail packet types
+346 QWK
+347 XRS
+348 BlueWave
+349 Text
+350 PKT
+;351 thru 355 resvd for future types
+356 Choose Offline Mail Type
+357 Maximum messages per packet?
+358 Maximum messages per message area?
+359 Ask whether you want each packet
+360 Receive your own messages
+361 Search all areas for your mail
+362 Send packets even with zero messages
+363 Offline mail format chosen is not available
+364 An error occured while creating your mail packet
+365 Logging On
+366 Scanning/extracting msgs
+;370 thru 379 are reserved for control code macros
+; 488 is command keys for archive packers
+488 LZAODJH
+; 489 thru 498 are the archive packer names
+489 LHA
+490 ZIP
+491 ARC
+492 ZOO
+493 DWC
+494 ARJ
+495 HYP
+; 499 is the command keys for protocols
+499 ZYOXGH
+; 500 through 509 are the protocol names
+500 Zmodem
+501 Ymodem
+502 1k-Xmodem
+503 Xmodem
+504 YmodemG
+505 HS-Link
+; Menu choices for main menu
+510 UDCQSGRIA
+; Menu choices for config menu
+511 NSBLCDTVPAFOYZQ
+512 Command >
+513 YNMA
+514 Include Area (Y)es (N)o (M)ine Only (A)ll and mine?
+515 Do you really want to log-off
+516 Include help information in packet
+520 Name:
+521 Include New Files List:
+522 Include Welcome/Bye Screens:
+523 Include Bulletins:
+524 Maximum Messages Per Packet:
+525 Maximum Messages Per Area:
+526 Protocol:
+527 Archive Packer:
+528 Flag messages as received:
+529 Send messages from you:
+530 Scan all areas for your mail:
+531 Send zero message packets:
+532 Verify that you want packet:
+533 Mail Packet Type:
+
+;
+; Added for MK (events): the login message before an exclusive event, in two parts around the number of minutes
+534 The BBS closes for maintenance in
+535 minute(s): this call ends then.

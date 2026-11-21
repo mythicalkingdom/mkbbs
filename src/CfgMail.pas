@@ -183,7 +183,7 @@ Procedure EditLink(Item: Word);
   F.AddChoice('NR mode:', NrC, 1, 0, 'Default|Off|On', 'Non-reliable mode with this link (Space or arrows change it)');
   F.At(14, 3, 14, 23);
   F.AddNumber('File request level:', L^.ReqSec.Level, 2, 0, 65535,
-    'Security of this system for file requests (File Requests page); 0 = the file request user.  F2 sets the flags');
+    'Security of this system for file requests (File Requests page); 0 = the file request security there.  F2 for flags');
   F.OnF2(EditSecurity, @L^.ReqSec, '[ File request access of this system ]');
   If F.Execute Then
     Begin
@@ -229,9 +229,9 @@ Procedure DoCfgFreq;
   F.At(4, 3, 4, 28);
   F.AddYesNo('Tell by netmail:', Netmail, 'Send a netmail to the requester saying what was found and what was refused');
   F.At(6, 3, 6, 28);
-  F.AddNumber('File request user:', M^.ReqSec.Level, 2, 0, 65535,
-    'Security of a system that has none of its own (Mailer Links); level 0 and no flags = such systems get nothing.  F2 sets the flags');
-  F.OnF2(EditSecurity, @M^.ReqSec, '[ File request user ]');
+  F.AddNumber('File request security:', M^.ReqSec.Level, 2, 0, 65535,
+    'Security of a system that has none of its own (Mailer Links); level 0 and no flags = such systems get nothing.  F2 for flags');
+  F.OnF2(EditSecurity, @M^.ReqSec, '[ File request security ]');
   F.At(8, 3, 8, 28);
   F.AddString('Magic names file:', M^.ReqMagicFile, 60, 'Text file with lines  NAME path [password]  (@LIST = a list of the files); blank = none');
   F.At(10, 3, 10, 28);

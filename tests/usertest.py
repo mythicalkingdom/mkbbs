@@ -25,9 +25,9 @@ cfgpatch.patch(p, root, lambda s: new if s == ra else s)
 fails = 0
 
 
-def check(name, ok):
+def check(name, ok, info=''):
     global fails
-    print(('ok   ' if ok else 'FAIL ') + 'mkusered: ' + name)
+    print(('ok   ' if ok else 'FAIL ') + 'mkusered: ' + name + ('' if ok else '  ' + str(info)))
     if not ok:
         fails += 1
 
@@ -74,6 +74,32 @@ check('Add: the new user is last: %r' % re.search(r'User (\d+) of (\d+)', s).gro
       ('User %d of %d' % (total, total + 1)) in s and 'Nobody Special' in s)
 s = run('\x1b[F')
 check('the new user is in the file', 'Nobody Special' in s and ('User %d of %d' % (total, total + 1)) in s)
+
+# a BBS with no user files at all: the first user is added, and saved (it used to be lost without a word), with dates of today
+import time
+dst2 = cfgpatch.short_dir() + '/r'
+shutil.copytree(dst, dst2, ignore=lambda d, n: [f for f in n if f.lower() in ('users.bbs', 'usersidx.bbs', 'extusers.bbs')])
+cfgpatch.patch(os.path.join(dst2, 'config.mk'), (dst + '/').encode(), lambda s: (dst2 + '/').encode() if s == (dst + '/').encode() else s)
+
+
+def run2(*keys):
+    env = dict(os.environ, CFGPROG='mkusered', CFGCWD=dst2, CFGDIR=dst2, CFGDELAY='0.7')
+    env.pop('CFGARGS', None)
+    return subprocess.run([sys.executable, os.path.join(here, 'cfgshot.py')] + list(keys), env=env,
+                          capture_output=True, text=True).stdout
+
+
+s = run2()
+check('no user files: the editor starts with 0 users', 'User 0 of 0' in s)
+s = run2('a', 'First Person', '\r')
+check('Add with no users.bbs: the user is added', 'User 0 of 1' in s and 'First Person' in s, s[:300])
+check('... users.bbs was made (one record), with the index and the extra file',
+      os.path.exists(dst2 + '/users.bbs') and os.path.getsize(dst2 + '/users.bbs') > 0 and os.path.exists(dst2 + '/usersidx.bbs') and os.path.exists(dst2 + '/extusers.bbs'))
+s = run2()
+check('... and it is there in a new run', 'User 0 of 1' in s and 'First Person' in s)
+today = time.strftime('%m-%d-%y')
+check('a new user has first call, last call and new files date of today (%s)' % today,
+      ('First Called: %s' % today) in s and ('Last Called: %s' % today) in s and ('New Files Date: %s' % today) in s, s[:900])
 
 # a template and validate with it: template 1 gives security 77
 run('\x1bc', '77', '\r')

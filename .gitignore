@@ -5,3 +5,4 @@ RA.LOG
 ExitInfo.Bbs
 lang/*.LC
 __pycache__/
+lang/*.lc

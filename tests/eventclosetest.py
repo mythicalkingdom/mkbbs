@@ -82,8 +82,8 @@ def conn(port):
     raise SystemExit('cannot connect')
 
 
-try:
-    time.sleep(2)
+def login():
+    """a caller of the BBS (language 1, the default): what he saw up to the menu"""
     c = conn(24651)
     seen = b''
     seen += until(c, b'language choice', 10); time.sleep(1.5); c.sendall(b'\r')
@@ -96,7 +96,12 @@ try:
             c.sendall(b'\r')
         else:
             break
-    t = strip(seen)
+    return c, strip(seen)
+
+
+try:
+    time.sleep(2)
+    c, t = login()
     m = re.search(rb'closes for maintenance in (\d+) minute\(s\)', t)
     check('the caller is told the BBS closes in 20 minutes', m is not None and m.group(1) in (b'19', b'20'), t[-300:])
     rem = re.search(rb'(\d+) Minutes Remaining', t)
@@ -106,6 +111,23 @@ try:
     mon.sendall(b'1\r'); until(mon, b'zzzz', 2.5)
     mon.sendall(b'\x01+')
     check('the sysop can still add time', b'Added 5 min' in until(mon, b'left', 4))
+    c.close()
+    # the text comes from the language file (prompts 534 and 535): the ones that ship in lang/, then a changed wording
+    for name in ('AMERICAN', 'ENGLISH'):
+        shutil.copy(os.path.join(repo, 'lang', name + '.TXT'), os.path.join(work, name + '.TXT'))
+        subprocess.run([build + '/mklc', os.path.join(work, name + '.TXT')], capture_output=True)
+        shutil.copy(os.path.join(work, name + '.lc'), os.path.join(ra, name.lower() + '.lc'))
+    c, t = login()
+    m = re.search(rb'The BBS closes for maintenance in (\d+) minute\(s\): this call ends then\.', t)
+    check('with the shipped language files (lang/AMERICAN.TXT, ENGLISH.TXT compiled): the same text', m is not None and m.group(1) in (b'19', b'20'), t[-300:])
+    c.close()
+    txt = open(os.path.join(work, 'AMERICAN.TXT'), encoding='latin-1').read().replace('534 The BBS closes for maintenance in', '534 CLOSING SOON, in')
+    open(os.path.join(work, 'AMERICAN.TXT'), 'w', encoding='latin-1').write(txt)
+    subprocess.run([build + '/mklc', os.path.join(work, 'AMERICAN.TXT')], capture_output=True)
+    shutil.copy(os.path.join(work, 'AMERICAN.lc'), os.path.join(ra, 'american.lc'))
+    c, t = login()
+    m = re.search(rb'CLOSING SOON, in (\d+) minute\(s\)', t)
+    check('a changed wording in the language file is what the caller sees', m is not None and m.group(1) in (b'19', b'20'), t[-300:])
     c.close()
 finally:
     lst.terminate()

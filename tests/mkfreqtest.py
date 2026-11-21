@@ -104,10 +104,15 @@ check('the password given for an unprotected file is not written to the log (std
 
 # the global request user (a system that is not a link): level 50, so no members area
 r, s, n = ask('1:110/999', 'secure', ['*.arc', 'secret.zip'])
-check('a system that is not a link gets the global file request user (level 50): the public area, not the members area',
+check('a system that is not a link gets the global file request security (level 50): the public area, not the members area',
       names(s) == ['this.arc'] and any('secret.zip' in x and 'not found' in x for x in n))
 r, s, n = ask('1:110/291', 'secure', ['this.arc'])
 check('a link whose profile is too low gets nothing from areas that need more', s == [] and any('not found' in x for x in n))
+r, s, n = ask('1:110/291', 'secure', ['secret.zip', 'hidden.zip', 'nothere.zip'])
+out = r.stdout
+check('the log says why nothing was found (a level 5 link): no area could be looked in, the areas whose security the system does not meet (with their levels), the ones without "Allow file requests"',
+      'no file area could be looked in' in out and 'Public (view 10' in out and 'Members (view 120, download 120)' in out and 'its level is 5' in out and 'areas without "Allow file requests"' in out, out)
+check('... while the requester is only told "not found"', all('not found' in x for x in n) and not any('Members' in x or 'level' in x for x in n), n)
 
 # wildcards, case, line ends
 r, s, n = ask('1:110/290', 'secure', ['THIS.*', 'README.TXT'], eol='\n')

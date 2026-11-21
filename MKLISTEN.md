@@ -205,7 +205,10 @@ The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.
 * **Callers before an exclusive event:** a caller who logs on within 24 hours before one is started with `mk -T<minutes>`: the call is cut
   to end when the event is due ("The BBS closes for maintenance in N minute(s)" at the login, and the minutes remaining show it).
   With `"lead": 10` new callers are refused that many minutes before the event instead of when it is due.  Callers already on
-  are cut by the same limit, so a *Forced* event usually finds the BBS empty.
+  are cut by the same limit, so a *Forced* event usually finds the BBS empty.  The login message is in the language files, prompts 534
+  and 535 (the text before and after the number of minutes); `lang/AMERICAN.TXT` and `lang/ENGLISH.TXT` have them in English (they are
+  the sample files with the two lines added; `make lang` compiles them to `lang/AMERICAN.lc` and `ENGLISH.lc`, to be copied to the BBS
+  directory as `american.lc` and `english.lc`).  A language file without them gives the English text built in.
 
 ```
 "events": { "config": "/bbs/ra",                    the BBS configuration directory (default: the mailer's)

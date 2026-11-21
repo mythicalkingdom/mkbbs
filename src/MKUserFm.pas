@@ -288,6 +288,8 @@ Procedure SaveUser;
   For i := 1 To 500 Do
     NameSearch.SetUserOffline(i, UR.Offline[i]);
   NameSearch.SaveChanges;
+  If Not NameSearch.SaveOk Then
+    MsgBox('The user could not be saved: ' + NameSearch.UsersFileName + ' cannot be written.');
   End;
 
 
@@ -297,6 +299,9 @@ Procedure DefaultUser;
   UR.ScrnLen := 23;
   UR.ScrnClr := True;
   UR.More := True;
+  UR.FirstCall := DateStr(GetDosDate);     {a new user: first and last call and the new files date are today (a blank date is not one mk accepts)}
+  UR.LastCall := UR.FirstCall;
+  UR.NewDate := UR.FirstCall;
   UR.LastTime := '00:00';
   UR.PageTune := 1;
   UR.Protocol := #0;

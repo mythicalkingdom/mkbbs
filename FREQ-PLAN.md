@@ -119,7 +119,7 @@ A separate program that uses the BBS's file area list, so mkbink stays ignorant 
 
 1. **Who is asking.**  The requester's address is matched to the link (echo system / mailer link).  What it may have is a
    **security profile**: the link's own request security (`MailLinkType.ReqSec`, level and flags; level 0 means the global one)
-   or the global **file request user** (`MailerCfgType.ReqSec`).  An unsecure session gets the profile only when the sysop
+   or the global **file request security** (`MailerCfgType.ReqSec`).  An unsecure session gets the profile only when the sysop
    allowed it, and in any case never the password-protected names.
 2. **Magic names.**  `ReqMagicFile` names a text file of magic names and what they mean (`NODELIST  /bbs/nodelist/nodelist.*`
    with an optional password; `FILES` and `ALLFILES` are generated from the file areas).  A magic name wins over an area
