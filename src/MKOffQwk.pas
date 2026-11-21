@@ -90,6 +90,7 @@ Type QwkInfo = Record
   ImpFirst: Array[1..QwkConfs] Of LongInt; {link: numbers of the first and the last message the import posted}
   ImpLast: Array[1..QwkConfs] Of LongInt;
   ImpTouched: Array[1..QwkConfs] Of Boolean;
+  ScrFile: Array[1..3] Of String[12];  {the welcome, news and goodbye files that are in the packet ('' = the standard names)}
   End;
 
 
@@ -102,6 +103,8 @@ Type QwkOffObj = Object(AbsOffObj)
   Procedure SetKeepKludges(KK: Boolean);
   Procedure SetQwke(QK: Boolean); Virtual;
   Procedure SetControlFiles(CF: Boolean); Virtual;
+  Procedure SetScreenFile(N: Word; Name: String); Virtual;
+  Function  AreaInPacket(Area: Word): Boolean; Virtual;
   Procedure SetLink(RemoteId: String; ConfOf: QwkConfFunc; AreaOf: QwkConfFunc);
   Function  LinkImported(Area: Word; Var Pending, First, Last: LongInt): Word;
     {link: messages the import posted in the area, the numbers of the first and last, and how many messages of the
@@ -124,6 +127,11 @@ Type QwkOffObj = Object(AbsOffObj)
 
 
 Type QwkOffPtr = ^QwkOffObj;
+
+
+Type QwkAreaProc = Procedure(Area: Word; Typ: Byte);
+Var QwkAreaHook: QwkAreaProc;          {TODOOR.EXT AREA lines: how the caller's subscription is kept (door: users.mko); Nil = the offline flags of the user (mk).
+                                        Typ: 0 = dropped, 1 = on, 2 = personal mail only, 3 = personal and to All}
 
 
 Function FindNoCase(Dir: String; Name: String): String;
@@ -222,6 +230,19 @@ Destructor QwkOffObj.Done;
   If QI^.Pers <> Nil Then
     FreeMem(QI^.Pers, QI^.PersCap * SizeOf(QwkExpType));
   Dispose(QI);
+  End;
+
+
+Function QwkOffObj.AreaInPacket(Area: Word): Boolean;
+  Begin
+  AreaInPacket := (Area <= QwkConfs) And (QI^.ConfCount[Area] > 0);
+  End;
+
+
+Procedure QwkOffObj.SetScreenFile(N: Word; Name: String);
+  Begin
+  If (N >= 1) And (N <= 3) Then
+    QI^.ScrFile[N] := Name;
   End;
 
 
@@ -518,9 +539,9 @@ Procedure QwkOffObj.DoControl;
       WriteLn(CF, Config^.GetMsgShortName(i));
       End;
     End;
-  WriteLn(CF, 'welcome.ans');
-  WriteLn(CF, 'news.ans');
-  WriteLn(CF, 'goodbye.ans');
+  If QI^.ScrFile[1] <> '' Then WriteLn(CF, QI^.ScrFile[1]) Else WriteLn(CF, 'welcome.ans');
+  If QI^.ScrFile[2] <> '' Then WriteLn(CF, QI^.ScrFile[2]) Else WriteLn(CF, 'news.ans');
+  If QI^.ScrFile[3] <> '' Then WriteLn(CF, QI^.ScrFile[3]) Else WriteLn(CF, 'goodbye.ans');
   WriteLn(CF, '0');
   WriteLn(CF, User^.GetUserScrLength);
   WriteLn(CF, Upper(User^.GetUserName));
@@ -1007,6 +1028,101 @@ Function ImpControl(Conf: LongInt; Subj: String): Boolean;
   End;
 
 
+Function DoneStr(Ok: Boolean): String;
+  Begin
+  If Ok Then
+    DoneStr := 'done'
+  Else
+    DoneStr := 'not done';
+  End;
+
+
+Procedure ImpTodoor(FN: String);
+  {TODOOR.EXT of the reply packet (QWKE): the caller's changes.  AREA <conf> <flags> (D drops it; a, p, g take it all / personal / personal and to All;
+   w, k, f are not kept per area in MK: ignored) and RESET <conf> [n] (no number: the start of the message base, else n messages back from the end).
+   KEYWORD, FILTER, TWIT, ATTACH, FILE and REQUEST are for things MK does not have: they are said to be ignored.}
+  Var
+    T: Text;
+    L, Cmd, Flags, Arg: String;
+    Area: LongInt;
+    Ptr: LongInt;
+    Typ: Byte;
+    Ok: Boolean;
+    i: Word;
+
+  Begin
+  Assign(T, FN);
+  Reset(T);
+  If IoResult <> 0 Then
+    Exit;
+  While Not Eof(T) Do
+    Begin
+    ReadLn(T, L);
+    L := StripBoth(StripBoth(L, #13), ' ');
+    If L = '' Then
+      Continue;
+    Cmd := Upper(ExtractWord(L, 1));
+    Ok := False;
+    If Cmd = 'AREA' Then
+      Begin
+      Area := Str2Long(ExtractWord(L, 2));
+      Flags := ExtractWord(L, 3);
+      If CtlArea(Area) Then
+        Begin
+        If Pos('D', Flags) > 0 Then
+          Begin
+          If Not Config^.GetMsgForceOffline(Area) Then
+            Begin
+            If Assigned(QwkAreaHook) Then
+              QwkAreaHook(Area, 0)
+            Else
+              ImpUser^.SetUserOffline(Area, False);
+            Ok := True;
+            End;
+          End
+        Else If (Pos('a', Flags) > 0) Or (Pos('p', Flags) > 0) Or (Pos('g', Flags) > 0) Then
+          Begin
+          If Pos('a', Flags) > 0 Then
+            Typ := 1
+          Else If Pos('g', Flags) > 0 Then
+            Typ := 3
+          Else
+            Typ := 2;
+          If Config^.GetMsgAllowOffline(Area) Or Config^.GetMsgForceOffline(Area) Then
+            Begin
+            If Assigned(QwkAreaHook) Then
+              QwkAreaHook(Area, Typ)
+            Else
+              ImpUser^.SetUserOffline(Area, True);
+            Ok := True;
+            End;
+          End
+        Else
+          Ok := True;                      {only w, k, f: nothing to keep}
+        End;
+      ImpUser^.DisplayStrLn('AREA ' + Long2Str(Area) + ': ' + DoneStr(Ok));
+      End
+    Else If Cmd = 'RESET' Then
+      Begin
+      Area := Str2Long(ExtractWord(L, 2));
+      Arg := ExtractWord(L, 3);
+      If Arg <> '' Then
+        Arg := '-' + Long2Str(Str2Long(Arg));
+      If CtlArea(Area) And ResolvePtr(Area, Arg, Ptr) Then
+        Begin
+        OffSetUserLR(Area, Ptr);
+        Ok := True;
+        End;
+      ImpUser^.DisplayStrLn('RESET ' + Long2Str(Area) + ': ' + DoneStr(Ok));
+      End
+    Else If (Cmd = 'KEYWORD') Or (Cmd = 'FILTER') Or (Cmd = 'TWIT') Or (Cmd = 'ATTACH') Or (Cmd = 'FILE') Or (Cmd = 'REQUEST') Then
+      ImpUser^.DisplayStrLn(Cmd + ': ignored');
+    End;
+  Close(T);
+  If IoResult <> 0 Then;
+  End;
+
+
 Procedure LedgerAdd(Area: LongInt; Num: LongInt);
   Var
     F: Text;
@@ -1094,6 +1210,9 @@ Procedure QwkOffObj.ImportPacket;
     QwkControl := Nil;
   E := QwkImportFile(FN, ImpO.DupeFile, ImpMap, ImpNote, R);
   QwkControl := Nil;
+  FN := FindNoCase(QI^.MsgPath, 'todoor.ext');
+  If FN <> '' Then
+    ImpTodoor(FN);                          {QWKE: the caller's changes of areas and pointers}
   If E <> 0 Then
     ImpUser^.DisplayStrLn(Prompts.GetString(182))
   Else

@@ -40,6 +40,8 @@ Type AbsOffObj = Object
   Procedure SetControlFiles(CF: Boolean); Virtual; {CONTROL.DAT and DOOR.ID in the packet (QWK only; default yes)}
   Procedure SetPath(MP: String); Virtual; {Set msg path/other info}
   Procedure SetBBSID(ID: String); Virtual; {Set BBS id/filename}
+  Function  AreaInPacket(Area: Word): Boolean; Virtual; {The packet has messages of the area (QWK: the conference is the area)}
+  Procedure SetScreenFile(N: Word; Name: String); Virtual; {The file of screen 1 (welcome), 2 (news) or 3 (goodbye) in the packet, as CONTROL.DAT names it (QWK only)}
   Function  StartPacket: Word; Virtual; {Do Packet startup tasks}
   Function  ClosePacket: Word; Virtual; {Do Packet finish tasks}
   Function  AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boolean; Virtual;
@@ -62,6 +64,17 @@ Constructor AbsOffObj.Init;
   User := @MKDoor.User;
   FillChar(ImpOpts, SizeOf(ImpOpts), 0);
   ImpOpts.ForceName := True;
+  End;
+
+
+Procedure AbsOffObj.SetScreenFile(N: Word; Name: String);
+  Begin
+  End;
+
+
+Function AbsOffObj.AreaInPacket(Area: Word): Boolean;
+  Begin
+  AreaInPacket := False;
   End;
 
 

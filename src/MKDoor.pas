@@ -189,6 +189,7 @@ Type DoorUser = Object
   Procedure SetUserLastTime (LT: String); {Set last called time}
   Procedure GetUserNewFileDate(Var DT: DateTime); {Get user new file search date}
   Procedure SetUserNewFileDate(DT: DateTime); {Set user new file search date}
+  Procedure WriteExtUser;              {Write only the extra record of the user (MK): the new files date ... without the last call date and the time on of WriteUser}
   Function  GetUserBbsType: Byte;      {Get Bbs type}
   Procedure SetUserBbsType(BT: Byte);  {Set Bbs type}
   Function  GetUserAvatar: Boolean;    {Get avatar setting}
@@ -3625,6 +3626,22 @@ Procedure DoorUser.SetUserNewFileDate(DT: DateTime);
   Case UserInfo^.BbsType of
     1: UserInfo^.ExitInfo.ExtUser.NewDate := FormattedDate(DT, 'YYMMDD');
     End;
+  End;
+
+
+Procedure DoorUser.WriteExtUser;
+  Var
+    UPos: LongInt;
+
+  Begin
+  If UserInfo^.BbsType <> 1 Then
+    Exit;
+  UPos := UserInfo^.ExitInfo.UserRecNum;
+  UPos := UPos * SizeOf(ExtUserType);
+  If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+    Exit;
+  If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs',
+    UserInfo^.ExitInfo.ExtUser, SizeOf(ExtUserBaseType), UPos) = 0 Then;
   End;
 
 

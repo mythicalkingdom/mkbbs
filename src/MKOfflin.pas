@@ -29,7 +29,7 @@ Implementation
 
 Uses MKFile, MKString, MKDoor, MKCfgAbs, MKGlobT, MKCFile,
   MKOffAbs, MKOffQwk, MKOffTxt, MKOffXrs, MKOffBwv,
-  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKOffDL, MKOffXfer,
+  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKOffDL, MKOffXfer, MKOffExt,
   Dos;
 
 
@@ -568,10 +568,14 @@ Procedure OfflineDL;
     R: OffDLResult;
     PackNum: Word;
     ArcName: String;
+    ExSpec: OffExtraSpec;
+    ExRes: OffExtraRes;
+    i: Word;
 
   Begin
   WorkPath := '';
   Quiet := False;
+  FillChar(ExRes, SizeOf(ExRes), 0);
   Local := Not CommActive;
   User.PostStatus(uoMail);
   Offline := nil;
@@ -630,6 +634,21 @@ Procedure OfflineDL;
     P.OwnMsgs := User.GetUserOffOwn;
     P.CheckUser := True;
     Cont := OffExport(Offline, P, R);
+    If Cont And (Not User.GetUserQwkNode) Then
+      Begin                            {the screens, bulletins and new files list of Offline Mail Parameters: what the caller wants and the sysop allows (or forces)}
+      FillChar(ExSpec, SizeOf(ExSpec), 0);
+      ExSpec.Screens := Config^.GetOffForceScrn Or (Config^.GetOffAllowScrn And User.GetUserOffScrn);
+      ExSpec.Bulletins := Config^.GetOffForceBull Or (Config^.GetOffAllowBull And User.GetUserOffBull);
+      ExSpec.NewFiles := Config^.GetOffForceNew Or (Config^.GetOffAllowNew And User.GetUserOffNew);
+      For i := 1 To 3 Do
+        ExSpec.Scr[i] := Config^.GetOffScrns(i);
+      For i := 1 To 10 Do
+        ExSpec.Bull[i] := Config^.GetOffBulls(i);
+      ExSpec.ToReader := Config^.GetOffQwke And (UpCase(User.GetUserOffType) = 'Q');
+      ExSpec.Alias := User.GetUserHandle;
+      ExSpec.OwnMsgs := User.GetUserOffOwn;
+      OffAddExtras(Offline, WorkPath, ExSpec, R, ExRes);
+      End;
     If Offline^.ClosePacket <> 0 Then
       Cont := False;
     If Cont And (R.NumMsgs = 0) And (Not User.GetUserOffZero) Then
@@ -669,7 +688,10 @@ Procedure OfflineDL;
       Cont := SendMail(WithBackSlash(WorkPath) + ArcName, ArcName, WorkPath);
     End;
   If Cont Then
+    Begin
     OffCommitLR(R);                    {the caller has what was in the packet}
+    OffExtrasCommit(ExRes);            {... and the new files it listed}
+    End;
   If (Not Cont) And (Not Quiet) Then
     Begin
     User.DisplayNewLine;

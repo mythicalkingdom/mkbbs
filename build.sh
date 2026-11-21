@@ -163,6 +163,9 @@ python3 tests/cattest.py build build/work/cat | grep -E "^(FAIL|failures)"
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwktest.py build build/qwkwork | grep -E "^(ok|FAIL|skip)" | tee build/qwkresult.txt
   if grep -q FAIL build/qwkresult.txt; then exit 1; fi
+  # the extras of a packet: screens, bulletins, the new files list (MKOffExt)
+  python3 tests/qwkextratest.py build build/work/qwkextra | grep -E "^(ok|FAIL|skip)" | tee build/qwkextraresult.txt
+  if grep -q FAIL build/qwkextraresult.txt; then exit 1; fi
 fi
 # MKProt (Zmodem both ways) against the real lrzsz over a socketpair
 python3 tests/prottest.py build build/work/prot | grep -E "^(ok|FAIL|skip|failures)" | tee build/protresult.txt

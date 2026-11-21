@@ -30,6 +30,20 @@ the listener `MKLISTEN.md`, and for the Fido tosser `TOSSER.md`.  `GETTING-START
 * **Terminals.**  ANSI and AVATAR; text is CP437 and is shown as UTF-8 to terminals that want it (decided by the terminal
   type, or set on the port).  Callers can come by Telnet, plain TCP or a web socket.
 
+**Offline mail extras.**  A packet of the offline mail door (`mkqwk`) or of the offline menu of `mk` can carry the BBS **screens** (welcome, news
+and goodbye), **bulletins** (up to ten) and a **list of new files**, for the callers who ask for them (the user's offline settings) and as
+the sysop allows.  The names are settings: `mkconfig` > Offline Mail Parameters (Allow / Force for each, the three screen names, ten bulletin
+names; used by `mk`) and the door's own *MKQwk Screens and Bulletins* page (names, the heading screen of the new files list) with *New Files /
+Screens / Bulletins* set to Never, Always or Ask in its configuration.  A screen or bulletin is taken as the caller's terminal gets it online
+(`.avt`, `.ans` or `.asc` in the text directory) and goes into every packet under its own name; `CONTROL.DAT` names the screen files that are
+really there; bulletins are `BLT-1`, `BLT-2` ... (the readers' names); a name with no file is left out.  The new files list is `newfiles.dat`: the heading screen, then for each file area the caller may
+list the files uploaded since the caller's new files date, laid out like the online list (name, date, size, description, long descriptions wrapped under
+it), and a count (at most 1000 lines).  The caller's new files date moves to today only when the packet was made and kept.  A QWK network
+node gets none of these, and a network pass never asks a hub for them.  (The file names of an area must be in upper case on disk: the list matches
+the name in `files.bbs` in upper case.)  With QWKE long names the packet also has `TOREADER.EXT` (the QWKE file for the reader: the caller's alias, an `AREA` line with flags for each conference in the packet, a `BULL` line for each
+bulletin).  A reader's reply packet may carry `TODOOR.EXT`: `AREA <conf> D` drops a conference, `a` / `p` / `g` take it (all, personal, personal and to All), and `RESET <conf> [n]` moves the last read pointer (no number: back to the start of the base).  The lines for things MK has no
+such lists for (keywords, filters, twits) or takes no files for (attach, file, request) are ignored.  Details: `QWK-EXTRAS-PLAN.md`.
+
 `mkusered` makes `users.bbs` when the BBS has none (the first user is saved, and a save that cannot write says so), and a new user gets the first
 call, last call and new files date of today.
 

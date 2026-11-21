@@ -127,6 +127,7 @@ Type CfgObj = Object
   Function  GetMsgOrigNum(Area: Word): Word; Virtual; {Get message orig number}
   Procedure SetMsgOrigNum(Area: Word; Orig: Word); Virtual; {Set msg orig number}
   Function  GetMsgAllowOffline(Area: Word): Boolean; Virtual; {Allow in offline}
+  Function  GetMsgPermit(Area: Word): Word; Virtual; {The permitted options of the area (mp constants of Struct.MK; private and public mail when the format has none)}
   Procedure SetMsgAllowOffline(Area: Word; AO: Boolean); Virtual; {Allow in offline}
   Function  GetMsgForceOffline(Area: Word): Boolean; Virtual; {Force in offline}
   Procedure SetMsgForceOffline(Area: Word; FO: Boolean); Virtual; {Force in offline}
@@ -924,6 +925,12 @@ Function CfgObj.GetMsgOrigNum(Area: Word): Word; {Get message orig number}
 Procedure CfgObj.SetMsgOrigNum(Area: Word; Orig: Word); {Set msg orig number}
   Begin
   End;
+
+Function CfgObj.GetMsgPermit(Area: Word): Word;
+  Begin
+  GetMsgPermit := 64 + 128;               {private and public mail (mpPriv, mpPubl of Struct.MK)}
+  End;
+
 
 Function CfgObj.GetMsgAllowOffline(Area: Word): Boolean; {Allow in offline}
   Begin

@@ -28,7 +28,7 @@ Implementation
 Uses MKFile, MKString, MKQwkG, MKCfgAbs, MKGlobT, Dos, MKDos, MKStr,
   MKSess, MKDoor, MKMisc, MKMsgSel, MKMsgJam,
   MKOffAbs, MKOffTxt, MKOffQwk, MKOffBwv, {MKOffXrs,}
-  MKOpen, MKMsgAbs, MKComAbs, MKOffDL, MKOffXfer;
+  MKOpen, MKMsgAbs, MKComAbs, MKOffDL, MKOffXfer, MKOffExt;
 
 
 Var
@@ -567,6 +567,43 @@ Procedure UnpackCmds(Var Cmds: OffCmdList; Var Num: Word);
   End;
 
 
+Procedure DoorAreaHook(Area: Word; Typ: Byte);
+  {TODOOR.EXT of a reader: the conference is dropped or taken (the subscription of the caller is QwkUser.UserConfs)}
+  Var
+    i, Slot, Free: Word;
+
+  Begin
+  Slot := 0;
+  Free := 0;
+  For i := 1 To QwkUserAreas Do
+    Begin
+    If QwkUser.UserConfs[i].Area = Area Then
+      Slot := i;
+    If (Free = 0) And ((QwkUser.UserConfs[i].Area = 0) Or (QwkUser.UserConfs[i].Typ = qctNone)) Then
+      Free := i;
+    End;
+  If Typ = 0 Then
+    Begin
+    If Slot > 0 Then
+      Begin
+      QwkUser.UserConfs[Slot].Area := 0;
+      QwkUser.UserConfs[Slot].Typ := qctNone;
+      End;
+    Exit;
+    End;
+  If Slot = 0 Then
+    Slot := Free;
+  If Slot = 0 Then
+    Exit;
+  QwkUser.UserConfs[Slot].Area := Area;
+  Case Typ Of
+    2: QwkUser.UserConfs[Slot].Typ := qctMy;
+    3: QwkUser.UserConfs[Slot].Typ := qctAll;
+    Else QwkUser.UserConfs[Slot].Typ := qctOn;
+    End;
+  End;
+
+
 Procedure OfflineUL(BatchMode: Boolean);
   {The reply packet of the caller: in a BBS session it is received with the caller's protocol, when run locally
    (-L / -R) it is <BBSID>.REP in the current directory.  It is unpacked in a work directory of its own and its
@@ -661,7 +698,9 @@ Procedure OfflineUL(BatchMode: Boolean);
       ImpO.ReDate := (QCfg.Attr And qaReDate) <> 0;
       ImpO.DupeFile := WithBackSlash(QCfg.UserPath) + 'qwkdupe.dat';
       Offline^.SetImportOpts(ImpO);
+      QwkAreaHook := DoorAreaHook;
       Offline^.ImportPacket;
+      QwkAreaHook := Nil;
       Imported := Offline^.GetImported;
       Inc(QwkUser.MsgsUL, Imported);
       User.DisplayNewLine;
@@ -764,8 +803,12 @@ Procedure OfflineDL(BatchMode: Boolean);
     PackNum: Word;
     ArcName: String;
     FullScrn: Boolean;
+    ExSpec: OffExtraSpec;
+    ExRes: OffExtraRes;
+    i: Word;
 
   Begin
+  FillChar(ExRes, SizeOf(ExRes), 0);
   FullScrn := User.GetUserAnsi or User.GetUserAvatar;
   DLFull := FullScrn;
   If FullScrn Then
@@ -817,6 +860,23 @@ Procedure OfflineDL(BatchMode: Boolean);
     P.CheckUser := Not BatchMode;
     Cont := OffExport(Offline, P, R);
     UpdateNumPkt(FullScrn, R.NumMsgs);
+    If Cont Then
+      Begin                            {the screens, bulletins and new files list of the door's settings: Never, Always, or what the caller chose}
+      FillChar(ExSpec, SizeOf(ExSpec), 0);
+      ExSpec.Screens := (QCfg.Screens = qatYes) Or (QCfg.Screens = qatNew) Or ((QCfg.Screens >= qatAskY) And ((QwkUser.Attr And quaScreens) <> 0));
+      ExSpec.Bulletins := (QCfg.Bulletins = qatYes) Or (QCfg.Bulletins = qatNew) Or ((QCfg.Bulletins >= qatAskY) And ((QwkUser.Attr And quaBulletin) <> 0));
+      ExSpec.NewFiles := (QCfg.NewFiles = qatYes) Or (QCfg.NewFiles = qatNew) Or ((QCfg.NewFiles >= qatAskY) And ((QwkUser.Attr And quaNewFile) <> 0));
+      ExSpec.Scr[1] := QCfg.ScrnHello;
+      ExSpec.Scr[2] := QCfg.ScrnNews;
+      ExSpec.Scr[3] := QCfg.ScrnBye;
+      For i := 1 To 10 Do
+        ExSpec.Bull[i] := QCfg.BullNames[i];
+      ExSpec.Head := QCfg.NewScrn;
+      ExSpec.ToReader := (QCfg.Attr And qaQwke) <> 0;
+      ExSpec.Alias := User.GetUserHandle;
+      ExSpec.OwnMsgs := (QwkUser.Attr And quaOwnMsgs) <> 0;
+      OffAddExtras(Offline, WorkPath, ExSpec, R, ExRes);
+      End;
     If Offline^.ClosePacket <> 0 Then
       Cont := False;
     If Cont And (R.NumMsgs = 0) And ((QwkUser.Attr And quaNoMsg) = 0) Then
@@ -856,7 +916,10 @@ Procedure OfflineDL(BatchMode: Boolean);
       Cont := SendMail(WithBackSlash(WorkPath) + ArcName, ArcName);
     End;
   If Cont Then
+    Begin
     OffCommitLR(R);                    {the caller has what was in the packet}
+    OffExtrasCommit(ExRes);            {... and the new files it listed}
+    End;
   If (Not Cont) And (Not Quiet) Then
     Begin
     User.DisplayNewLine;

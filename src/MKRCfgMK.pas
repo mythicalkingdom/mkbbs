@@ -87,6 +87,7 @@ Type MKRCfgObj = Object(CfgObj)
   Function  GetMsgAddrNum(Area: Word): Word; Virtual; {Get message aka number}
   Function  GetMsgOrigNum(Area: Word): Word; Virtual; {Get message orig number}
   Function  GetMsgAllowOffline(Area: Word): Boolean; Virtual; {Allow in offline}
+  Function  GetMsgPermit(Area: Word): Word; Virtual;
   Function  GetMsgForceOffline(Area: Word): Boolean; Virtual; {Force in offline}
   Function  GetMsgAllowCombined(Area: Word): Boolean; Virtual; {Allow in combined read}
   Function  GetMsgDefCombined(Area: Word): Boolean; Virtual; {Default combined area}
@@ -604,6 +605,19 @@ Function MKRCfgObj.GetMsgOrigNum(Area: Word): Word;
     GetMsgOrigNum := MKMsg^[MA].Origin
   Else
     GetMsgOrigNum := 1;
+  End;
+
+
+Function MKRCfgObj.GetMsgPermit(Area: Word): Word;
+  Var
+    MA: Word;
+
+  Begin
+  MA := ValidMsgArea(Area);
+  If MA > 0 Then
+    GetMsgPermit := MKMsg^[MA].Permit
+  Else
+    GetMsgPermit := mpPriv Or mpPubl;
   End;
 
 

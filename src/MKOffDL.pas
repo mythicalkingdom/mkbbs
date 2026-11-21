@@ -67,6 +67,7 @@ Type OffDLResult = Record
   NumAreas: Word;                      {areas looked at}
   Failed: Boolean;                     {the packet could not be made}
   NewLR: Array[1..OffAreas] Of LongInt; {the last message looked at in each area, -1 = not looked at}
+  Mode: Array[1..OffAreas] Of Byte;    {how each area was taken (omAll, omMy, omAllYour; 0 = not looked at)}
   End;
 
 
@@ -168,6 +169,7 @@ Function OffExport(Offline: AbsOffPtr; Var P: OffDLParams; Var R: OffDLResult): 
     If (Area >= 1) And (Area <= OffAreas) And (Area <= Config^.GetMaxMsgAreas) And
        Config^.MsgReadAccess(Area, Sec) Then
       Begin
+      R.Mode[Area] := Mode;
       SysopAccess := Config^.MsgSysopAccess(Area, Sec);
       NetAccess := (Config^.GetMsgNetStatus(Area) And User.GetUserNetStatus) <> 0;
       If OpenMsgArea(CMsg, Config^.GetMsgAreaId(Area)) Then
