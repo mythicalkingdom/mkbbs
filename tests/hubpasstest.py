@@ -145,6 +145,45 @@ os.rename(led + '.off', led)
 open(led, 'a').write('6 4999 20200101\n')               # an entry from years ago
 subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
 check('an entry older than 60 days is dropped from the file, the others stay', '20200101' not in open(led).read() and '6 ' in open(led).read(), open(led).read())
+# control commands for the hub (the node side of ADD / DROP ...): queued with -X or in <id>.ctl, sent as messages to SBBS, taken out when the hub has them
+def pass_x(*extra, mapextra=''):
+    mp = node_ra + '/' + hub_id + '.map'
+    base = open(mp).read().split('reply-')[0]
+    open(mp, 'w').write(base + mapextra)
+    l = subprocess.Popen([build + '/mklisten', '-c', work + '/listen.json'], stdout=subprocess.DEVNULL)
+    time.sleep(1)
+    try:
+        return subprocess.run([build + '/mk', '-L', '-G' + hub_id] + list(extra), env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=240, stdin=subprocess.DEVNULL)
+    finally:
+        l.terminate()
+        l.wait()
+
+
+ctl = node_ra + '/' + hub_id + '.ctl'
+tlog = node_ra + '/' + hub_id + '.hub.log'
+p = subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-D', '-XDROP 6', '-XRESETALL -5'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+check('dry run with -X: lists the control messages (to SBBS, the conference of the command, the command), queues nothing',
+      p.returncode == 0 and 'control message to SBBS in conference 6: DROP 6' in p.stderr and 'conference 6: RESETALL -5' in p.stderr and not os.path.exists(ctl), p.stderr[-500:])
+p = pass_x('-XDROP 6')
+tl = open(tlog, encoding='latin-1').read() if os.path.exists(tlog) else ''
+reps = [f for f in os.listdir(node_ra + '/out') if f.lower().endswith('.rep')]
+check('-X"DROP 6": a reply packet is made although no message is new, the hub did it (DROP 6: done), nothing is left in the node\'s files',
+      p.returncode == 0 and 'DROP 6: done' in tl and not os.path.exists(ctl) and not os.path.exists(ctl + '.out') and not reps, (p.returncode, tl[-300:], os.listdir(node_ra)))
+open(ctl, 'w').write('; put the conference back\nADD 6\n\nCONTROL ON\n')
+p = pass_x()
+tl = open(tlog, encoding='latin-1').read()
+check('<id>.ctl with comments and blank lines: ADD 6 and CONTROL ON reach the hub (done), the file is consumed',
+      p.returncode == 0 and 'ADD 6: done' in tl and 'CONTROL: done' in tl and not os.path.exists(ctl) and not os.path.exists(ctl + '.out'), (p.returncode, tl[-400:]))
+p = pass_x('-XFROB 1', '-XADD')
+check('a command that is not valid, or ADD without a conference: exit 8, nothing queued, nothing sent', p.returncode == 8 and not os.path.exists(ctl), (p.returncode, p.stderr[-300:]))
+open(ctl, 'w').write('CTRL-A STRIP\n')
+p = pass_x(mapextra='reply-ok zzz-never-said\n')
+reps = [f for f in os.listdir(node_ra + '/out') if f.lower().endswith('.rep')]
+check('a reply packet the hub is taken not to have accepted (exit 7) keeps its commands (.ctl.out) as it keeps the packet',
+      p.returncode == 7 and reps and os.path.exists(ctl + '.out') and not os.path.exists(ctl), (p.returncode, reps, os.listdir(node_ra)))
+p = pass_x()
+check('the next pass sends that packet, and then the commands are gone', p.returncode == 0 and not os.path.exists(ctl + '.out') and not [f for f in os.listdir(node_ra + '/out') if f.lower().endswith('.rep')],
+      (p.returncode, os.listdir(node_ra), os.listdir(node_ra + '/out')))
 # a hub that is not there
 open(node_ra + '/' + hub_id + '.map', 'a').write('hub 127.0.0.1:1\n')
 p = subprocess.run([build + '/mk', '-L', '-G' + hub_id], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=240, stdin=subprocess.DEVNULL)

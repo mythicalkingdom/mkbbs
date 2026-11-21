@@ -134,7 +134,25 @@ Do this on your system when you want to take mail from a hub.
    The pass: makes the reply packet (new messages of the subscribed areas), logs in to the hub, sends the reply packet,
    downloads its packet, and posts it.  Duplicates are skipped.  The packet is kept as `<id>.QWK.old`; the reply file is
    deleted when the hub has it.
-   **Look before you send:** `MK=/bbs/ra mk -G<id> -D` is a dry run.  It prints (on the error output) what the reply packet would
+   **Control commands for the hub (subscribe, drop, set pointers).**  The node side of the control messages above: what you want the hub
+to do goes up in the next reply packet.  Queue a command with `mk -G<id> -X"ADD 4029 -50"` (up to 10 `-X`; they are queued and sent by that
+pass), or write one command a line in `<id>.ctl` next to the map file (`;` or `#` starts a comment):
+
+```
+ADD 4029 -50         subscribe to conference 4029 and send the last 50 messages (or a message number, or mm/dd/yy)
+DROP 1003            unsubscribe
+RESET 4029 -100      set the pointer of one conference         RESETALL -20   ... of all of them
+CTRL-A STRIP         the hub takes the colour codes out         CONTROL ON, TZ ON, VIA ON, MSGID ON, NDX ON, OWN ON, MAIL ALL ...
+```
+
+The commands that are about one conference give its number as the hub numbers it, first.  They are sent as messages **to `SBBS`** (the name
+Synchronet and MK both answer to; `control-to NAME` in the map file changes it) with the command as the subject, in the conference the command is
+about; the commands that are about no conference go in the first conference of the map file.  A reply packet is made even when no message is new.
+The commands are taken out of the file when the hub has the packet; a refused packet (exit 7) keeps them with it.  A command that is not valid is
+not sent, said so, and the pass ends with exit code 8 (the others went).  `mk -G<id> -D` lists what would be sent.  Tested against an MK hub; the format is the
+one of Synchronet's QWK remote commands, but a real Synchronet hub has not been tried.
+
+**Look before you send:** `MK=/bbs/ra mk -G<id> -D` is a dry run.  It prints (on the error output) what the reply packet would
    hold, area by area and from which message number on, and whether a reply packet or a packet of the hub is waiting.  It makes no
    packet, moves no pointer, does not call the hub and writes no file of the BBS.  Do it before the first pass, and whenever you
    moved a last read pointer by hand: everything after a hub user's pointer goes up to the hub, including mail that was

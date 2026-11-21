@@ -109,6 +109,8 @@ Type QwkOffObj = Object(AbsOffObj)
   Function  StartPacket: Word; Virtual; {Do Packet startup tasks}
   Function  ClosePacket: Word; Virtual; {Do Packet finish tasks}
   Function  AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boolean; Virtual;
+  Function  AddControl(Conf: LongInt; ToName, FromName, Subj: String): Boolean;
+    {link (a reply packet to a hub): a control message (ADD, DROP ...): to ToName, in conference Conf, the command as the subject}
   Function  GetArchiveName(Packer: Word): String; Virtual;
   Function  GetReplyName: String; Virtual;
   Function  GetExtractSpec: String; Virtual;
@@ -383,6 +385,37 @@ Function QwkOffObj.AddMsg(Var Msg: AbsMsgObj; Area: Word; ToYou: Boolean): Boole
     End
   Else
     AddMsg := (Res >= 1005) And (Res <= 1008);   {this message only}
+  End;
+
+
+Function QwkOffObj.AddControl(Conf: LongInt; ToName, FromName, Subj: String): Boolean;
+  Var
+    Q: QwkMsgPtr;
+    Y, M, D, W, H, Mi, S, S100: Word;
+
+  Function Z2(N: Word): String;
+    Begin
+    Z2 := Chr(48 + (N Div 10) Mod 10) + Chr(48 + N Mod 10);
+    End;
+
+  Begin
+  AddControl := False;
+  Q := QI^.Q;
+  If Q = Nil Then
+    Exit;
+  Dos.GetDate(Y, M, D, W);
+  Dos.GetTime(H, Mi, S, S100);
+  Q^.StartNewMsg;
+  Q^.SetMsgConf(Conf);
+  Q^.SetQwkNum(0);
+  Q^.SetPriv(False);
+  Q^.SetFrom(FromName);
+  Q^.SetTo(ToName);
+  Q^.SetSubj(Subj);
+  Q^.SetDate(Z2(M) + '-' + Z2(D) + '-' + Z2(Y Mod 100));
+  Q^.SetTime(Z2(H) + ':' + Z2(Mi));
+  Q^.DoStringLn(Subj);                   {QWK has no message without text}
+  AddControl := Q^.WriteMsg = 0;
   End;
 
 

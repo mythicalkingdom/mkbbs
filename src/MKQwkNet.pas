@@ -6,6 +6,22 @@ Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<Remo
      strip-ctrla yes     take the Ctrl-A codes (colours and attributes of a Synchronet hub) out of the text of the messages that
                          are posted; a line that began with one stays (default no)
 
+     Control commands for the hub (the node side of the control messages ADD, DROP ... of Synchronet's QWK networking, which the MK
+     hub takes as well):  one command a line in RemoteId.ctl next to the map file, or  mk -G<id> -X"ADD 4029 -50"  (up to 10 -X, queued
+     and sent by that pass).  Lines beginning with ; or # are comments.  The commands are put in the reply packet as messages to SBBS
+     (the name both Synchronet and MK answer to; "control-to NAME" in the map file changes it), the command as the subject, in the conference
+     that the command is about:
+         ADD <conf> [YOURS] [ptr | -msgs | mm/dd/yy]     subscribe to a conference (optionally from a message, the last N, or a date)
+         DROP <conf>                                      unsubscribe
+         YOURS <conf> [ptr | -msgs | mm/dd/yy]            only the mail addressed to us
+         RESET <conf> [..]   SUBPTR <conf> [..]           set the pointer of a conference
+         RESETALL [..]   ALLPTR [..]                      set the pointers of all conferences
+         CTRL-A KEEP|EXPAND|STRIP   CONTROL ON|OFF   TZ ON|OFF   VIA ON|OFF   MSGID ON|OFF   NDX ON|OFF   OWN ON|OFF
+         MAIL [ALL|ON|OFF]   DELMAIL ON|OFF   FILES [ON|OFF|mm/dd/yy]   ATTACH ON|OFF   FREQ <filename>
+     The commands that are not about one conference are sent in the first conference of the map file.  They go up with the next reply
+     packet (one is made even when no message is new) and are taken out of the file when the hub has the packet; a refused packet
+     (exit 7) keeps them.  Exit code 8: a command was not valid (it is not sent; the others are).
+
      The messages the pass posts from the hub's packet are written down (RemoteId.imp next to the map file: area and message
      number) and are not put in a reply packet, whatever the last read pointer says: they do not go back to where they came from.
      An entry is kept 60 days (a last read pointer put back by hand within that time is safe; message numbers of a base that is
@@ -63,7 +79,8 @@ Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<Remo
 
      The exit code: 0 done, 1 no map file, 2 the user is not there (or is not a QWK node), 3 the reply packet could not be made,
      4 the packet of the system could not be read, 5 the hub could not be reached, 6 the script (login, transfer) failed,
-     7 the hub did not accept the reply packet (see reply-error and reply-ok below; the packet stays and goes again next time).
+     7 the hub did not accept the reply packet (see reply-error and reply-ok below; the packet stays and goes again next time),
+     8 a control command was not valid (see the control commands below; the others went).
 
      What the hub says after it got the reply packet can tell that it refused it (Synchronet says so for a sub-board that
      is not there ...): the transcript has the text, and these lines of the map file name what to look for (blank
@@ -93,6 +110,9 @@ Interface
 
 
 Var
+  QwkNetCmds: Array[1..10] Of String[100];   {mk -G<id> -X"ADD 4029 -50": control commands to queue for the hub (up to 10)}
+  QwkNetNumCmds: Word;
+  QwkNetCtlBad: Boolean;                 {a control command was not valid (exit code 8)}
   QwkNetDry: Boolean;                    {mk -G<id> -D: only say what a pass would send, change nothing}
 
 Function QwkNetPass(RemoteId: String): Integer;
@@ -116,6 +136,7 @@ Var
   AreaConf: Array[1..OffAreas] Of LongInt; {area -> conference (-1 = none)}
   Inbound, Outbound, UserName, MapDir: String;
   HubHost, HubProfile, HubScript, HubLogin, HubPass, HubProto, HubLog: String;
+  CtlTo: String[20];                     {control-to: whom the control messages are for (default SBBS)}
   StripA: Boolean;                       {strip-ctrla: the Ctrl-A codes of the hub's messages are taken out}
   ReplyErr, ReplyOk: Array[1..8] Of String[80];   {what the hub says after the reply packet: refused / accepted}
   NumErr, NumOk: Word;
@@ -181,6 +202,7 @@ Function LoadMap(Id: String): Boolean;
   NumErr := 0;
   NumOk := 0;
   StripA := False;
+  CtlTo := 'SBBS';
   MapDir := Config^.FindBbsFile(Id + '.map');
   FileName := MapDir + Id + '.map';
   If Not FileExist(FileName) Then
@@ -232,6 +254,8 @@ Function LoadMap(Id: String): Boolean;
         HubProto := UpCase(Rest[1])
       Else If Key = 'transcript' Then
         HubLog := Rest
+      Else If (Key = 'control-to') And (Rest <> '') Then
+        CtlTo := Copy(Rest, 1, 20)
       Else If Key = 'strip-ctrla' Then
         StripA := Lower(ExtractWord(Rest, 1)) = 'yes'
       Else If (Key = 'reply-error') And (NumErr < 8) And (Rest <> '') Then
@@ -467,6 +491,191 @@ Function LedgerSkip(Area: Word; MsgNum: LongInt): Boolean;
   End;
 
 
+{ ---- control messages for the hub (RemoteId.ctl) }
+
+Function CtlFile(Id: String): String;
+  Begin
+  CtlFile := MapDir + Id + '.ctl';
+  End;
+
+
+Function FirstConf: LongInt;
+  {the conference a command that is not about one is sent in: the first one of the map file (a hub wants a conference it sends)}
+  Var
+    C: LongInt;
+
+  Begin
+  FirstConf := 0;
+  For C := 0 To 65535 Do
+    If ConfArea[C] <> 0 Then
+      Begin
+      FirstConf := C;
+      Exit;
+      End;
+  End;
+
+
+Function AllDigits(Const S: String): Boolean;
+  Var
+    i: Word;
+
+  Begin
+  AllDigits := Length(S) > 0;
+  For i := 1 To Length(S) Do
+    If (S[i] < '0') Or (S[i] > '9') Then
+      AllDigits := False;
+  End;
+
+
+Function CtlParse(Line: String; Var Conf: LongInt; Var Subj, Err: String): Boolean;
+  {One command: the conference of the message and the subject.  False with Err = '' for a blank line or a comment, with a text
+   for a command that is not valid}
+  Const
+    ConfCmds = ' ADD DROP YOURS RESET SUBPTR ';
+    GlobCmds = ' RESETALL ALLPTR FREQ FILES ATTACH OWN MAIL DELMAIL CTRL-A NDX CONTROL VIA TZ MSGID ';
+
+  Var
+    Cmd, Rest, First: String;
+
+  Begin
+  CtlParse := False;
+  Err := '';
+  Line := StripBoth(Line, ' ');
+  If (Line = '') Or (Line[1] = ';') Or (Line[1] = '#') Then
+    Exit;
+  Cmd := Upper(ExtractWord(Line, 1));
+  Rest := StripBoth(Copy(Line, Length(ExtractWord(Line, 1)) + 1, 200), ' ');
+  If Pos(' ' + Cmd + ' ', ConfCmds) > 0 Then
+    Begin
+    First := ExtractWord(Rest, 1);
+    If (Not AllDigits(First)) Or (Length(First) > 5) Or (Str2Long(First) > 65535) Then
+      Begin
+      Err := Cmd + ' needs the number of the conference (as the hub numbers it) first';
+      Exit;
+      End;
+    Conf := Str2Long(First);
+    Rest := StripBoth(Copy(Rest, Length(First) + 1, 200), ' ');
+    If Cmd = 'DROP' Then
+      Rest := First;                   {DROP <conf>: the number is the argument, as the hub reads it}
+    End
+  Else If Pos(' ' + Cmd + ' ', GlobCmds) > 0 Then
+    Conf := FirstConf
+  Else
+    Begin
+    Err := Cmd + ' is not a control command (ADD DROP YOURS RESET SUBPTR RESETALL ALLPTR FREQ FILES ATTACH OWN MAIL DELMAIL CTRL-A NDX CONTROL VIA TZ MSGID)';
+    Exit;
+    End;
+  Subj := Cmd;
+  If Rest <> '' Then
+    Subj := Subj + ' ' + Rest;
+  CtlParse := True;
+  End;
+
+
+Function QueueCtl(Id, Line: String; Var Err: String): Boolean;
+  {mk -G<id> -X"...": checked and added to RemoteId.ctl}
+  Var
+    Conf: LongInt;
+    Subj: String;
+    F: Text;
+
+  Begin
+  QueueCtl := False;
+  If Not CtlParse(Line, Conf, Subj, Err) Then
+    Begin
+    If Err = '' Then
+      Err := 'nothing to send';
+    Exit;
+    End;
+  Assign(F, CtlFile(Id));
+  If FileExist(CtlFile(Id)) Then
+    Append(F)
+  Else
+    Rewrite(F);
+  If IoResult <> 0 Then
+    Begin
+    Err := 'cannot write ' + CtlFile(Id);
+    Exit;
+    End;
+  WriteLn(F, StripBoth(Line, ' '));
+  Close(F);
+  If IoResult <> 0 Then;
+  QueueCtl := True;
+  End;
+
+
+Function AddControls(Offline: QwkOffPtr; Id: String; Var Bad: Word): Word;
+  {the commands of RemoteId.ctl go in the reply packet as messages (to SBBS, the command as the subject); how many}
+  Var
+    F: Text;
+    Line, Subj, Err: String;
+    Conf: LongInt;
+    N: Word;
+
+  Begin
+  AddControls := 0;
+  Bad := 0;
+  N := 0;
+  If Not FileExist(CtlFile(Id)) Then
+    Exit;
+  Assign(F, CtlFile(Id));
+  Reset(F);
+  If IoResult <> 0 Then
+    Exit;
+  While Not Eof(F) Do
+    Begin
+    ReadLn(F, Line);
+    If CtlParse(Line, Conf, Subj, Err) Then
+      Begin
+      If Offline^.AddControl(Conf, CtlTo, UserName, Subj) Then
+        Inc(N)
+      Else
+        Inc(Bad);
+      End
+    Else If Err <> '' Then
+      Begin
+      User.DisplayStrLn('control command not sent: ' + Err);
+      Inc(Bad);
+      End;
+    End;
+  Close(F);
+  If IoResult <> 0 Then;
+  AddControls := N;
+  End;
+
+
+Procedure CtlInPacket(Id: String);
+  {the commands are in the reply packet that was made: RemoteId.ctl becomes RemoteId.ctl.out until the hub has the packet}
+  Var
+    F: File;
+
+  Begin
+  If FileExist(CtlFile(Id) + '.out') Then
+    Begin
+    Assign(F, CtlFile(Id) + '.out');
+    Erase(F);
+    If IoResult <> 0 Then;
+    End;
+  Assign(F, CtlFile(Id));
+  Rename(F, CtlFile(Id) + '.out');
+  If IoResult <> 0 Then;
+  End;
+
+
+Procedure CtlSent(Id: String);
+  Var
+    F: File;
+
+  Begin
+  If FileExist(CtlFile(Id) + '.out') Then
+    Begin
+    Assign(F, CtlFile(Id) + '.out');
+    Erase(F);
+    If IoResult <> 0 Then;
+    End;
+  End;
+
+
 Function DoReply(Id: String): Boolean;
   {the reply packet; False when it could not be made}
   Var
@@ -476,9 +685,11 @@ Function DoReply(Id: String): Boolean;
     R: OffDLResult;
     Cont: Boolean;
     PackNum: Word;
+    NumCtl, BadCtl: Word;
 
   Begin
   DoReply := True;
+  NumCtl := 0;
   Offline := New(QwkOffPtr, Init);
   Offline^.SetLink(Id, NetConfOf, NetAreaOf);
   Offline^.SetQwke(True);
@@ -489,6 +700,7 @@ Function DoReply(Id: String): Boolean;
     Dispose(Offline, Done);
     Exit;
     End;
+  CtlSent(Id);                           {commands of a packet that is gone: it was sent}
   WorkPath := CreateTempDir(Config^.GetTempPath);
   Cont := Length(WorkPath) > 0;
   If Cont Then
@@ -514,12 +726,18 @@ Function DoReply(Id: String): Boolean;
     OffSkip := Nil;
     If LedgerSkipped > 0 Then
       User.DisplayStrLn(Long2Str(LedgerSkipped) + ' message(s) that came from the hub are not sent back');
+    If Cont Then
+      Begin
+      NumCtl := AddControls(Offline, Id, BadCtl);
+      If BadCtl > 0 Then
+        QwkNetCtlBad := True;
+      End;
     If Offline^.ClosePacket <> 0 Then
       Cont := False;
     End;
   If Cont Then
     Begin
-    If R.NumMsgs = 0 Then
+    If (R.NumMsgs = 0) And (NumCtl = 0) Then
       User.DisplayStrLn('No new messages for ' + Id)
     Else
       Begin
@@ -530,8 +748,10 @@ Function DoReply(Id: String): Boolean;
           Outbound + ArcName + ' *.*');
       If Cont Then
         Begin
-        User.DisplayStrLn(Long2Str(R.NumMsgs) + ' message(s) in ' + ArcName);
+        User.DisplayStrLn(Long2Str(R.NumMsgs) + ' message(s) and ' + Long2Str(NumCtl) + ' control message(s) in ' + ArcName);
         OffCommitLR(R);                {sent: the last read goes on}
+        If NumCtl > 0 Then
+          CtlInPacket(Id);
         End;
       End;
     End;
@@ -565,6 +785,50 @@ Procedure DryEv(What: Word; Area: Word; N: LongInt);
   End;
 
 
+Function ListControls(Id: String): Word;
+  {the dry run: what RemoteId.ctl (and the -X commands) would send; how many control messages}
+  Var
+    F: Text;
+    Line, Subj, Err: String;
+    Conf: LongInt;
+    N: Word;
+    i: Word;
+
+  Begin
+  N := 0;
+  If FileExist(CtlFile(Id)) Then
+    Begin
+    Assign(F, CtlFile(Id));
+    Reset(F);
+    If IoResult = 0 Then
+      Begin
+      While Not Eof(F) Do
+        Begin
+        ReadLn(F, Line);
+        If CtlParse(Line, Conf, Subj, Err) Then
+          Begin
+          Inc(N);
+          WriteLn(StdErr, '  control message to ', CtlTo, ' in conference ', Conf, ': ', Subj);
+          End
+        Else If Err <> '' Then
+          WriteLn(StdErr, '  control command NOT sent: ', Err);
+        End;
+      Close(F);
+      If IoResult <> 0 Then;
+      End;
+    End;
+  For i := 1 To QwkNetNumCmds Do
+    If CtlParse(QwkNetCmds[i], Conf, Subj, Err) Then
+      Begin
+      Inc(N);
+      WriteLn(StdErr, '  control message to ', CtlTo, ' in conference ', Conf, ': ', Subj, '   (from -X, not queued by a dry run)');
+      End
+    Else
+      WriteLn(StdErr, '  -X command NOT sent: ', Err);
+  ListControls := N;
+  End;
+
+
 Function DryRun(Id: String): Integer;
   {Does what DoReply does up to the packet (the messages are looked at, nothing is written but a work directory that is
    removed again) and does not move any last read pointer, call the hub or touch a file of the BBS.  mk -G<id> -D}
@@ -574,10 +838,11 @@ Function DryRun(Id: String): Integer;
     P: OffDLParams;
     R: OffDLResult;
     Cont: Boolean;
-    i, Subscribed: Word;
+    i, Subscribed, CtlCount: Word;
 
   Begin
   DryRun := 0;
+  CtlCount := 0;
   WriteLn(StdErr, 'Dry run of the pass with ', Id, ': nothing is sent, called, moved or written.');
   WriteLn(StdErr, 'User ', UserName, '; reply packets would go to ', Outbound, ', packets from the hub come to ', Inbound);
   If HubHost <> '' Then
@@ -628,12 +893,14 @@ Function DryRun(Id: String): Integer;
     OffSkip := Nil;
     Offline^.ClosePacket;
     End;
+  If Cont Then
+    CtlCount := ListControls(Id);
   If Not Cont Then
     Begin
     WriteLn(StdErr, 'The messages could not be looked at.');
     DryRun := 3;
     End
-  Else If R.NumMsgs = 0 Then
+  Else If (R.NumMsgs = 0) And (CtlCount = 0) Then
     Begin
     If LedgerSkipped > 0 Then
       WriteLn(StdErr, LedgerSkipped, ' message(s) that came from the hub are not sent back.');
@@ -643,7 +910,7 @@ Function DryRun(Id: String): Integer;
     Begin
     If LedgerSkipped > 0 Then
       WriteLn(StdErr, LedgerSkipped, ' message(s) that came from the hub are not sent back.');
-    WriteLn(StdErr, R.NumMsgs, ' message(s) would go up in ', ArcName, '.  Last read pointers are NOT moved by this run.');
+    WriteLn(StdErr, R.NumMsgs + CtlCount, ' message(s) would go up in ', ArcName, '.  Last read pointers are NOT moved by this run.');
     End;
   Dispose(Offline, Done);
   ChDir(StripTrail(StartUpPath, '/'));
@@ -872,6 +1139,7 @@ Function DoHub(Id: String): Integer;
       Assign(F, Rep);
       Erase(F);
       If IoResult <> 0 Then;
+      CtlSent(Id);                         {the hub has the commands}
       User.DisplayStrLn('The reply packet was sent');
       End;
     { the packet that came: RemoteId.qwk in the inbound directory }
@@ -1002,6 +1270,8 @@ Function DoPacket(Id: String): Boolean;
 Function QwkNetPass(RemoteId: String): Integer;
   Var
     Res, N: Integer;
+    i: Word;
+    CtlErr: String;
 
   Begin
   Res := 0;
@@ -1020,6 +1290,14 @@ Function QwkNetPass(RemoteId: String): Integer;
     QwkNetPass := 2;
     Exit;
     End;
+  If Not QwkNetDry Then
+    For i := 1 To QwkNetNumCmds Do
+      If Not QueueCtl(RemoteId, QwkNetCmds[i], CtlErr) Then
+        Begin
+        User.DisplayStrLn('control command not queued: ' + CtlErr);
+        WriteLn(StdErr, 'mk: control command "', QwkNetCmds[i], '" not queued: ', CtlErr);
+        QwkNetCtlBad := True;
+        End;
   If QwkNetDry Then
     Begin
     QwkNetPass := DryRun(RemoteId);          {nothing else: no WriteUser either}
@@ -1035,6 +1313,8 @@ Function QwkNetPass(RemoteId: String): Integer;
     End;
   If Not DoPacket(RemoteId) Then
     Res := 4;
+  If QwkNetCtlBad And (Res = 0) Then
+    Res := 8;
   User.WriteUser;
   QwkNetPass := Res;
   End;
