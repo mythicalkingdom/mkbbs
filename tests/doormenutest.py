@@ -25,7 +25,7 @@ maps = {(src + '/').encode(): (ra + '/').encode(), (srcmenus + '/').encode(): (m
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: maps.get(s, s))
 
 # the programs (menu command 007 runs an external program: the data is the command line)
-os.makedirs(ra + '/games')
+os.makedirs(ra + '/games', exist_ok=True)   # the sample BBS may have one already
 def script(path, text):
     open(path, 'w').write('#!/bin/sh\n' + text)
     os.chmod(path, 0o755)
@@ -68,6 +68,15 @@ if os.path.exists(repo + '/bbs/bbsc/mkqwk/config.mko') and os.path.exists(repo +
     cc['ExtPack'][1]['UCmdLine'] = 'unzip -o -q'
     dj['messages']['6']['Permit'] |= 1024
     cc['OffAttr'] |= 128                                     # QWKE long names in the packets (oaQwke)
+    # the extras of a packet (Messages > Offline in mkconfig; the door's config.mko has nothing to do with it): screens, bulletins, the new files list
+    cc['OffAttr'] |= 2 | 8 | 32                              # forced: new files list, screens, bulletins
+    cc['OffScrns'] = ['hello', 'news', 'bye', 'nfhead', '']
+    cc['OffBulls'] = ['bulla', 'nobull'] + [''] * 8
+    os.makedirs(ra + '/txt', exist_ok=True)
+    for i in range(len(cc['TxtPath'])):
+        cc['TxtPath'][i] = ra + '/txt/'
+    for nm in ('hello', 'news', 'bye', 'bulla', 'nfhead'):
+        open(ra + '/txt/' + nm + '.asc', 'w').write(nm.upper() + ' screen of mk\n')
     json.dump(dj, open(os.path.join(cj, 'bbsconfig.json'), 'w', encoding='utf-8'), ensure_ascii=False)
     subprocess.run([repo + '/build/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True)
     # the reply packet a caller would upload: <BOARDID>.REP, a ZIP with <BOARDID>.MSG (2 messages for area 6, 1 for an unknown conference)
@@ -95,7 +104,7 @@ for f in os.listdir(menus):
 d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
-free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV890' if k not in used]
+free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV890' if k not in used] + [k for k in '=;/!+' if k not in used]   # more keys when the sample menu has many items
 items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('qwkul', repo + '/build/mkqwk -U'), ('qwkin', '#156'), ('qwkout', '#157'), ('setprot', '#153'), ('missing', 'nope-door-xyz')]
 keys = {}
 slot = 1
@@ -349,6 +358,9 @@ try:
         # menu command 157: the packet for the caller (area 6 is forced into everybody's offline mail), packed and sent
         c.sendall(keys['qwkout'].encode())
         b = until(c, b'Command >', 40)
+        while b'More?' in b[-60:]:                      # a long list of areas is paged: continuous
+            c.sendall(b'c')
+            b += until(c, b'Command >', 40)
         sent = ra + '/sent.qwk'
         check('menu command 157 (the download inside mk) packs the packet and sends it with the protocol of the caller', os.path.exists(sent) and b'Begin transfer now' in b and b'Command >' in b)
         pk = os.path.join(work, 'pk'); os.makedirs(pk)
@@ -360,6 +372,10 @@ try:
         check('... it holds messages.dat, control.dat, door.id and the index of conference 6', all(n in names for n in ('messages.dat', 'control.dat', 'door.id', '006.ndx')))
         pdump = subprocess.run([repo + '/build/qwkmsgtest', 'dump', pk + '/messages.dat'], capture_output=True, text=True, encoding='latin-1').stdout
         check('... the replies are in it (the caller\'s own messages: he asked for them) in conference 6', 'Reply via REP' in pdump and 'conf=6' in pdump)
+        check('... the screens, the bulletin (BLT-1; the one with no file is left out), the new files list and TOREADER.EXT are in it: mk needs only config.mk',
+              all(n in names for n in ('hello.asc', 'news.asc', 'bye.asc', 'blt-1.asc', 'newfiles.dat', 'toreader.ext')) and 'blt-2.asc' not in names)
+        nfl = open(pk + '/newfiles.dat', encoding='latin-1').read() if os.path.exists(pk + '/newfiles.dat') else ''
+        check('... the new files list starts with the heading screen of Messages > Offline (New Files Head)', nfl.startswith('NFHEAD screen of mk'))
         ctl = open(pk + '/control.dat', encoding='latin-1').read().split('\n') if os.path.exists(pk + '/control.dat') else []
         check('... control.dat has the board id of config.mk', len(ctl) > 4 and ctl[4].endswith('MythKing'))
         c.sendall(keys['qwkout'].encode())
@@ -463,6 +479,9 @@ try:
             break
     c.sendall(keys['missing'].encode())
     b = until(c, b'ress', 6)
+    if b'More?' in b[-60:]:                          # the pager of a screen that is long now
+        c.sendall(b'c')
+        b += until(c, b'ress', 6)
     check('a program that does not exist: the caller is told, not left with nothing', b'Error: nope-door-xyz could not be run' in b)
     c.sendall(b'\r')
     check('... and the menu is back', b'Command >' in until(c, b'Command >', 6))

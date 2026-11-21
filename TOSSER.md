@@ -60,7 +60,7 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    system's areafix password (`EchoSys.PWD`, now labelled "Areafix pwd" in mkconfig).  Commands `%LIST %QUERY %UNLINKED
    %HELP`, `+AREA`, `-AREA`, a bare `AREA` (links), `*` and `?` in names, processing stops at a `---` line.  An area is
    available to a system when it has a tag, does not come from that system (its Hub), and, if the area is restricted to
-   networks (Message Areas > Networks), the system has one of them (Network Security).  `AfterChange`: for an area with a
+   networks (Messages > Areas > an area > Net Status...), the system has one of them (Network Security).  `AfterChange`: for an area with a
    Hub, the hub is linked and sent `+TAG` when the first other system takes the area, and for a pass-through area
    unlinked and sent `-TAG` when the last one leaves (the request is a netmail to Areafix at the hub with the hub's
    password).  The changes are saved with `MKCfgObj.SaveEchoCfg` (echocfg.mk only).
@@ -71,7 +71,7 @@ EchoMail settings of `mkconfig` (echo systems, echo areas, archivers).  mkbink s
    a wrong packet password, links changed, the answers and the hub request read from the real outbound),
    `tests/mailertest.py` (the mkconfig page saves the packet password).
 4. **Integration (done)**:
-   * `Mailer > Tosser` (mkconfig, flag `mcTosser` = 128 in `Mailer.Mk`) switches the tosser on.  `mktoss` does nothing (exit 3,
+   * `EchoMail > Mailer > Tosser` (mkconfig, flag `mcTosser` = 128 in `Mailer.Mk`) switches the tosser on.  `mktoss` does nothing (exit 3,
      says so unless `-q`) while it is off, `-f` overrides; so cron, the mailer's hook and mklisten's scan can call it all the time.
    * `mkbinkcfg` writes `on-inbound <mktoss>` (the one next to mkbinkcfg) when the tosser is on and "After mail comes" is blank;
      a command set there wins.  mkbink runs it after every session that received files (its output, the summary line included,

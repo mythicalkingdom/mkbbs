@@ -100,7 +100,7 @@ and QWKE detection by a reader, are not covered.
 
 ### 6. Settings and the sysop's side
 
-* Sysop switches (`mkconfig`: the QWK network / offline page) for each extra: screens, new files (with the limit), bulletins, `TOREADER.EXT`;
+* Sysop switches (`mkconfig` > Messages > Offline for `mk`; `mkqwkcfg` > Main Configuration and Screens for the door) for each extra: screens, new files (with the limit), bulletins, `TOREADER.EXT`;
   the user switches that exist stay the way to choose per user.  A QWK Node user gets none of them by default.
 * JSON and `mkcfgcvt` follow every configuration change (a new field in the record or the expansion room, `genjsoncfg.py`, `jsoncfgtest`).
 

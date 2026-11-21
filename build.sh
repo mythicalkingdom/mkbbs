@@ -166,6 +166,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # the extras of a packet: screens, bulletins, the new files list (MKOffExt)
   python3 tests/qwkextratest.py build build/work/qwkextra | grep -E "^(ok|FAIL|skip)" | tee build/qwkextraresult.txt
   if grep -q FAIL build/qwkextraresult.txt; then exit 1; fi
+  # mk and the rest of MK are independent of the old offline mail door: only mkqwk and mkqwkcfg know its files (config.mko, users.mko, confs.mko)
+  for p in mk mklisten mkconfig mkmon mktoss mkfreq mkevents mkbinkcfg mkread mkusered mkcfgcvt; do
+    if strings -a build/$p | grep -qi 'config\.mko\|users\.mko\|confs\.mko'; then echo "FAIL independence: $p knows the files of the offline mail door"; fi
+  done | tee build/qwkindepresult.txt
+  if grep -q FAIL build/qwkindepresult.txt; then exit 1; fi
 fi
 # MKProt (Zmodem both ways) against the real lrzsz over a socketpair
 python3 tests/prottest.py build build/work/prot | grep -E "^(ok|FAIL|skip|failures)" | tee build/protresult.txt

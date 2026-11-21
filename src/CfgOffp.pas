@@ -16,7 +16,7 @@ Type
     ReDate, Qwke, AllowNew, ForceNew, AllowScrn, ForceScrn, AllowBull, ForceBull,
       AllowFreq: Boolean;
     Bull1, Welcome, Bull2, News, Bull3, GoodBye, Bull4, Bull5, Bull6, Bull7,
-      Bull8, Bull9, Bull10: String[8];
+      Bull8, Bull9, Bull10, NewHead: String[8];
     End;
 
 
@@ -54,7 +54,8 @@ Procedure EditOffCfgP;
   UR^.Bull8 := Config^.GetOffBulls(8);
   UR^.Bull9 := Config^.GetOffBulls(9);
   UR^.Bull10 := Config^.GetOffBulls(10);
-  F.Init('Offline Mail Paramaters');
+  UR^.NewHead := Config^.GetOffScrns(4);
+  F.Init('Offline Mail Parameters');
   F.Window(3, 3, 75, 21);
   F.At(8, 24, 0, 0);
   F.AddText('-----   Screens  ------');
@@ -90,6 +91,8 @@ Procedure EditOffCfgP;
   F.AddString('Bulletin  1:', UR^.Bull1, 8, 'Bulletin  1');
   F.At(9, 38, 9, 47);
   F.AddString('Welcome:', UR^.Welcome, 8, 'Welcome');
+  F.At(12, 38, 12, 54);
+  F.AddString('New Files Head:', UR^.NewHead, 8, 'Screen shown above the new files list in a packet (blank = none)');
   F.At(10, 3, 10, 16);
   F.AddString('Bulletin  2:', UR^.Bull2, 8, 'Bulletin  2');
   F.At(10, 38, 10, 44);
@@ -141,6 +144,7 @@ Procedure EditOffCfgP;
     Config^.SetOffBulls(8, UR^.Bull8);
     Config^.SetOffBulls(9, UR^.Bull9);
     Config^.SetOffBulls(10, UR^.Bull10);
+    Config^.SetOffScrns(4, UR^.NewHead);
     End;
   Dispose(UR);
   End;

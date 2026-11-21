@@ -227,18 +227,18 @@ Fido mail needs the mailer (`mkbink`) and the tosser (`mktoss`).  Netmail is rou
 systems you link.
 
 1. **Your address.**  In `mkconfig` set your main address (and AKAs) and your sysop name.
-2. **Areas.**  In `mkconfig` create a message area for each echo you carry and a *netmail* area.  Give an echo area its
-   **tag** (EchoMail), its tear line and origin, and the address (AKA) it uses.
+2. **Areas.**  `Messages > Areas`: create a message area for each echo you carry and a *netmail* area (the **Type**).  Give an echo area its
+   **Area** tag, its origin and the **Address** (AKA) it uses.
 3. **Echo systems.**  `EchoMail > Systems`: add each system you exchange mail with.  For each system set:
    * its address;
    * the **archiver** it takes (ZIP is the usual choice);
    * the **flavour** (immediate, crash, normal, hold);
    * the **areafix password** and, if you agreed one, the **packet password**;
    * the networks it may see (for areafix).
-4. **Link systems to areas.**  `EchoMail > Areas`: for each echo choose the systems that get it (*Echo to*), and the
-   **hub** (the system you get it from).  Options: keep or hide path and seen-by, pass-through.
-5. **Archivers and paths.**  `EchoMail > Archivers` has the pack and unpack command lines; `EchoMail > Options` has
-   the inbound, secure inbound, outbound, and the maximum packet size.  `General > Paths` has the file attach
+4. **Link systems to areas.**  In the same area form: **Echo To...** chooses the systems that get the echo, **Hub** is the system you get it
+   from, and **Fido Options...** has pass-through and keep or hide path and seen-by.
+5. **Archivers and paths.**  `General > Packers` has the pack and unpack command lines; `EchoMail > Options` has
+   the inbound, outbound and the maximum packet size.  `General > Bbs Paths` has the file attach
    directory.
 6. **Routing.**  `EchoMail > Routing`: the first route whose patterns fit wins, for example `1:120/* !1:120/9` via your
    uplink.  A system in your echo systems list is always sent to directly.  A route's flavour overrides the message's.
@@ -291,8 +291,8 @@ nodelist index (`mknodeidx`; IBN and INA flags; every nodelist in the index is s
 with a zone of its own works next to Fidonet; two networks that use the same zone number cannot be told apart).  `mkbink` writes the
 `.req`, calls, and the answer comes back in the same session when both sides offer multiple batches.
 
-**Strangers.**  `accept-unknown yes` (mkconfig: Mailer > Accept unknown) lets a system that is not in the links list call; give it
-no password for an anonymous (unsecure) session, and turn on "unsecure" on File Requests so that it can ask for files, as the anonymous
+**Strangers.**  `accept-unknown yes` (`mkconfig`: EchoMail > Mailer > Accept unknown) lets a system that is not in the links list call; give it
+no password for an anonymous (unsecure) session, and turn on **Without a password** on `EchoMail > File Requests` so that it can ask for files, as the anonymous
 file requests of the BBS days.  What it may take is the same list as for everyone else: the areas with Allow file requests, the
 unsecure security profile and the magic names.  What it sends goes to `inbound-unsecure`.  Without `accept-unknown`, mkbink refuses a
 caller that is not a link ("Bad address").

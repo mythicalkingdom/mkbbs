@@ -32,9 +32,8 @@ the listener `MKLISTEN.md`, and for the Fido tosser `TOSSER.md`.  `GETTING-START
 
 **Offline mail extras.**  A packet of the offline mail door (`mkqwk`) or of the offline menu of `mk` can carry the BBS **screens** (welcome, news
 and goodbye), **bulletins** (up to ten) and a **list of new files**, for the callers who ask for them (the user's offline settings) and as
-the sysop allows.  The names are settings: `mkconfig` > Offline Mail Parameters (Allow / Force for each, the three screen names, ten bulletin
-names; used by `mk`) and the door's own *MKQwk Screens and Bulletins* page (names, the heading screen of the new files list) with *New Files /
-Screens / Bulletins* set to Never, Always or Ask in its configuration.  A screen or bulletin is taken as the caller's terminal gets it online
+the sysop allows.  The names are settings: `mkconfig` > Messages > Offline (Offline Mail Parameters: Allow / Force for each, the three screen names, ten bulletin
+names and **New Files Head**, the screen above the new files list; this is all `mk` uses: it needs nothing of the door's `config.mko`) and, for the door (`mkqwkcfg`, which edits the door's own `config.mko`), *Screens* (the names and the heading screen of the new files list) and *Main Configuration* (*New Files / Screens / Bulletins* set to Never, Always or Ask).  A screen or bulletin is taken as the caller's terminal gets it online
 (`.avt`, `.ans` or `.asc` in the text directory) and goes into every packet under its own name; `CONTROL.DAT` names the screen files that are
 really there; bulletins are `BLT-1`, `BLT-2` ... (the readers' names); a name with no file is left out.  The new files list is `newfiles.dat`: the heading screen, then for each file area the caller may
 list the files uploaded since the caller's new files date, laid out like the online list (name, date, size, description, long descriptions wrapped under
@@ -101,7 +100,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mknodeidx`, `mknodelist` | build the nodelist index, look an address up |
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
-| `mkqwk`, `mkqwkcfg` | the older offline mail door and its configuration |
+| `mkqwk`, `mkqwkcfg` | the older offline mail door and its configuration (`config.mko`): kept for systems that do not run `mk`; nothing else in MK uses it |
 | `mkfreq` | answers FTN file requests for `mkbink` (see `NETWORKING.md`) |
 | `mkpwconv` | expands `extusers.bbs` (`-x`) and converts plain passwords to hashes (`-h`); see `PASSWORDS.md` |
 

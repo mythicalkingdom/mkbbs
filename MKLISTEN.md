@@ -172,7 +172,7 @@ normal ports are not affected.
 }
 ```
 
-* `mkbinkcfg` writes the mailer's settings from the BBS configuration (`mkconfig`: Mailer, Mailer Links, EchoMail
+* `mkbinkcfg` writes the mailer's settings from the BBS configuration (`mkconfig`: EchoMail > Mailer, Mailer Links and
   Options) at the start and whenever `config.mk`, `echocfg.mk`, `mailer.mk` or `bbsconfig.json` change, or when SIGHUP
   arrives.
 * `mkbink` is started while the mailer is switched on in `mkconfig`.  When the settings change it gets SIGHUP (it reads
@@ -180,7 +180,7 @@ normal ports are not affected.
 * A mailer that dies is started again after `restart` seconds (default 5, doubled while it keeps dying, at most 300).
 * `scan` runs `mktoss -s -q` that often so that messages the BBS wrote are packed and given to the mailer.  After a
   session that received mail the mailer runs `mktoss` itself.  `mktoss` does nothing unless the tosser is on
-  (`Mailer > Tosser` in `mkconfig`).
+  (`EchoMail > Mailer > Tosser` in `mkconfig`).
 * Other keys: `mkbink`, `mkbinkcfg`, `mktoss` (program paths; default next to `mk`), `settings`, `logfile`, `interval`.
 * Whatever happens to the listener, even SIGKILL, takes `mkbink` with it.
 

@@ -644,6 +644,7 @@ Procedure OfflineDL;
         ExSpec.Scr[i] := Config^.GetOffScrns(i);
       For i := 1 To 10 Do
         ExSpec.Bull[i] := Config^.GetOffBulls(i);
+      ExSpec.Head := Config^.GetOffScrns(4);          {the screen above the new files list: Messages > Offline > New Files Head}
       ExSpec.ToReader := Config^.GetOffQwke And (UpCase(User.GetUserOffType) = 'Q');
       ExSpec.Alias := User.GetUserHandle;
       ExSpec.OwnMsgs := User.GetUserOffOwn;
