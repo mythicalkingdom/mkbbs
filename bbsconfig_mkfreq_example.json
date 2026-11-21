@@ -1,0 +1,69 @@
+{
+  "_about": "A minimal MK configuration for answering file requests with mkfreq on a system that does not run the MK BBS (for example a binkd node). Put it in a directory as bbsconfig.json and point MKJSON at that directory. Keys that start with an underscore are notes and are ignored.",
+
+  "_binkd_cfg": "In binkd.cfg, run the wrapper below for every file request that arrives (*S is the SRIF file binkd writes):   exec \"/usr/local/bin/mkfreq-binkd *S\" *.req",
+
+  "_wrapper": [
+    "Save as /usr/local/bin/mkfreq-binkd and make it executable (chmod 755). binkd runs it as its own user: that user must be able to read this directory and the folders below.",
+    "#!/bin/sh",
+    "MKJSON=/etc/mkfreq exec /usr/local/bin/mkfreq -S \"$1\""
+  ],
+
+  "_test_by_hand": "Make a request file (one name per line) and an SRIF file with the lines  Sysop x / AKA 1:110/100 / Baud 1 / Time -1 / RequestList /tmp/req.txt / ResponseList /tmp/rsp.txt / RemoteStatus PROTECTED  and run:  MKJSON=/etc/mkfreq mkfreq -S /tmp/srif.txt   then look at /tmp/rsp.txt (one +path line for each file found). The log lines say why a name was not found.",
+
+  "version": 1,
+
+  "config": {
+    "_note": "Our main address: used in the note a requester gets by netmail (only when the BBS tosser runs) and in the log.",
+    "SysopName": "Your Name",
+    "Addr": [ { "Zone": 1, "Net": 110, "Node": 290, "Point": 0 } ]
+  },
+
+  "files": {
+    "_note": "Each folder that may be requested is a file area. Attr 32 = Allow file requests. FilePath is absolute, ends with a slash and is at most 50 characters (a longer one is cut short). A requester gets a file only from an area whose ViewSec and DLSec its request security meets (see Links and ReqSec below).",
+    "1": {
+      "Name": "Public files",
+      "ShortName": "Public",
+      "FilePath": "/var/spool/ftn/freq/",
+      "ViewSec": { "Level": 1, "Flags": 0 },
+      "DLSec":   { "Level": 1, "Flags": 0 },
+      "Attr": 32
+    },
+    "2": {
+      "Name": "Nodelist",
+      "ShortName": "Nodelist",
+      "FilePath": "/var/spool/ftn/nodelist/",
+      "ViewSec": { "Level": 1, "Flags": 0 },
+      "DLSec":   { "Level": 1, "Flags": 0 },
+      "Attr": 32
+    },
+    "3": {
+      "Name": "Members only",
+      "ShortName": "Members",
+      "FilePath": "/home/user/members_files/",
+      "ViewSec": { "Level": 50, "Flags": 0 },
+      "DLSec":   { "Level": 50, "Flags": 0 },
+      "Attr": 32
+    }
+  },
+
+  "mailer": {
+    "_note": "Flags 64 = answer file requests (mcFileReq). ReqSec is the file request security of a system that is not a link (or whose link has level 0): level 1 gets the areas of level 1 or less. ReqAttr: 1 = also answer sessions without a password, 2 = tell the requester by netmail (needs the MK tosser; leave it out here). ReqMaxFiles 0 = 20 files, ReqMaxKb 0 = no limit.",
+    "Version": 1,
+    "Flags": 64,
+    "ReqSec": { "Level": 1, "Flags": 0 },
+    "ReqMagicFile": "/etc/mkfreq/magic.txt",
+    "ReqMaxFiles": 20,
+    "ReqMaxKb": 0,
+    "ReqAttr": 1,
+
+    "Links": {
+      "_note": "A system you know gets its own request security instead of the one above: Level 0 = use ReqSec. Level 50 here also gets the Members only area.",
+      "1": {
+        "Addr": { "Zone": 1, "Net": 110, "Node": 100, "Point": 0 },
+        "Name": "Test Hub",
+        "ReqSec": { "Level": 50, "Flags": 0 }
+      }
+    }
+  }
+}

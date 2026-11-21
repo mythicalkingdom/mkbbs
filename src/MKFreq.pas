@@ -336,7 +336,7 @@ Function AreaAllowed(i: Word): Boolean;
 
 
 Var
-  Searched, NoFreq, Blocked: String;           {what the last search looked at and why it left areas out (for the log)}
+  Searched, NoFreq, Blocked, Missing: String;           {what the last search looked at and why it left areas out (for the log)}
 
 
 Procedure AddName(Var L: String; Const S: String);
@@ -355,12 +355,14 @@ Function SearchAreas(Pattern, Req: String): Word;
     i: Word;
     Found: Word;
     V, D: SecType;
+    St: Stat;
 
   Begin
   Found := 0;
   Searched := '';
   NoFreq := '';
   Blocked := '';
+  Missing := '';
   For i := 1 To Config^.GetMaxFileAreas Do
     If (Config^.GetFileAreaName(i) <> '') And (Config^.GetFileAreaPath(i) <> '') Then
       Begin
@@ -369,6 +371,8 @@ Function SearchAreas(Pattern, Req: String): Word;
       Else If AreaAllowed(i) Then
         Begin
         AddName(Searched, Config^.GetFileAreaName(i));
+        If fpStat(AbsPath(Config^.GetFileAreaPath(i)), St) <> 0 Then
+          AddName(Missing, Config^.GetFileAreaName(i) + ' (' + Config^.GetFileAreaPath(i) + ')');
         Found := Found + AddMatching(AbsPath(Config^.GetFileAreaPath(i)), Pattern, Req);
         End
       Else
@@ -670,6 +674,8 @@ Procedure DoRequest(Line: String);
     If Blocked <> '' Then
       LogLine('  areas that allow requests but whose security this system does not meet (its level is ' + Long2Str(Profile.Level) +
         '; Mailer Links: File request level, or the file request security of the File Requests page): ' + Blocked);
+    If Missing <> '' Then
+      LogLine('  folders that do not exist (a path longer than 50 characters is cut short): ' + Missing);
     If NoFreq <> '' Then
       LogLine('  areas without "Allow file requests" (mkconfig: Files > Areas): ' + NoFreq);
     End;

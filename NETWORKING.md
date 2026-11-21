@@ -312,6 +312,16 @@ is made too.  A request processor must never be able to delete a file it only of
 security the system's level does not meet (with their levels), and the areas without "Allow file requests".  A new link's "File request level" and the
 file areas' security are the usual causes: a system of level 1 only gets areas whose view and download security are 1 or less.
 
+**A system that does not run MK at all.**  `mkfreq` needs only a configuration, and the configuration can be one JSON file: copy
+`bbsconfig_mkfreq_example.json` to `/etc/mkfreq/bbsconfig.json`, list your folders as file areas (`"Attr": 32` = allow requests, absolute
+`FilePath` with a slash at the end, the security of each area), set the request security (`mailer.ReqSec`, and per known system under `mailer.Links`),
+and run it with `MKJSON=/etc/mkfreq mkfreq -S <srif file>`.  Nothing else of the BBS is needed.  The wrapper for binkd:
+
+```sh
+#!/bin/sh
+MKJSON=/etc/mkfreq exec /usr/local/bin/mkfreq -S "$1"
+```
+
 **The mailer's side of that rule.**  `mkbink` obeys a delete mark of a request answer (`^`, or `=` / `-` of SRIF) only for a regular file directly in its
 `freq-tmp` directory (`freq-tmp` in its settings, default `freq-tmp` in the inbound directory; `mkfreq` makes its lists there through `MKBINK_TMP`).
 For any other file the mark is ignored, the file is sent and kept, and the log says so.  `mkbink` can also use any SRIF processor with

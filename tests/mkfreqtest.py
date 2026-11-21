@@ -223,6 +223,43 @@ subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=envj2, check=True, cap
 r, s, n = ask('1:110/290', 'secure', ['this.arc'])
 check('file requests switched off: nothing is sent, a note says so', s == [] and any('not answered here' in x for x in n))
 
+# the example configuration for a system that does not run mk (bbsconfig_mkfreq_example.json, MKJSON only)
+ex = tmp + '/ex'                      # a short path: FilePath is 50 characters at most
+for d in ('freq', 'nodelist', 'members', 'cfg'):
+    os.makedirs(ex + '/' + d)
+open(ex + '/freq/hello.c', 'w').write('int main(){}\n')
+open(ex + '/nodelist/nodelist.322', 'w').write('nl\n')
+open(ex + '/members/secret.zip', 'w').write('s')
+open(ex + '/cfg/magic.txt', 'w').write('NODELIST %s/nodelist/nodelist.*\nFILES @LIST\n' % ex)
+t = open(os.path.join(repo, 'bbsconfig_mkfreq_example.json'), encoding='utf-8').read()
+for a, b in (('/var/spool/ftn/freq/', ex + '/freq/'), ('/var/spool/ftn/nodelist/', ex + '/nodelist/'), ('/home/user/members_files/', ex + '/members/'),
+             ('/etc/mkfreq/magic.txt', ex + '/cfg/magic.txt')):
+    t = t.replace(a, b)
+open(ex + '/cfg/bbsconfig.json', 'w', encoding='utf-8').write(t)
+
+
+def exsrif(aka, status, lines):
+    open(ex + '/req', 'w').write('\r'.join(lines) + '\r')
+    open(ex + '/s', 'w').write('Sysop X\nAKA %s\nBaud 1\nTime -1\nRequestList %s/req\nResponseList %s/rsp\nRemoteStatus %s\nSystemStatus LISTED\n' % (aka, ex, ex, status))
+    if os.path.exists(ex + '/rsp'):
+        os.remove(ex + '/rsp')
+    r = subprocess.run([build + '/mkfreq', '-S', ex + '/s'], env={'PATH': os.environ['PATH'], 'MKJSON': ex + '/cfg'}, capture_output=True, text=True)
+    return r, [l for l in open(ex + '/rsp').read().split('\n') if l] if os.path.exists(ex + '/rsp') else []
+
+
+r, o = exsrif('1:110/100', 'PROTECTED', ['hello.c', 'secret.zip', 'nodelist.*'])
+check('the example configuration (MKJSON only, no mk): the known system (level 50) gets all three, from three file areas',
+      r.returncode == 0 and sorted(os.path.basename(l[1:]) for l in o) == ['hello.c', 'nodelist.322', 'secret.zip'], (r.stdout, o))
+r, o = exsrif('2:2/2', 'UNPROTECTED', ['hello.c', 'secret.zip', 'FILES'])
+check('... a stranger without a password (level 1, unsecure allowed): the public file and the list, not the members file',
+      r.returncode == 0 and [os.path.basename(l[1:]) for l in o] == ['hello.c', 'files.lst'] and o[1][0] == '=', (r.stdout, o))
+# a folder that does not exist (a typo, or a path cut short at 50 characters) is named in the log when something is not found
+os.makedirs(ex + '/cfg2')
+open(ex + '/cfg2/bbsconfig.json', 'w', encoding='utf-8').write(open(ex + '/cfg/bbsconfig.json', encoding='utf-8').read().replace(ex + '/members/', ex + '/nope/'))
+open(ex + '/req', 'w').write('secret.zip\r')
+open(ex + '/s', 'w').write('Sysop X\nAKA 1:110/100\nBaud 1\nTime -1\nRequestList %s/req\nResponseList %s/rsp\nRemoteStatus PROTECTED\n' % (ex, ex))
+r = subprocess.run([build + '/mkfreq', '-S', ex + '/s'], env={'PATH': os.environ['PATH'], 'MKJSON': ex + '/cfg2'}, capture_output=True, text=True)
+check('a folder that does not exist is said in the log when a file is not found', 'folders that do not exist' in r.stdout and '/nope/' in r.stdout, r.stdout + r.stderr)
 r = subprocess.run([build + '/mkfreq'], env=env, capture_output=True, text=True)
 check('no arguments: usage, exit 1', r.returncode == 1 and 'Usage' in r.stdout)
 print('failures:', fails)
