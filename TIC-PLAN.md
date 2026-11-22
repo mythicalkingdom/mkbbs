@@ -1,6 +1,6 @@
 # TIC file echoes: plan
 
-Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`), 3 (tossing), 4 (passing on) and 5 (`mkhatch`) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
+Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`), 3 (tossing), 4 (passing on), 5 (`mkhatch`) and 6 (FileFix) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
 before any code is written (the same way the QWKE specification was read before `TOREADER.EXT` was done).
 
 ## Decided 2026-11-22
@@ -15,6 +15,18 @@ before any code is written (the same way the QWKE specification was read before 
    answer in the time limit, refuses the file to `badtic/`.  An echo can switch it off (*No check command*).
 6. **The pass-through spool is limited**: days a file waits for a system (`PassDays`, default 14) and the most it may hold (`PassMaxMB`, 0 = no limit, the oldest go first).
 7. Any FTN network; the sysop's FSX systems are for testing.
+
+## Phase 6 (done): FileFix
+
+A netmail for us to `FileFix`, `FileMgr` or `FileManager` from an echo system is dealt with by the same code as Areafix (`ProcessAreafix` of `MKToss.pas`, now with a *Files* switch), on
+the file echoes of `fileecho.mk`: `%LIST` (the echoes the system may have), `%QUERY` (linked: marked `*`), `%UNLINKED`, `%HELP`, `+TAG`, `-TAG`, a bare `TAG`, `*` and `?` in names, processing
+stops at a `---` line.  **The password** in the subject is the FileFix password of the system (File Echo Systems), **or its Areafix password when that is blank**; a system that has a
+FileFix password is not served with the Areafix one.  A file echo is available to a system when it has a tag, does not come from that system (it is its hub), and is open to everyone (no
+groups) or shares a group with it.  The answer is a netmail from FileFix to the name that asked (`FileFix response`, or `FileFix: password error`); `fileecho.mk` is saved by itself
+(`SaveFileEcho`); as with Areafix, the first downlink of an echo that has a hub links the hub and makes us ask it (`+TAG`, the subject is the hub's FileFix password), and the last
+downlink of a pass-through echo (no file area) makes us tell the hub to stop (`-TAG`).  A request from a system that is not an echo system is stored for the sysop.  The names are the
+only names: there is no setting for them (the Areafix names stay Areafix's).  Test: `tests/filefixtest.py` (packets made by the test itself; it patches the message base paths of the
+sample so that the replies go into its own copy).
 
 ## Phase 5 (done): `mkhatch`
 
@@ -179,7 +191,7 @@ records instead of the message ones.  Groups limit what a system may see and lin
 3. Tossing without passing on (checks, the file into the area, `files.bbs`, `badtic/`, the dupe file), tests.  **Done.**
 4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.  **Done.**
 5. `mkhatch`.  **Done.**
-6. FileFix.
+6. FileFix.  **Done.**
 7. Docs, the round trip test, the full build.
 
 ## Questions for the sysop

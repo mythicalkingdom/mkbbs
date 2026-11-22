@@ -1453,8 +1453,194 @@ Procedure DoSubscribe(Sys: Word; Pat: String; Link: Boolean);
   End;
 
 
-Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
-  {A netmail for Areafix: True = it was dealt with (answered, not stored); False = not ours to answer (the sender is
+
+{---------------------------------------------------------------- filefix: the same for the file echoes (fileecho.mk)}
+
+Var
+  FEF: ^FileEchoCfgType;               {the file echoes while a FileFix request is dealt with}
+
+
+Function FileFixPassword(Sys: Word): String;
+  {the FileFix password of the system; blank: its Areafix password}
+  Begin
+  If (FEF <> Nil) And (FEF^.Sys[Sys].FixPwd <> '') Then
+    FileFixPassword := StripBoth(FEF^.Sys[Sys].FixPwd, ' ')
+  Else
+    FileFixPassword := StripBoth(Config^.GetEchoToPwd(Sys), ' ');
+  End;
+
+
+Function FEAvailable(Sys: Word; E: Word): Boolean;
+  {a file echo that the system may link to: it has a tag, it does not come from that system, and it is open to every system or shares a group with it}
+  Begin
+  FEAvailable := False;
+  If FEF^.Area[E].Tag = '' Then
+    Exit;
+  If FEF^.Area[E].Hub = Sys Then
+    Exit;
+  FEAvailable := (FEF^.Area[E].Groups = 0) Or ((FEF^.Area[E].Groups And FEF^.Sys[Sys].Groups) <> 0);
+  End;
+
+
+Function FELinked(Sys: Word; E: Word): Boolean;
+  Begin
+  FELinked := (FEF^.Area[E].EchoTo And (LongInt(1) Shl (Sys - 1))) <> 0;
+  End;
+
+
+Procedure FESetLinked(Sys: Word; E: Word; On: Boolean);
+  Begin
+  If On Then
+    FEF^.Area[E].EchoTo := FEF^.Area[E].EchoTo Or (LongInt(1) Shl (Sys - 1))
+  Else
+    FEF^.Area[E].EchoTo := FEF^.Area[E].EchoTo And Not (LongInt(1) Shl (Sys - 1));
+  End;
+
+
+Procedure FEAfterChange(E: Word);
+  {as AfterChange for the file echoes: the hub is asked for the echo when the first downlink comes and (a pass-through echo) told to stop when the last one goes}
+  Var
+    H, S, Downs: Word;
+    A: AddrType;
+    Tag: String;
+
+  Begin
+  H := FEF^.Area[E].Hub;
+  If (H < 1) Or (H > 32) Then
+    Exit;
+  Config^.GetEchoToAddr(H, A);
+  If A.Zone = 0 Then
+    Exit;
+  Tag := FEF^.Area[E].Tag;
+  Downs := 0;
+  For S := 1 To 32 Do
+    If (S <> H) And FELinked(S, E) Then
+      Inc(Downs);
+  If (Downs > 0) And (Not FELinked(H, E)) Then
+    Begin
+    FESetLinked(H, E, True);
+    AddHubReq(H, '+' + Tag);
+    Log('file echo ' + Tag + ' is asked for from the hub ' + AddrStr(A));
+    End
+  Else If (Downs = 0) And FELinked(H, E) And (FEF^.Area[E].FileArea = 0) Then
+    Begin
+    FESetLinked(H, E, False);
+    AddHubReq(H, '-' + Tag);
+    Log('file echo ' + Tag + ' is no longer needed: the hub ' + AddrStr(A) + ' is told to stop it');
+    End;
+  End;
+
+
+Procedure FERepList(Sys: Word; Mode: Char);
+  {%LIST (all available), %QUERY (linked), %UNLINKED (available, not linked)}
+  Var
+    i, n: Word;
+    Linked: Boolean;
+
+  Begin
+  n := 0;
+  For i := 1 To MaxFileEchoes Do
+    If FEAvailable(Sys, i) Or ((Mode = 'Q') And (FEF^.Area[i].Tag <> '') And FELinked(Sys, i)) Then
+      Begin
+      Linked := FELinked(Sys, i);
+      If ((Mode = 'Q') And Not Linked) Or ((Mode = 'U') And Linked) Then
+        Continue;
+      If Linked Then
+        AddRep('* ' + PadRight(FEF^.Area[i].Tag, ' ', 28) + Copy(FEF^.Area[i].Desc, 1, 60))
+      Else
+        AddRep('  ' + PadRight(FEF^.Area[i].Tag, ' ', 28) + Copy(FEF^.Area[i].Desc, 1, 60));
+      Inc(n);
+      End;
+  If n = 0 Then
+    AddRep('(none)');
+  If Mode = 'L' Then
+    AddRep('(* = linked)');
+  End;
+
+
+Procedure FESubscribe(Sys: Word; Pat: String; Link: Boolean);
+  Var
+    i, n: Word;
+    Tag: String;
+    Linked, Seen, Wild: Boolean;
+
+  Begin
+  n := 0;
+  Seen := False;
+  Wild := Pos('*', Pat) + Pos('?', Pat) > 0;
+  For i := 1 To MaxFileEchoes Do
+    Begin
+    Tag := FEF^.Area[i].Tag;
+    If (Tag = '') Or (Not MatchPat(Pat, Tag)) Then
+      Continue;
+    Seen := True;
+    Linked := FELinked(Sys, i);
+    If Link Then
+      Begin
+      If Not FEAvailable(Sys, i) Then
+        Begin
+        If Not Wild Then
+          AddRep('+' + Tag + ': not available to you');
+        Continue;
+        End;
+      If Linked Then
+        Begin
+        If Not Wild Then
+          AddRep('+' + Tag + ': already linked');
+        End
+      Else
+        Begin
+        FESetLinked(Sys, i, True);
+        EchoChanged := True;
+        FEAfterChange(i);
+        AddRep('+' + Tag + ': linked');
+        Inc(n);
+        End;
+      End
+    Else
+      Begin
+      If Linked Then
+        Begin
+        FESetLinked(Sys, i, False);
+        EchoChanged := True;
+        FEAfterChange(i);
+        AddRep('-' + Tag + ': unlinked');
+        Inc(n);
+        End
+      Else If Not Wild Then
+        AddRep('-' + Tag + ': was not linked');
+      End;
+    End;
+  If Not Seen Then
+    Begin
+    If Link Then
+      AddRep('+' + Pat + ': no such file echo')
+    Else
+      AddRep('-' + Pat + ': no such file echo');
+    End
+  Else If (n = 0) And Wild Then
+    AddRep(Copy('+-', 2 - Ord(Link), 1) + Pat + ': nothing to change');
+  End;
+
+
+Function IsFileFixName(Name: String): Boolean;
+  Var
+    U: String;
+    i: Word;
+    R: String;
+
+  Begin
+  U := Upper(Name);
+  R := '';
+  For i := 1 To Length(U) Do
+    If U[i] <> ' ' Then
+      R := R + U[i];
+  IsFileFixName := (R = 'FILEFIX') Or (R = 'FILEMGR') Or (R = 'FILEMANAGER');
+  End;
+
+
+Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType; Files: Boolean): Boolean;
+  {A netmail for Areafix (Files: for FileFix, the same for the file echoes): True = it was dealt with (answered, not stored); False = not ours to answer (the sender is
    not a system of ours), the message is stored for the sysop.}
   Var
     C: MsgCopy;
@@ -1464,7 +1650,7 @@ Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
     p: LongInt;
     LStart: LongInt;
     Stop: Boolean;
-    Subj: String;
+    Subj, Nm, Want, LogNm: String;
     FromAddr: AddrType;
 
   Procedure DoLine(L: String);
@@ -1483,41 +1669,94 @@ Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
     Cmd := Upper(ExtractWord(L, 1));
     If Cmd = '%LIST' Then
       Begin
-      AddRep('Areas you can have:');
-      RepList(Sys, 'L');
+      If Files Then
+        Begin
+        AddRep('File echoes you can have:');
+        FERepList(Sys, 'L');
+        End
+      Else
+        Begin
+        AddRep('Areas you can have:');
+        RepList(Sys, 'L');
+        End;
       End
     Else If Cmd = '%QUERY' Then
       Begin
-      AddRep('Areas you have:');
-      RepList(Sys, 'Q');
+      If Files Then
+        Begin
+        AddRep('File echoes you have:');
+        FERepList(Sys, 'Q');
+        End
+      Else
+        Begin
+        AddRep('Areas you have:');
+        RepList(Sys, 'Q');
+        End;
       End
     Else If Cmd = '%UNLINKED' Then
       Begin
-      AddRep('Areas you can have and do not:');
-      RepList(Sys, 'U');
+      If Files Then
+        Begin
+        AddRep('File echoes you can have and do not:');
+        FERepList(Sys, 'U');
+        End
+      Else
+        Begin
+        AddRep('Areas you can have and do not:');
+        RepList(Sys, 'U');
+        End;
       End
     Else If Cmd = '%HELP' Then
       Begin
-      AddRep('Areafix: a netmail to Areafix, your password as the subject, one command to a line:');
+      AddRep(Nm + ': a netmail to ' + Nm + ', your password as the subject, one command to a line:');
       AddRep('  %LIST       the areas you can have          %QUERY     the areas you have');
       AddRep('  %UNLINKED   the areas you can have and do not   %HELP   this text');
       AddRep('  +AREA       link the area                   -AREA      unlink the area');
       AddRep('  (a bare AREA links it; * and ? stand for characters: +* all, -* none)');
+      If Files Then
+        AddRep('  (here AREA is the tag of a file echo; the password is the FileFix one, or the Areafix one when none is set)');
       End
     Else If L[1] = '%' Then
       AddRep(Cmd + ': not a command that is known (%HELP)')
     Else If L[1] = '-' Then
-      DoSubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), False)
+      Begin
+      If Files Then
+        FESubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), False)
+      Else
+        DoSubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), False);
+      End
     Else If L[1] = '+' Then
-      DoSubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), True)
+      Begin
+      If Files Then
+        FESubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), True)
+      Else
+        DoSubscribe(Sys, Upper(StripBoth(Copy(L, 2, 80), ' ')), True);
+      End
     Else If L[1] In ['A'..'Z', 'a'..'z', '0'..'9', '_'] Then
-      DoSubscribe(Sys, Upper(ExtractWord(L, 1)), True)
+      Begin
+      If Files Then
+        FESubscribe(Sys, Upper(ExtractWord(L, 1)), True)
+      Else
+        DoSubscribe(Sys, Upper(ExtractWord(L, 1)), True);
+      End
     Else
       AddRep(L + ': not understood (%HELP)');
     End;
 
   Begin
   ProcessAreafix := False;
+  If Files Then
+    Begin
+    Nm := 'FileFix';
+    LogNm := 'FileFix';
+    If Not Config^.HasFileEcho Then
+      Exit;
+    End
+  Else
+    Begin
+    Nm := 'Areafix';
+    LogNm := 'areafix';
+    End;
   Pkt.GetOrig(Sender);
   Sys := FindSystem(Sender);
   If Sys = 0 Then
@@ -1528,7 +1767,7 @@ Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
     End;
   If Sys = 0 Then
     Begin
-    Log('areafix request from ' + AddrStr(Sender) + ', which is not a system of ours: stored for the sysop');
+    Log(LogNm + ' request from ' + AddrStr(Sender) + ', which is not a system of ours: stored for the sysop');
     Exit;
     End;
   ProcessAreafix := True;
@@ -1539,14 +1778,22 @@ Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
   EchoChanged := False;
   For i := 1 To 32 Do
     HubReq[i] := Nil;
-  Subj := 'Areafix';
-  Pwd := Upper(StripBoth(Pkt.GetSubj, ' '));
-  If (Config^.GetEchoToPwd(Sys) = '') Or (Pwd <> Upper(StripBoth(Config^.GetEchoToPwd(Sys), ' '))) Then
+  If Files Then
     Begin
-    Log('areafix request from ' + AddrStr(Sender) + ': wrong password');
+    New(FEF);
+    Config^.GetFileEcho(FEF^);
+    Want := FileFixPassword(Sys);
+    End
+  Else
+    Want := StripBoth(Config^.GetEchoToPwd(Sys), ' ');
+  Subj := Nm;
+  Pwd := Upper(StripBoth(Pkt.GetSubj, ' '));
+  If (Want = '') Or (Pwd <> Upper(Want)) Then
+    Begin
+    Log(LogNm + ' request from ' + AddrStr(Sender) + ': wrong password');
     AddRep('Your request was not carried out: the password in the subject is not right.');
-    AddRep('(%HELP tells what Areafix does)');
-    Subj := 'Areafix: password error';
+    AddRep('(%HELP tells what ' + Nm + ' does)');
+    Subj := Nm + ': password error';
     End
   Else
     Begin
@@ -1567,27 +1814,44 @@ Function ProcessAreafix(Var Pkt: PktMsgObj; Var Dst: AddrType): Boolean;
     CopyFree(C);
     If Cmds = 0 Then
       AddRep('There was no command in your message (%HELP).');
-    Subj := 'Areafix response';
-    Log('areafix request from ' + AddrStr(Sender) + ': ' + Long2Str(Cmds) + ' command(s)');
+    Subj := Nm + ' response';
+    Log(LogNm + ' request from ' + AddrStr(Sender) + ': ' + Long2Str(Cmds) + ' command(s)');
     End;
   If EchoChanged Then
     Begin
-    If MKCfgObjPtr(Config)^.SaveEchoCfg <> 0 Then
+    If Files Then
+      Begin
+      Config^.SetFileEcho(FEF^);
+      If MKCfgObjPtr(Config)^.SaveFileEcho <> 0 Then
+        Begin
+        Log('cannot save fileecho.mk');
+        Problems := True;
+        End;
+      End
+    Else If MKCfgObjPtr(Config)^.SaveEchoCfg <> 0 Then
       Begin
       Log('cannot save echocfg.mk');
       Problems := True;
       End;
     End;
-  PostNetmail('Areafix', SenderName, Subj, Dst, FromAddr, NumRep, 0);
+  PostNetmail(Nm, SenderName, Subj, Dst, FromAddr, NumRep, 0);
   For i := 1 To 32 Do
     If HubReq[i] <> Nil Then
       Begin
       Config^.GetEchoToAddr(i, Boss);
-      PostNetmail('Areafix', 'Areafix', StripBoth(Config^.GetEchoToPwd(i), ' '), Dst, Boss, 0, i);
+      If Files Then
+        PostNetmail(Nm, Nm, FileFixPassword(i), Dst, Boss, 0, i)
+      Else
+        PostNetmail(Nm, Nm, StripBoth(Config^.GetEchoToPwd(i), ' '), Dst, Boss, 0, i);
       Dispose(HubReq[i]);
       HubReq[i] := Nil;
       End;
   Dispose(Rep);
+  If Files Then
+    Begin
+    Dispose(FEF);
+    FEF := Nil;
+    End;
   End;
 
 
@@ -1862,7 +2126,13 @@ Procedure TossNetmail(Var Pkt: PktMsgObj; Sys: Word);
   ForUs := IsOurs(Dst);
   Subj := Pkt.GetSubj;
   If ForUs And IsAreafixName(Pkt.GetTo) Then
-    If ProcessAreafix(Pkt, Dst) Then
+    If ProcessAreafix(Pkt, Dst, False) Then
+      Begin
+      Inc(Areafixes);
+      Exit;
+      End;
+  If ForUs And IsFileFixName(Pkt.GetTo) Then
+    If ProcessAreafix(Pkt, Dst, True) Then
       Begin
       Inc(Areafixes);
       Exit;

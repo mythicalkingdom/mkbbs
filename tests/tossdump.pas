@@ -2,7 +2,7 @@ program tossdump;
 {$mode tp}
 { tossdump <area> ...: the messages of the message areas of the configuration (MK=...) }
 uses MKString, MKGlobT, MKCfgAbs, MKCfgMK, MKMsgAbs, MKOpen;
-var i: Word; P: AbsMsgPtr; A: Word; S: String; C: Char; T: String; O, D: AddrType; Code: Integer;
+var i: Word; P: AbsMsgPtr; A: Word; S: String; C: Char; T: AnsiString; O, D: AddrType; Code: Integer;
 begin
   Config := New(MKCfgObjPtr, Init); Config^.Load;
   for i := 1 to ParamCount do begin

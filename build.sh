@@ -258,6 +258,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # TIC files (file echoes): checks, the file area, files.bbs, replaces, bad TICs, the check command
   python3 tests/tictosstest.py build build/tictosswork | grep -E "^(ok|FAIL|skip)" | tee build/tictossresult.txt
   if grep -q FAIL build/tictossresult.txt; then exit 1; fi
+  # FileFix: netmail to FileFix links and unlinks file echoes
+  python3 tests/filefixtest.py build build/filefixwork | grep -E "^(ok|FAIL|skip)" | tee build/filefixresult.txt
+  if grep -q FAIL build/filefixresult.txt; then exit 1; fi
 fi
 # the way in: a mkbink calls the mkbink of the BBS, the on-inbound command (mktoss) tosses the packet
 if [ -f bbs/bbsc/ra/config.mk ]; then

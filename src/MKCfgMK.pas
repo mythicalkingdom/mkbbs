@@ -33,6 +33,7 @@ Type MKCfgObj = Object(CfgObj)
   Function  SaveFileNames: String; Virtual;
   Procedure MKSave; Virtual; {Normally internal to save MK config}
   Function  EnvBbsPath: String; Virtual; {The main directory before the config is read (the MK environment variable)}
+  Function  SaveFileEcho: Word; Virtual; {Save only fileecho.mk (what FileFix changes: which system gets which file echo)}
   Function  SaveEchoCfg: Word; Virtual; {Save only echocfg.mk (what the tosser changes: which system gets which area)}
   Function  GetBbsType: Word; Virtual;               {Get type of Bbs}
   Procedure SetBbsType(BT: Word); Virtual;           {Set type of Bbs}
@@ -811,6 +812,12 @@ Function MKCfgObj.SaveFileName(FN: String): String;
     SaveFileName := TmpStr + FN
   Else
     SaveFileName := GetBbsPath + FN;
+  End;
+
+
+Function MKCfgObj.SaveFileEcho: Word;
+  Begin
+  SaveFileEcho := SaveFile(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
   End;
 
 
