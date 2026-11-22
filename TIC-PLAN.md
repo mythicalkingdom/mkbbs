@@ -1,6 +1,6 @@
 # TIC file echoes: plan
 
-Status (2026-11-22): **phases 1 (the configuration) and 2 (`MKTic.pas`) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
+Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`) and 3 (tossing) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
 before any code is written (the same way the QWKE specification was read before `TOREADER.EXT` was done).
 
 ## Decided 2026-11-22
@@ -15,6 +15,19 @@ before any code is written (the same way the QWKE specification was read before 
    answer in the time limit, refuses the file to `badtic/`.  An echo can switch it off (*No check command*).
 6. **The pass-through spool is limited**: days a file waits for a system (`PassDays`, default 14) and the most it may hold (`PassMaxMB`, 0 = no limit, the oldest go first).
 7. Any FTN network; the sysop's FSX systems are for testing.
+
+## Phase 3 (done): tossing a TIC
+
+`src/MKTicToss.pas`, called by `mktoss` after the packets (and only with the tosser switched on, as the mail is).  For each `*.tic` of the **secure** inbound, in this order:
+the TIC has File, Area, Size and Crc; its file is in the inbound (any case; when it has not come the TIC waits, and is bad after a day); `From` is an echo system and, when that
+system has a TIC password, `Pw` is it (a system with none set is not asked: set one); `Area` is one of our file echoes and the system is its hub or the echo goes to it; our own
+address is not in `Path`; the file has the size and CRC of the TIC; it is not a duplicate (`ticdupe.dat` in the inbound, 30 days: echo, name, CRC); the check command accepts it
+(`timeout <seconds> sh -c "<command>"`, `%F` and `%T` quoted; any status but 0, or the time limit, refuses it; an echo can skip it).  What fails goes with its file to `badtic/` in
+the inbound (a name that is there already gets the time added) and the log says why.  What passes: the file with that name that is in the area (another CRC) is replaced, the files
+`Replaces` names go too when the echo allows it, the file is moved (copied and deleted across disks) under the name the TIC gives, gets the date of the TIC, and `files.bbs`
+gets a line with the description and the `Ldesc` lines under it (the old lines of replaced files, and their long descriptions, are taken out; the file is written new and renamed).
+A file area with no directory is bad; a directory that is not there makes the TIC wait.  **A pass-through echo is left in the inbound** (counted as waiting) until phase 4.
+The summary line of `mktoss` ends with `; N tic tossed, N bad tic, N tic duplicate(s), N tic waiting` when there were TICs.  Test: `tests/tictosstest.py`.
 
 ## Phase 2 (done): `MKTic.pas`
 
@@ -140,7 +153,7 @@ records instead of the message ones.  Groups limit what a system may see and lin
 
 1. Configuration: `fileecho.mk`, JSON, `mkcfgcvt`, `mkconfig` screens, tests.  **Done.**
 2. `MKTic.pas` and its unit test.  **Done.**
-3. Tossing without passing on (checks, the file into the area, `files.bbs`, `badtic/`, the dupe file), tests.
+3. Tossing without passing on (checks, the file into the area, `files.bbs`, `badtic/`, the dupe file), tests.  **Done.**
 4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.
 5. `mkhatch`.
 6. FileFix.

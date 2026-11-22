@@ -72,13 +72,14 @@ Program MKToss;
 }
 
 Uses
-  BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKMsgAbs, MKMsgPkt, MKOpen, MKDupe, Crc32;
+  BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKMsgAbs, MKMsgPkt, MKOpen, MKDupe, Crc32, MKTicToss;
 
 
 Type
   NameList = Array[1..512] Of String[80];
 
 Var
+  TicRes: TicTossResult;
   Quiet: Boolean;
   InDir, WorkDir, BadName: String;
   Ours: Array[1..10] Of AddrType;
@@ -2206,6 +2207,15 @@ Procedure TossInbound;
   End;
 
 
+Function TicOurs(A: String): Boolean;
+  Var
+    X: AddrType;
+
+  Begin
+  TicOurs := ParseAddr(A, Ours[1], X) And IsOurs(X);
+  End;
+
+
 Procedure CountUnsecure;
   Var
     M: ^MailerCfgType;
@@ -3196,6 +3206,9 @@ LoadSerial;
 Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Scanned := 0; NetSent := 0; FreqMade := 0; Areafixes := 0;
 
 Problems := False;
+FillChar(TicRes, SizeOf(TicRes), 0);
+TicLog := Log;
+TicIsOurs := TicOurs;
 Dupes.Init;
 Dupes.Open(InDir + 'dupe.mk', 20000);
 Dupes.SetDays(14);
@@ -3203,6 +3216,7 @@ Log('mktoss: ' + InDir);
 If DoToss Then
   Begin
   TossInbound;
+  TicTossInbound(InDir, TicRes);
   CountUnsecure;
   End;
 If DoScan Then
@@ -3217,7 +3231,8 @@ Dupes.Done;
 Log('mktoss done: ' + Long2Str(Tossed) + ' tossed, ' + Long2Str(Netmails) + ' netmail, ' + Long2Str(Passed) +
   ' passed through, ' + Long2Str(Dups) + ' duplicates, ' + Long2Str(Bad) + ' bad; ' + Long2Str(Forwarded) +
   ' passed on, ' + Long2Str(Scanned) + ' scanned, ' + Long2Str(NetSent) + ' netmail sent, ' + Long2Str(FreqMade) + ' file request(s) made, ' + Long2Str(Areafixes) +
-  ' areafix');
+  ' areafix' + Copy('; ' + Long2Str(TicRes.Tossed) + ' tic tossed, ' + Long2Str(TicRes.Bad) + ' bad tic, ' + Long2Str(TicRes.Dupes) + ' tic duplicate(s), ' +
+  Long2Str(TicRes.Waiting + TicRes.Passthru) + ' tic waiting', 1, 120 * Ord(TicRes.Tossed + TicRes.Bad + TicRes.Dupes + TicRes.Waiting + TicRes.Passthru > 0)));
 If Problems Then
   Halt(2);
 End.

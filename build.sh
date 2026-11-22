@@ -254,6 +254,9 @@ fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/tosstest.py build build/tosswork | grep -E "^(ok|FAIL|skip)" | tee build/tossresult.txt
   if grep -q FAIL build/tossresult.txt; then exit 1; fi
+  # TIC files (file echoes): checks, the file area, files.bbs, replaces, bad TICs, the check command
+  python3 tests/tictosstest.py build build/tictosswork | grep -E "^(ok|FAIL|skip)" | tee build/tictossresult.txt
+  if grep -q FAIL build/tictossresult.txt; then exit 1; fi
 fi
 # the way in: a mkbink calls the mkbink of the BBS, the on-inbound command (mktoss) tosses the packet
 if [ -f bbs/bbsc/ra/config.mk ]; then
