@@ -96,7 +96,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkdraw` | screen editor for ANSI, AVATAR and ASCII screens |
 | `mklc` | language compiler: `mklc english.txt` makes `english.lc` |
 | `mkcat` | show a CP437 screen or log on a terminal |
-| `mklist` | list the message areas to a text file |
+| `mklistmsgarea` | list the message areas to a text file |
 | `mknodeidx`, `mknodelist` | build the nodelist index, look an address up |
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |

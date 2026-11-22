@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mklist and mknodelist on the sample BBS.   usage: toolstest.py <build dir> <work dir>"""
+"""mklistmsgarea and mknodelist on the sample BBS.   usage: toolstest.py <build dir> <work dir>"""
 import os, subprocess, sys
 
 build, work = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
@@ -22,19 +22,19 @@ def check(name, ok):
 out = os.path.join(work, 'areas.txt')
 if os.path.exists(out):
     os.remove(out)
-r = subprocess.run([os.path.join(build, 'mklist'), out], env=env, capture_output=True, text=True)
+r = subprocess.run([os.path.join(build, 'mklistmsgarea'), out], env=env, capture_output=True, text=True)
 lines = open(out, encoding='latin-1').read().split('\n') if os.path.exists(out) else []
 if lines and lines[-1] == '':
     lines.pop()
-check('mklist: three lines per area (%d lines)' % len(lines), r.returncode == 0 and len(lines) > 0 and len(lines) % 3 == 0)
-check('mklist: the first area is the local General area', len(lines) >= 3 and lines[0][0] == 'H' and 'General' in ' '.join(lines[:3]))
-check('mklist: no names longer than 70', all(len(l) <= 70 for l in lines[2::3]))
-r = subprocess.run([os.path.join(build, 'mklist')], env=env, capture_output=True, text=True)
-check('mklist: no file name: syntax message', r.returncode == 1 and 'syntax' in r.stdout)
-r = subprocess.run([os.path.join(build, 'mklist'), '/nonexistent/dir/x.txt'], env=env, capture_output=True, text=True)
-check('mklist: cannot create the file', r.returncode == 2)
-r = subprocess.run([os.path.join(build, 'mklist'), out], env={'PATH': os.environ['PATH']}, capture_output=True, text=True)
-check('mklist: no BBS configured', r.returncode == 1 and 'No configuration' in r.stderr)
+check('mklistmsgarea: three lines per area (%d lines)' % len(lines), r.returncode == 0 and len(lines) > 0 and len(lines) % 3 == 0)
+check('mklistmsgarea: the first area is the local General area', len(lines) >= 3 and lines[0][0] == 'H' and 'General' in ' '.join(lines[:3]))
+check('mklistmsgarea: no names longer than 70', all(len(l) <= 70 for l in lines[2::3]))
+r = subprocess.run([os.path.join(build, 'mklistmsgarea')], env=env, capture_output=True, text=True)
+check('mklistmsgarea: no file name: syntax message', r.returncode == 1 and 'syntax' in r.stdout)
+r = subprocess.run([os.path.join(build, 'mklistmsgarea'), '/nonexistent/dir/x.txt'], env=env, capture_output=True, text=True)
+check('mklistmsgarea: cannot create the file', r.returncode == 2)
+r = subprocess.run([os.path.join(build, 'mklistmsgarea'), out], env={'PATH': os.environ['PATH']}, capture_output=True, text=True)
+check('mklistmsgarea: no BBS configured', r.returncode == 1 and 'No configuration' in r.stderr)
 
 r = subprocess.run([os.path.join(build, 'mknodelist')], env=env, capture_output=True, text=True)
 check('mknodelist: no address: syntax message', r.returncode == 1 and 'syntax' in r.stdout)

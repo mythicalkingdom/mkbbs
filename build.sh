@@ -42,7 +42,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkpwconv src/MKPwConv.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfreq src/MKFreq.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkevents src/MKEvents.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
-fpc -B -Fusrc -FEbuild -FUbuild -vew -omklist src/MKList.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodeidx src/MKNodeIdx.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas

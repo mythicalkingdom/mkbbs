@@ -1,9 +1,9 @@
-Program MKList;
+Program MKListMsgArea;
 
 {$I MKB.Def}
 
 {
-     mklist OutPut.Txt
+     mklistmsgarea OutPut.Txt
 
      Writes the message areas of the BBS (MK, RA, QUICK or SBBS names the config
      directory, as for mk) to a text file, three lines per area: the area id,

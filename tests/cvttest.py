@@ -56,8 +56,8 @@ want['fileecho.mk'] = 33024          # new: the file echoes (TIC), written with 
 check('the four MK files have the sizes of the real ones, mailer.mk, events.mk and fileecho.mk the sizes of their records: %s' % names, names == want)
 ra = os.path.join(work, 'ra.txt')
 mk = os.path.join(work, 'mk.txt')
-r1 = run('mklist', ra, RA=inp)
-r2 = run('mklist', mk, MK=out)
+r1 = run('mklistmsgarea', ra, RA=inp)
+r2 = run('mklistmsgarea', mk, MK=out)
 la = open(ra, encoding='latin-1').read().split('\n')[:-1] if os.path.exists(ra) else []
 lm = open(mk, encoding='latin-1').read().split('\n')[:-1] if os.path.exists(mk) else []
 check('converted MK configuration loads and lists %d areas' % (len(lm) // 3), r1.returncode == 0 and r2.returncode == 0 and len(lm) > 0)

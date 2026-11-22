@@ -52,11 +52,11 @@ check('only message and file areas in use are written, named by number',
 
 # a program that finds the configuration with MKJSON only (no MK): the same message areas as with the .mk files
 a = os.path.join(work, 'a.txt'); b = os.path.join(work, 'b.txt')
-r1 = run('mklist', a, MK=inp)
-r2 = run('mklist', b, MKJSON=jdir)
+r1 = run('mklistmsgarea', a, MK=inp)
+r2 = run('mklistmsgarea', b, MKJSON=jdir)
 ta = open(a, encoding='latin-1').read() if os.path.exists(a) else None
 tb = open(b, encoding='latin-1').read() if os.path.exists(b) else None
-check('mklist with only MKJSON lists the same areas as with MK (%d bytes)' % len(ta or ''), ta is not None and ta == tb and len(ta) > 100)
+check('mklistmsgarea with only MKJSON lists the same areas as with MK (%d bytes)' % len(ta or ''), ta is not None and ta == tb and len(ta) > 100)
 
 # the UTF-8 text of the file and the CP437 of the record file
 d['config']['SystemName'] = 'Café ░ ñ'
