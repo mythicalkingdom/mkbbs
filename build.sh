@@ -158,6 +158,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
 fi
 }
 lane D par_4
+# TIC files (file echoes): MKTic reads and writes them, the CRC of a file, the Path and Seenby lines, dates, Replaces
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/tictest tests/tictest.pas 2>&1 | grep -E "Error|Fatal" || true
+mkdir -p build/work/tic
+build/tictest build/work/tic | grep -E "^(ok|FAIL|failures)" | tee build/ticresult.txt
+if grep -q FAIL build/ticresult.txt; then exit 1; fi
 # hold in the abstract message object (False where a base has no such flag)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/holdabstest tests/holdabstest.pas 2>&1 | grep -E "Error|Fatal" || true
 build/holdabstest | grep -E "^(ok|FAIL|failures)" | tee build/holdabsresult.txt

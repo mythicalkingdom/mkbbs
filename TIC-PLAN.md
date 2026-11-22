@@ -1,6 +1,6 @@
 # TIC file echoes: plan
 
-Status (2026-11-22): **phase 1 (the configuration) is built**; the rest is plan.  Items marked *(verify)* need the text of the specification
+Status (2026-11-22): **phases 1 (the configuration) and 2 (`MKTic.pas`) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
 before any code is written (the same way the QWKE specification was read before `TOREADER.EXT` was done).
 
 ## Decided 2026-11-22
@@ -15,6 +15,19 @@ before any code is written (the same way the QWKE specification was read before 
    answer in the time limit, refuses the file to `badtic/`.  An echo can switch it off (*No check command*).
 6. **The pass-through spool is limited**: days a file waits for a system (`PassDays`, default 14) and the most it may hold (`PassMaxMB`, 0 = no limit, the oldest go first).
 7. Any FTN network; the sysop's FSX systems are for testing.
+
+## Phase 2 (done): `MKTic.pas`
+
+* **The text of FSC-0087 could not be read** (ftsc.org did not answer; the copies found are of other documents), so the unit follows what the common tossers write and read.
+  What is certain from other sources: `Crc` is 8 hexadecimal digits (CRC-32), `Replaces` is a file name (no path) of the echo, `Desc` is one line (at most 80 characters),
+  `Ldesc` lines add to it, `Pw` is never passed on, and a forwarding system adds itself to both `Path` and `Seenby`.  **To be checked against real TICs** (the sysop's FSX
+  systems): the `Path` line layout (written as `address seconds date UTC program`), the `Date` field (seconds since 1970; a text date is kept as it is), upper or lower case of
+  the `Crc` digits (written upper case, read in any case), `Fullname`, and whether a TIC may carry `Seenby` lines in the `zone:net/node` form only.  Please send a `.tic` from FSX when
+  one is there: it goes in `tests/` as a sample.
+* **What it does:** `TicParse` (CR LF or LF, keywords in any case, a comment line, unknown keywords kept whole), `TicCheck` (File, Area, Size, Crc), `TicWrite`, `TicFileCrc` (CRC and size
+  of a file), `TicCrcStr` / `TicHexCrc`, `TicDateStr` (UTC), `TicAddPath` / `TicAddSeen` / `TicInPath` / `TicInSeen` (no duplicates; the oldest `Path` line goes when there are too many),
+  `TicSameAddr` (a `.0` point, case and `@domain` do not matter), `TicMatchName` (`*` and `?` for `Replaces`).
+* **Test:** `tests/tictest.pas` (the CRC-32 check value `CBF43926` of "123456789", a leap day, the last second of a year, a TIC written by another tosser, the round trip).
 
 ## Phase 1 (done): what is in the configuration
 
@@ -126,7 +139,7 @@ records instead of the message ones.  Groups limit what a system may see and lin
 ## Phases
 
 1. Configuration: `fileecho.mk`, JSON, `mkcfgcvt`, `mkconfig` screens, tests.  **Done.**
-2. `MKTic.pas` and its unit test.
+2. `MKTic.pas` and its unit test.  **Done.**
 3. Tossing without passing on (checks, the file into the area, `files.bbs`, `badtic/`, the dupe file), tests.
 4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.
 5. `mkhatch`.
