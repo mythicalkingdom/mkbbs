@@ -20,11 +20,13 @@ Type MKCfgObj = Object(CfgObj)
   MKEcho:   ^EchoCfgType;
   MKMail:   ^MailerCfgType;
   MKEvents: ^EventsCfgType;
+  MKFileEcho: ^FileEchoCfgType;
   Procedure Load; Virtual; {Loads Bbs config info}
   Procedure Unload; Virtual; {Not normally called direct - unloads config}
   Procedure MKLoad; Virtual;{Normally internal to load MK config}
   Procedure MKMailLoad;
   Procedure MKEventsLoad;
+  Procedure MKFileEchoLoad;
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
@@ -264,6 +266,9 @@ Type MKCfgObj = Object(CfgObj)
   Function  HasEventExt: Boolean; Virtual;
   Procedure GetEventExt(Var E: EventsCfgType); Virtual;
   Procedure SetEventExt(Var E: EventsCfgType); Virtual;
+  Function  HasFileEcho: Boolean; Virtual;
+  Procedure GetFileEcho(Var F: FileEchoCfgType); Virtual;
+  Procedure SetFileEcho(Var F: FileEchoCfgType); Virtual;
   Procedure GetMailer(Var M: MailerCfgType); Virtual;
   Procedure SetMailer(Var M: MailerCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
@@ -636,6 +641,29 @@ Procedure MKCfgObj.MKEventsLoad;
   End;
 
 
+Procedure MKCfgObj.MKFileEchoLoad;
+  {FileEcho.Mk is optional too: missing, the defaults (no echoes, a 60 second check, 14 days in the pass-through spool)}
+  Var
+    FN: String;
+    Tmp: ^FileEchoCfgType;
+
+  Begin
+  FN := FindBbsFile('fileecho.mk') + 'fileecho.mk';
+  If Not FileExist(FN) Then
+    Exit;
+  New(Tmp);
+  FileEchoDefaults(Tmp^);
+  If LoadFile(FN, Tmp^, SizeOf(Tmp^)) = 0 Then
+    Begin
+    If (Tmp^.Version >= 1) And (Tmp^.Version <= FileEchoCfgVersion) Then
+      MKFileEcho^ := Tmp^;
+    End
+  Else
+    Error := 8891;
+  Dispose(Tmp);
+  End;
+
+
 Procedure MKCfgObj.MKLoad;
   Begin
   New(MKCfg);
@@ -646,6 +674,8 @@ Procedure MKCfgObj.MKLoad;
   MailerDefaults(MKMail^);
   New(MKEvents);
   EventsDefaults(MKEvents^);
+  New(MKFileEcho);
+  FileEchoDefaults(MKFileEcho^);
   FileMode := fmReadWrite + fmDenyNone;
   Error := LoadFile(FindBbsFile('config.mk') + 'config.mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
@@ -659,6 +689,8 @@ Procedure MKCfgObj.MKLoad;
     MKMailLoad;
     If Error = 0 Then
       MKEventsLoad;
+    If Error = 0 Then
+      MKFileEchoLoad;
     End;
   If Error = 0 Then
     CfgInfo^.Loaded := True
@@ -671,6 +703,7 @@ Procedure MKCfgObj.MKLoad;
     Dispose(MKEcho);
     Dispose(MKMail);
     Dispose(MKEvents);
+    Dispose(MKFileEcho);
     End;
   End;
 
@@ -687,6 +720,8 @@ Procedure MKCfgObj.Allocate;
     MailerDefaults(MKMail^);
     New(MKEvents);
     EventsDefaults(MKEvents^);
+    New(MKFileEcho);
+    FileEchoDefaults(MKFileEcho^);
     FillChar(MKCfg^, SizeOf(MKCfg^), 0);
     FillChar(MKMsg^, SizeOf(MKMsg^), 0);
     FillChar(MKFile^, SizeOf(MKFile^), 0);
@@ -708,6 +743,7 @@ Procedure MKCfgObj.Unload;
     Dispose(MKEcho);
     Dispose(MKMail);
     Dispose(MKEvents);
+    Dispose(MKFileEcho);
     CfgInfo^.Loaded := False;
     End;
   End;
@@ -756,7 +792,7 @@ Procedure MKCfgObj.Save;
 
 Function MKCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk|events.mk';
+  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk|events.mk|fileecho.mk';
   End;
 
 
@@ -797,6 +833,8 @@ Procedure MKCfgObj.MKSave;
     Error := SaveFile(SaveFileName('mailer.mk'), MKMail^, SizeOf(MKMail^));
   If Error = 0 Then
     Error := SaveFile(SaveFileName('events.mk'), MKEvents^, SizeOf(MKEvents^));
+  If Error = 0 Then
+    Error := SaveFile(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
   End;
 
 
@@ -2663,6 +2701,25 @@ Function MKCfgObj.HasEventExt: Boolean;
 Procedure MKCfgObj.GetEventExt(Var E: EventsCfgType);
   Begin
   E := MKEvents^;
+  End;
+
+
+Function MKCfgObj.HasFileEcho: Boolean;
+  Begin
+  HasFileEcho := True;
+  End;
+
+
+Procedure MKCfgObj.GetFileEcho(Var F: FileEchoCfgType);
+  Begin
+  F := MKFileEcho^;
+  End;
+
+
+Procedure MKCfgObj.SetFileEcho(Var F: FileEchoCfgType);
+  Begin
+  MKFileEcho^ := F;
+  MKFileEcho^.Version := FileEchoCfgVersion;
   End;
 
 

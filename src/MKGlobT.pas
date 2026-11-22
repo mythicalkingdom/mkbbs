@@ -180,6 +180,47 @@ Type EventExtType = Record
   Reserved: Array[1..40] of Byte;
   End;
 
+{File echoes (TIC): FileEcho.Mk.  See TIC-PLAN.md.  The systems are the echo systems of EchoCfg.Mk (the same numbers 1..32).}
+Const
+  FileEchoCfgVersion = 1;
+  MaxFileEchoes = 300;
+  feReplaces = 1;                      {FileEchoAreaType.Attr: the TIC may name files it replaces}
+  feNoCheck = 2;                       {the check command is not run for this echo}
+  feKeepPath = 4;                      {keep the Path / Seenby lines of the TIC when it is passed on (otherwise the Seenby lines are cut to the systems that get it)}
+
+Type FileEchoSysType = Record
+  TicPwd: String[8];                   {the password in the TIC of this system (blank = none)}
+  FixPwd: String[15];                  {the FileFix password (blank = the Areafix password of the system)}
+  Groups: LongInt;                     {the groups (bit 0 = A ... bit 25 = Z) of the echoes it may list and link to}
+  Expansion: Array[1..12] of Byte;
+  End;
+
+Type FileEchoAreaType = Record
+  Tag: String[40];                     {the name of the file echo: blank = unused}
+  Desc: String[40];                    {what it is (the Areadesc line of the TIC)}
+  FileArea: Word;                      {the file area (files.mk) the files go to, 0 = pass-through: no copy is kept}
+  EchoTo: LongInt;                     {the systems that get the files (bit 0 = system 1 ...)}
+  Hub: Byte;                           {the system the echo comes from (0 = none)}
+  Groups: LongInt;                     {groups the echo belongs to (A..Z as above); 0 = any system may link to it}
+  Attr: Word;                          {fe constants}
+  Expansion: Array[1..10] of Byte;
+  End;
+
+Type FileEchoCfgType = Record
+  Version: Word;                       {FileEchoCfgVersion}
+  CheckCmd: String[100];               {a command run for each file before it is accepted (%F = the file, %T = the TIC); not 0 = refused; blank = none}
+  CheckTimeout: Word;                  {seconds before the check is stopped (counts as refused); 0 = 60}
+  SpoolPath: String[60];               {where the files of pass-through echoes wait (blank = <outbound>/mktoss/tic)}
+  PassDays: Word;                      {days a pass-through file waits for a system that has not fetched it, 0 = 14}
+  PassMaxMB: Word;                     {the most the pass-through spool may hold in MB, 0 = no limit}
+  Flags: Word;
+  Expansion: Array[1..40] of Byte;
+  Sys: Array[1..32] of FileEchoSysType;
+  Area: Array[1..MaxFileEchoes] of FileEchoAreaType;
+  End;
+
+Procedure FileEchoDefaults(Var F: FileEchoCfgType);
+
 Type EventsCfgType = Record
   Version: Word;                       {EventsCfgVersion}
   Ev: Array[1..MaxEventExt] of EventExtType;
@@ -262,6 +303,15 @@ Procedure EventsDefaults(Var E: EventsCfgType);
     E.Ev[i].LateMin := 10;
     E.Ev[i].LateMax := 5;
     End;
+  End;
+
+
+Procedure FileEchoDefaults(Var F: FileEchoCfgType);
+  Begin
+  FillChar(F, SizeOf(F), 0);
+  F.Version := FileEchoCfgVersion;
+  F.CheckTimeout := 60;
+  F.PassDays := 14;
   End;
 
 

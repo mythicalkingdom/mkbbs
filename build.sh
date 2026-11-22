@@ -321,6 +321,8 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/eventscfgtest.py build build/work/eventscfg | grep -E "^(FAIL|failures)"
   # the event editor of mkconfig (action, command, late handling, exclusive)
   python3 tests/eventsedittest.py build/work/eventsedit | grep -E "^(FAIL|failures)"
+  # the file echo pages of mkconfig (TIC: the echoes, the options, the systems)
+  python3 tests/fileechoedittest.py build/work/fileechoedit | grep -E "^(FAIL|failures)"
 fi
 # menu command 169 (BASIC programs): unit test on a scripted session, then the real mk over telnet
 if [ -n "$BASICFLAGS" ]; then

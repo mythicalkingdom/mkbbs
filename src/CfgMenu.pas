@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgProt, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail;
+  CfgXfer, CfgProt, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail, CfgFEcho;
 
 Const
   cmGeneral = 1000;
@@ -67,6 +67,9 @@ Const
   cmMailLinks = 1044;
   cmRoutes = 1045;
   cmFreq = 1046;
+  cmFileEchoes = 1047;
+  cmFileEchoOpts = 1048;
+  cmFileEchoSys = 1049;
   cmQuitCfg = 1042;
   cmQuitDlg = 2000;
 
@@ -155,6 +158,9 @@ Function CfgStatus.Hint(AHelpCtx: Word): String;
     cmMailLinks: Hint := 'Systems the Mailer Calls and Answers';
     cmRoutes: Hint := 'Where Netmail for Other Systems is Sent';
     cmFreq: Hint := 'Answering File Requests from Other Systems';
+    cmFileEchoes: Hint := 'File Echoes (TIC): the echoes, the file area of each and the systems they go to';
+    cmFileEchoOpts: Hint := 'File Echo Options: the check command and the pass-through spool';
+    cmFileEchoSys: Hint := 'File Echo Systems: TIC and FileFix passwords and groups';
     cmQuitCfg: Hint := 'Quit and Save Changes';
     End;
   End;
@@ -239,7 +245,10 @@ Procedure CfgApp.InitMenuBar;
             NewItem('Mailer ~L~inks', '', kbNoKey, cmMailLinks, cmMailLinks,
             NewItem('~R~outing', '', kbNoKey, cmRoutes, cmRoutes,
             NewItem('~F~ile Requests', '', kbNoKey, cmFreq, cmFreq,
-            Nil))))))),
+            NewItem('File ~E~choes', '', kbNoKey, cmFileEchoes, cmFileEchoes,
+            NewItem('File Echo O~p~tions', '', kbNoKey, cmFileEchoOpts, cmFileEchoOpts,
+            NewItem('File Echo S~y~stems', '', kbNoKey, cmFileEchoSys, cmFileEchoSys,
+            Nil)))))))))),
         NewItem('~Q~uit', '', kbNoKey, cmQuitCfg, cmQuitCfg,
         Nil))))))
     )));
@@ -327,6 +336,9 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmMailLinks: DoCfgMailLinks;
       cmRoutes: DoCfgRoutes;
       cmFreq: DoCfgFreq;
+      cmFileEchoes: DoCfgFileEchoes;
+      cmFileEchoOpts: DoCfgFileEchoOpts;
+      cmFileEchoSys: DoCfgFileEchoSys;
       Else Exit;
       End;
     ClearEvent(Event);

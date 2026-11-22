@@ -27,6 +27,7 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     Addr: AddrType;
     Mail: ^MailerCfgType;
     Ev: ^EventsCfgType;
+    FE: ^FileEchoCfgType;
 
   Begin
   If IConfig.HasMailer And OConfig.HasMailer Then
@@ -35,6 +36,13 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     IConfig.GetMailer(Mail^);
     OConfig.SetMailer(Mail^);
     Dispose(Mail);
+    End;
+  If IConfig.HasFileEcho And OConfig.HasFileEcho Then
+    Begin                              {the file echoes, when both formats keep them}
+    New(FE);
+    IConfig.GetFileEcho(FE^);
+    OConfig.SetFileEcho(FE^);
+    Dispose(FE);
     End;
   If IConfig.HasEventExt And OConfig.HasEventExt Then
     Begin                              {what the events do, when both formats keep it}

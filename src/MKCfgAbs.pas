@@ -278,6 +278,9 @@ Type CfgObj = Object
   Function  HasEventExt: Boolean; Virtual; {Events.Mk: what the events do (MK configurations only)}
   Procedure GetEventExt(Var E: EventsCfgType); Virtual; {Defaults if none}
   Procedure SetEventExt(Var E: EventsCfgType); Virtual;
+  Function  HasFileEcho: Boolean; Virtual; {FileEcho.Mk: the file echoes (TIC) (MK configurations only)}
+  Procedure GetFileEcho(Var F: FileEchoCfgType); Virtual; {Defaults if none}
+  Procedure SetFileEcho(Var F: FileEchoCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
   Procedure SetEchoInPath(EP: String); Virtual; {Set inbound files path}
   Function  GetEchoOutPath: String; Virtual; {Get outbound files path}
@@ -1540,6 +1543,20 @@ Procedure CfgObj.GetMailer(Var M: MailerCfgType);
   End;
 
 Procedure CfgObj.SetMailer(Var M: MailerCfgType);
+  Begin
+  End;
+
+Function CfgObj.HasFileEcho: Boolean;
+  Begin
+  HasFileEcho := False;
+  End;
+
+Procedure CfgObj.GetFileEcho(Var F: FileEchoCfgType);
+  Begin
+  FileEchoDefaults(F);
+  End;
+
+Procedure CfgObj.SetFileEcho(Var F: FileEchoCfgType);
   Begin
   End;
 

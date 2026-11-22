@@ -18,6 +18,9 @@ Function JsonTo_RouteType(Var R: RouteType): TJSONObject; Forward;
 Function JsonTo_MailerCfgType(Var R: MailerCfgType): TJSONObject; Forward;
 Function JsonTo_EventExtType(Var R: EventExtType): TJSONObject; Forward;
 Function JsonTo_EventsCfgType(Var R: EventsCfgType): TJSONObject; Forward;
+Function JsonTo_FileEchoSysType(Var R: FileEchoSysType): TJSONObject; Forward;
+Function JsonTo_FileEchoAreaType(Var R: FileEchoAreaType): TJSONObject; Forward;
+Function JsonTo_FileEchoCfgType(Var R: FileEchoCfgType): TJSONObject; Forward;
 
 Var
   ZeroJson_SecType: String;
@@ -55,6 +58,12 @@ Var
   ZeroJson_EventExtType: String;
 Var
   ZeroJson_EventsCfgType: String;
+Var
+  ZeroJson_FileEchoSysType: String;
+Var
+  ZeroJson_FileEchoAreaType: String;
+Var
+  ZeroJson_FileEchoCfgType: String;
 
 
 Function JsonTo_SecType(Var R: SecType): TJSONObject;
@@ -598,6 +607,74 @@ Function JsonTo_EventsCfgType(Var R: EventsCfgType): TJSONObject;
   JsonTo_EventsCfgType := O;
   End;
 
+Function JsonTo_FileEchoSysType(Var R: FileEchoSysType): TJSONObject;
+  Var
+    O: TJSONObject;
+
+  Begin
+  O := TJSONObject.Create;
+  O.Add('TicPwd', TJSONString.Create(PasToJson(ShortOk(R.TicPwd, 8))));
+  O.Add('FixPwd', TJSONString.Create(PasToJson(ShortOk(R.FixPwd, 15))));
+  O.Add('Groups', TJSONInt64Number.Create(R.Groups));
+  JsonTo_FileEchoSysType := O;
+  End;
+
+Function JsonTo_FileEchoAreaType(Var R: FileEchoAreaType): TJSONObject;
+  Var
+    O: TJSONObject;
+
+  Begin
+  O := TJSONObject.Create;
+  O.Add('Tag', TJSONString.Create(PasToJson(ShortOk(R.Tag, 40))));
+  O.Add('Desc', TJSONString.Create(PasToJson(ShortOk(R.Desc, 40))));
+  O.Add('FileArea', TJSONInt64Number.Create(R.FileArea));
+  O.Add('EchoTo', TJSONInt64Number.Create(R.EchoTo));
+  O.Add('Hub', TJSONInt64Number.Create(R.Hub));
+  O.Add('Groups', TJSONInt64Number.Create(R.Groups));
+  O.Add('Attr', TJSONInt64Number.Create(R.Attr));
+  JsonTo_FileEchoAreaType := O;
+  End;
+
+Function JsonTo_FileEchoCfgType(Var R: FileEchoCfgType): TJSONObject;
+  Var
+    O: TJSONObject;
+    S: TJSONObject;
+    E: TJSONObject;
+    i32: Integer;
+    i33: Integer;
+
+  Begin
+  O := TJSONObject.Create;
+  O.Add('Version', TJSONInt64Number.Create(R.Version));
+  O.Add('CheckCmd', TJSONString.Create(PasToJson(ShortOk(R.CheckCmd, 100))));
+  O.Add('CheckTimeout', TJSONInt64Number.Create(R.CheckTimeout));
+  O.Add('SpoolPath', TJSONString.Create(PasToJson(ShortOk(R.SpoolPath, 60))));
+  O.Add('PassDays', TJSONInt64Number.Create(R.PassDays));
+  O.Add('PassMaxMB', TJSONInt64Number.Create(R.PassMaxMB));
+  O.Add('Flags', TJSONInt64Number.Create(R.Flags));
+  S := TJSONObject.Create;
+  For i32 := 1 To 32 Do
+    Begin
+    E := JsonTo_FileEchoSysType(R.Sys[i32]);
+    If E.AsJSON <> ZeroJson_FileEchoSysType Then
+      S.Add(IntToStr(i32), E)
+    Else
+      E.Free;
+    End;
+  O.Add('Sys', S);
+  S := TJSONObject.Create;
+  For i33 := 1 To 300 Do
+    Begin
+    E := JsonTo_FileEchoAreaType(R.Area[i33]);
+    If E.AsJSON <> ZeroJson_FileEchoAreaType Then
+      S.Add(IntToStr(i33), E)
+    Else
+      E.Free;
+    End;
+  O.Add('Area', S);
+  JsonTo_FileEchoCfgType := O;
+  End;
+
 Procedure JsonFrom_SecType(O: TJSONObject; Var R: SecType);
   Var
     D: TJSONData;
@@ -732,8 +809,6 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
   Var
     D: TJSONData;
     E: TJSONData;
-    i32: Integer;
-    i33: Integer;
     i34: Integer;
     i35: Integer;
     i36: Integer;
@@ -756,6 +831,8 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     i53: Integer;
     i54: Integer;
     i55: Integer;
+    i56: Integer;
+    i57: Integer;
 
   Begin
   D := O.Find('CommPort');
@@ -787,19 +864,19 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.Response := Copy(JsonStr(D, R.Response), 1, 40);
   D := O.Find('ConnectStr');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i32 := 1 To 11 Do
-      If i32 - 1 < TJSONArray(D).Count Then
-        R.ConnectStr[i32] := Copy(JsonStr(TJSONArray(D).Items[i32 - 1], R.ConnectStr[i32]), 1, 40);
+    For i34 := 1 To 11 Do
+      If i34 - 1 < TJSONArray(D).Count Then
+        R.ConnectStr[i34] := Copy(JsonStr(TJSONArray(D).Items[i34 - 1], R.ConnectStr[i34]), 1, 40);
   D := O.Find('ExitEL');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i33 := 1 To 11 Do
-      If i33 - 1 < TJSONArray(D).Count Then
-        R.ExitEL[i33] := JsonNum(TJSONArray(D).Items[i33 - 1], R.ExitEL[i33], 0, 255);
+    For i35 := 1 To 11 Do
+      If i35 - 1 < TJSONArray(D).Count Then
+        R.ExitEL[i35] := JsonNum(TJSONArray(D).Items[i35 - 1], R.ExitEL[i35], 0, 255);
   D := O.Find('FunctionKeys');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i34 := 1 To 10 Do
-      If i34 - 1 < TJSONArray(D).Count Then
-        R.FunctionKeys[i34] := Copy(JsonStr(TJSONArray(D).Items[i34 - 1], R.FunctionKeys[i34]), 1, 60);
+    For i36 := 1 To 10 Do
+      If i36 - 1 < TJSONArray(D).Count Then
+        R.FunctionKeys[i36] := Copy(JsonStr(TJSONArray(D).Items[i36 - 1], R.FunctionKeys[i36]), 1, 60);
   D := O.Find('AnswerStr');
   If D <> Nil Then
     R.AnswerStr := Copy(JsonStr(D, R.AnswerStr), 1, 40);
@@ -832,9 +909,9 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.SystemName := Copy(JsonStr(D, R.SystemName), 1, 40);
   D := O.Find('Color');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i35 := 1 To 5 Do
-      If i35 - 1 < TJSONArray(D).Count Then
-        R.Color[i35] := JsonNum(TJSONArray(D).Items[i35 - 1], R.Color[i35], 0, 255);
+    For i37 := 1 To 5 Do
+      If i37 - 1 < TJSONArray(D).Count Then
+        R.Color[i37] := JsonNum(TJSONArray(D).Items[i37 - 1], R.Color[i37], 0, 255);
   D := O.Find('TimeOut');
   If D <> Nil Then
     R.TimeOut := JsonNum(D, R.TimeOut, 0, 65535);
@@ -855,14 +932,14 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.MaxPages := JsonNum(D, R.MaxPages, 0, 255);
   D := O.Find('PageStart');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i36 := 0 To 6 Do
-      If i36 - 0 < TJSONArray(D).Count Then
-        R.PageStart[i36] := JsonNum(TJSONArray(D).Items[i36 - 0], R.PageStart[i36], 0, 65535);
+    For i38 := 0 To 6 Do
+      If i38 - 0 < TJSONArray(D).Count Then
+        R.PageStart[i38] := JsonNum(TJSONArray(D).Items[i38 - 0], R.PageStart[i38], 0, 65535);
   D := O.Find('PageStop');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i37 := 0 To 6 Do
-      If i37 - 0 < TJSONArray(D).Count Then
-        R.PageStop[i37] := JsonNum(TJSONArray(D).Items[i37 - 0], R.PageStop[i37], 0, 65535);
+    For i39 := 0 To 6 Do
+      If i39 - 0 < TJSONArray(D).Count Then
+        R.PageStop[i39] := JsonNum(TJSONArray(D).Items[i39 - 0], R.PageStop[i39], 0, 65535);
   D := O.Find('DefPage');
   If D <> Nil Then
     R.DefPage := JsonNum(D, R.DefPage, 0, 255);
@@ -919,34 +996,34 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.WaitTime := JsonNum(D, R.WaitTime, 0, 255);
   D := O.Find('LangName');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i38 := 1 To 10 Do
-      If i38 - 1 < TJSONArray(D).Count Then
-        R.LangName[i38] := Copy(JsonStr(TJSONArray(D).Items[i38 - 1], R.LangName[i38]), 1, 10);
-  D := O.Find('LangFile');
-  If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i39 := 1 To 10 Do
-      If i39 - 1 < TJSONArray(D).Count Then
-        R.LangFile[i39] := Copy(JsonStr(TJSONArray(D).Items[i39 - 1], R.LangFile[i39]), 1, 8);
-  D := O.Find('MenuPath');
-  If (D <> Nil) And (D.JSONType = jtArray) Then
     For i40 := 1 To 10 Do
       If i40 - 1 < TJSONArray(D).Count Then
-        R.MenuPath[i40] := Copy(JsonStr(TJSONArray(D).Items[i40 - 1], R.MenuPath[i40]), 1, 60);
-  D := O.Find('TxtPath');
+        R.LangName[i40] := Copy(JsonStr(TJSONArray(D).Items[i40 - 1], R.LangName[i40]), 1, 10);
+  D := O.Find('LangFile');
   If (D <> Nil) And (D.JSONType = jtArray) Then
     For i41 := 1 To 10 Do
       If i41 - 1 < TJSONArray(D).Count Then
-        R.TxtPath[i41] := Copy(JsonStr(TJSONArray(D).Items[i41 - 1], R.TxtPath[i41]), 1, 60);
-  D := O.Find('QuesPath');
+        R.LangFile[i41] := Copy(JsonStr(TJSONArray(D).Items[i41 - 1], R.LangFile[i41]), 1, 8);
+  D := O.Find('MenuPath');
   If (D <> Nil) And (D.JSONType = jtArray) Then
     For i42 := 1 To 10 Do
       If i42 - 1 < TJSONArray(D).Count Then
-        R.QuesPath[i42] := Copy(JsonStr(TJSONArray(D).Items[i42 - 1], R.QuesPath[i42]), 1, 60);
-  D := O.Find('MsgPath');
+        R.MenuPath[i42] := Copy(JsonStr(TJSONArray(D).Items[i42 - 1], R.MenuPath[i42]), 1, 60);
+  D := O.Find('TxtPath');
   If (D <> Nil) And (D.JSONType = jtArray) Then
     For i43 := 1 To 10 Do
       If i43 - 1 < TJSONArray(D).Count Then
-        R.MsgPath[i43] := Copy(JsonStr(TJSONArray(D).Items[i43 - 1], R.MsgPath[i43]), 1, 60);
+        R.TxtPath[i43] := Copy(JsonStr(TJSONArray(D).Items[i43 - 1], R.TxtPath[i43]), 1, 60);
+  D := O.Find('QuesPath');
+  If (D <> Nil) And (D.JSONType = jtArray) Then
+    For i44 := 1 To 10 Do
+      If i44 - 1 < TJSONArray(D).Count Then
+        R.QuesPath[i44] := Copy(JsonStr(TJSONArray(D).Items[i44 - 1], R.QuesPath[i44]), 1, 60);
+  D := O.Find('MsgPath');
+  If (D <> Nil) And (D.JSONType = jtArray) Then
+    For i45 := 1 To 10 Do
+      If i45 - 1 < TJSONArray(D).Count Then
+        R.MsgPath[i45] := Copy(JsonStr(TJSONArray(D).Items[i45 - 1], R.MsgPath[i45]), 1, 60);
   D := O.Find('QuoteStr');
   If D <> Nil Then
     R.QuoteStr := Copy(JsonStr(D, R.QuoteStr), 1, 15);
@@ -973,20 +1050,20 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.OfflineConfMax := JsonNum(D, R.OfflineConfMax, 0, 65535);
   D := O.Find('Origin');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i44 := 1 To 20 Do
-      If i44 - 1 < TJSONArray(D).Count Then
-        R.Origin[i44] := Copy(JsonStr(TJSONArray(D).Items[i44 - 1], R.Origin[i44]), 1, 55);
+    For i46 := 1 To 20 Do
+      If i46 - 1 < TJSONArray(D).Count Then
+        R.Origin[i46] := Copy(JsonStr(TJSONArray(D).Items[i46 - 1], R.Origin[i46]), 1, 55);
   D := O.Find('Addr');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i45 := 1 To 10 Do
-      If i45 - 1 < TJSONArray(D).Count Then
-        If TJSONArray(D).Items[i45 - 1].JSONType = jtObject Then
-          JsonFrom_AddrType(TJSONObject(TJSONArray(D).Items[i45 - 1]), R.Addr[i45]);
+    For i47 := 1 To 10 Do
+      If i47 - 1 < TJSONArray(D).Count Then
+        If TJSONArray(D).Items[i47 - 1].JSONType = jtObject Then
+          JsonFrom_AddrType(TJSONObject(TJSONArray(D).Items[i47 - 1]), R.Addr[i47]);
   D := O.Find('NetBoard');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i46 := 1 To 10 Do
-      If i46 - 1 < TJSONArray(D).Count Then
-        R.NetBoard[i46] := JsonNum(TJSONArray(D).Items[i46 - 1], R.NetBoard[i46], 0, 65535);
+    For i48 := 1 To 10 Do
+      If i48 - 1 < TJSONArray(D).Count Then
+        R.NetBoard[i48] := JsonNum(TJSONArray(D).Items[i48 - 1], R.NetBoard[i48], 0, 65535);
   D := O.Find('Default');
   If D <> Nil Then
     R.Default := JsonNum(D, R.Default, 0, 65535);
@@ -1034,9 +1111,9 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.BadMsgArea := JsonNum(D, R.BadMsgArea, 0, 65535);
   D := O.Find('AddOn');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i47 := 1 To 38 Do
-      If i47 - 1 < TJSONArray(D).Count Then
-        R.AddOn[i47] := JsonNum(TJSONArray(D).Items[i47 - 1], R.AddOn[i47], 0, 255);
+    For i49 := 1 To 38 Do
+      If i49 - 1 < TJSONArray(D).Count Then
+        R.AddOn[i49] := JsonNum(TJSONArray(D).Items[i49 - 1], R.AddOn[i49], 0, 255);
   D := O.Find('LogAttr');
   If D <> Nil Then
     R.LogAttr := JsonNum(D, R.LogAttr, 0, 255);
@@ -1051,44 +1128,44 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.PrinterName := Copy(JsonStr(D, R.PrinterName), 1, 20);
   D := O.Find('Events');
   If (D <> Nil) And (D.JSONType = jtObject) Then
-    For i48 := 1 To 30 Do
+    For i50 := 1 To 30 Do
       Begin
-      E := TJSONObject(D).Find(IntToStr(i48));
+      E := TJSONObject(D).Find(IntToStr(i50));
       If (E <> Nil) And (E.JSONType = jtObject) Then
-        JsonFrom_EventType(TJSONObject(E), R.Events[i48]);
+        JsonFrom_EventType(TJSONObject(E), R.Events[i50]);
       End;
   D := O.Find('Doors');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i49 := 1 To 10 Do
-      If i49 - 1 < TJSONArray(D).Count Then
-        If TJSONArray(D).Items[i49 - 1].JSONType = jtObject Then
-          JsonFrom_DoorRecType(TJSONObject(TJSONArray(D).Items[i49 - 1]), R.Doors[i49]);
+    For i51 := 1 To 10 Do
+      If i51 - 1 < TJSONArray(D).Count Then
+        If TJSONArray(D).Items[i51 - 1].JSONType = jtObject Then
+          JsonFrom_DoorRecType(TJSONObject(TJSONArray(D).Items[i51 - 1]), R.Doors[i51]);
   D := O.Find('InProt');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i50 := 1 To 10 Do
-      If i50 - 1 < TJSONArray(D).Count Then
-        If TJSONArray(D).Items[i50 - 1].JSONType = jtObject Then
-          JsonFrom_InProtType(TJSONObject(TJSONArray(D).Items[i50 - 1]), R.InProt[i50]);
+    For i52 := 1 To 10 Do
+      If i52 - 1 < TJSONArray(D).Count Then
+        If TJSONArray(D).Items[i52 - 1].JSONType = jtObject Then
+          JsonFrom_InProtType(TJSONObject(TJSONArray(D).Items[i52 - 1]), R.InProt[i52]);
   D := O.Find('ExtProt');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i51 := 11 To 20 Do
-      If i51 - 11 < TJSONArray(D).Count Then
-        If TJSONArray(D).Items[i51 - 11].JSONType = jtObject Then
-          JsonFrom_ExtProtType(TJSONObject(TJSONArray(D).Items[i51 - 11]), R.ExtProt[i51]);
+    For i53 := 11 To 20 Do
+      If i53 - 11 < TJSONArray(D).Count Then
+        If TJSONArray(D).Items[i53 - 11].JSONType = jtObject Then
+          JsonFrom_ExtProtType(TJSONObject(TJSONArray(D).Items[i53 - 11]), R.ExtProt[i53]);
   D := O.Find('EchoLog');
   If D <> Nil Then
     R.EchoLog := Copy(JsonStr(D, R.EchoLog), 1, 60);
   D := O.Find('ExtPack');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i52 := 1 To 10 Do
-      If i52 - 1 < TJSONArray(D).Count Then
-        If TJSONArray(D).Items[i52 - 1].JSONType = jtObject Then
-          JsonFrom_ExtPackType(TJSONObject(TJSONArray(D).Items[i52 - 1]), R.ExtPack[i52]);
+    For i54 := 1 To 10 Do
+      If i54 - 1 < TJSONArray(D).Count Then
+        If TJSONArray(D).Items[i54 - 1].JSONType = jtObject Then
+          JsonFrom_ExtPackType(TJSONObject(TJSONArray(D).Items[i54 - 1]), R.ExtPack[i54]);
   D := O.Find('OffAvail');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i53 := 1 To 10 Do
-      If i53 - 1 < TJSONArray(D).Count Then
-        R.OffAvail[i53] := JsonBool(TJSONArray(D).Items[i53 - 1], R.OffAvail[i53]);
+    For i55 := 1 To 10 Do
+      If i55 - 1 < TJSONArray(D).Count Then
+        R.OffAvail[i55] := JsonBool(TJSONArray(D).Items[i55 - 1], R.OffAvail[i55]);
   D := O.Find('OffAttr');
   If D <> Nil Then
     R.OffAttr := JsonNum(D, R.OffAttr, 0, 65535);
@@ -1106,14 +1183,14 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
     R.OffSafety := JsonNum(D, R.OffSafety, 0, 255);
   D := O.Find('OffScrns');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i54 := 1 To 5 Do
-      If i54 - 1 < TJSONArray(D).Count Then
-        R.OffScrns[i54] := Copy(JsonStr(TJSONArray(D).Items[i54 - 1], R.OffScrns[i54]), 1, 8);
+    For i56 := 1 To 5 Do
+      If i56 - 1 < TJSONArray(D).Count Then
+        R.OffScrns[i56] := Copy(JsonStr(TJSONArray(D).Items[i56 - 1], R.OffScrns[i56]), 1, 8);
   D := O.Find('OffBulls');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i55 := 1 To 10 Do
-      If i55 - 1 < TJSONArray(D).Count Then
-        R.OffBulls[i55] := Copy(JsonStr(TJSONArray(D).Items[i55 - 1], R.OffBulls[i55]), 1, 8);
+    For i57 := 1 To 10 Do
+      If i57 - 1 < TJSONArray(D).Count Then
+        R.OffBulls[i57] := Copy(JsonStr(TJSONArray(D).Items[i57 - 1], R.OffBulls[i57]), 1, 8);
   End;
 
 Procedure JsonFrom_MsgAreaType(O: TJSONObject; Var R: MsgAreaType);
@@ -1256,8 +1333,8 @@ Procedure JsonFrom_EchoCfgType(O: TJSONObject; Var R: EchoCfgType);
   Var
     D: TJSONData;
     E: TJSONData;
-    i56: Integer;
-    i57: Integer;
+    i58: Integer;
+    i59: Integer;
 
   Begin
   D := O.Find('InBoundFiles');
@@ -1271,19 +1348,19 @@ Procedure JsonFrom_EchoCfgType(O: TJSONObject; Var R: EchoCfgType);
     R.MaxPktSize := JsonNum(D, R.MaxPktSize, -2147483648, 2147483647);
   D := O.Find('EchoSys');
   If (D <> Nil) And (D.JSONType = jtObject) Then
-    For i56 := 1 To 32 Do
+    For i58 := 1 To 32 Do
       Begin
-      E := TJSONObject(D).Find(IntToStr(i56));
+      E := TJSONObject(D).Find(IntToStr(i58));
       If (E <> Nil) And (E.JSONType = jtObject) Then
-        JsonFrom_EchoSystemType(TJSONObject(E), R.EchoSys[i56]);
+        JsonFrom_EchoSystemType(TJSONObject(E), R.EchoSys[i58]);
       End;
   D := O.Find('EchoArea');
   If (D <> Nil) And (D.JSONType = jtObject) Then
-    For i57 := 1 To 500 Do
+    For i59 := 1 To 500 Do
       Begin
-      E := TJSONObject(D).Find(IntToStr(i57));
+      E := TJSONObject(D).Find(IntToStr(i59));
       If (E <> Nil) And (E.JSONType = jtObject) Then
-        JsonFrom_EchoAreaType(TJSONObject(E), R.EchoArea[i57]);
+        JsonFrom_EchoAreaType(TJSONObject(E), R.EchoArea[i59]);
       End;
   End;
 
@@ -1344,9 +1421,9 @@ Procedure JsonFrom_MailerCfgType(O: TJSONObject; Var R: MailerCfgType);
   Var
     D: TJSONData;
     E: TJSONData;
-    i58: Integer;
-    i59: Integer;
     i60: Integer;
+    i61: Integer;
+    i62: Integer;
 
   Begin
   D := O.Find('Version');
@@ -1402,11 +1479,11 @@ Procedure JsonFrom_MailerCfgType(O: TJSONObject; Var R: MailerCfgType);
     R.ReqAttr := JsonNum(D, R.ReqAttr, 0, 65535);
   D := O.Find('Links');
   If (D <> Nil) And (D.JSONType = jtObject) Then
-    For i58 := 1 To 64 Do
+    For i60 := 1 To 64 Do
       Begin
-      E := TJSONObject(D).Find(IntToStr(i58));
+      E := TJSONObject(D).Find(IntToStr(i60));
       If (E <> Nil) And (E.JSONType = jtObject) Then
-        JsonFrom_MailLinkType(TJSONObject(E), R.Links[i58]);
+        JsonFrom_MailLinkType(TJSONObject(E), R.Links[i60]);
       End;
   D := O.Find('UnsecureIn');
   If D <> Nil Then
@@ -1419,21 +1496,21 @@ Procedure JsonFrom_MailerCfgType(O: TJSONObject; Var R: MailerCfgType);
     R.HookTimeout := JsonNum(D, R.HookTimeout, 0, 65535);
   D := O.Find('PktPwd');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i59 := 1 To 32 Do
-      If i59 - 1 < TJSONArray(D).Count Then
-        R.PktPwd[i59] := Copy(JsonStr(TJSONArray(D).Items[i59 - 1], R.PktPwd[i59]), 1, 8);
+    For i61 := 1 To 32 Do
+      If i61 - 1 < TJSONArray(D).Count Then
+        R.PktPwd[i61] := Copy(JsonStr(TJSONArray(D).Items[i61 - 1], R.PktPwd[i61]), 1, 8);
   D := O.Find('Routes');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i60 := 1 To 12 Do
-      If i60 - 1 < TJSONArray(D).Count Then
-        If TJSONArray(D).Items[i60 - 1].JSONType = jtObject Then
-          JsonFrom_RouteType(TJSONObject(TJSONArray(D).Items[i60 - 1]), R.Routes[i60]);
+    For i62 := 1 To 12 Do
+      If i62 - 1 < TJSONArray(D).Count Then
+        If TJSONArray(D).Items[i62 - 1].JSONType = jtObject Then
+          JsonFrom_RouteType(TJSONObject(TJSONArray(D).Items[i62 - 1]), R.Routes[i62]);
   End;
 
 Procedure JsonFrom_EventExtType(O: TJSONObject; Var R: EventExtType);
   Var
     D: TJSONData;
-    i61: Integer;
+    i63: Integer;
 
   Begin
   D := O.Find('Action');
@@ -1459,16 +1536,16 @@ Procedure JsonFrom_EventExtType(O: TJSONObject; Var R: EventExtType);
     R.TimeoutMin := JsonNum(D, R.TimeoutMin, 0, 65535);
   D := O.Find('Reserved');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i61 := 1 To 40 Do
-      If i61 - 1 < TJSONArray(D).Count Then
-        R.Reserved[i61] := JsonNum(TJSONArray(D).Items[i61 - 1], R.Reserved[i61], 0, 255);
+    For i63 := 1 To 40 Do
+      If i63 - 1 < TJSONArray(D).Count Then
+        R.Reserved[i63] := JsonNum(TJSONArray(D).Items[i63 - 1], R.Reserved[i63], 0, 255);
   End;
 
 Procedure JsonFrom_EventsCfgType(O: TJSONObject; Var R: EventsCfgType);
   Var
     D: TJSONData;
     E: TJSONData;
-    i62: Integer;
+    i64: Integer;
 
   Begin
   D := O.Find('Version');
@@ -1476,11 +1553,102 @@ Procedure JsonFrom_EventsCfgType(O: TJSONObject; Var R: EventsCfgType);
     R.Version := JsonNum(D, R.Version, 0, 65535);
   D := O.Find('Ev');
   If (D <> Nil) And (D.JSONType = jtObject) Then
-    For i62 := 1 To 30 Do
+    For i64 := 1 To 30 Do
       Begin
-      E := TJSONObject(D).Find(IntToStr(i62));
+      E := TJSONObject(D).Find(IntToStr(i64));
       If (E <> Nil) And (E.JSONType = jtObject) Then
-        JsonFrom_EventExtType(TJSONObject(E), R.Ev[i62]);
+        JsonFrom_EventExtType(TJSONObject(E), R.Ev[i64]);
+      End;
+  End;
+
+Procedure JsonFrom_FileEchoSysType(O: TJSONObject; Var R: FileEchoSysType);
+  Var
+    D: TJSONData;
+
+  Begin
+  D := O.Find('TicPwd');
+  If D <> Nil Then
+    R.TicPwd := Copy(JsonStr(D, R.TicPwd), 1, 8);
+  D := O.Find('FixPwd');
+  If D <> Nil Then
+    R.FixPwd := Copy(JsonStr(D, R.FixPwd), 1, 15);
+  D := O.Find('Groups');
+  If D <> Nil Then
+    R.Groups := JsonNum(D, R.Groups, -2147483648, 2147483647);
+  End;
+
+Procedure JsonFrom_FileEchoAreaType(O: TJSONObject; Var R: FileEchoAreaType);
+  Var
+    D: TJSONData;
+
+  Begin
+  D := O.Find('Tag');
+  If D <> Nil Then
+    R.Tag := Copy(JsonStr(D, R.Tag), 1, 40);
+  D := O.Find('Desc');
+  If D <> Nil Then
+    R.Desc := Copy(JsonStr(D, R.Desc), 1, 40);
+  D := O.Find('FileArea');
+  If D <> Nil Then
+    R.FileArea := JsonNum(D, R.FileArea, 0, 65535);
+  D := O.Find('EchoTo');
+  If D <> Nil Then
+    R.EchoTo := JsonNum(D, R.EchoTo, -2147483648, 2147483647);
+  D := O.Find('Hub');
+  If D <> Nil Then
+    R.Hub := JsonNum(D, R.Hub, 0, 255);
+  D := O.Find('Groups');
+  If D <> Nil Then
+    R.Groups := JsonNum(D, R.Groups, -2147483648, 2147483647);
+  D := O.Find('Attr');
+  If D <> Nil Then
+    R.Attr := JsonNum(D, R.Attr, 0, 65535);
+  End;
+
+Procedure JsonFrom_FileEchoCfgType(O: TJSONObject; Var R: FileEchoCfgType);
+  Var
+    D: TJSONData;
+    E: TJSONData;
+    i65: Integer;
+    i66: Integer;
+
+  Begin
+  D := O.Find('Version');
+  If D <> Nil Then
+    R.Version := JsonNum(D, R.Version, 0, 65535);
+  D := O.Find('CheckCmd');
+  If D <> Nil Then
+    R.CheckCmd := Copy(JsonStr(D, R.CheckCmd), 1, 100);
+  D := O.Find('CheckTimeout');
+  If D <> Nil Then
+    R.CheckTimeout := JsonNum(D, R.CheckTimeout, 0, 65535);
+  D := O.Find('SpoolPath');
+  If D <> Nil Then
+    R.SpoolPath := Copy(JsonStr(D, R.SpoolPath), 1, 60);
+  D := O.Find('PassDays');
+  If D <> Nil Then
+    R.PassDays := JsonNum(D, R.PassDays, 0, 65535);
+  D := O.Find('PassMaxMB');
+  If D <> Nil Then
+    R.PassMaxMB := JsonNum(D, R.PassMaxMB, 0, 65535);
+  D := O.Find('Flags');
+  If D <> Nil Then
+    R.Flags := JsonNum(D, R.Flags, 0, 65535);
+  D := O.Find('Sys');
+  If (D <> Nil) And (D.JSONType = jtObject) Then
+    For i65 := 1 To 32 Do
+      Begin
+      E := TJSONObject(D).Find(IntToStr(i65));
+      If (E <> Nil) And (E.JSONType = jtObject) Then
+        JsonFrom_FileEchoSysType(TJSONObject(E), R.Sys[i65]);
+      End;
+  D := O.Find('Area');
+  If (D <> Nil) And (D.JSONType = jtObject) Then
+    For i66 := 1 To 300 Do
+      Begin
+      E := TJSONObject(D).Find(IntToStr(i66));
+      If (E <> Nil) And (E.JSONType = jtObject) Then
+        JsonFrom_FileEchoAreaType(TJSONObject(E), R.Area[i66]);
       End;
   End;
 
@@ -1700,6 +1868,42 @@ Function ZeroOf_EventsCfgType: String;
   J.Free;
   End;
 
+Function ZeroOf_FileEchoSysType: String;
+  Var
+    R: FileEchoSysType;
+    J: TJSONObject;
+
+  Begin
+  FillChar(R, SizeOf(R), 0);
+  J := JsonTo_FileEchoSysType(R);
+  ZeroOf_FileEchoSysType := J.AsJSON;
+  J.Free;
+  End;
+
+Function ZeroOf_FileEchoAreaType: String;
+  Var
+    R: FileEchoAreaType;
+    J: TJSONObject;
+
+  Begin
+  FillChar(R, SizeOf(R), 0);
+  J := JsonTo_FileEchoAreaType(R);
+  ZeroOf_FileEchoAreaType := J.AsJSON;
+  J.Free;
+  End;
+
+Function ZeroOf_FileEchoCfgType: String;
+  Var
+    R: FileEchoCfgType;
+    J: TJSONObject;
+
+  Begin
+  FillChar(R, SizeOf(R), 0);
+  J := JsonTo_FileEchoCfgType(R);
+  ZeroOf_FileEchoCfgType := J.AsJSON;
+  J.Free;
+  End;
+
 Procedure JsonInitZero;
   Begin
   ZeroJson_SecType := ZeroOf_SecType;
@@ -1720,4 +1924,7 @@ Procedure JsonInitZero;
   ZeroJson_MailerCfgType := ZeroOf_MailerCfgType;
   ZeroJson_EventExtType := ZeroOf_EventExtType;
   ZeroJson_EventsCfgType := ZeroOf_EventsCfgType;
+  ZeroJson_FileEchoSysType := ZeroOf_FileEchoSysType;
+  ZeroJson_FileEchoAreaType := ZeroOf_FileEchoAreaType;
+  ZeroJson_FileEchoCfgType := ZeroOf_FileEchoCfgType;
   End;
