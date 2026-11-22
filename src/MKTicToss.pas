@@ -29,6 +29,8 @@ Unit MKTicToss;   {Tossing TIC files (file echoes): the files that came in with 
 
 Interface
 
+Uses MKTic;
+
 Var
   TicLog: Procedure(S: String);         {the log of the tosser}
   TicIsOurs: Function(A: String): Boolean;  {an address of ours}
@@ -48,9 +50,22 @@ Procedure TicTossInbound(InDir: String; Var R: TicTossResult);
 Procedure TicCleanSpool;
   {what waits too long or too much in the spool goes; empty directories go}
 
+Type
+  HatchSpec = Record
+    Tag: String;                       {the file echo}
+    FileName: String;                  {the file (a path)}
+    Desc, Replaces, Magic: String;
+    NumLdesc: Word;
+    Ldesc: Array[1..TicMaxLdesc] Of String[250];
+    Move: Boolean;                     {the file is moved, not copied (into the file area; a pass-through file is deleted after it was queued)}
+    End;
+
+Function TicHatch(Var H: HatchSpec; Var Msg: String): Boolean;
+  {a file of ours into a file echo: stored in the area of the echo (with its files.bbs line), a TIC for each system the echo goes to}
+
 Implementation
 
-Uses BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKTic;
+Uses BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs;
 
 Const
   DupeDays = 30;
@@ -540,7 +555,8 @@ Procedure PassOn(Var T: TicType; Src: String; Echo, Sender: Word; Var R: TicToss
     U^.From := Ours;
     U^.ToAddr := AddrStr(A);
     U^.Pw := FE^.Sys[s].TicPwd;
-    U^.Created := 'by mktoss';
+    If U^.Created = '' Then
+      U^.Created := 'by mktoss';
     TicAddPath(U^, Ours, Now_, 'mktoss');
     TicAddSeen(U^, Ours);
     For k := 1 To NumT Do
@@ -906,6 +922,153 @@ Procedure TicTossInbound(InDir: String; Var R: TicTossResult);
   For i := 1 To n Do
     OneTic(InDir, Names[i], R);
   TicCleanSpool;
+  Dispose(FE);
+  FE := Nil;
+  End;
+
+Function SamePath(A, B: String): Boolean;
+  Var
+    SA, SB: Stat;
+
+  Begin
+  SamePath := False;
+  If (fpStat(A, SA) = 0) And (fpStat(B, SB) = 0) Then
+    SamePath := (SA.st_ino = SB.st_ino) And (SA.st_dev = SB.st_dev);
+  End;
+
+
+Function BaseOf(P: String): String;
+  Var
+    i: Word;
+
+  Begin
+  i := Length(P);
+  While (i > 0) And (P[i] <> '/') Do
+    Dec(i);
+  BaseOf := Copy(P, i + 1, 255);
+  End;
+
+
+Function TicHatch(Var H: HatchSpec; Var Msg: String): Boolean;
+  Var
+    T: ^TicType;
+    R: TicTossResult;
+    Echo, AreaNo, i: Word;
+    Name, Src, D, ListName, Ours: String;
+    Crc, Size: LongInt;
+    Old: String;
+    Ok: Boolean;
+
+  Begin
+  TicHatch := False;
+  Msg := '';
+  If Not Config^.HasFileEcho Then
+    Begin
+    Msg := 'this configuration has no file echoes';
+    Exit;
+    End;
+  New(FE);
+  Config^.GetFileEcho(FE^);
+  Echo := EchoOf(H.Tag);
+  If Echo = 0 Then
+    Begin
+    Msg := 'the file echo ' + H.Tag + ' is not one of ours (EchoMail > File Echoes)';
+    Dispose(FE); FE := Nil;
+    Exit;
+    End;
+  Src := H.FileName;
+  If Not FileExist(Src) Then
+    Begin
+    Msg := Src + ' is not there';
+    Dispose(FE); FE := Nil;
+    Exit;
+    End;
+  Name := BaseOf(Src);
+  If Not TicFileCrc(Src, Crc, Size) Then
+    Begin
+    Msg := Src + ' cannot be read';
+    Dispose(FE); FE := Nil;
+    Exit;
+    End;
+  New(T);
+  TicInit(T^);
+  If @TicOurAddr <> Nil Then
+    Ours := TicOurAddr(0)
+  Else
+    Ours := '';
+  T^.Area := FE^.Area[Echo].Tag;
+  T^.AreaDesc := FE^.Area[Echo].Desc;
+  T^.Origin := Ours;
+  T^.FileName := Name;
+  T^.Size := Size;
+  T^.HasSize := True;
+  T^.Date := FileTime(Src);
+  T^.Crc := Crc;
+  T^.HasCrc := True;
+  T^.Desc := H.Desc;
+  T^.Replaces := H.Replaces;
+  T^.Magic := H.Magic;
+  T^.Created := 'by mkhatch';
+  For i := 1 To H.NumLdesc Do
+    Begin
+    Inc(T^.NumLdesc);
+    T^.Ldesc[T^.NumLdesc] := H.Ldesc[i];
+    End;
+  TicAddSeen(T^, Ours);
+  AreaNo := FE^.Area[Echo].FileArea;
+  Ok := True;
+  If AreaNo > 0 Then
+    Begin
+    If AreaNo > Config^.GetMaxFileAreas Then
+      Ok := False
+    Else
+      Begin
+      ListName := Config^.GetFileListPath(AreaNo);
+      D := Copy(ListName, 1, Length(ListName) - Length('files.bbs'));
+      Ok := (D <> '') And (D <> '/') And DirExist(D);
+      End;
+    If Not Ok Then
+      Msg := 'the file area ' + Long2Str(AreaNo) + ' of ' + T^.Area + ' has no directory'
+    Else
+      Begin
+      If Not SamePath(Src, D + Name) Then
+        Begin
+        Old := FindNoCase(D, Name);
+        If Old <> '' Then
+          fpUnlink(D + Old);
+        If H.Move Then
+          Ok := MoveFile(Src, D + Name)
+        Else
+          Ok := CopyFile(Src, D + Name);
+        If Ok Then
+          SetFileTime(D + Name, T^.Date)
+        Else
+          Msg := 'cannot put ' + Name + ' into ' + D;
+        End;
+      If Ok Then
+        Begin
+        If H.Replaces <> '' Then
+          Begin
+          DropOld(D, H.Replaces, Name, ListName, T^);
+          ListUpdate(ListName, H.Replaces, True, Name, T^, False);
+          End;
+        ListUpdate(ListName, Name, False, Name, T^, True);
+        Src := D + Name;
+        End;
+      End;
+    End;
+  If Ok Then
+    Begin
+    FillChar(R, SizeOf(R), 0);
+    PassOn(T^, Src, Echo, 0, R);
+    If (AreaNo = 0) And H.Move And (R.Waiting = 0) Then
+      fpUnlink(H.FileName);
+    TicCleanSpool;
+    Msg := Name + ' in ' + T^.Area + ': ' + Long2Str(R.PassedOn) + ' system(s) get it' + Copy(', not stored: pass-through echo', 1, 40 * Ord(AreaNo = 0)) +
+      Copy('; some could not be queued: look at the log', 1, 60 * Ord(R.Waiting > 0));
+    TicHatch := R.Waiting = 0;
+    End;
+  Dispose(T);
   Dispose(FE);
   FE := Nil;
   End;

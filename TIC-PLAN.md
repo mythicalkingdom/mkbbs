@@ -1,6 +1,6 @@
 # TIC file echoes: plan
 
-Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`), 3 (tossing) and 4 (passing on) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
+Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`), 3 (tossing), 4 (passing on) and 5 (`mkhatch`) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
 before any code is written (the same way the QWKE specification was read before `TOREADER.EXT` was done).
 
 ## Decided 2026-11-22
@@ -15,6 +15,16 @@ before any code is written (the same way the QWKE specification was read before 
    answer in the time limit, refuses the file to `badtic/`.  An echo can switch it off (*No check command*).
 6. **The pass-through spool is limited**: days a file waits for a system (`PassDays`, default 14) and the most it may hold (`PassMaxMB`, 0 = no limit, the oldest go first).
 7. Any FTN network; the sysop's FSX systems are for testing.
+
+## Phase 5 (done): `mkhatch`
+
+`mkhatch -a <TAG> [-d desc] [-l long line]... [-r replaces] [-m magic] [-x] [-b mkbink] [-q] file ...` (`src/MKHatch.pas`, the work is `TicHatch` in `MKTicToss.pas`, the same passing-on code
+as the tosser's).  For each file: it is copied into the file area of the echo (moved with `-x`; the file keeps its date; one with that name that is there is replaced, the files `-r`
+names go, a file that is already in the area is only listed again) with a line in `files.bbs`, and a TIC (`Created by mkhatch`, our address as `Origin`, the description lines, `Replaces`,
+`Magic`, size, CRC, date) and the file go to each system of *Echo To* through the mailer.  A pass-through echo is not stored, only passed on (with `-x` the source is deleted
+afterwards).  The default description is the name of the file.  It takes the lock of `mktoss` (`mktoss.lock` in the inbound) so that it does not run at the same time as the tosser.
+Exit status 0 done, 1 wrong call or no configuration, 2 a file could not be hatched (the reason on stderr).  It can run from an event (`command`).  `mktoss` and `mkhatch` share
+`MKBinkQ.pas` (`mkbink queue`, the flavour of a system).  Tests: `tests/tictosstest.py`.
 
 ## Phase 4 (done): passing on and pass-through
 
@@ -168,7 +178,7 @@ records instead of the message ones.  Groups limit what a system may see and lin
 2. `MKTic.pas` and its unit test.  **Done.**
 3. Tossing without passing on (checks, the file into the area, `files.bbs`, `badtic/`, the dupe file), tests.  **Done.**
 4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.  **Done.**
-5. `mkhatch`.
+5. `mkhatch`.  **Done.**
 6. FileFix.
 7. Docs, the round trip test, the full build.
 

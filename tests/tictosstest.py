@@ -260,6 +260,56 @@ if have_bink:
     out = toss()
     check('the spool over its limit (PassMaxMB 1): the oldest directory goes first, the newer stays',
           'spool over 1 MB' in out and not os.path.exists(spool + '02-%d-902' % (now - 100)) and os.path.exists(spool + '02-%d-903/NEW.BIN' % (now - 50)), out[-300:])
+    # ---- mkhatch: a file of ours into an echo
+    srcd = tmp + '/hatch/'
+    os.makedirs(srcd)
+
+    def hatch(*args):
+        return subprocess.run([os.path.join(build, 'mkhatch')] + list(args) + ['-b', mkbink], capture_output=True, text=True, env=env, encoding='latin-1')
+
+    open(srcd + 'HATCH.ZIP', 'wb').write(b'a hatched file')
+    os.utime(srcd + 'HATCH.ZIP', (1100000000, 1100000000))
+    before = flo()
+    r = hatch('-a', 'fsx_gen', '-d', 'hatched here', '-l', 'long one', '-l', 'long two', '-r', 'KEEPNOT*.ZIP', '-m', 'HATCHME', srcd + 'HATCH.ZIP')
+    ent = [x for v in new_entries(before, flo()).values() for x in v]
+    check('mkhatch: exit 0, says how many systems get the file (the echo is found whatever the case of its tag)', r.returncode == 0 and '1 system(s) get it' in r.stdout, r.stdout + r.stderr)
+    check('the file is copied into the area (the source stays), with the date of the source, and listed with its descriptions',
+          open(area1 + 'HATCH.ZIP', 'rb').read() == b'a hatched file' and os.path.exists(srcd + 'HATCH.ZIP') and int(os.path.getmtime(area1 + 'HATCH.ZIP')) == 1100000000
+          and re.search(r'^HATCH\.ZIP +hatched here\n +long one\n +long two\n', lst(area1), re.M), lst(area1))
+    tp = [x.lstrip('^#') for x in ent if x.endswith('.tic')]
+    t = open(tp[0], encoding='latin-1').read() if tp and os.path.exists(tp[0]) else ''
+    check('a TIC and the file are queued for system 2, the file first', len(ent) == 2 and ent[0].endswith('HATCH.ZIP') and ent[1].endswith('.tic'), ent)
+    check('the TIC: Created by mkhatch, our address as Origin and From, To system 2, the Desc and Ldesc lines, Replaces, Magic, size, CRC, date of the file',
+          'Created by mkhatch' in t and 'Origin 1:110/290' in t and 'From 1:110/290' in t and 'To 1:110/200' in t and 'Desc hatched here' in t and 'Ldesc long one' in t and 'Ldesc long two' in t
+          and 'Replaces KEEPNOT*.ZIP' in t and 'Magic HATCHME' in t and 'Size 14' in t and ('Crc %08X' % (zlib.crc32(b'a hatched file') & 0xFFFFFFFF)) in t and 'Date 1100000000' in t, repr(t))
+    check('... Path with only our line, Seenby us and system 2, the password of system 2',
+          len(re.findall(r'^Path ', t, re.M)) == 1 and 'Path 1:110/290 ' in t and 'Seenby 1:110/290' in t and 'Seenby 1:110/200' in t and 'Pw pw2tic' in t, repr(t))
+    # the same name again: the old file and its line are replaced, -x moves the file
+    open(srcd + 'HATCH.ZIP', 'wb').write(b'the second version of the hatched file')
+    r = hatch('-a', 'FSX_GEN', '-x', '-q', '-d', 'second version', srcd + 'HATCH.ZIP')
+    check('hatching a file with a name that is there: replaced, one line in files.bbs with the new description, -x moved the source',
+          r.returncode == 0 and r.stdout == '' and open(area1 + 'HATCH.ZIP', 'rb').read() == b'the second version of the hatched file' and lst(area1).count('HATCH.ZIP') == 1
+          and 'hatched here' not in lst(area1) and not os.path.exists(srcd + 'HATCH.ZIP'), (r.returncode, r.stdout, r.stderr, lst(area1)))
+    # a file that is already in the area is only listed and passed on
+    r = hatch('-a', 'FSX_GEN', '-d', 'already there', area1 + 'KEEP.ZIP')
+    check('a file that is already in the area: no copy of itself, listed again with the new description', r.returncode == 0 and os.path.exists(area1 + 'KEEP.ZIP') and lst(area1).count('KEEP.ZIP') == 1 and 'already there' in lst(area1), lst(area1) + r.stderr)
+    # a pass-through echo: not stored, -x deletes the source after it was queued
+    open(srcd + 'THRU.ZIP', 'wb').write(b'through')
+    before = flo()
+    r = hatch('-a', 'FSX_PASS', '-x', srcd + 'THRU.ZIP')
+    nw = new_entries(before, flo())
+    check('a pass-through echo: queued for system 2, not stored in any area, the source (-x) is deleted',
+          r.returncode == 0 and 'pass-through echo' in r.stdout and sum(len(v) for v in nw.values()) == 2 and not os.path.exists(area1 + 'THRU.ZIP') and not os.path.exists(srcd + 'THRU.ZIP')
+          and any(os.path.exists(x.lstrip('^#')) for v in nw.values() for x in v if x.endswith('THRU.ZIP')), r.stdout + r.stderr)
+    # errors
+    r = hatch('-a', 'NO_SUCH_ECHO', srcd + 'x')
+    check('an echo that is not ours: exit 2, said so', r.returncode == 2 and 'is not one of ours' in r.stderr, r.stderr)
+    r = hatch('-a', 'FSX_GEN', srcd + 'nothere.zip')
+    check('a file that is not there: exit 2', r.returncode == 2 and 'is not there' in r.stderr, r.stderr)
+    r = subprocess.run([os.path.join(build, 'mkhatch')], capture_output=True, text=True, env=env)
+    check('no echo and no file: the usage, exit 1', r.returncode == 1 and 'Usage: mkhatch' in r.stderr)
+    r = hatch('-a', 'FSX_BADAREA', srcd + 'x')
+    check('an echo whose file area is not defined: exit 2, said so', r.returncode == 2, r.stderr)
 else:
     print('skip: no mkbink, passing on is not checked')
 

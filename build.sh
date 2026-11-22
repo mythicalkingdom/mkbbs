@@ -49,6 +49,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcfgcvt src/MKCfgCvt.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbinkcfg src/MKBinkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklower src/MKLower.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omktoss src/MKToss.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkhatch src/MKHatch.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwk src/MKQwk.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwkcfg src/MKQwkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas

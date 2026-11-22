@@ -100,6 +100,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mknodeidx`, `mknodelist` | build the nodelist index, look an address up |
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
+| `mkhatch` | put files into a file echo (TIC): stored in the file area and sent to the systems the echo goes to |
 | `mkqwk`, `mkqwkcfg` | the older offline mail door and its configuration (`config.mko`): kept for systems that do not run `mk`; nothing else in MK uses it |
 | `mkfreq` | answers FTN file requests for `mkbink` (see `NETWORKING.md`) |
 | `mkpwconv` | expands `extusers.bbs` (`-x`) and converts plain passwords to hashes (`-h`); see `PASSWORDS.md` |

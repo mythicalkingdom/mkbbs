@@ -72,7 +72,7 @@ Program MKToss;
 }
 
 Uses
-  BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKMsgAbs, MKMsgPkt, MKOpen, MKDupe, Crc32, MKTicToss;
+  BaseUnix, Unix, Dos, MKString, MKGlobT, MKFile, MKCfgAbs, MKCfgMK, MKCfgNew, MKMsgAbs, MKMsgPkt, MKOpen, MKDupe, Crc32, MKTicToss, MKBinkQ;
 
 
 Type
@@ -89,7 +89,7 @@ Var
   Tossed, Dups, Bad, Netmails, Passed: LongInt;
   Problems: Boolean;
   LogName: String;
-  OutDir, SpoolDir, BinkProg: String;
+  OutDir, SpoolDir: String;
   Forwarded, Scanned, NetSent, FreqMade: LongInt;
   LastSerial: LongInt;
   DoToss, DoScan: Boolean;
@@ -875,12 +875,7 @@ Function MsgCrc(M: AbsMsgPtr): LongInt;
 Function FlavourOf(Sys: Word): Char;
   {the flavour of the system for echomail: Immediate, Crash, Normal, Hold}
   Begin
-  Case Config^.GetEchoToMailType(Sys) Of
-    0: FlavourOf := 'I';
-    1: FlavourOf := 'C';
-    3: FlavourOf := 'H';
-    Else FlavourOf := 'N';
-    End;
+  FlavourOf := EchoFlavour(Sys);
   End;
 
 
@@ -2257,49 +2252,14 @@ Procedure CountUnsecure;
 
 
 
-Function BinkPath: String;
-  Var
-    Me: String;
-    p: Word;
-
-  Begin
-  If BinkProg <> '' Then
-    Begin
-    BinkPath := BinkProg;
-    Exit;
-    End;
-  Me := ParamStr(0);
-  p := Length(Me);
-  While (p > 0) And (Me[p] <> '/') Do
-    Dec(p);
-  If (p > 0) And FileExist(Copy(Me, 1, p) + 'mkbink') Then
-    BinkPath := Copy(Me, 1, p) + 'mkbink'
-  Else
-    BinkPath := 'mkbink';
-  End;
 
 
 
 Function QueueFile(Sys: Word; Flav: Char; Path: String; Act: Char): Boolean;
   {a file (not a packet) for the system: mkbink queue puts it in the BSO outbound; Act = ^ delete it after it was sent,
    # truncate it, else leave it}
-  Var
-    A: AddrType;
-    Opt: String;
-    Rc: LongInt;
-
   Begin
-  Config^.GetEchoToAddr(Sys, A);
-  Opt := '';
-  If Act = '^' Then
-    Opt := ' -x'
-  Else If Act = '#' Then
-    Opt := ' -T';
-  Rc := fpSystem(ShellQuote(BinkPath) + ' queue -O ' + ShellQuote(Copy(OutDir, 1, Length(OutDir) - 1)) + ' -Z ' +
-    Long2Str(Ours[1].Zone) + ' -t ' + AddrStr(A) + ' -F ' + Flav + Opt + ' ' + ShellQuote(Path) + ' >/dev/null 2>&1');
-  QueueFile := Rc = 0;
-  If Rc <> 0 Then
-    Log('mkbink queue failed (status ' + Long2Str(Rc) + ') for ' + Path + ' to ' + AddrStr(A));
+  QueueFile := BinkQueue(Sys, Flav, Path, Act);
   End;
 
 
@@ -3194,6 +3154,9 @@ For i := 1 To 10 Do
     Ours[NumOurs] := A;
     End;
   End;
+BinkOutDir := OutDir;
+BinkZone := Ours[1].Zone;
+BinkLog := Log;
 HaveMail := Config^.HasMailer;
 MailCfg := Nil;
 If HaveMail Then
