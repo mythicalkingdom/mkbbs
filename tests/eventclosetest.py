@@ -45,8 +45,8 @@ subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=dict(env, MKJSON=cj), 
 _lt = time.localtime()
 today = int(time.mktime((_lt.tm_year, _lt.tm_mon, _lt.tm_mday, 0, 0, 0, 0, 0, -1)))
 cfg = {'mk': build + '/mk', 'mkmon': build + '/mkmon', 'rundir': tmp + '/run', 'logfile': work + '/listen.log', 'workdir': ra, 'nodes': '1-2',
-       'ports': [{'port': 24651, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra},
-                 {'port': 24652, 'type': 'sysop', 'bind': '127.0.0.1', 'password': 'pw', 'config': ra}],
+       'ports': [{'port': 24781, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra},
+                 {'port': 24782, 'type': 'sysop', 'bind': '127.0.0.1', 'password': 'pw', 'config': ra}],
        'events': {'config': ra, 'mkevents': build + '/mkevents', 'interval': 1, 'clock': today + 3 * 3600}}
 json.dump(cfg, open(work + '/listen.json', 'w'))
 lst = subprocess.Popen([build + '/mklisten', '-c', work + '/listen.json'], stdout=subprocess.DEVNULL)
@@ -84,7 +84,7 @@ def conn(port):
 
 def login():
     """a caller of the BBS (language 1, the default): what he saw up to the menu"""
-    c = conn(24651)
+    c = conn(24781)
     seen = b''
     seen += until(c, b'language choice', 10); time.sleep(1.5); c.sendall(b'\r')
     seen += until(c, b'last name: ', 10); time.sleep(2.5)
@@ -106,7 +106,7 @@ try:
     check('the caller is told the BBS closes in 20 minutes', m is not None and m.group(1) in (b'19', b'20'), t[-300:])
     rem = re.search(rb'(\d+) Minutes Remaining', t)
     check('the caller\'s own prompt shows about 20 minutes remaining (the cap, not the hour of the user)', rem is not None and 18 <= int(rem.group(1)) <= 20, t[-300:])
-    mon = conn(24652)
+    mon = conn(24782)
     until(mon, b'Password: ', 3); mon.sendall(b'pw\r'); until(mon, b'Q quit', 5)
     mon.sendall(b'1\r'); until(mon, b'zzzz', 2.5)
     mon.sendall(b'\x01+')

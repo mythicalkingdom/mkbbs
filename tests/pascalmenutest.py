@@ -70,7 +70,7 @@ open(path, 'wb').write(d)
 
 cfg = {'mk': repo + '/build/mk', 'rundir': os.path.join(work, 'run'), 'logfile': os.path.join(work, 'listen.log'),
        'workdir': ra, 'nodes': '1-2',
-       'ports': [{'port': 24661, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra}]}
+       'ports': [{'port': 24761, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra}]}
 json.dump(cfg, open(os.path.join(work, 'listen.json'), 'w'))
 lst = subprocess.Popen([repo + '/build/mklisten', '-c', os.path.join(work, 'listen.json')], stdout=subprocess.DEVNULL)
 
@@ -119,7 +119,7 @@ def show(b):
 
 
 try:
-    c = conn(24661)
+    c = conn(24761)
     until(c, b'language choice', 10); time.sleep(1.5); c.sendall(b'\r')
     until(c, b'last name: ', 10); time.sleep(2.5)
     c.sendall(b'Mark May\r'); until(c, b'assword'); time.sleep(0.5); c.sendall(b'windows\r')

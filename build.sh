@@ -62,6 +62,25 @@ for t in smoke mertest merstress comtest dupetest doortest stdtest opentest synt
 done
 mkdir -p build/work
 build/smoke build/work
+# The slow tests run in four lanes at the same time (a lane runs its tests one after the other, in the order they are given here),
+# next to the rest of the tests, which run one after the other.  Each lane writes its own log; the logs are shown, and the build
+# fails if a lane failed, at the end.  The tests of different lanes use other ports and other work directories.
+LANEJOBS=""
+lane() {                               # lane <A-D> <function>
+  L=$1; F=$2
+  mkdir -p build/lanes
+  ( flock 9; "$F" ) 9> build/lanes/lock.$L > build/lanes/$F.log 2>&1 &
+  LANEJOBS="$LANEJOBS $!:$F"
+}
+lanewait() {                           # waits for the lanes, shows what they said, fails if one failed
+  LANEBAD=0
+  for J in $LANEJOBS; do
+    P=${J%%:*}; F=${J#*:}
+    if wait "$P"; then :; else LANEBAD=1; echo "FAIL lane job $F (see above)"; fi
+    cat build/lanes/$F.log
+  done
+  [ "$LANEBAD" = 0 ] || exit 1
+}
 build/mertest build/work | grep -E 'FAIL|failures'
 build/merstress build/work | grep -E 'FAIL|failures'
 build/comtest | grep -E 'FAIL|failures'
@@ -72,19 +91,25 @@ build/pwdtest | grep -E 'FAIL|failures'
 build/eventtest | grep -E 'FAIL|failures'
 mkdir -p build/work/pwconv
 python3 tests/pwconvtest.py build build/work/pwconv | grep -E '^(ok|FAIL|skip|failures)'
+par_1() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   rm -rf build/work/pwuser; mkdir -p build/work/pwuser; cp -r bbs/bbsc/ra/. build/work/pwuser/ 2>/dev/null || true
   MK=$PWD/build/work/pwuser build/pwusertest | grep -E 'FAIL|failures'
   python3 tests/pwlogintest.py build build/work/pwlogin | grep -E '^(FAIL|skip|failures)'
 fi
+}
+lane B par_1
 build/opentest build/work | grep -E 'FAIL|failures'
 build/syntest selftest build/work | grep -E 'FAIL|failures'
 build/teltest | grep -E "FAIL|failures"
 (cd build/work && ../charsettest) | grep -E "FAIL|failures"
 build/wstest | grep -E "FAIL|failures"
 build/listentest build/mklisten build/fakemk build/work 2>&1 | grep -E "^(FAIL|failures)"
+par_2() {
 mkdir -p build/work/mon
 python3 tests/montest.py build/mklisten build/fakemk build/mkmon build/work/mon | grep -E "^(FAIL|failures)"
+}
+lane C par_2
 python3 tests/monlocaltest.py build/mklisten build/mkmon build/work/monlocal | grep -E "^(FAIL|failures)"
 # the real Synchronet sample base (from the JS project): every index CRC must match ours
 if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then
@@ -117,16 +142,22 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   if grep -q FAIL build/readwork/result.txt; then exit 1; fi
 fi
 # MKMenu: edit, pick a command, insert, delete, save a private copy of a sample menu
+par_3() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/menuwork
   python3 tests/menutest.py build/menuwork | grep -E "^(ok|FAIL)" | tee build/menuwork/result.txt
   if grep -q FAIL build/menuwork/result.txt; then exit 1; fi
 fi
+}
+lane D par_3
 # mailer settings: mkconfig pages, Mailer.Mk, mkbinkcfg (and mkbink check when that project is built next to this one)
+par_4() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/mailertest.py build/mailwork | grep -E "^(ok|FAIL|skip)" | tee build/mailresult.txt
   if grep -q FAIL build/mailresult.txt; then exit 1; fi
 fi
+}
+lane D par_4
 # hold in the abstract message object (False where a base has no such flag)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/holdabstest tests/holdabstest.pas 2>&1 | grep -E "Error|Fatal" || true
 build/holdabstest | grep -E "^(ok|FAIL|failures)" | tee build/holdabsresult.txt
@@ -151,12 +182,18 @@ mkdir -p build/fidwork
 build/fidtest build/fidwork | grep -E "^(ok|FAIL|failures)" | tee build/fidresult.txt
 if grep -q FAIL build/fidresult.txt; then exit 1; fi
 # menu command 007 (external programs, doors): paths, parameters, drop files, the caller's input, a program that is not there
+par_5() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doormenutest.py build/work/doormenu | grep -E "^(ok|FAIL|skip)" | tee build/doormenuresult.txt
   if grep -q FAIL build/doormenuresult.txt; then exit 1; fi
 fi
+}
+lane A par_5
 # mkdraw: the screen editor (ANSI / AVATAR / ASCII screens) through a pseudo terminal
+par_6() {
 python3 tests/drawtest.py build build/work/draw | grep -E "^(FAIL|failures)"
+}
+lane D par_6
 # mkcat: CP437 text to the terminal
 python3 tests/cattest.py build build/work/cat | grep -E "^(FAIL|failures)"
 # the offline mail door (mkqwk): local mode on a private copy of the sample BBS, a real QWK packet
@@ -173,8 +210,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   if grep -q FAIL build/qwkindepresult.txt; then exit 1; fi
 fi
 # MKProt (Zmodem both ways) against the real lrzsz over a socketpair
+par_7() {
 python3 tests/prottest.py build build/work/prot | grep -E "^(ok|FAIL|skip|failures)" | tee build/protresult.txt
 if grep -q FAIL build/protresult.txt; then exit 1; fi
+}
+lane A par_7
 # mk -G<id>: a pass with a QWK network system (reply packet, packet of the hub, last read past the imported messages)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwknettest.py build build/work/qwknet | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwknetresult.txt
@@ -244,14 +284,20 @@ fi
 python3 tests/mailerlistentest.py build/mlwork | grep -E "^(ok|FAIL|skip)" | tee build/mlresult.txt
 if grep -q FAIL build/mlresult.txt; then exit 1; fi
 # mklisten runs the events: commands, events.sh, mailer actions, missed events, exclusive events
+par_8() {
 python3 tests/eventlistentest.py build/work/eventlisten | grep -E "^(ok|FAIL|skip)" | tee build/evresult.txt
 if grep -q FAIL build/evresult.txt; then exit 1; fi
+}
+lane C par_8
 # a caller before an exclusive event: told when the BBS closes, the call is cut to that (mk -T)
 python3 tests/eventclosetest.py build/work/eventclose | grep -E "^(ok|FAIL|skip)" | tee build/evclose.txt
 if grep -q FAIL build/evclose.txt; then exit 1; fi
 # a caller who is on when an exclusive event waits is told (plain, and forced with "warn")
+par_9() {
 ( python3 tests/eventwarntest.py build/work/eventwarn0 0; python3 tests/eventwarntest.py build/work/eventwarn1 1 ) | grep -E "^(ok|FAIL|skip)" | tee build/evwarn.txt
 if grep -q FAIL build/evwarn.txt; then exit 1; fi
+}
+lane B par_9
 # the events screen of mkmon
 python3 tests/eventsmontest.py build/work/eventsmon | grep -E "^(ok|FAIL|skip)" | tee build/evmon.txt
 if grep -q FAIL build/evmon.txt; then exit 1; fi
@@ -295,19 +341,28 @@ if [ -n "$PASCALFLAGS" ]; then
   fi
 fi
 # CP437 -> UTF-8 by terminal type: real telnet callers with different terminal types and ports
+par_10() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/charsetnettest.py build/work/charsetnet | grep -E "^(FAIL|failures)"
 fi
+}
+lane C par_10
 # MKUserEd: browse, edit, delete, search, add, validate on a private copy of the sample user files
+par_11() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/userwork
   python3 tests/usertest.py build/userwork | grep -E "^(ok|FAIL)" | tee build/userwork/result.txt
   if grep -q FAIL build/userwork/result.txt; then exit 1; fi
 fi
+}
+lane A par_11
 # the real mk with the sysop monitor: log in, chat from the monitor, time, kick (private copy of the sample BBS)
+par_12() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/chatwork
   python3 tests/chattest.py build/chatwork | grep -E "^(ok|FAIL)" | tee build/chatwork/result.txt
   if grep -q FAIL build/chatwork/result.txt; then exit 1; fi
 fi
-
+}
+lane B par_12
+lanewait

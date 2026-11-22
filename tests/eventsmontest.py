@@ -165,13 +165,13 @@ today = int(time.mktime((_lt.tm_year, _lt.tm_mon, _lt.tm_mday, 0, 0, 0, 0, 0, -1
 run = tempfile.mkdtemp(prefix='r', dir='/tmp')
 log = os.path.join(work, 'listen.log')
 cfg = {'mk': build + '/mk', 'mkmon': build + '/mkmon', 'rundir': run, 'logfile': log, 'workdir': ra, 'nodes': '1-2',
-       'ports': [{'port': 24661, 'type': 'sysop', 'bind': '127.0.0.1', 'password': 'sesame', 'config': ra}],
+       'ports': [{'port': 24771, 'type': 'sysop', 'bind': '127.0.0.1', 'password': 'sesame', 'config': ra}],
        'events': {'config': ra, 'mkevents': build + '/mkevents', 'interval': 1, 'clock': today + 3 * 3600}}
 json.dump(cfg, open(work + '/l.json', 'w'))
 lst = subprocess.Popen([build + '/mklisten', '-c', work + '/l.json'], stdout=subprocess.DEVNULL)
 try:
     check('mklisten writes events.info for the monitor', wait(lambda: os.path.exists(run + '/events.info'), 15))
-    t = Term(24661)
+    t = Term(24771)
     t.until(lambda: b'assword' in t.raw)
     t.send('sesame\r')
     t.until(lambda: 'MK sysop monitor' in t.screen())
