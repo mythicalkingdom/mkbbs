@@ -117,7 +117,7 @@ Procedure PickGroups(Data: Pointer; Title: String);
 Procedure EditEcho(Item: Word);
   Var
     F: CfgFormObj;
-    Replaces, NoCheck, KeepPath: Boolean;
+    Replaces, NoCheck: Boolean;
     Hub, FArea: Word;
 
   Begin
@@ -125,11 +125,10 @@ Procedure EditEcho(Item: Word);
   Cur^ := FE^.Area[Item];
   Replaces := (Cur^.Attr And feReplaces) <> 0;
   NoCheck := (Cur^.Attr And feNoCheck) <> 0;
-  KeepPath := (Cur^.Attr And feKeepPath) <> 0;
   Hub := Cur^.Hub;
   FArea := Cur^.FileArea;
   F.Init('File Echo ' + Long2Str(Item));
-  F.Window(3, 4, 76, 17);
+  F.Window(3, 4, 76, 15);
   F.At(2, 3, 2, 10);
   F.AddString('Tag:', Cur^.Tag, 40, 'The name of the file echo as the network knows it (blank = the echo is not used)');
   F.At(3, 3, 3, 10);
@@ -143,19 +142,16 @@ Procedure EditEcho(Item: Word);
   F.At(9, 3, 9, 22);
   F.AddYesNo('No check command:', NoCheck, 'Do not run the check command of File Echo Options for the files of this echo');
   F.At(10, 3, 10, 22);
-  F.AddYesNo('Keep path lines:', KeepPath, 'Pass the Seenby lines on as they came instead of cutting them to the systems that get the file');
-  F.At(12, 3, 12, 22);
   F.AddAction('Echo To...', PickEchoTo, Nil, '', 'The systems that get the files');
-  F.At(12, 30, 12, 46);
+  F.At(10, 30, 10, 46);
   F.AddAction('Groups...', PickGroups, Nil, '', 'The groups of the echo: a system may list and link to it when it has one of them');
   If F.Execute Then
     Begin
     Cur^.Hub := Hub;
     Cur^.FileArea := FArea;
-    Cur^.Attr := Cur^.Attr And Not (feReplaces Or feNoCheck Or feKeepPath);
+    Cur^.Attr := Cur^.Attr And Not (feReplaces Or feNoCheck);
     If Replaces Then Cur^.Attr := Cur^.Attr Or feReplaces;
     If NoCheck Then Cur^.Attr := Cur^.Attr Or feNoCheck;
-    If KeepPath Then Cur^.Attr := Cur^.Attr Or feKeepPath;
     FE^.Area[Item] := Cur^;
     End;
   Dispose(Cur);

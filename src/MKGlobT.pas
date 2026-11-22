@@ -186,7 +186,6 @@ Const
   MaxFileEchoes = 300;
   feReplaces = 1;                      {FileEchoAreaType.Attr: the TIC may name files it replaces}
   feNoCheck = 2;                       {the check command is not run for this echo}
-  feKeepPath = 4;                      {keep the Path / Seenby lines of the TIC when it is passed on (otherwise the Seenby lines are cut to the systems that get it)}
 
 Type FileEchoSysType = Record
   TicPwd: String[8];                   {the password in the TIC of this system (blank = none)}

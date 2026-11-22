@@ -43,8 +43,8 @@ def pstr(d, off, n):
 s = screen('\x1bc', 'e')
 check('EchoMail > File Echoes lists the 300 echoes, none used', 'File Echoes' in s and '(unused)' in s)
 s = screen('\x1bc', 'e', '\r')
-check('the echo form has Tag, About, File area, Hub, the three switches, Echo To and Groups',
-      all(w in s for w in ('Tag:', 'About:', 'File area:', 'Hub:', 'Replaces allowed:', 'No check command:', 'Keep path lines:', 'Echo To...', 'Groups...')))
+check('the echo form has Tag, About, File area, Hub, the two switches, Echo To and Groups',
+      all(w in s for w in ('Tag:', 'About:', 'File area:', 'Hub:', 'Replaces allowed:', 'No check command:', 'Echo To...', 'Groups...')))
 
 # echo 1: tag, about, file area 3, hub 2, replaces allowed
 screen('\x1bc', 'e', '\r', 'FSX_GEN', '\t', 'General files', '\t', '3', '\t', '2', '\t', ' ', '\r', '\x1b', '\x1bx', 'y')

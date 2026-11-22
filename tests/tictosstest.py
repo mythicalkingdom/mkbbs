@@ -9,6 +9,8 @@ import cfgpatch
 
 repo = os.path.realpath(os.path.join(here, '..'))
 build, work = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+mkbink = os.environ.get('MKBINK', os.path.join(repo, '..', 'mkbink', 'build', 'mkbink'))
+have_bink = os.path.exists(mkbink)
 srcra = os.path.join(repo, 'bbs', 'bbsc', 'ra')
 if not os.path.isdir(srcra):
     print('skip: no sample BBS'); sys.exit(0)
@@ -50,12 +52,13 @@ sec = lambda lv: {'Level': lv, 'Flags': 0}
 dj['files'] = {str(n): {'Name': 'Area %d' % n, 'ShortName': 'A%d' % n, 'FilePath': p, 'ViewSec': sec(0), 'DLSec': sec(0), 'ULSec': sec(255), 'PFileSec': sec(255), 'Attr': 0, 'Select': ''}
                for n, p in ((1, area1), (2, area2))}
 fe = dj['fileecho']
-fe['Area'] = {'1': {'Tag': 'FSX_GEN', 'Desc': 'General', 'FileArea': 1, 'EchoTo': 0, 'Hub': 1, 'Groups': 0, 'Attr': 1},
+fe['Area'] = {'1': {'Tag': 'FSX_GEN', 'Desc': 'General', 'FileArea': 1, 'EchoTo': 2, 'Hub': 1, 'Groups': 0, 'Attr': 1},
               '2': {'Tag': 'FSX_NOCK', 'FileArea': 2, 'EchoTo': 1, 'Hub': 0, 'Attr': 2},
-              '3': {'Tag': 'FSX_PASS', 'FileArea': 0, 'EchoTo': 1, 'Hub': 1},
+              '3': {'Tag': 'FSX_PASS', 'FileArea': 0, 'EchoTo': 2, 'Hub': 1},
+              '6': {'Tag': 'FSX_NOBODY', 'FileArea': 0, 'EchoTo': 1, 'Hub': 1},
               '4': {'Tag': 'FSX_FROM2', 'FileArea': 1, 'EchoTo': 0, 'Hub': 2},
               '5': {'Tag': 'FSX_BADAREA', 'FileArea': 77, 'EchoTo': 1, 'Hub': 1}}
-fe['Sys'] = {'1': {'TicPwd': 'tic1'}}
+fe['Sys'] = {'1': {'TicPwd': 'tic1'}, '2': {'TicPwd': 'pw2tic'}}
 json.dump(dj, open(cj + '/bbsconfig.json', 'w', encoding='utf-8'), ensure_ascii=False)
 subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True, input='', text=True)
 # the mailer settings: the tosser on
@@ -87,7 +90,7 @@ def tic(name, data, area='FSX_GEN', frm='1:110/100', pw='tic1', crc=None, size=N
 
 
 def toss():
-    r = run('mktoss', '-t', '-f')
+    r = run('mktoss', '-t', '-f', '-b', mkbink) if have_bink else run('mktoss', '-t', '-f')
     return r.stdout
 
 
@@ -180,12 +183,85 @@ out = toss()
 check('after a day it is bad: its file did not come', 'did not come' in out and os.path.exists(inb + '/badtic/' + t) and not os.path.exists(inb + '/' + t), out)
 open(inb + '/LATE.ZIP', 'wb').write(b'late')
 
-# 8. a pass-through echo is left alone for now
-t = tic('PASS.ZIP', b'pass me on', area='FSX_PASS')
-out = toss()
-check('a pass-through echo: left in the inbound (passing on is the next step), said so', 'pass-through echo FSX_PASS is left in the inbound' in out and os.path.exists(inb + '/' + t)
-      and os.path.exists(inb + '/PASS.ZIP'), out)
-check('... and counted as waiting in the summary', re.search(r'tic waiting', out) is not None and re.search(r'[1-9]\d* tic waiting', out), out[-300:])
+# 8. passing on: needs the real mkbink (mkbink queue)
+def flo():
+    """the entries of the BSO outbound of the systems: {file name: [lines]}"""
+    r = {}
+    for root, dirs, files in os.walk(outb):
+        for f in files:
+            if f.lower().endswith('lo'):
+                r[f] = open(os.path.join(root, f), encoding='latin-1').read().split()
+    return r
+
+
+def new_entries(before, after):
+    return {f: [x for x in v if x not in before.get(f, [])] for f, v in after.items() if [x for x in v if x not in before.get(f, [])]}
+
+
+spool = outb + '/mktoss/tic/'
+if have_bink:
+    before = flo()
+    data = b'a file to be passed on'
+    tic('FWD.ZIP', data, extra='Seenby 1:110/55\r\n')
+    out = toss()
+    nw = new_entries(before, flo())
+    ent = [x for v in nw.values() for x in v]
+    check('a file of an echo that goes to system 2: tossed, passed on to 1:110/200, said so', 'tossed FWD.ZIP' in out and 'passed on to 1:110/200' in out, out[-400:])
+    paths = [x.lstrip('^#') for x in ent]
+    fpath = [p for p in paths if p.endswith('FWD.ZIP')]
+    tpath = [p for p in paths if p.endswith('.tic')]
+    check('the mailer got the file first and then the TIC, both to be deleted after they were sent (^)', len(ent) == 2 and ent[0].startswith('^') and ent[0].endswith('FWD.ZIP') and ent[1].startswith('^') and ent[1].endswith('.tic'), ent)
+    check('... and the file in the spool is a hard link of the file in the area (one copy on the disk)',
+          fpath and os.path.exists(fpath[0]) and os.stat(fpath[0]).st_ino == os.stat(area1 + 'FWD.ZIP').st_ino and os.stat(area1 + 'FWD.ZIP').st_nlink == 2)
+    t = open(tpath[0], encoding='latin-1').read() if tpath and os.path.exists(tpath[0]) else ''
+    check('the TIC for system 2: from us (1:110/290), to 1:110/200, its password, the file, size, CRC, the description',
+          'From 1:110/290' in t and 'To 1:110/200' in t and 'Pw pw2tic' in t and 'File FWD.ZIP' in t and ('Size %d' % len(data)) in t and ('Crc %08X' % (zlib.crc32(data) & 0xFFFFFFFF)) in t and 'Desc A file' in t, t)
+    check('... Origin kept, our Path line after the one that was there, Seenby for the ones that had it, for us and for system 2',
+          'Origin 1:110/100' in t and re.search(r'Path 1:110/100 .*\nPath 1:110/290 \d+ \w{3} \w{3} \d\d \d\d:\d\d:\d\d \d{4} UTC mktoss', t)
+          and 'Seenby 1:110/100' in t and 'Seenby 1:110/55' in t and 'Seenby 1:110/290' in t and 'Seenby 1:110/200' in t, repr(t))
+    # a system in the Seenby lines does not get it again
+    before = flo()
+    tic('SEEN.ZIP', b'seen by system 2', extra='Seenby 1:110/200\r\n')
+    out = toss()
+    check('a system that is in the Seenby lines is not sent the file again', 'tossed SEEN.ZIP' in out and not new_entries(before, flo()) and 'passed on to' not in out, out[-300:])
+    # pass-through: no copy in the area, passed on, the inbound is clean
+    before = flo()
+    t = tic('PASS.ZIP', b'pass me on', area='FSX_PASS')
+    out = toss()
+    nw = new_entries(before, flo())
+    check('a pass-through echo: passed on to system 2, no copy kept (not in any area), gone from the inbound', 'passed through PASS.ZIP' in out and 'passed on to 1:110/200' in out
+          and sum(len(v) for v in nw.values()) == 2 and not os.path.exists(inb + '/PASS.ZIP') and not os.path.exists(inb + '/' + t)
+          and not os.path.exists(area1 + 'PASS.ZIP') and not os.path.exists(area2 + 'PASS.ZIP'), (nw, flo()))
+    check('... the file waits in the spool for the mailer', any(os.path.exists(x.lstrip('^#')) for v in nw.values() for x in v if x.endswith('PASS.ZIP')))
+    # nobody to pass it to
+    t = tic('NOBODY.ZIP', b'nowhere to go', area='FSX_NOBODY')
+    before = flo()
+    out = toss()
+    check('a pass-through echo that goes only to the system it came from: dropped, said so, the inbound is clean', 'no system to pass it on to, dropped' in out and not new_entries(before, flo())
+          and not os.path.exists(inb + '/NOBODY.ZIP') and not os.path.exists(inb + '/' + t), out[-300:])
+    check('the summary counts what was passed on and through', re.search(r'\d+ tic passed on, \d+ passed through, \d+ dropped', out) is not None, out[-300:])
+    # the spool: files that wait too long, and the limit in MB
+    now = int(time.time())
+    for name, age, size in (('02-%d-901' % (now - 20 * 86400), 'OLD.BIN', 10), ('02-%d-902' % (now - 100), 'MID.BIN', 700 * 1024), ('02-%d-903' % (now - 50), 'NEW.BIN', 700 * 1024)):
+        pass
+    os.makedirs(spool + '02-%d-901' % (now - 20 * 86400), exist_ok=True)
+    open(spool + '02-%d-901/OLD.BIN' % (now - 20 * 86400), 'wb').write(b'x' * 10)
+    os.makedirs(spool + '02-%d-902' % (now - 100), exist_ok=True)
+    open(spool + '02-%d-902/MID.BIN' % (now - 100), 'wb').write(b'x' * 700 * 1024)
+    os.makedirs(spool + '02-%d-903' % (now - 50), exist_ok=True)
+    open(spool + '02-%d-903/NEW.BIN' % (now - 50), 'wb').write(b'x' * 700 * 1024)
+    os.makedirs(spool + '02-%d-904' % (now - 10), exist_ok=True)         # nothing in it: its files were sent
+    out = toss()
+    check('the spool: a directory that waited more than 14 days (PassDays) is dropped, an empty one goes', 'waited more than 14 days: dropped' in out and not os.path.exists(spool + '02-%d-901' % (now - 20 * 86400))
+          and not os.path.exists(spool + '02-%d-904' % (now - 10)), out[-300:])
+    d = json.load(open(cj + '/bbsconfig.json', encoding='utf-8')); d['fileecho']['PassMaxMB'] = 1
+    json.dump(d, open(cj + '/bbsconfig.json', 'w', encoding='utf-8'), ensure_ascii=False)
+    subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True, input='', text=True)
+    out = toss()
+    check('the spool over its limit (PassMaxMB 1): the oldest directory goes first, the newer stays',
+          'spool over 1 MB' in out and not os.path.exists(spool + '02-%d-902' % (now - 100)) and os.path.exists(spool + '02-%d-903/NEW.BIN' % (now - 50)), out[-300:])
+else:
+    print('skip: no mkbink, passing on is not checked')
 
 # 9. a TIC that is not a TIC
 open(inb + '/junk.tic', 'w').write('this is not a tic file\n')

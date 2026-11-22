@@ -2216,6 +2216,12 @@ Function TicOurs(A: String): Boolean;
   End;
 
 
+Function TicOurAddress(Sys: Word): String;
+  Begin
+  TicOurAddress := AddrStr(Ours[1]);
+  End;
+
+
 Procedure CountUnsecure;
   Var
     M: ^MailerCfgType;
@@ -3208,6 +3214,10 @@ Tossed := 0; Dups := 0; Bad := 0; Netmails := 0; Passed := 0; Forwarded := 0; Sc
 Problems := False;
 FillChar(TicRes, SizeOf(TicRes), 0);
 TicLog := Log;
+TicQueue := QueueFile;
+TicFlavour := FlavourOf;
+TicOurAddr := TicOurAddress;
+TicSpoolDir := SpoolDir + 'tic/';
 TicIsOurs := TicOurs;
 Dupes.Init;
 Dupes.Open(InDir + 'dupe.mk', 20000);
@@ -3232,7 +3242,8 @@ Log('mktoss done: ' + Long2Str(Tossed) + ' tossed, ' + Long2Str(Netmails) + ' ne
   ' passed through, ' + Long2Str(Dups) + ' duplicates, ' + Long2Str(Bad) + ' bad; ' + Long2Str(Forwarded) +
   ' passed on, ' + Long2Str(Scanned) + ' scanned, ' + Long2Str(NetSent) + ' netmail sent, ' + Long2Str(FreqMade) + ' file request(s) made, ' + Long2Str(Areafixes) +
   ' areafix' + Copy('; ' + Long2Str(TicRes.Tossed) + ' tic tossed, ' + Long2Str(TicRes.Bad) + ' bad tic, ' + Long2Str(TicRes.Dupes) + ' tic duplicate(s), ' +
-  Long2Str(TicRes.Waiting + TicRes.Passthru) + ' tic waiting', 1, 120 * Ord(TicRes.Tossed + TicRes.Bad + TicRes.Dupes + TicRes.Waiting + TicRes.Passthru > 0)));
+  Long2Str(TicRes.Waiting) + ' tic waiting, ' + Long2Str(TicRes.PassedOn) + ' tic passed on, ' + Long2Str(TicRes.Passthru) + ' passed through, ' + Long2Str(TicRes.Dropped) + ' dropped', 1,
+  200 * Ord(TicRes.Tossed + TicRes.Bad + TicRes.Dupes + TicRes.Waiting + TicRes.Passthru + TicRes.PassedOn + TicRes.Dropped > 0)));
 If Problems Then
   Halt(2);
 End.

@@ -1,6 +1,6 @@
 # TIC file echoes: plan
 
-Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`) and 3 (tossing) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
+Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`), 3 (tossing) and 4 (passing on) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
 before any code is written (the same way the QWKE specification was read before `TOREADER.EXT` was done).
 
 ## Decided 2026-11-22
@@ -16,6 +16,19 @@ before any code is written (the same way the QWKE specification was read before 
 6. **The pass-through spool is limited**: days a file waits for a system (`PassDays`, default 14) and the most it may hold (`PassMaxMB`, 0 = no limit, the oldest go first).
 7. Any FTN network; the sysop's FSX systems are for testing.
 
+## Phase 4 (done): passing on and pass-through
+
+After a file is stored (or, for a pass-through echo, instead of storing it) `MKTicToss` passes it on to each system the echo goes to (*Echo To*), except the system it came from, the
+ones in its `Seenby` lines or `Path`, and ourselves.  For each one: a directory of its own in the spool (`<outbound>/mktoss/tic/`, or *Pass-thru spool* of File Echo Options) named
+`<system>-<seconds>-<number>`, a hard link to the file in it (a copy across disks), and a new TIC: `From` is our address, `To` the system, `Pw` its TIC password (blank when none),
+`Created` `by mktoss`, `Path` the old lines and ours (`address seconds date UTC mktoss`), `Seenby` the old lines, ours and the systems that get it now; everything else (`Origin`, `Desc`,
+`Ldesc`, `Crc`, `Replaces`, `Magic`, unknown lines) as it came.  Both go to the mailer with `mkbink queue` in the flavour of the system, **the file first, the TIC after it**, both
+deleted after they were sent (so the area keeps its file).  A pass-through echo with no system left to pass it to is dropped (said so).  The spool is cleaned at every run: a
+directory with nothing left in it goes, one older than *Pass-thru days* (14 by default) goes, and while the spool is over *Pass-thru MB* the oldest go first (the numbers count every
+link as a file).  The `feKeepPath` switch of phase 1 was taken out: the old `Path` and `Seenby` lines are always kept.  The summary line of `mktoss` now says how many were passed on,
+passed through and dropped.  Tests: `tests/tictosstest.py` (with the mkbink of the neighbouring project: the entries of the BSO outbound, the hard link, the TIC of system 2, the
+`Seenby` rule, pass-through, nobody to pass to, the spool limits).
+
 ## Phase 3 (done): tossing a TIC
 
 `src/MKTicToss.pas`, called by `mktoss` after the packets (and only with the tosser switched on, as the mail is).  For each `*.tic` of the **secure** inbound, in this order:
@@ -26,7 +39,7 @@ address is not in `Path`; the file has the size and CRC of the TIC; it is not a 
 the inbound (a name that is there already gets the time added) and the log says why.  What passes: the file with that name that is in the area (another CRC) is replaced, the files
 `Replaces` names go too when the echo allows it, the file is moved (copied and deleted across disks) under the name the TIC gives, gets the date of the TIC, and `files.bbs`
 gets a line with the description and the `Ldesc` lines under it (the old lines of replaced files, and their long descriptions, are taken out; the file is written new and renamed).
-A file area with no directory is bad; a directory that is not there makes the TIC wait.  **A pass-through echo is left in the inbound** (counted as waiting) until phase 4.
+A file area with no directory is bad; a directory that is not there makes the TIC wait.  **A pass-through echo is only passed on (phase 4).**
 The summary line of `mktoss` ends with `; N tic tossed, N bad tic, N tic duplicate(s), N tic waiting` when there were TICs.  Test: `tests/tictosstest.py`.
 
 ## Phase 2 (done): `MKTic.pas`
@@ -46,7 +59,7 @@ The summary line of `mktoss` ends with `; N tic tossed, N bad tic, N tic duplica
 
 * **`fileecho.mk`**: one record of 33024 bytes (`FileEchoCfgType` in `MKGlobT.pas`): version; `CheckCmd`, `CheckTimeout`, `SpoolPath`, `PassDays`, `PassMaxMB`, flags; 32 systems
   (`TicPwd`, `FixPwd`, `Groups`: the same numbers as the echo systems); 300 echoes (`Tag`, `Desc`, `FileArea`, `EchoTo`, `Hub`, `Groups`, `Attr`: `feReplaces`,
-  `feNoCheck`, `feKeepPath`).  Groups are the letters A to Z (bit 0 = A): an echo with no group is open to every system, one with groups only to the systems that have one
+  `feNoCheck`).  Groups are the letters A to Z (bit 0 = A): an echo with no group is open to every system, one with groups only to the systems that have one
   of them.  A missing file means the defaults (no echoes, a 60 second check, 14 days).
 * **Access:** `Config^.HasFileEcho`, `GetFileEcho`, `SetFileEcho` (`MKCfgAbs`, `MKCfgMK`), and `"fileecho"` in `bbsconfig.json` (`MKCfgJs`, `CfgJson.Inc` from `tools/genjsoncfg.py`,
   `mkcfgcvt`).
@@ -154,7 +167,7 @@ records instead of the message ones.  Groups limit what a system may see and lin
 1. Configuration: `fileecho.mk`, JSON, `mkcfgcvt`, `mkconfig` screens, tests.  **Done.**
 2. `MKTic.pas` and its unit test.  **Done.**
 3. Tossing without passing on (checks, the file into the area, `files.bbs`, `badtic/`, the dupe file), tests.  **Done.**
-4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.
+4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.  **Done.**
 5. `mkhatch`.
 6. FileFix.
 7. Docs, the round trip test, the full build.

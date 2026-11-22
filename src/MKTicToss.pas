@@ -15,7 +15,14 @@ Unit MKTicToss;   {Tossing TIC files (file echoes): the files that came in with 
   What is not right goes, with its file, to badtic/ in the inbound and the log says why.  What is right goes to the file area of the echo:
   a file with that name that is there (another CRC: a new file) is replaced, the files that Replaces names too when the echo allows it, the
   file gets the date of the TIC, and a line (and the long description) is added to files.bbs of the area.  A pass-through echo (no file
-  area) is left alone in this version (passing on is the next step).
+  area) is not kept, only passed on.
+
+  Passing on: for each system the echo goes to, except the one it came from, the ones in its Seenby lines and ourselves, a new TIC (our address in
+  From, the system in To, its TIC password in Pw, a Path line of ours, and Seenby lines for the ones that had it, for us and for the systems that get
+  it) and the file go to the mailer (mkbink queue; the file first, then the TIC).  Each system gets its own directory in the spool
+  (<outbound>/mktoss/tic/ or File Echo Options) with a hard link to the file (a copy across disks) and the TIC; both are deleted after they
+  were sent.  A file that waits there for a system that does not fetch it is dropped after PassDays and, when the spool is over PassMaxMB,
+  the oldest go first.
 }
 
 {$I MKB.Def}
@@ -26,14 +33,20 @@ Var
   TicLog: Procedure(S: String);         {the log of the tosser}
   TicIsOurs: Function(A: String): Boolean;  {an address of ours}
   TicNow: LongInt;                      {seconds since 1970; 0 = the clock}
+  TicQueue: Function(Sys: Word; Flav: Char; Path: String; Act: Char): Boolean;   {a file for a system to the mailer; Act ^ = delete it after it was sent}
+  TicFlavour: Function(Sys: Word): Char;
+  TicOurAddr: Function(Sys: Word): String;  {the address of ours that the system is sent from}
+  TicSpoolDir: String;                  {where the files for the systems wait (default; File Echo Options can name another)}
 
 Type
   TicTossResult = Record
-    Tossed, Bad, Dupes, Waiting, Passthru: Word;
+    Tossed, Bad, Dupes, Waiting, Passthru, PassedOn, Dropped: Word;
     End;
 
 Procedure TicTossInbound(InDir: String; Var R: TicTossResult);
   {all the TICs of the directory (with the slash at the end)}
+Procedure TicCleanSpool;
+  {what waits too long or too much in the spool goes; empty directories go}
 
 Implementation
 
@@ -424,6 +437,271 @@ Procedure DropOld(D: String; Pattern: String; Keep: String; ListName: String; Va
   End;
 
 
+{---------------------------------------------------------------- passing on}
+
+Var
+  Seq: Word;
+
+
+Function Spool: String;
+  Var
+    S: String;
+
+  Begin
+  S := FE^.SpoolPath;
+  If S = '' Then
+    S := TicSpoolDir;
+  If (S <> '') And (S[Length(S)] <> '/') Then
+    S := S + '/';
+  Spool := S;
+  End;
+
+
+Function MakeDirs(D: String): Boolean;
+  {the directory and the ones above it}
+  Var
+    i: Word;
+
+  Begin
+  For i := 2 To Length(D) Do
+    If D[i] = '/' Then
+      If Not DirExist(Copy(D, 1, i - 1)) Then
+        MkDir(Copy(D, 1, i - 1));
+  If IoResult <> 0 Then;
+  MakeDirs := DirExist(D);
+  End;
+
+
+Function LinkOrCopy(Src, Dst: String): Boolean;
+  Begin
+  If fpLink(Src, Dst) = 0 Then
+    LinkOrCopy := True
+  Else
+    LinkOrCopy := CopyFile(Src, Dst);
+  End;
+
+
+Procedure PassOn(Var T: TicType; Src: String; Echo, Sender: Word; Var R: TicTossResult);
+  {the file (Src, a file that is going to stay or to go) and its TIC to the systems that get the echo}
+  Var
+    Targets: Array[1..32] Of Word;
+    NumT, i, s, k: Word;
+    A: AddrType;
+    U: ^TicType;
+    Ours, D, TicP: String;
+    Failed: Boolean;
+    Mask: LongInt;
+    Flav: Char;
+
+  Begin
+  NumT := 0;
+  Mask := FE^.Area[Echo].EchoTo;
+  For s := 1 To 32 Do
+    If (s <> Sender) And ((Mask And (LongInt(1) Shl (s - 1))) <> 0) Then
+      Begin
+      Config^.GetEchoToAddr(s, A);
+      If (A.Zone <> 0) And (Not TicInSeen(T, AddrStr(A))) And (Not TicInPath(T, AddrStr(A))) And
+         (Not ((@TicIsOurs <> Nil) And TicIsOurs(AddrStr(A)))) Then
+        Begin
+        Inc(NumT);
+        Targets[NumT] := s;
+        End;
+      End;
+  If NumT = 0 Then
+    Begin
+    If FE^.Area[Echo].FileArea = 0 Then
+      Begin
+      Say('  ' + T.FileName + ' for ' + T.Area + ': no system to pass it on to, dropped');
+      Inc(R.Dropped);
+      End;
+    Exit;
+    End;
+  New(U);
+  Failed := False;
+  For i := 1 To NumT Do
+    Begin
+    s := Targets[i];
+    Config^.GetEchoToAddr(s, A);
+    If @TicOurAddr <> Nil Then
+      Ours := TicOurAddr(s)
+    Else
+      Ours := '';
+    Repeat                             {a directory that is not there yet: two runs in one second do not meet}
+      D := Spool + PadLeft(Long2Str(s), '0', 2) + '-' + Long2Str(Now_) + '-' + Long2Str(Seq) + '/';
+      Inc(Seq);
+    Until Not DirExist(D);
+    If (Not MakeDirs(D)) Or (Not LinkOrCopy(Src, D + T.FileName)) Then
+      Begin
+      Say('  cannot make ' + D + T.FileName + ' for ' + AddrStr(A));
+      Failed := True;
+      Continue;
+      End;
+    U^ := T;
+    U^.From := Ours;
+    U^.ToAddr := AddrStr(A);
+    U^.Pw := FE^.Sys[s].TicPwd;
+    U^.Created := 'by mktoss';
+    TicAddPath(U^, Ours, Now_, 'mktoss');
+    TicAddSeen(U^, Ours);
+    For k := 1 To NumT Do
+      Begin
+      Config^.GetEchoToAddr(Targets[k], A);
+      TicAddSeen(U^, AddrStr(A));
+      End;
+    Config^.GetEchoToAddr(s, A);
+    TicP := D + TicCrcStr(Now_ + Seq) + '.tic';
+    If Not TicWrite(TicP, U^) Then
+      Begin
+      Say('  cannot write ' + TicP);
+      Failed := True;
+      Continue;
+      End;
+    If @TicFlavour <> Nil Then
+      Flav := TicFlavour(s)
+    Else
+      Flav := 'H';
+    If (@TicQueue = Nil) Or (Not TicQueue(s, Flav, D + T.FileName, '^')) Or (Not TicQueue(s, Flav, TicP, '^')) Then
+      Failed := True
+    Else
+      Begin
+      Inc(R.PassedOn);
+      Say('  passed on to ' + AddrStr(A) + ' (' + Flav + ')');
+      End;
+    End;
+  Dispose(U);
+  If Failed Then
+    Inc(R.Waiting);
+  End;
+
+
+Procedure RemoveDir(D: String);
+  {a spool directory and what is in it}
+  Var
+    SF: SearchRec;
+
+  Begin
+  FindFirst(D + '*', AnyFile, SF);
+  While DosError = 0 Do
+    Begin
+    If (SF.Attr And Directory) = 0 Then
+      fpUnlink(D + SF.Name);
+    FindNext(SF);
+    End;
+  FindClose(SF);
+  fpRmDir(D);
+  End;
+
+
+Procedure TicCleanSpool;
+  {the directories of the spool are <system>-<seconds>-<number>: one older than PassDays goes, the oldest go while the spool is over PassMaxMB,
+   an empty one (its files were sent) goes}
+  Var
+    SR, SF: SearchRec;
+    Names: Array[1..400] Of String[40];
+    Secs: Array[1..400] Of LongInt;
+    Sizes: Array[1..400] Of LongInt;
+    n, i, j, k: Word;
+    Total, Limit, MaxAge, T: LongInt;
+    S, D, Nm: String;
+    Files: Word;
+    Own: Boolean;
+
+  Begin
+  If FE = Nil Then
+    Begin
+    If Not Config^.HasFileEcho Then
+      Exit;
+    New(FE);
+    Config^.GetFileEcho(FE^);
+    Own := True;
+    End
+  Else
+    Own := False;
+  S := Spool;
+  If (S <> '') And DirExist(S) Then
+    Begin
+    MaxAge := FE^.PassDays;
+    If MaxAge = 0 Then
+      MaxAge := 14;
+    n := 0;
+    FindFirst(S + '*', Directory, SR);
+    While (DosError = 0) And (n < 400) Do
+      Begin
+      If ((SR.Attr And Directory) <> 0) And (SR.Name <> '.') And (SR.Name <> '..') And (Pos('-', SR.Name) = 3) Then
+        Begin
+        Inc(n);
+        Names[n] := SR.Name;
+        k := Pos('-', Copy(SR.Name, 4, 40));
+        If k = 0 Then
+          k := 20;
+        Secs[n] := Str2Long(Copy(SR.Name, 4, k - 1));
+        End;
+      FindNext(SR);
+      End;
+    FindClose(SR);
+    Total := 0;
+    For i := 1 To n Do
+      Begin
+      D := S + Names[i] + '/';
+      Sizes[i] := 0;
+      Files := 0;
+      FindFirst(D + '*', AnyFile, SF);
+      While DosError = 0 Do
+        Begin
+        If (SF.Attr And Directory) = 0 Then
+          Begin
+          Sizes[i] := Sizes[i] + SF.Size;
+          Inc(Files);
+          End;
+        FindNext(SF);
+        End;
+      FindClose(SF);
+      If Files = 0 Then
+        Begin
+        fpRmDir(D);
+        Sizes[i] := -1;
+        End
+      Else If Now_ - Secs[i] > MaxAge * 86400 Then
+        Begin
+        Say('spool ' + Names[i] + ': waited more than ' + Long2Str(MaxAge) + ' days: dropped');
+        RemoveDir(D);
+        Sizes[i] := -1;
+        End
+      Else
+        Total := Total + Sizes[i];
+      End;
+    Limit := LongInt(FE^.PassMaxMB) * 1024 * 1024;
+    If (Limit > 0) And (Total > Limit) Then
+      Begin
+      For i := 1 To n Do
+        For j := i + 1 To n Do
+          If Secs[j] < Secs[i] Then
+            Begin
+            T := Secs[i]; Secs[i] := Secs[j]; Secs[j] := T;
+            T := Sizes[i]; Sizes[i] := Sizes[j]; Sizes[j] := T;
+            Nm := Names[i]; Names[i] := Names[j]; Names[j] := Nm;
+            End;
+      i := 1;
+      While (Total > Limit) And (i <= n) Do
+        Begin
+        If Sizes[i] >= 0 Then
+          Begin
+          Say('spool over ' + Long2Str(FE^.PassMaxMB) + ' MB: ' + Names[i] + ' dropped');
+          RemoveDir(S + Names[i] + '/');
+          Total := Total - Sizes[i];
+          End;
+        Inc(i);
+        End;
+      End;
+    End;
+  If Own Then
+    Begin
+    Dispose(FE);
+    FE := Nil;
+    End;
+  End;
+
+
 Procedure OneTic(InDir, TicName: String; Var R: TicTossResult);
   Var
     T: TicType;
@@ -431,7 +709,7 @@ Procedure OneTic(InDir, TicName: String; Var R: TicTossResult);
     Rc, Sys, Echo, AreaNo: Word;
     Crc, Size, Status: LongInt;
     i: Word;
-    A: AddrType;
+    A, A0: AddrType;
 
   Begin
   Rc := TicParse(InDir + TicName, T);
@@ -472,6 +750,8 @@ Procedure OneTic(InDir, TicName: String; Var R: TicTossResult);
     End;
   Path := InDir + FileName;
   Sys := SystemOf(T.From);
+  If Sys > 0 Then
+    Config^.GetEchoToAddr(Sys, A0);
   If Sys = 0 Then
     Begin
     ToBad(InDir, TicName, FileName, 'from ' + T.From + ' that is not one of the echo systems');
@@ -539,8 +819,12 @@ Procedure OneTic(InDir, TicName: String; Var R: TicTossResult);
       End;
   AreaNo := FE^.Area[Echo].FileArea;
   If AreaNo = 0 Then
-    Begin
-    Say('TIC ' + TicName + ': ' + T.FileName + ' for the pass-through echo ' + T.Area + ' is left in the inbound (passing on comes later)');
+    Begin                              {pass-through: no copy for the BBS, the file only goes on}
+    PassOn(T, Path, Echo, Sys, R);
+    AddDupe(InDir, T);
+    fpUnlink(InDir + TicName);
+    fpUnlink(Path);
+    Say('passed through ' + T.FileName + ' (' + Long2Str(Size) + ' bytes) of ' + T.Area + ' from ' + AddrStr(A0));
     Inc(R.Passthru);
     Exit;
     End;
@@ -588,6 +872,7 @@ Procedure OneTic(InDir, TicName: String; Var R: TicTossResult);
   ListUpdate(ListName, T.FileName, False, T.FileName, T, True);
   AddDupe(InDir, T);
   fpUnlink(InDir + TicName);
+  PassOn(T, D + T.FileName, Echo, Sys, R);
   Config^.GetEchoToAddr(Sys, A);
   Say('tossed ' + T.FileName + ' (' + Long2Str(Size) + ' bytes) into file area ' + Long2Str(AreaNo) + ' from ' + T.Area + ' (from ' + AddrStr(A) + ')');
   Inc(R.Tossed);
@@ -620,6 +905,7 @@ Procedure TicTossInbound(InDir: String; Var R: TicTossResult);
   FindClose(SR);
   For i := 1 To n Do
     OneTic(InDir, Names[i], R);
+  TicCleanSpool;
   Dispose(FE);
   FE := Nil;
   End;
