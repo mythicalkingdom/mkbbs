@@ -29,7 +29,7 @@ maps = {(src + '/').encode(): (ra + '/').encode(), (srcmenus + '/').encode(): (m
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: maps.get(s, s))
 
 # the programs: in the BBS directory, one in a subdirectory (reached with a DOS style path)
-os.makedirs(ra + '/games')
+os.makedirs(ra + '/games', exist_ok=True)
 open(ra + '/quiz.pas', 'w').write("var n: string; x: integer;\nbegin\n  write('Your name? '); readln(n); writeln('Hello ', n);\n  write('Number? '); readln(x); writeln('double ', x * 2)\nend.\n")
 open(ra + '/err.pas', 'w').write("begin\n  writeln('start');\n  x := 1\nend.\n")
 open(ra + '/inp.pas', 'w').write("var s: string;\nbegin\n  write('Say? '); readln(s); writeln('never')\nend.\n")
