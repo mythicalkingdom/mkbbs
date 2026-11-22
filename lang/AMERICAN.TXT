@@ -453,3 +453,11 @@
 ;
 ; Added for MK (events): said to a caller who is online when an exclusive event is waiting for the callers to leave
 536 The BBS is about to close for maintenance. Please finish and log off.
+;
+; Added for MK (passwords): the failures since the last log-on, an expired password, one that expires soon
+537 Wrong passwords typed for your account since your last log-on:
+538 Your password has expired. You must choose a new one now.
+539 The new password must be different from the old one.
+540 Your password expires in
+541 day(s).
+542 The password was not changed: this call ends.

@@ -290,7 +290,7 @@ Procedure HashUsers;
         Else
           Begin
           {the hash first, then the field: a stop in between leaves the plain password working}
-          If Not PwdHashSet(H, UR.Pwd, True) Then
+          If Not PwdHashSetKeep(H, UR.Pwd, True) Then       {a conversion is not a new password: the state stays}
             Begin
             WriteLn('No random numbers: stopped');
             Halt(1);

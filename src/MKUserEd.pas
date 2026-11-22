@@ -159,6 +159,8 @@ Procedure BuildLines;
     'Zero Pkt: ' + Pad2(YN(UR.OffZero), 5) + 'GateWay: ' + Pad2(YN(UR.OffGate), 5) +
     'Areas: ' + UR.OffCount);
   Add(' Time Bank Minutes: ' + Long2Str(UR.BankMin));
+  If UR.PwdText <> '' Then
+    Add(' Password: ' + UR.PwdText + Copy('   [LOCKED]', 1, 11 * Ord(UR.Locked)));
   End;
 
 

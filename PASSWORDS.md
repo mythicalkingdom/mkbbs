@@ -98,6 +98,45 @@ Neither setting converts users who never log on.  For those:
 Exit status: 0 done or nothing to do, 1 a file could not be read or written, 2 a size that fits no record, 3 a backup is in the
 way, 4 not an MK configuration or `-x` needed, 5 callers on line.
 
+## Limits: locking and expiry
+
+Both work for **MK users in MK configurations**, plain or hashed password alike, and both are **off until the sysop turns them on**
+(`mkconfig` > General > Security > Options; they are stored with a marker, so the bytes that an older `config.mk` has in those places are
+never taken for settings).
+
+| Setting | Meaning |
+|---|---|
+| **Lock After Failures** | wrong passwords in a row, over all calls, after which the account is locked (0 = never) |
+| **Locked For (minutes)** | how long a locked account stays locked (15 when not set) |
+| **Password Expires (days)** | a password is good for this many days (0 = never) |
+| **Warn Before Expiry (days)** | the caller is told at log-on when the password has this many days or fewer left (0 = no warning) |
+
+(`Password Tries`, the wrong passwords in one call before the line is dropped, is the old setting and works as before.)
+
+**Locking.**  Every wrong password is counted for the account and kept at once in `extusers.bbs` (only the state, not the rest of
+the record), so dropping the line and calling again does not start a new count.  The count of `Lock After Failures` locks the
+account for `Locked For` minutes.  While it is locked **no password is taken, the right one included**, and the caller sees the
+ordinary "incorrect password" and nothing that says there is a lock (so a stranger cannot find out which names exist); the log
+says `The account of X is locked for N minute(s)` and, for every try, `Locked account X tried a password`.  A good password
+resets the count; the failures there were since the last good log-on are told to the caller ("Wrong passwords typed for your
+account since your last log-on: 3") and logged.  The first wrong password after a lock that is over is a new count.  The login
+of QWK network systems (`mk -Q`) counts and locks in the same way.  In `mkusered` an account shows `[LOCKED]`, and the
+**Locked** switch of the edit form unlocks it (and forgets the failures) or locks it by hand.
+
+**Expiry.**  The day a password was set is kept in the same state, and every way of setting one sets it (a new user, *Your
+settings > Password*, the editor, the forced change below); the conversion to a hash does not, and nor does a hash that is renewed.  A
+password whose date is not known (an account from before) starts its clock at its next good log-on: nobody is made to change at
+once.  After `Password Expires` days the caller who gives the right password must choose a new one before anything else (it must
+differ from the old one and meet the minimum length; three tries, then the call ends and nothing changes).  A QWK network system is
+never asked (nobody is there to answer).
+
+**The login guard of `mklisten`** is a second, separate limit: it counts failed log-ons **by address** and keeps a stranger out
+before a node is used (`"loginguard"` in `mklisten.json`, see `MKLISTEN.md`).
+
+The state is in the hash block of the user's `extusers.bbs` record (`PwStateType` in `Struct.MK`: `Changed`, `Fails`, `FailTime`,
+`LockUntil`; it took 13 of the 128 reserved bytes, the record keeps its size).  `tests/pwstate.pas` shows or sets it for tests.
+The texts are in the language files (prompts 537 to 542); a language file without them gives the English words.
+
 ## Notes for sysops who run other software
 
 * Do not convert a user base that Remote Access, QuickBBS or SuperBBS also reads from the same `users.bbs`: they would see
@@ -108,5 +147,5 @@ way, 4 not an MK configuration or `-x` needed, 5 callers on line.
 ## Where it is in the code
 
 `src/MKPwd.pas` (SHA-256, HMAC, PBKDF2 and the hash block), `Struct.MK` (`PwHashType`, `ExtUserType`), `MKDoor.pas`
-(`CheckUserPwd`, `ChangeUserPwd`), `MKName.pas` (the user editor), `MKPwConv.pas` (the conversion).  Tests: `tests/pwdtest.pas`,
-`tests/pwusertest.pas`, `tests/pwlogintest.py`, `tests/pwconvtest.py`.
+(`CheckUserPwd`, `ChangeUserPwd`, `PwdLocked`, `NoteBadPwd`, `PwdDaysLeft`), `MKLogOn.pas` (`TryPassword`, `PasswordNotices`), `MKName.pas` (the user editor), `MKPwConv.pas` (the conversion).  Tests: `tests/pwdtest.pas`,
+`tests/pwusertest.pas`, `tests/pwlogintest.py`, `tests/pwlimittest.py`, `tests/loginguardtest.py`, `tests/pwconvtest.py`.

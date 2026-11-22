@@ -56,7 +56,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest eventtest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest pwstate eventtest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -111,6 +111,16 @@ mkdir -p build/work/mon
 python3 tests/montest.py build/mklisten build/fakemk build/mkmon build/work/mon | grep -E "^(FAIL|failures)"
 }
 lane C par_2
+# password limits: locking after wrong passwords, the expiry of a password; the login guard of mklisten (counts failed log-ons per address)
+par_pwlimits() {
+  if [ -f bbs/bbsc/ra/config.mk ]; then
+    python3 tests/pwlimittest.py build/work/pwlimit | grep -E "^(ok|FAIL|skip)" | tee build/pwlimitresult.txt
+    if grep -q FAIL build/pwlimitresult.txt; then exit 1; fi
+    python3 tests/loginguardtest.py build/work/loginguard | grep -E "^(ok|FAIL|skip)" | tee build/loginguardresult.txt
+    if grep -q FAIL build/loginguardresult.txt; then exit 1; fi
+  fi
+}
+lane C par_pwlimits
 python3 tests/monlocaltest.py build/mklisten build/mkmon build/work/monlocal | grep -E "^(FAIL|failures)"
 # the real Synchronet sample base (from the JS project): every index CRC must match ours
 if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then

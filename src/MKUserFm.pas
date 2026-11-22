@@ -61,6 +61,8 @@ Type
     OffNew, OffScrn, OffBull, OffVerify, OffFlag, OffOwn, OffAll, OffZero, OffGate: Boolean;
     OffCount: String[4];               {Number of offline areas, for the screen}
     BankMin: Word;
+    Locked: Boolean;                   {the account is locked after wrong passwords: No unlocks it}
+    PwdText: String[70];               {when the password was set, the wrong ones, for the screen}
     UserNum: LongInt;
     Offline: CfgBigMarks;
     End;
@@ -100,7 +102,7 @@ Function  ValidDate(S: String): Boolean;
 
 Implementation
 
-Uses Objects, Drivers, Views, Dialogs, App, MKString, MKFile, MKCfgAbs, MKName,
+Uses Objects, Drivers, Views, Dialogs, App, MKString, MKFile, MKCfgAbs, MKRCfgMK, MKName, MKPwd, MKTic,
   MKMsgAbs, MKOpen, MKDos, CfgForm, CfgSec2, CfgBox;
 
 
@@ -166,6 +168,7 @@ Procedure Letters;
 Procedure LoadUser;
   Var
     i: Word;
+    PS: PwStateType;
 
   Begin
   UR.Name := NameSearch.GetName;
@@ -207,6 +210,12 @@ Procedure LoadUser;
   UR.Protocol := NameSearch.GetProt;
   UR.Packer := NameSearch.GetPacker;
   UR.BankMin := NameSearch.GetBankTime;
+  NameSearch.GetPwdState(PS);
+  UR.Locked := PS.LockUntil > PwdNow;
+  If PS.Changed = 0 Then
+    UR.PwdText := 'password set: not known; wrong in a row: ' + Long2Str(PS.Fails)
+  Else
+    UR.PwdText := 'password set ' + Copy(TicDateStr(PS.Changed), 5, 30) + '; wrong in a row: ' + Long2Str(PS.Fails);
   UR.Address := NameSearch.GetAddr;
   UR.ZipCode := NameSearch.GetZip;
   UR.MaxMsg := NameSearch.GetOffMax;
@@ -231,6 +240,7 @@ Procedure LoadUser;
 Procedure SaveUser;
   Var
     i: Word;
+    PS: PwStateType;
 
   Begin
   NameSearch.SetName(UR.Name);
@@ -271,6 +281,15 @@ Procedure SaveUser;
   NameSearch.SetProt(UR.Protocol);
   NameSearch.SetPacker(UpCase(UR.Packer));
   NameSearch.SetBankTime(UR.BankMin);
+  NameSearch.GetPwdState(PS);
+  If UR.Locked And (PS.LockUntil <= PwdNow) Then
+    PS.LockUntil := PwdNow + LongInt(Config^.GetLockMinutes) * 60       {the sysop locks it}
+  Else If (Not UR.Locked) And (PS.LockUntil > PwdNow) Then
+    Begin
+    PS.LockUntil := 0;                                                  {the sysop unlocks it: no failures either}
+    PS.Fails := 0;
+    End;
+  NameSearch.SetPwdState(PS);
   NameSearch.SetAddr(UR.Address);
   NameSearch.SetZip(UR.ZipCode);
   NameSearch.SetOffMax(UR.MaxMsg);
@@ -578,6 +597,12 @@ Function EditUser: Boolean;
     F.AddYesNo('GateWay:', UR.OffGate, 'Offline: mail gateway');
     F.At(19, 3, 19, 22);
     F.AddNumber('Time Bank Minutes:', UR.BankMin, 2, 0, 65535, 'Minutes in the time bank');
+    F.At(4, 3, 4, 12);
+    F.AddYesNo('Locked:', UR.Locked, 'The account is locked after too many wrong passwords: No unlocks it (and forgets them); Yes locks it for the time in Security options');
+    F.At(4, 16, 4, 17);
+    F.ReadOnly;
+    F.Show(60);
+    F.AddString('', UR.PwdText, 70, 'When the password was set and the wrong ones typed since the last good log-on');
     F.At(19, 34, 19, 41);
     F.ReadOnly;
     F.Show(4);

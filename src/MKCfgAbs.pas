@@ -289,6 +289,12 @@ Type CfgObj = Object
   Procedure SetPwdTries(PT: Byte); Virtual; {Set max password attempts}
   Function  GetPwdExpire: Word; Virtual; {Get password expiration days}
   Procedure SetPwdExpire(PE: Word); Virtual; {Set password expiration days}
+  Function  GetLockFails: Byte; Virtual; {Wrong passwords in a row that lock an account (0 = never)}
+  Procedure SetLockFails(LF: Byte); Virtual;
+  Function  GetLockMinutes: Word; Virtual; {Minutes a locked account stays locked (0 = 15)}
+  Procedure SetLockMinutes(LM: Word); Virtual;
+  Function  GetPwdWarn: Byte; Virtual; {Days before a password expires that its owner is told (0 = no warning)}
+  Procedure SetPwdWarn(PW: Byte); Virtual;
   Function  GetBDCheck: Byte; Virtual; {Get calls between birthdate confirms}
   Procedure SetBDCheck(BD: Byte); Virtual; {Set calls between birthdate confirms}
   Function  GetPhoneCheck: Byte; Virtual; {Get calls between phone num confirms}
@@ -1595,6 +1601,33 @@ Function CfgObj.GetPwdTries: Byte; {Get max password attempts}
   End;
 
 Procedure CfgObj.SetPwdTries(PT: Byte); {Set max password attempts}
+  Begin
+  End;
+
+Function CfgObj.GetLockFails: Byte;
+  Begin
+  GetLockFails := 0;
+  End;
+
+Procedure CfgObj.SetLockFails(LF: Byte);
+  Begin
+  End;
+
+Function CfgObj.GetLockMinutes: Word;
+  Begin
+  GetLockMinutes := 15;
+  End;
+
+Procedure CfgObj.SetLockMinutes(LM: Word);
+  Begin
+  End;
+
+Function CfgObj.GetPwdWarn: Byte;
+  Begin
+  GetPwdWarn := 0;
+  End;
+
+Procedure CfgObj.SetPwdWarn(PW: Byte);
   Begin
   End;
 

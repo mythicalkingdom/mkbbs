@@ -315,8 +315,12 @@ Function JsonTo_BbsCfg(Var R: BbsCfg): TJSONObject;
   O.Add('MinUlSpace', TJSONInt64Number.Create(R.MinUlSpace));
   O.Add('ULCredit', TJSONInt64Number.Create(R.ULCredit));
   O.Add('BadMsgArea', TJSONInt64Number.Create(R.BadMsgArea));
+  O.Add('LimitsMark', TJSONInt64Number.Create(R.LimitsMark));
+  O.Add('LockFails', TJSONInt64Number.Create(R.LockFails));
+  O.Add('LockMinutes', TJSONInt64Number.Create(R.LockMinutes));
+  O.Add('PwdWarn', TJSONInt64Number.Create(R.PwdWarn));
   A := TJSONArray.Create;
-  For i16 := 1 To 38 Do
+  For i16 := 1 To 33 Do
     A.Add(TJSONInt64Number.Create(R.AddOn[i16]));
   O.Add('AddOn', A);
   O.Add('LogAttr', TJSONInt64Number.Create(R.LogAttr));
@@ -1109,9 +1113,21 @@ Procedure JsonFrom_BbsCfg(O: TJSONObject; Var R: BbsCfg);
   D := O.Find('BadMsgArea');
   If D <> Nil Then
     R.BadMsgArea := JsonNum(D, R.BadMsgArea, 0, 65535);
+  D := O.Find('LimitsMark');
+  If D <> Nil Then
+    R.LimitsMark := JsonNum(D, R.LimitsMark, 0, 255);
+  D := O.Find('LockFails');
+  If D <> Nil Then
+    R.LockFails := JsonNum(D, R.LockFails, 0, 255);
+  D := O.Find('LockMinutes');
+  If D <> Nil Then
+    R.LockMinutes := JsonNum(D, R.LockMinutes, 0, 65535);
+  D := O.Find('PwdWarn');
+  If D <> Nil Then
+    R.PwdWarn := JsonNum(D, R.PwdWarn, 0, 255);
   D := O.Find('AddOn');
   If (D <> Nil) And (D.JSONType = jtArray) Then
-    For i49 := 1 To 38 Do
+    For i49 := 1 To 33 Do
       If i49 - 1 < TJSONArray(D).Count Then
         R.AddOn[i49] := JsonNum(TJSONArray(D).Items[i49 - 1], R.AddOn[i49], 0, 255);
   D := O.Find('LogAttr');

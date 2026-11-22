@@ -280,6 +280,12 @@ Type MKCfgObj = Object(CfgObj)
   Procedure SetPwdTries(PT: Byte); Virtual; {Set max password attempts}
   Function  GetPwdExpire: Word; Virtual; {Get password expiration days}
   Procedure SetPwdExpire(PE: Word); Virtual; {Set password expiration days}
+  Function  GetLockFails: Byte; Virtual; {Wrong passwords in a row that lock an account (0 = never)}
+  Procedure SetLockFails(LF: Byte); Virtual;
+  Function  GetLockMinutes: Word; Virtual; {Minutes a locked account stays locked (0 = 15)}
+  Procedure SetLockMinutes(LM: Word); Virtual;
+  Function  GetPwdWarn: Byte; Virtual; {Days before a password expires that its owner is told (0 = no warning)}
+  Procedure SetPwdWarn(PW: Byte); Virtual;
   Function  GetBDCheck: Byte; Virtual; {Get calls between birthdate confirms}
   Procedure SetBDCheck(BD: Byte); Virtual; {Set calls between birthdate confirms}
   Function  GetPhoneCheck: Byte; Virtual; {Get calls between phone num confirms}
@@ -2789,14 +2795,60 @@ Procedure MKCfgObj.SetPwdTries(PT: Byte);
   End;
 
 
+Function MKCfgObj.GetLockFails: Byte;
+  Begin
+  If MKCfg^.LimitsMark = LimitsMarkValue Then
+    GetLockFails := MKCfg^.LockFails
+  Else
+    GetLockFails := 0;
+  End;
+
+Procedure MKCfgObj.SetLockFails(LF: Byte);
+  Begin
+  MKCfg^.LimitsMark := LimitsMarkValue;
+  MKCfg^.LockFails := LF;
+  End;
+
+Function MKCfgObj.GetLockMinutes: Word;
+  Begin
+  If (MKCfg^.LimitsMark <> LimitsMarkValue) Or (MKCfg^.LockMinutes = 0) Then
+    GetLockMinutes := 15
+  Else
+    GetLockMinutes := MKCfg^.LockMinutes;
+  End;
+
+Procedure MKCfgObj.SetLockMinutes(LM: Word);
+  Begin
+  MKCfg^.LimitsMark := LimitsMarkValue;
+  MKCfg^.LockMinutes := LM;
+  End;
+
+Function MKCfgObj.GetPwdWarn: Byte;
+  Begin
+  If MKCfg^.LimitsMark = LimitsMarkValue Then
+    GetPwdWarn := MKCfg^.PwdWarn
+  Else
+    GetPwdWarn := 0;
+  End;
+
+Procedure MKCfgObj.SetPwdWarn(PW: Byte);
+  Begin
+  MKCfg^.LimitsMark := LimitsMarkValue;
+  MKCfg^.PwdWarn := PW;
+  End;
+
 Function MKCfgObj.GetPwdExpire: Word;
   Begin
-  GetPwdExpire := MKCfg^.PwdExpire;
+  If MKCfg^.LimitsMark = LimitsMarkValue Then
+    GetPwdExpire := MKCfg^.PwdExpire
+  Else
+    GetPwdExpire := 0;                 {a file from before: what is in the field was never used for anything}
   End;
 
 
 Procedure MKCfgObj.SetPwdExpire(PE: Word);
   Begin
+  MKCfg^.LimitsMark := LimitsMarkValue;
   MKCfg^.PwdExpire := PE;
   End;
 

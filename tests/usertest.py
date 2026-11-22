@@ -52,6 +52,21 @@ check('End goes to the last user: ' + str(total - 1), ('User %d of' % (total - 1
 s = run('s', 'Chuck', '\r')
 check('Search finds Chuck', 'Chuck Ebenschweiger' in s and 'User 1 of' in s)
 
+# the password state (MK users): set when, the wrong passwords in a row, a lock
+import time as _t
+pw = os.path.join(repo, 'build', 'pwstate')
+if os.path.exists(pw):
+    e = dict(os.environ, MK=dst)
+    subprocess.run([pw, 'Mark May', str(int(_t.time()) - 5 * 86400), '2', str(int(_t.time()) - 100), '0'], env=e, capture_output=True, text=True)
+    s = run()
+    check('the password state is shown: when it was set and the wrong ones in a row', 'Password: password set' in s and 'wrong in a row: 2' in s and '[LOCKED]' not in s, s)
+    subprocess.run([pw, 'Mark May', str(int(_t.time()) - 5 * 86400), '5', str(int(_t.time()) - 100), str(int(_t.time()) + 3600)], env=e, capture_output=True, text=True)
+    s = run()
+    check('a locked account is marked [LOCKED]', '[LOCKED]' in s and 'wrong in a row: 5' in s)
+    s = run('\r')
+    check('the edit form has Locked: checked for it', 'Locked:  [X]' in s, [l for l in s.split('\n') if 'ocked' in l])
+    subprocess.run([pw, 'Mark May', '0', '0', '0', '0'], env=e, capture_output=True, text=True)
+
 # edit the handle of user 0 (Tab: Password, Handle), OK; a new program sees it
 run('\r', '\t', '\t', 'TestHandle', '\r')
 s = run()

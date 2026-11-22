@@ -70,6 +70,8 @@ Type NameObj = Object
   Procedure SetLocation(Loc: String); {set location}
   Procedure SetPwd(Pwd: String); {a new password as typed by the sysop: a hash in an MK configuration that has them on; "*" leaves a hash alone}
   Function  PwdMaxLen: Byte; {longest password the editor takes}
+  Procedure GetPwdState(Var S: PwStateType); {when the password was set, the wrong ones in a row, until when the account is locked (MK users; zeros for others)}
+  Procedure SetPwdState(Var S: PwStateType);
   Procedure SetDataPhone(DP: String);
   Procedure SetVoicePhone(VP: String);
   Procedure SetLastDate(LD: String); {set last called date}
@@ -867,6 +869,27 @@ Function NameObj.PwdMaxLen: Byte;
     PwdMaxLen := PwdMaxHashed
   Else
     PwdMaxLen := PwdMaxPlain;
+  End;
+
+
+Procedure NameObj.GetPwdState(Var S: PwStateType);
+  Begin
+  FillChar(S, SizeOf(S), 0);
+  If User^.BbsType <> 1 Then
+    Exit;
+  If Not User^.ExtraLoaded Then
+    LoadExtra;
+  S := User^.MKExtra^.PwHash.State;
+  End;
+
+
+Procedure NameObj.SetPwdState(Var S: PwStateType);
+  Begin
+  If User^.BbsType <> 1 Then
+    Exit;
+  If Not User^.ExtraLoaded Then
+    LoadExtra;
+  User^.MKExtra^.PwHash.State := S;
   End;
 
 

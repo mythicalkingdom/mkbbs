@@ -538,8 +538,15 @@ Function TryPassword(Raw, Parsed: String): Boolean;
    word without a "/door" after it, which is what the DOS version took}
   Var
     Hashed, Ok: Boolean;
+    Mins: LongInt;
 
   Begin
+  If User.PwdLocked(Mins) Then
+    Begin                              {a locked account takes no password, the right one included; the caller is told nothing it could use}
+    LogEntry.WriteEntry('Locked account ' + User.GetUserName + ' tried a password (' + Long2Str(Mins) + ' minute(s) left)');
+    TryPassword := False;
+    Exit;
+    End;
   Hashed := User.UserPwdIsHashed;
   Ok := (Length(Raw) > 0) And User.CheckUserPwd(Raw);
   If Ok Then
@@ -548,6 +555,13 @@ Function TryPassword(Raw, Parsed: String): Boolean;
     Ok := User.CheckUserPwd(Parsed);
   If Ok And (Not Hashed) And User.UserPwdIsHashed Then
     LogEntry.WriteEntry('The password of ' + User.GetUserName + ' was converted to a hash');
+  If Not Ok Then
+    Begin
+    User.NoteBadPwd;
+    If User.PwdLocked(Mins) Then
+      LogEntry.WriteEntry('The account of ' + User.GetUserName + ' is locked for ' + Long2Str(Mins) + ' minute(s): ' + Long2Str(User.PwdFailCount) +
+        ' wrong passwords in a row');
+    End;
   TryPassword := Ok;
   End;
 
@@ -714,8 +728,82 @@ Procedure StartUpUser;
   End;
 
 
+Procedure PasswordNotices;
+  {after a good password: the wrong ones there were since the last good log-on, a password that has expired (a new one is asked for now), one that is about to}
+  Var
+    Fails: Byte;
+    Days: LongInt;
+    Tries: Word;
+    Done, Hashed: Boolean;
+    P1, P2: String;
+
+  Begin
+  Fails := User.NoteGoodPwd;
+  If Fails > 0 Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn(PromptOr(537, 'Wrong passwords typed for your account since your last log-on:') + ' ' + Long2Str(Fails));
+    LogEntry.WriteEntry(Long2Str(Fails) + ' wrong password(s) for ' + User.GetUserName + ' since the last good log-on');
+    End;
+  Days := User.PwdDaysLeft;
+  If Days < 0 Then
+    Exit;
+  If Days = 0 Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn(PromptOr(538, 'Your password has expired. You must choose a new one now.'));
+    LogEntry.WriteEntry('The password of ' + User.GetUserName + ' has expired: a new one is asked for');
+    Done := False;
+    Tries := 0;
+    While (Not Done) And (Tries < 3) And User.Ok Do
+      Begin
+      Inc(Tries);
+      Hashed := (User.UserPwdMaxLen > PwdMaxPlain);
+      User.DisplayNewLine;
+      User.DisplayStr(Prompts.GetString(061) + ' ');
+      P1 := User.InputPwd(User.UserPwdMaxLen);
+      User.DisplayNewLine;
+      User.DisplayStr(Prompts.GetString(037) + ' ');
+      P2 := User.InputPwd(User.UserPwdMaxLen);
+      User.DisplayNewLine;
+      If Not Hashed Then
+        Begin
+        P1 := Upper(P1);
+        P2 := Upper(P2);
+        End;
+      If P1 <> P2 Then
+        User.DisplayStrLn(Prompts.GetString(192))
+      Else If (Length(P1) < Config^.GetMinPwd) Or (P1 = '*') Then
+        User.DisplayStrLn(Prompts.GetString(300))
+      Else If User.CheckUserPwd(P1) Then
+        User.DisplayStrLn(PromptOr(539, 'The new password must be different from the old one.'))
+      Else If User.ChangeUserPwd(P1) Then
+        Begin
+        Done := True;
+        User.DisplayStrLn(Prompts.GetString(191));
+        LogEntry.WriteEntry('Password changed (it had expired)');
+        End
+      Else
+        User.DisplayStrLn(Prompts.GetString(192));
+      End;
+    If Not Done Then
+      Begin
+      LogEntry.WriteEntry('The expired password of ' + User.GetUserName + ' was not changed: the call ends');
+      User.DisplayStrLn(PromptOr(542, 'The password was not changed: this call ends.'));
+      User.SetOk(False);
+      End;
+    End
+  Else If (Config^.GetPwdWarn > 0) And (Days <= Config^.GetPwdWarn) Then
+    Begin
+    User.DisplayNewLine;
+    User.DisplayStrLn(PromptOr(540, 'Your password expires in') + ' ' + Long2Str(Days) + ' ' + PromptOr(541, 'day(s).'));
+    End;
+  End;
+
+
 Procedure BadPassword;
   Begin
+  ExitErrorLevel := LoginFailLevel;      {mklisten counts these per address}
   LogEntry.WriteEntry('Password Failure');
   LogEntry.WriteEntry('User off-line');
   User.SetOk(False);
@@ -878,11 +966,17 @@ Function AskName: String;
       If Not CheckPassword Then
         BadPassword
       Else
-        LogOnUser;
+        Begin
+        PasswordNotices;
+        If User.Ok Then
+          LogOnUser;
+        End;
       End;
     End
   Else
     Begin
+    If User.Ok Then
+      ExitErrorLevel := LoginFailLevel;    {no name was accepted (too many tries), the caller did not just hang up}
     User.SetOk(False);
       If CurrentPort <> 0 Then
       Begin

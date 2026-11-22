@@ -332,7 +332,13 @@ Procedure MKJsonCfgObj.MKLoad;
       Try
         D := Root.Find('config');
         If (D <> Nil) And (D.JSONType = jtObject) Then
+          Begin
           JsonFrom_BbsCfg(TJSONObject(D), MKCfg^);
+          {a hand made file that names one of the password limits but not the mark that says they are real: they are}
+          If (TJSONObject(D).Find('LimitsMark') = Nil) And ((TJSONObject(D).Find('LockFails') <> Nil) Or (TJSONObject(D).Find('LockMinutes') <> Nil) Or
+             (TJSONObject(D).Find('PwdWarn') <> Nil) Or (TJSONObject(D).Find('PwdExpire') <> Nil)) Then
+            MKCfg^.LimitsMark := LimitsMarkValue;
+          End;
         D := Root.Find('messages');
         If (D <> Nil) And (D.JSONType = jtObject) Then
           For i := 1 To 500 Do

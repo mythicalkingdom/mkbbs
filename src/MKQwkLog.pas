@@ -35,6 +35,7 @@ Function QwkLogin: Boolean;
     Tries: Word;
     Name, Pwd: String;
     Ok: Boolean;
+    Mins: LongInt;
 
   Begin
   Ok := False;
@@ -54,7 +55,16 @@ Function QwkLogin: Boolean;
       If User.UserFound Then
         Begin
         User.ReadUser;
-        Ok := User.GetUserQwkNode And User.CheckUserPwd(Pwd);
+        If User.PwdLocked(Mins) Then
+          LogEntry.WriteEntry('QWK login for "' + Name + '": the account is locked (' + Long2Str(Mins) + ' minute(s) left)')
+        Else If User.GetUserQwkNode Then
+          Begin
+          Ok := User.CheckUserPwd(Pwd);
+          If Ok Then
+            User.NoteGoodPwd
+          Else
+            User.NoteBadPwd;
+          End;
         End;
       End;
     If Not Ok Then

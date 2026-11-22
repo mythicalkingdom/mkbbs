@@ -79,6 +79,14 @@ Const                                  {Users.Attr values}
   uaFullScrEd =   64;                  {Use full screen editor}
 
 
+Type PwStateType = Record              {What is kept of the password of a user besides the hash: the same for a plain and a hashed one}
+  Changed: LongInt;                    {when the password was set: seconds since 1970, 0 = not known (the clock starts at the next good log-on)}
+  Fails: Byte;                         {wrong passwords since the last good log-on (255 at most)}
+  FailTime: LongInt;                   {when the last wrong password was typed: seconds since 1970}
+  LockUntil: LongInt;                  {the account is locked until then (seconds since 1970), 0 = not locked}
+  End;
+
+
 Type PwHashType = Record               {Hashed password, at the end of an ExtUsers.Bbs record (MKPwd)}
   Version: Byte;                       {1}
   Algo: Byte;                          {0 = none (the Pwd field of Users.Bbs is the password), 1 = PBKDF2-HMAC-SHA256}
@@ -86,7 +94,8 @@ Type PwHashType = Record               {Hashed password, at the end of an ExtUse
   Iter: LongInt;                       {iterations}
   Salt: Array[1..16] of Byte;
   Hash: Array[1..32] of Byte;
-  Reserved: Array[1..128] of Byte;     {for future use: keep zero}
+  State: PwStateType;                  {Changed, Fails, FailTime, LockUntil (MKPwd keeps them when the hash is set or cleared)}
+  Reserved: Array[1..115] of Byte;     {for future use: keep zero}
   End;
 
 
@@ -205,7 +214,7 @@ Type BbsCfg = Record                   {Config.Mk file}
   NewCredit: Integer;                  {New user netmail credit}
   IdleTime: Word;                      {Seconds before idle timeout}
   PassTries: Byte;                     {Maximum password tries}
-  PwdExpire: Byte;                     {Calls before password expires}
+  PwdExpire: Byte;                     {Days a password is good for before its owner must choose a new one (0 = never)}
   MinPWD: Byte;                        {Minimum password length}
   MinPhone: Byte;                      {Minimum phone number length}
   DLStart: Word;                       {Start DL time hi=hour lo=min}
@@ -243,7 +252,11 @@ Type BbsCfg = Record                   {Config.Mk file}
   MinUlSpace: LongInt;                 {Minimum free space remaining}
   ULCredit: Word;                      {Credit for uploads}
   BadMsgArea: Word;                    {Msg area for offline replies that cannot go where they were meant (0 = none)}
-  AddOn: Array[1..38] of Byte;         {For add-ons to claim space}
+  LimitsMark: Byte;                    {= LimitsMarkValue when PwdExpire, LockFails, LockMinutes and PwdWarn were set by this version (older files have other bytes there: the four are then off)}
+  LockFails: Byte;                     {Wrong passwords in a row, over all calls, that lock the account (0 = never lock)}
+  LockMinutes: Word;                   {Minutes a locked account stays locked (0 = 15)}
+  PwdWarn: Byte;                       {Days before a password expires that its owner is told at log-on (0 = no warning)}
+  AddOn: Array[1..33] of Byte;         {For add-ons to claim space}
   LogAttr: Byte;                       {Type and level of logging}
   CheckBD: Byte;                       {Check birthdate at log-on}
   CheckPhone: Byte;                    {Check phone at log-on}
@@ -329,6 +342,9 @@ Const                                  {Config.Mk NewOpt}
   noOneWord = 256;                     {Allow one word names}
   noReAsk = 512;                       {ReAsk Questions with Blank Answers}
   noAvatar = 1024;                     {Ask user if they support avatar}
+
+Const
+  LimitsMarkValue = 173;               {BbsCfg.LimitsMark}
 
 Const                                  {OffAttr = offline mail settings}
  oaAllowNew = 1;                       {Allow new files list}

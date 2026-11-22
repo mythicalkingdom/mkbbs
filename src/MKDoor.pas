@@ -155,6 +155,15 @@ Type DoorUser = Object
   Function  CheckUserPwd(Typed: String): Boolean; {Is this the password?  (plain or hashed; may convert or rehash it)}
   Function  ChangeUserPwd(Typed: String): Boolean; {A new password as typed; False when it cannot be used}
   Function  GetUserPwdShown: String;   {For doors and displays: the password, or unavailable for a hash}
+  Function  PwdLocked(Var MinsLeft: LongInt): Boolean; {The account is locked after too many wrong passwords (MK configurations); MinsLeft rounded up}
+  Procedure NoteBadPwd;                {A wrong password was typed: counted and kept at once; the account is locked at LockFails of them}
+  Function  NoteGoodPwd: Byte;         {A good password: the failures since the last good log-on (returned) are forgotten}
+  Function  PwdDaysLeft: LongInt;      {Days until the password expires; < 0 when it has none (no expiry set, or not known); the clock starts when it is not known}
+  Procedure UnlockPwd;                 {The sysop unlocks the account: no failures, no lock}
+  Procedure WritePwdState;             {Keep the state of the password (set when, failures, lock) in ExtUsers.Bbs now, without the rest of the record}
+  Function  PwdFailCount: Byte;        {Wrong passwords since the last good log-on}
+  Procedure GetPwdState(Var S: PwStateType); {The state of the password: set when, failures, lock (MK configurations)}
+  Procedure SetPwdState(Var S: PwStateType); {Set it (WriteUser keeps it)}
   Function  GetUserDataPhone: String;  {Get users data phone}
   Procedure SetUserDataPhone(Phone: String); {Set users data phone}
   Function  GetUserVoicePhone: String; {Get users voice phone}
@@ -2245,8 +2254,7 @@ Function DoorUser.CheckUserPwd(Typed: String): Boolean;
         Begin
         Good := PwdHashCheck(UserInfo^.PwHash, Typed);
         If Good And PwdNeedsRehash(UserInfo^.PwHash) Then
-          If PwdHashSet(H, Typed, (UserInfo^.PwHash.Flags And phUpper) <> 0) Then
-            UserInfo^.PwHash := H;
+          PwdHashSetKeep(UserInfo^.PwHash, Typed, (UserInfo^.PwHash.Flags And phUpper) <> 0);
         End;
       CheckUserPwd := Good;
       Exit;
@@ -2256,13 +2264,143 @@ Function DoorUser.CheckUserPwd(Typed: String): Boolean;
   If Good And (UserInfo^.BbsType = 1) And (PwdMode = pmConvert) And (UserInfo^.ExitInfo.User.Pwd <> '') Then
     Begin
     {the plain password was compared in upper case: the hash is of the upper case form}
-    If PwdHashSet(H, Typed, True) Then
-      Begin
-      UserInfo^.PwHash := H;
+    If PwdHashSetKeep(UserInfo^.PwHash, Typed, True) Then
       UserInfo^.ExitInfo.User.Pwd := '*';
-      End;
     End;
   CheckUserPwd := Good;
+  End;
+
+
+Function StateOffset: LongInt;
+  {where the state is in the hash block}
+  Var
+    H: PwHashType;
+
+  Begin
+  StateOffset := LongInt(PtrUInt(@H.State) - PtrUInt(@H));
+  End;
+
+
+Procedure DoorUser.WritePwdState;
+  Var
+    UPos: LongInt;
+
+  Begin
+  If (UserInfo^.BbsType <> 1) Or (Not UserInfo^.UserLoaded) Or ExtUsersBad Then
+    Exit;
+  UPos := UserInfo^.ExitInfo.UserRecNum;
+  UPos := UPos * SizeOf(ExtUserType) + SizeOf(ExtUserBaseType) + StateOffset;
+  If ExtUsersFormat(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs') <> 0 Then
+    Exit;
+  If SaveFilePos(Config^.FindBbsFile('extusers.bbs') + 'extusers.bbs', UserInfo^.PwHash.State, SizeOf(PwStateType), UPos) = 0 Then;
+  End;
+
+
+Function DoorUser.PwdLocked(Var MinsLeft: LongInt): Boolean;
+  Var
+    Now: LongInt;
+
+  Begin
+  PwdLocked := False;
+  MinsLeft := 0;
+  If (UserInfo^.BbsType <> 1) Or (UserInfo^.PwHash.State.LockUntil = 0) Then
+    Exit;
+  Now := PwdNow;
+  If Now >= UserInfo^.PwHash.State.LockUntil Then
+    Begin                              {the time is over; the failures stay to be told at the next good log-on (the next wrong password starts a new count)}
+    UserInfo^.PwHash.State.LockUntil := 0;
+    WritePwdState;
+    Exit;
+    End;
+  MinsLeft := (UserInfo^.PwHash.State.LockUntil - Now + 59) Div 60;
+  PwdLocked := True;
+  End;
+
+
+Procedure DoorUser.NoteBadPwd;
+  Begin
+  If (UserInfo^.BbsType <> 1) Or (Config^.GetLockFails = 0) Then
+    Exit;
+  If (UserInfo^.PwHash.State.LockUntil = 0) And (UserInfo^.PwHash.State.Fails >= Config^.GetLockFails) Then
+    UserInfo^.PwHash.State.Fails := 0;        {a lock that is over: a new count}
+  If UserInfo^.PwHash.State.Fails < 255 Then
+    Inc(UserInfo^.PwHash.State.Fails);
+  UserInfo^.PwHash.State.FailTime := PwdNow;
+  If UserInfo^.PwHash.State.Fails >= Config^.GetLockFails Then
+    UserInfo^.PwHash.State.LockUntil := PwdNow + LongInt(Config^.GetLockMinutes) * 60;
+  WritePwdState;
+  End;
+
+
+Function DoorUser.NoteGoodPwd: Byte;
+  Begin
+  NoteGoodPwd := 0;
+  If UserInfo^.BbsType <> 1 Then
+    Exit;
+  NoteGoodPwd := UserInfo^.PwHash.State.Fails;
+  If (UserInfo^.PwHash.State.Fails <> 0) Or (UserInfo^.PwHash.State.LockUntil <> 0) Then
+    Begin
+    UserInfo^.PwHash.State.Fails := 0;
+    UserInfo^.PwHash.State.LockUntil := 0;
+    WritePwdState;
+    End;
+  End;
+
+
+Procedure DoorUser.GetPwdState(Var S: PwStateType);
+  Begin
+  If UserInfo^.BbsType = 1 Then
+    S := UserInfo^.PwHash.State
+  Else
+    FillChar(S, SizeOf(S), 0);
+  End;
+
+
+Procedure DoorUser.SetPwdState(Var S: PwStateType);
+  Begin
+  If UserInfo^.BbsType = 1 Then
+    UserInfo^.PwHash.State := S;
+  End;
+
+
+Function DoorUser.PwdFailCount: Byte;
+  Begin
+  If UserInfo^.BbsType = 1 Then
+    PwdFailCount := UserInfo^.PwHash.State.Fails
+  Else
+    PwdFailCount := 0;
+  End;
+
+
+Function DoorUser.PwdDaysLeft: LongInt;
+  Var
+    Age, Left: LongInt;
+
+  Begin
+  PwdDaysLeft := -1;
+  If (UserInfo^.BbsType <> 1) Or (Config^.GetPwdExpire = 0) Then
+    Exit;
+  If UserInfo^.PwHash.State.Changed = 0 Then
+    Begin                              {not known: the clock starts now, nobody is made to change at once}
+    UserInfo^.PwHash.State.Changed := PwdNow;
+    WritePwdState;
+    End;
+  Age := (PwdNow - UserInfo^.PwHash.State.Changed) Div 86400;
+  If Age < 0 Then
+    Age := 0;
+  Left := LongInt(Config^.GetPwdExpire) - Age;
+  If Left < 0 Then
+    Left := 0;
+  PwdDaysLeft := Left;
+  End;
+
+
+Procedure DoorUser.UnlockPwd;
+  Begin
+  If UserInfo^.BbsType <> 1 Then
+    Exit;
+  UserInfo^.PwHash.State.Fails := 0;
+  UserInfo^.PwHash.State.LockUntil := 0;
   End;
 
 
@@ -2292,7 +2430,10 @@ Function DoorUser.ChangeUserPwd(Typed: String): Boolean;
       Exit;
     UserInfo^.ExitInfo.User.Pwd := Upper(Typed);
     If UserInfo^.BbsType = 1 Then
+      Begin
       PwdHashClear(UserInfo^.PwHash);
+      PwdStateNew(UserInfo^.PwHash);
+      End;
     ChangeUserPwd := True;
     End;
   End;

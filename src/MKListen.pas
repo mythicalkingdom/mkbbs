@@ -226,6 +226,14 @@ Var
   GFirst: Integer = 1;
   GLast: Integer = 8;
   GMaxPerIp: Integer = 0;
+  GuardFails: Integer = 0;             {loginguard: failed log-ons from one address within GuardWindow seconds that block it (0 = off)}
+  GuardWindow: Integer = 600;
+  GuardBlock: Integer = 900;           {seconds the address stays blocked}
+  GuardMsg: String = 'Too many failed log-ons from this address. Please try again later.';
+  GuardIp: Array Of String;            {the failed log-ons: address, time}
+  GuardAt: Array Of LongInt;
+  BlockIp: Array Of String;            {the blocked addresses and until when}
+  BlockTo: Array Of LongInt;
   Ports: Array Of TPort;
   Children: Array Of TChild;
   LogFd: LongInt = -1;
@@ -571,6 +579,30 @@ Procedure LoadEvents(O: TJSONObject);
   End;
 
 
+Procedure ParseGuard(V: TJSONData);
+  {"loginguard": { "fails": 5, "window": 600, "block": 900, "message": "..." }: an address with that many failed log-ons within "window" seconds is
+   refused for "block" seconds}
+  Var
+    O: TJSONObject;
+    j: Integer;
+    K: String;
+
+  Begin
+  If V.JSONType <> jtObject Then
+    Die('loginguard must be an object: { "fails": 5, "window": 600, "block": 900 }');
+  O := TJSONObject(V);
+  For j := 0 To O.Count - 1 Do
+    Begin
+    K := LowerCase(O.Names[j]);
+    If K = 'fails' Then GuardFails := JInt(O.Items[j], 'loginguard.fails', 0, 1000)
+    Else If K = 'window' Then GuardWindow := JInt(O.Items[j], 'loginguard.window', 1, 86400)
+    Else If K = 'block' Then GuardBlock := JInt(O.Items[j], 'loginguard.block', 1, 604800)
+    Else If K = 'message' Then GuardMsg := JStr(O.Items[j], 'loginguard.message')
+    Else If Copy(K, 1, 1) <> '_' Then Die('loginguard: unknown key "' + O.Names[j] + '"');
+    End;
+  End;
+
+
 Procedure LoadConfig;
   Var
     Src: TFileStream;
@@ -617,6 +649,7 @@ Procedure LoadConfig;
     Else If Key = 'busy' Then BusyMsg := JStr(V, 'busy')
     Else If Key = 'nodes' Then ParseNodes(V, GFirst, GLast, 'nodes')
     Else If Key = 'maxperip' Then GMaxPerIp := JInt(V, 'maxperip', 0, 1000)
+    Else If Key = 'loginguard' Then ParseGuard(V)
     Else If Key = 'ports' Then
       Begin
       If V.JSONType <> jtArray Then
@@ -2611,6 +2644,9 @@ Procedure EventsTick;
   End;
 
 
+Procedure NoteFailedLogon(Const Addr: String); Forward;
+
+
 Procedure ReapChildren;
   Var
     Pid: TPid;
@@ -2649,6 +2685,8 @@ Procedure ReapChildren;
           Begin
           Log('node ' + IntToStr(Children[i].Node) + ' ended (' + How + ') ' +
             Children[i].Addr);
+          If wifexited(Status) And (wexitstatus(Status) = 88) And (Not Ports[Children[i].PortNo].Proxy) Then
+            NoteFailedLogon(Children[i].Addr);
           DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.info');
           DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.snoop');
           End
@@ -2804,6 +2842,94 @@ Procedure Refuse(Client: LongInt; Const Why: String; Const Addr: String; Const M
   End;
 
 
+Function Blocked(Const Addr: String): Boolean;
+  {the address is blocked now; blocks that are over are dropped}
+  Var
+    i, j: Integer;
+    Now: LongInt;
+
+  Begin
+  Blocked := False;
+  Now := fpTime;
+  i := 0;
+  While i <= High(BlockIp) Do
+    Begin
+    If BlockTo[i] <= Now Then
+      Begin
+      For j := i To High(BlockIp) - 1 Do
+        Begin
+        BlockIp[j] := BlockIp[j + 1];
+        BlockTo[j] := BlockTo[j + 1];
+        End;
+      SetLength(BlockIp, Length(BlockIp) - 1);
+      SetLength(BlockTo, Length(BlockTo) - 1);
+      End
+    Else
+      Begin
+      If BlockIp[i] = Addr Then
+        Blocked := True;
+      Inc(i);
+      End;
+    End;
+  End;
+
+
+Procedure NoteFailedLogon(Const Addr: String);
+  {a caller from Addr failed to log on (mk ended with the errorlevel 88): counted; at "fails" of them within "window" seconds the address is blocked}
+  Var
+    i, j, n: Integer;
+    Now: LongInt;
+
+  Begin
+  If (GuardFails <= 0) Or (Addr = '') Then
+    Exit;
+  Now := fpTime;
+  {what is older than the window goes}
+  i := 0;
+  While i <= High(GuardIp) Do
+    If Now - GuardAt[i] > GuardWindow Then
+      Begin
+      For j := i To High(GuardIp) - 1 Do
+        Begin
+        GuardIp[j] := GuardIp[j + 1];
+        GuardAt[j] := GuardAt[j + 1];
+        End;
+      SetLength(GuardIp, Length(GuardIp) - 1);
+      SetLength(GuardAt, Length(GuardAt) - 1);
+      End
+    Else
+      Inc(i);
+  If Length(GuardIp) >= 2000 Then
+    Exit;                              {a flood from many addresses: no more is kept}
+  SetLength(GuardIp, Length(GuardIp) + 1);
+  SetLength(GuardAt, Length(GuardAt) + 1);
+  GuardIp[High(GuardIp)] := Addr;
+  GuardAt[High(GuardAt)] := Now;
+  n := 0;
+  For i := 0 To High(GuardIp) Do
+    If GuardIp[i] = Addr Then
+      Inc(n);
+  If (n >= GuardFails) And (Not Blocked(Addr)) Then
+    Begin
+    SetLength(BlockIp, Length(BlockIp) + 1);
+    SetLength(BlockTo, Length(BlockTo) + 1);
+    BlockIp[High(BlockIp)] := Addr;
+    BlockTo[High(BlockTo)] := Now + GuardBlock;
+    Log('loginguard: ' + Addr + ' is blocked for ' + IntToStr(GuardBlock) + ' seconds after ' + IntToStr(n) + ' failed log-ons');
+    j := 0;                            {what it had counted is forgotten: the next count starts when the block is over}
+    For i := 0 To High(GuardIp) Do
+      If GuardIp[i] <> Addr Then
+        Begin
+        GuardIp[j] := GuardIp[i];
+        GuardAt[j] := GuardAt[i];
+        Inc(j);
+        End;
+    SetLength(GuardIp, j);
+    SetLength(GuardAt, j);
+    End;
+  End;
+
+
 Procedure Accept(PortNo: Integer);
   Var
     A: TInetSockAddr;
@@ -2821,6 +2947,11 @@ Procedure Accept(PortNo: Integer);
   If (Ports[PortNo].MaxPerIp > 0) And (CountFrom(PortNo, Addr) >= Ports[PortNo].MaxPerIp) Then
     Begin
     Refuse(C, 'too many callers from this address', Addr);
+    Exit;
+    End;
+  If (GuardFails > 0) And (Not Ports[PortNo].Sysop) And Blocked(Addr) Then
+    Begin
+    Refuse(C, 'blocked after failed log-ons', Addr, GuardMsg);
     Exit;
     End;
   If (Not Ports[PortNo].Sysop) And EventsBlockLogins Then

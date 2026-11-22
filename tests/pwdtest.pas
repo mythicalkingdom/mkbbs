@@ -98,9 +98,20 @@ PwdHashClear(H);
 Check(Not PwdHashIsSet(H), 'cleared');
 Check(Not PwdHashCheck(H, ''), 'a cleared block matches nothing');
 Check(Not PwdHashCheck(H, 'SECRET'), 'a cleared block matches no password');
-For i := 1 To 128 Do
+For i := 1 To 115 Do
   If H.Reserved[i] <> 0 Then
     Check(False, 'reserved bytes stay zero');
+Check(SizeOf(PwHashType) = 183, 'the hash block is still 183 bytes (the state took 13 of the reserved ones)');
+{the state of a password: when it was set, the failures, the lock}
+Check(PwdHashSet(H, 'Secret', False), 'a hash is made');
+Check((H.State.Changed > 1700000000) And (Abs(H.State.Changed - PwdNow) < 5), 'a new hash has the time it was made as Changed');
+Check((H.State.Fails = 0) And (H.State.FailTime = 0) And (H.State.LockUntil = 0), '... and no failures, no lock');
+H.State.Fails := 7; H.State.FailTime := 1234; H.State.LockUntil := 5678; H.State.Changed := 4242;
+Check(PwdHashSetKeep(H, 'Other One', False) And PwdHashCheck(H, 'Other One') And (Not PwdHashCheck(H, 'Secret')), 'PwdHashSetKeep makes a new hash');
+Check((H.State.Fails = 7) And (H.State.FailTime = 1234) And (H.State.LockUntil = 5678) And (H.State.Changed = 4242), '... and the state is the one that was there (a hash that is renewed is not a new password)');
+PwdStateNew(H);
+Check((H.State.Fails = 0) And (H.State.LockUntil = 0) And (Abs(H.State.Changed - PwdNow) < 5), 'PwdStateNew: set now, no failures, no lock');
+
 WriteLn('failures: ', Fails);
 If Fails > 0 Then Halt(1);
 End.

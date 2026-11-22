@@ -165,6 +165,9 @@ Type MKRCfgObj = Object(CfgObj)
   Function  GetEchoOutPath: String; Virtual; {Get outbound files path}
   Function  GetPwdTries: Byte; Virtual; {Get max password attempts}
   Function  GetPwdExpire: Word; Virtual; {Get password expiration days}
+  Function  GetLockFails: Byte; Virtual;
+  Function  GetLockMinutes: Word; Virtual;
+  Function  GetPwdWarn: Byte; Virtual;
   Function  GetBDCheck: Byte; Virtual; {Get calls between birthdate confirms}
   Function  GetPhoneCheck: Byte; Virtual; {Get calls between phone num confirms}
   Function  GetMinPwd: Byte; Virtual; {Get min password length}
@@ -1716,9 +1719,36 @@ Function MKRCfgObj.GetPwdTries: Byte;
   End;
 
 
+Function MKRCfgObj.GetLockFails: Byte;
+  Begin
+  If MKCfg^.LimitsMark = LimitsMarkValue Then
+    GetLockFails := MKCfg^.LockFails
+  Else
+    GetLockFails := 0;
+  End;
+
+Function MKRCfgObj.GetLockMinutes: Word;
+  Begin
+  If (MKCfg^.LimitsMark <> LimitsMarkValue) Or (MKCfg^.LockMinutes = 0) Then
+    GetLockMinutes := 15
+  Else
+    GetLockMinutes := MKCfg^.LockMinutes;
+  End;
+
+Function MKRCfgObj.GetPwdWarn: Byte;
+  Begin
+  If MKCfg^.LimitsMark = LimitsMarkValue Then
+    GetPwdWarn := MKCfg^.PwdWarn
+  Else
+    GetPwdWarn := 0;
+  End;
+
 Function MKRCfgObj.GetPwdExpire: Word;
   Begin
-  GetPwdExpire := MKCfg^.PwdExpire;
+  If MKCfg^.LimitsMark = LimitsMarkValue Then
+    GetPwdExpire := MKCfg^.PwdExpire
+  Else
+    GetPwdExpire := 0;
   End;
 
 

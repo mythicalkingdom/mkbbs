@@ -184,6 +184,23 @@ normal ports are not affected.
 * Other keys: `mkbink`, `mkbinkcfg`, `mktoss` (program paths; default next to `mk`), `settings`, `logfile`, `interval`.
 * Whatever happens to the listener, even SIGKILL, takes `mkbink` with it.
 
+### The login guard
+
+`mklisten` can keep an address out that fails to log on again and again (guessing names and passwords), before it uses a node:
+
+```
+"loginguard": { "fails": 5,                   failed log-ons from one address that block it (0 = off, the default)
+                "window": 600,                within this many seconds
+                "block": 900,                 and the address is refused for this many seconds
+                "message": "Too many failed log-ons from this address. Please try again later." }
+```
+
+A caller who did not get in (wrong passwords, too many tries at the name) makes `mk` end with the errorlevel **88**; `mklisten` counts that
+for the address of the connection (not for a port with `"proxy": true`: the address is the proxy's, and not for the sysop port).  The address
+that reaches `fails` within `window` is refused (the message, no node) for `block` seconds and the log says so (`loginguard: 1.2.3.4 is blocked
+for 900 seconds after 5 failed log-ons`, `refused 1.2.3.4: blocked after failed log-ons`).  The counts are in memory: a restart clears them.
+This is separate from the lock on the account (`PASSWORDS.md`: Lock After Failures), which follows the user name whatever the address.
+
 ### Events
 
 The events of the BBS (`mkconfig`: Events) are run by `mklisten` at their times.  Each event has a time, the days it runs, a status

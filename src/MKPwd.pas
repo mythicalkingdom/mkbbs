@@ -56,6 +56,11 @@ Function  PwdHashCheck(Const H: PwHashType; Const Typed: String): Boolean;
 Function  PwdHashIsSet(Const H: PwHashType): Boolean;
 Procedure PwdHashClear(Var H: PwHashType);
 Function  PwdNeedsRehash(Const H: PwHashType): Boolean;
+Function  PwdNow: LongInt;                             {seconds since 1970 (UTC)}
+Function  PwdHashSetKeep(Var H: PwHashType; Const Typed: String; Upper: Boolean): Boolean;
+  {as PwdHashSet, but the state of the block (when the password was set, the failures, the lock) stays: for a hash that is renewed or converted, not for a new password}
+Procedure PwdStateNew(Var H: PwHashType);
+  {a password was set: the state starts again (set now, no failures, no lock)}
 
 Procedure PwdModeFromConfig;                           {PwdMode := what the configuration says (always plain for RA, QuickBBS, SuperBBS)}
 Function  ExtUsersFormat(FileName: String): Integer;   {0 fine (or no file), 1 DOS size (expand it), 2 a size that fits neither}
@@ -66,7 +71,7 @@ Function  ExtUsersNewSize: Word;
 Implementation
 
 
-Uses MKString, MKFile, MKCfgAbs;
+Uses BaseUnix, MKString, MKFile, MKCfgAbs;
 
 
 Const
@@ -371,7 +376,36 @@ Function PwdHashSet(Var H: PwHashType; Const Typed: String; Upper: Boolean): Boo
   Move(D, H.Hash, 32);
   FillChar(D, 32, 0);
   FillChar(P, SizeOf(P), 0);
+  PwdStateNew(H);
   PwdHashSet := True;
+  End;
+
+
+Function PwdNow: LongInt;
+  Begin
+  PwdNow := fpTime;
+  End;
+
+
+Procedure PwdStateNew(Var H: PwHashType);
+  Begin
+  FillChar(H.State, SizeOf(H.State), 0);
+  H.State.Changed := PwdNow;
+  End;
+
+
+Function PwdHashSetKeep(Var H: PwHashType; Const Typed: String; Upper: Boolean): Boolean;
+  Var
+    N: PwHashType;
+
+  Begin
+  PwdHashSetKeep := False;
+  If PwdHashSet(N, Typed, Upper) Then
+    Begin
+    N.State := H.State;
+    H := N;
+    PwdHashSetKeep := True;
+    End;
   End;
 
 

@@ -225,6 +225,9 @@ Type EventsCfgType = Record
   Ev: Array[1..MaxEventExt] of EventExtType;
   End;
 
+Const
+  LoginFailLevel = 88;                 {the errorlevel mk ends with when a caller failed to log on (a wrong password, too many tries at the name): mklisten counts them per address ("loginguard")}
+
 Procedure EventsDefaults(Var E: EventsCfgType);
 
 Procedure MailerDefaults(Var M: MailerCfgType);
