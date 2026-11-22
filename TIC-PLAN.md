@@ -1,6 +1,6 @@
 # TIC file echoes: plan
 
-Status (2026-11-22): **phases 1 (the configuration), 2 (`MKTic.pas`), 3 (tossing), 4 (passing on), 5 (`mkhatch`) and 6 (FileFix) are built**; the rest is plan.  Items marked *(verify)* need the text of the specification
+Status (2026-11-22): **all seven phases are built** (the configuration, `MKTic.pas`, tossing, passing on, `mkhatch`, FileFix, docs and a round trip); the rest is plan.  Items marked *(verify)* need the text of the specification
 before any code is written (the same way the QWKE specification was read before `TOREADER.EXT` was done).
 
 ## Decided 2026-11-22
@@ -15,6 +15,17 @@ before any code is written (the same way the QWKE specification was read before 
    answer in the time limit, refuses the file to `badtic/`.  An echo can switch it off (*No check command*).
 6. **The pass-through spool is limited**: days a file waits for a system (`PassDays`, default 14) and the most it may hold (`PassMaxMB`, 0 = no limit, the oldest go first).
 7. Any FTN network; the sysop's FSX systems are for testing.
+
+## Phase 7 (done): docs and the round trip
+
+`NETWORKING.md` has a section *File echoes (TIC)* (how to set them up, what happens to a file, `mkhatch`, FileFix); `MKBBS.md` lists `fileecho.mk` and this plan; `TOSSER.md` says what the tosser does for TICs.
+`tests/ticroundtrip.py` runs the whole way with the real mkbink: a hub (a plain mkbink, 1:110/100) sends a file and its TIC to the BBS (mkbink with `mktoss` as `on-inbound`, as `mklisten` starts it), the
+file is stored in the area (date, `files.bbs`), passed on to a second system that the BBS calls (TIC with the BBS's address, the second system's password, the old Path line and ours), the spool is empty again, and
+a file hatched with `mkhatch` reaches the second system the same way.  It is in `build.sh`.
+
+**What is still open** (not needed for a first use): the TIC field list and the `Path` layout were written from the common tossers because FSC-0087 could not be read: **check them against a real TIC of the sysop's
+FSX systems** (send one: it becomes a sample in `tests/`); `mkmon`'s mailer screen could count the TICs tossed and the ones in `badtic/`; files that are listed in `files.bbs` need their names in the case the
+online list matches (exact case, as before); a limit on how many files an echo keeps (as message areas have) is not there; TICs in the unsecure inbound are not tossed.
 
 ## Phase 6 (done): FileFix
 
@@ -192,7 +203,7 @@ records instead of the message ones.  Groups limit what a system may see and lin
 4. Passing on and pass-through (the outgoing TIC, the queue, `Path` / `Seenby`), tests.  **Done.**
 5. `mkhatch`.  **Done.**
 6. FileFix.  **Done.**
-7. Docs, the round trip test, the full build.
+7. Docs, the round trip test, the full build.  **Done.**
 
 ## Questions for the sysop
 

@@ -272,6 +272,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   mkdir -p build/work/mkfreq build/work/freqrt
   python3 tests/mkfreqtest.py build build/work/mkfreq | grep -E "^(FAIL|skip|failures)" | tee build/freqresult.txt
   python3 tests/freqroundtrip.py build build/work/freqrt | grep -E "^(FAIL|skip|failures)" | tee -a build/freqresult.txt
+  # a file echo, the whole way: a hub, the BBS (tosses, stores, passes on), a second system, mkhatch
+  mkdir -p build/work/ticrt
+  python3 tests/ticroundtrip.py build build/work/ticrt | grep -E "^(FAIL|skip|failures)" | tee -a build/freqresult.txt
   if grep -q FAIL build/freqresult.txt; then exit 1; fi
 fi
 # message packets: the unit's own tests and a comparison with javascript/MessagePacket.js (node)

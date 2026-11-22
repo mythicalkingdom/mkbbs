@@ -360,6 +360,40 @@ Mail from a system that is not in your list, an echo whose tag you do not carry,
 echo, or a damaged packet.  The inbound directory has a `bad` folder for them; a damaged bundle is renamed `.bad`.
 Mail in the *unsecure* inbound (callers without a password) is never tossed.
 
+### File echoes (TIC)
+
+A *file echo* is the file counterpart of an echo: a file hatched in one system is passed from system to system, each keeps a copy in its file area.  The file travels
+with a small text file, the **TIC** (`name.tic`), that names the echo, the file, its size and CRC, a description, the systems it has been through and a password.  The mailer only
+moves the two files into the inbound; `mktoss` (after every session, and from `mklisten`'s scan) does the rest.  Set it up with the pieces of Fido networking above (echo systems,
+the mailer, the tosser switched on) and:
+
+1. **A file area** for the echo (`Files > Areas`): a directory and a name.  The BBS lists it from `files.bbs` in that directory, which the tosser keeps.
+2. **The echo systems' passwords.**  `EchoMail > File Echo Systems`: for each system the **TIC password** it sends in its TICs (it is checked; a system with none set is not asked for
+   one, so set one), its **FileFix password** (blank = its Areafix password) and its **groups** (letters A to Z).
+3. **The file echoes.**  `EchoMail > File Echoes`: the **tag** the network knows the echo by (not case sensitive), what it is, the **file area** (0 = *pass-through*: no copy is kept, the files
+   are only passed on), the **hub** (the system you get it from, 1 to 32 as in Echo Systems), **Echo To...** (the systems that get the files) and **Groups...** (an echo with no group is open to
+   every system, one with groups only to the systems that share a letter).  *Replaces allowed* lets a TIC name files it replaces (they are deleted); *No check command* skips the check.
+4. **Options.**  `EchoMail > File Echo Options`: a **check command** run for each file before it is accepted (`%F` = the file, `%T` = the TIC; any exit status but 0, or no answer in the
+   time limit, refuses the file: use a virus scanner or a file type filter), and the **pass-through spool**: where files wait for the systems that fetch them, for how many days
+   (14 by default) and the most it may hold in MB (the oldest go first).
+
+What happens to a file that comes in: its TIC is read and checked (the file is there, the sender is an echo system and its password is right, the echo is one of yours and the sender may send it,
+the size and CRC are those of the file, you are not in its `Path` already, it was not tossed before, the check command accepts it).  What is wrong goes with its file to `badtic/` in the inbound,
+and the log says why (`mktoss` writes it; mkmon's mailer screen shows the hook's output).  What is right is moved into the file area **under the name the TIC gives, in the case it gives**; a file of
+that name that is there is replaced (another CRC makes it a new file), the files `Replaces` names go too when the echo allows it, the file gets the date of the TIC, and `files.bbs` gets a line and
+the long description.  Then it is passed on: to each system the echo goes to, except the one it came from and the ones in its `Seenby` lines, a new TIC (your address, that system's password, your
+line in `Path`, the systems that have it in `Seenby`) and the file go to the mailer, the file first.  They wait in the spool (a hard link: no second copy on the disk) and are deleted after they were sent.
+A TIC whose file has not come waits up to a day.  TICs in the *unsecure* inbound are never tossed.
+
+**Hatching** a file of your own: `mkhatch -a TAG [-d "description"] [-l "long line"]... [-r "OLD*.ZIP"] [-m magic] [-x] file ...` stores it in the file area of the echo (moved with `-x`), lists it, and
+sends it and a TIC to every system the echo goes to.  It can run from an event.
+
+**FileFix**: a netmail to `FileFix` (or `FileMgr`) from an echo system, its FileFix (or Areafix) password as the subject, one command to a line: `%LIST` the echoes it may have, `%QUERY` the ones it
+has, `%UNLINKED`, `%HELP`, `+TAG` link, `-TAG` unlink, a bare `TAG` links, `*` and `?` in names.  The answer comes by netmail.  An echo that has a hub is asked for from the hub when its first
+system takes it (and a pass-through echo is given up when the last leaves).  A request from a system that is not an echo system is kept for you.
+
+Tests: `tests/tictest.pas`, `tictosstest.py`, `filefixtest.py`, `ticroundtrip.py` (a hub, the BBS and a second system, with the real mkbink).  Details and the design: `TIC-PLAN.md`.
+
 ### File attaches
 
 A netmail with the file attach flag names its files in the subject: `^name` deletes it after sending, `#name`

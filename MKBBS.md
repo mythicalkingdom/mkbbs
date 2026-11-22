@@ -74,6 +74,7 @@ caller --- mklisten --- mk (one process per caller) --- files on disk
 | `messages.mk` | the message areas |
 | `files.mk` | the file areas |
 | `echocfg.mk` | Fido echo systems and echo areas |
+| `fileecho.mk` | file echoes (TIC): the echoes, the systems' TIC and FileFix passwords, the check command and the pass-through spool |
 | `mailer.mk` | mailer settings, links, routes |
 | `bbsconfig.json` | the whole configuration in one JSON file (optional; every setting has a place in it) |
 | `users.bbs`, `extusers.bbs`, `lastread.bbs`, `useron.bbs` ... | users, their extended records (including a hashed password), last read pointers, who is online |
@@ -160,3 +161,4 @@ of the sample BBS, never on the sample itself.
 | `NETWORKING.md` | QWK and Fido networking set-up |
 | `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |
+| `TIC-PLAN.md` | file echoes (TIC): how they work, what each part does, the decisions |
