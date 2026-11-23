@@ -111,7 +111,7 @@ Do this on your system when you want to take mail from a hub.
    user      Hub User Name            # the user record (default: the id)
 
    hub       bbs.example.com:23       # call it by Telnet (leave out when files are moved by something else)
-   profile   synchronet               # synchronet or mk;  or  script  MYHUB.scr  for one of your own
+   profile   synchronet               # a profile file NAME.scr or one built in (synchronet, mk; mk -G -P lists);  or  script  MYHUB.scr
    login     MYLOGIN
    password  secret
    protocol  Z                        # Z Zmodem, Y Ymodem, G Ymodem-G, X Xmodem
@@ -210,6 +210,64 @@ expect "main menu"
 download
 upload "%rep%"
 ```
+
+**Profiles are files.**  `profile NAME` is the file `NAME.scr` (a script like the one above) found in this order: next to the map file, the `hubs`
+directory of the BBS, `/usr/local/share/mkbbs/hubs`, `/usr/share/mkbbs/hubs` (`make install` puts `synchronet.scr` and `mk.scr` in the first of
+the system ones); the two profiles built into the program are the fallback when no file has the name.  So a new hub is a text file that you can write,
+test and share, with no new build.  `mk -G -P` lists the profiles that are found with the software and version each was checked with, and
+`mk -G -P<name>` shows one (`mk -G -Psynchronet > mysynch.scr` makes a copy to start from).  The comment lines at the top of a profile may say
+
+```
+# software: Synchronet (the QWK: menu of a user)
+# checked: Synchronet 3.19 (login, D, U, the hang up prompt)
+# reply-error: invalid conference
+# reply-ok: ...
+```
+
+`reply-error` and `reply-ok` there are used when the map file has none of its own (the map file's lines win).  A profile that is not found is
+exit 6 and the message says where it looked.
+
+### A hub reached by programs: `transport exec`
+
+For a hub that is not a Telnet menu (FTP, SFTP, HTTP, rsync ...) the map file names two programs, and MK moves the files with them:
+
+```
+hub        ftp.example.com:21               # the name the programs get (MK_HUB_HOST); no call is made
+transport  exec
+login      lion
+password   secret
+get        /usr/local/bin/qwk-get.sh %id% %qwk%     # fetch the packet: write it as %qwk%
+put        /usr/local/bin/qwk-put.sh %id% %rep%     # send the reply packet %rep%
+nothing    3                                        # exit status of get: nothing new (default 3; not an error)
+exec-timeout 600                                    # seconds before a program is stopped (default 600)
+```
+
+* The programs are run **without a shell**, with the words of the line as their arguments; a word can be in "quotes".  `%id%`, `%qwk%` (the full name
+  where `get` writes the packet), `%rep%` (the reply packet, named `<id>.REP`), `%login%`, `%host%` and `%port%` are replaced.  A program name
+  with no `/` is looked for in `PATH`, one with a relative path is relative to the directory of the map file (which is the working directory).
+* **The password is not on the command line** (`ps` shows it): it is in the environment as `MK_HUB_PASSWORD`, with `MK_HUB_LOGIN`, `MK_HUB_HOST`,
+  `MK_HUB_PORT`, `MK_HUB_ID`, `MK_HUB_QWK` and `MK_HUB_REP`.
+* **Exit status:** `get`: 0 done (a packet at `%qwk%`; none: "nothing new"), the `nothing` status = nothing new, anything else = failed.  `put`: 0 =
+  the hub took the reply packet (it is deleted), anything else = failed and the packet stays for the next pass.  A program that does not end in
+  `exec-timeout` seconds is killed with what it started.  A failure is exit 5 of `mk -G`, so the `retries` of the events (EVENTS-PLAN.md) apply.
+* What the programs print (output and errors) is written to the transcript (`<id>.hub.log`, the password replaced by stars) and what `put` prints is
+  what `reply-error` / `reply-ok` look at, as for a Telnet hub.  With only `get` or only `put` the other half is left to somebody else.
+* `mk -G<id> -D` says what the programs are and runs neither.
+
+Recipes (the programs are yours; these are the shape):
+
+```sh
+#!/bin/sh   # qwk-get.sh <id> <packet>: FTP with curl; the hub keeps the packet until it is deleted there
+curl -sS --fail -u "$MK_HUB_LOGIN:$MK_HUB_PASSWORD" -o "$2" "ftp://$MK_HUB_HOST/qwk/$1.qwk" || exit 3      # 3: not there = nothing new
+curl -sS -u "$MK_HUB_LOGIN:$MK_HUB_PASSWORD" -Q "-DELE qwk/$1.qwk" "ftp://$MK_HUB_HOST/" -o /dev/null
+```
+
+```sh
+#!/bin/sh   # qwk-put.sh <id> <reply packet>
+curl -sS --fail -u "$MK_HUB_LOGIN:$MK_HUB_PASSWORD" -T "$2" "ftp://$MK_HUB_HOST/qwk/" && echo "reply packet sent"
+```
+
+For SFTP use `sftp -b` with a key (no password in the environment), for HTTP `curl -F`.
 
 ### What to check on a Synchronet hub
 

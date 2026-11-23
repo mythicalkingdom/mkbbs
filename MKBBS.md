@@ -164,6 +164,7 @@ of the sample BBS, never on the sample itself.
 | `NETWORKING.md` | QWK and Fido networking set-up |
 | `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |
+| `hubs/*.scr` | QWK hub profiles (installed in `share/mkbbs/hubs`; `mk -G -P` lists them; NETWORKING.md) |
 | `SSH.md` | SSH for callers: OpenSSH or Dropbear in front, `mkbbsssh`, no password at the SSH level |
 | `DOS-DOORS.md` | DOS doors on Linux: dosemu2 and `mkdosdoor` |
 | `TIC-PLAN.md` | file echoes (TIC): how they work, what each part does, the decisions |

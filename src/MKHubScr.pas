@@ -95,7 +95,8 @@ Type HubScriptObj = Object
   End;
 
 
-Function HubProfile(Name: String): AnsiString;
+Function HubProfile(Name: String): AnsiString;     {the profile built into the program ('' when there is none by that name)}
+Function HubProfileNames: String;                   {the names of the built in profiles, with commas}
   {the script of a profile ('' when there is none)}
 
 
@@ -804,6 +805,12 @@ Function HubScriptObj.Run: Boolean;
 
 { ---- profiles }
 
+Function HubProfileNames: String;
+  Begin
+  HubProfileNames := 'mk,synchronet';
+  End;
+
+
 Function HubProfile(Name: String): AnsiString;
   Var
     R: AnsiString;
@@ -818,7 +825,8 @@ Function HubProfile(Name: String): AnsiString;
   R := '';
   If Name = 'mk' Then
     Begin
-    Add('# mk -Q of another MK system');
+    Add('# software: MK BBS (another MK system, the mk -Q menu)');
+    Add('# checked: MK in this distribution (tests/hubpasstest.py)');
     Add('timeout 30');
     Add('when "press any key" send " "');
     Add('expect "login:|user name|your name"');
@@ -844,7 +852,10 @@ Function HubProfile(Name: String): AnsiString;
     End
   Else If Name = 'synchronet' Then
     Begin
-    Add('# a Synchronet hub: the QWK: menu of a user (checked with Synchronet 3.19: login, D, U, the hang up prompt)');
+    Add('# software: Synchronet (the QWK: menu of a user)');
+    Add('# checked: Synchronet 3.19 (login, D, U, the hang up prompt)');
+    Add('# reply-error: invalid conference');
+    Add('#');
     Add('# The packet comes first (D, and N to "Hang up after transfer?"), then the reply packet (U, the same question).');
     Add('timeout 30');
     Add('when "press any key" send " "');

@@ -1,0 +1,25 @@
+# profile mk: built into the program
+# software: MK BBS (another MK system, the mk -Q menu)
+# checked: MK in this distribution (tests/hubpasstest.py)
+timeout 30
+when "press any key" send " "
+expect "login:|user name|your name"
+sendln "%login%"
+expect "password:"
+sendln "%password%"
+expect "QWK:" 60
+if have_rep
+  send "U"
+  expect "begin transfer"
+  upload "%rep%"
+  expect "QWK:" 120
+endif
+send "D"
+# a packet ("Begin transfer now") or nothing for the caller (the QWK: prompt comes again)
+expect "begin transfer|QWK:" 120
+ifeq "%matched%" "begin transfer"
+  download
+  expect "QWK:" 120
+endif
+send "Q"
+hangup

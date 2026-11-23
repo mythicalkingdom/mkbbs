@@ -1,0 +1,46 @@
+# profile synchronet: built into the program
+# software: Synchronet (the QWK: menu of a user)
+# checked: Synchronet 3.19 (login, D, U, the hang up prompt)
+# reply-error: invalid conference
+#
+# The packet comes first (D, and N to "Hang up after transfer?"), then the reply packet (U, the same question).
+timeout 30
+when "press any key" send " "
+when "hit a key" send " "
+expect "login:|user name|your name"
+sendln "%login%"
+expect "password:|pw:"
+sendln "%password%"
+expect "QWK:" 120
+send "D"
+# the packet is made (it can take a while), then: protocol (the user has one: it shows "Protocol or Quit: Z"),
+# "Hang up after transfer?" (answered N), the transfer; or "No new messages."
+expect "after transfer|no new messages|protocol or quit" 240
+ifeq "%matched%" "protocol or quit"
+  send "%protocol%"
+  expect "after transfer" 30
+endif
+ifeq "%matched%" "no new messages"
+  expect "QWK:" 30
+else
+  send "N"
+  download
+  expect "QWK:" 60
+endif
+if have_rep
+  send "U"
+  expect "protocol or quit|zmodem" 30
+  send "%protocol%"
+  # the same "Hang up after transfer?" question as for D: it must be answered before the transfer starts
+  expect "after transfer" 30
+  send "N"
+  upload "%rep%"
+  # the hub unpacks the reply packet and shows the prompt again (or logs off: "Good-bye!")
+  try "good-bye|QWK:" 120
+  ifeq "%matched%" "qwk:"
+    send "Q"
+  endif
+else
+  send "Q"
+endif
+hangup

@@ -1,6 +1,6 @@
 # QWK hub profiles: plan
 
-Status (2026-11-23): **plan only.**  Nothing is built.  Items marked *(verify)* need a transcript or the documentation of a real hub before any code is written;
+Status (2026-11-23): **phases 1 and 2 are built** (profiles as files, `mk -G -P`, the `exec` transport; see NETWORKING.md; tests/hubexectest.py, build/hubexectest).  Phases 3-7 are not.  Items marked *(verify)* need a transcript or the documentation of a real hub before any code is written;
 items marked *(proposal)* are for the sysop to decide.
 
 A *hub* is the system a QWK node calls to take its packet (`<id>.QWK`) and leave its reply packet (`<id>.REP`).  `mk -G<id>` does the exchange with the hub

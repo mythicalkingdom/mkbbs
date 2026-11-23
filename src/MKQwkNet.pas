@@ -116,6 +116,7 @@ Var
   QwkNetDry: Boolean;                    {mk -G<id> -D: only say what a pass would send, change nothing}
 
 Function QwkNetPass(RemoteId: String): Integer;
+Procedure QwkNetProfiles(RemoteId, Name: String);   {mk -G -P: list the profiles found; mk -G -P<name>: show one}
 
 
 Implementation
@@ -123,7 +124,7 @@ Implementation
 
 Uses MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
   MKOffAbs, MKOffQwk, MKQwkImp, MKOffDL, MKOffXfer, MKOfflin,
-  MKComAbs, MKComClient, MKHubScr, MKProt, MKVideo, MKPlat,
+  MKComAbs, MKComClient, MKHubScr, MKHubExec, MKProt, MKVideo, MKPlat,
   Dos;
 
 
@@ -141,6 +142,10 @@ Var
   ReplyErr, ReplyOk: Array[1..8] Of String[80];   {what the hub says after the reply packet: refused / accepted}
   NumErr, NumOk: Word;
   HubPort: Word;
+  HubExec: Boolean;                      {transport exec: programs move the files (get / put) instead of a Telnet call}
+  HubGet, HubPut: String;
+  HubNothing: LongInt;                   {the exit status of get that means "nothing new" (default 3)}
+  HubExecSecs: LongInt;                  {exec-timeout}
   SelIdx: Word;
 
 
@@ -199,6 +204,11 @@ Function LoadMap(Id: String): Boolean;
   HubPass := '';
   HubProto := 'Z';
   HubLog := '';
+  HubExec := False;
+  HubGet := '';
+  HubPut := '';
+  HubNothing := 3;
+  HubExecSecs := 600;
   NumErr := 0;
   NumOk := 0;
   StripA := False;
@@ -254,6 +264,20 @@ Function LoadMap(Id: String): Boolean;
         HubProto := UpCase(Rest[1])
       Else If Key = 'transcript' Then
         HubLog := Rest
+      Else If Key = 'transport' Then
+        HubExec := Lower(ExtractWord(Rest, 1)) = 'exec'
+      Else If Key = 'get' Then
+        HubGet := Rest
+      Else If Key = 'put' Then
+        HubPut := Rest
+      Else If Key = 'nothing' Then
+        HubNothing := Str2Long(ExtractWord(Rest, 1))
+      Else If Key = 'exec-timeout' Then
+        Begin
+        HubExecSecs := Str2Long(ExtractWord(Rest, 1));
+        If HubExecSecs < 1 Then
+          HubExecSecs := 600;
+        End
       Else If (Key = 'control-to') And (Rest <> '') Then
         CtlTo := Copy(Rest, 1, 20)
       Else If Key = 'strip-ctrla' Then
@@ -284,11 +308,6 @@ Function LoadMap(Id: String): Boolean;
     End;
   Close(F);
   If IoResult <> 0 Then;
-  If (Lower(HubProfile) = 'synchronet') And (NumErr = 0) And (NumOk = 0) Then
-    Begin                              {what a Synchronet hub says to a message for a conference it does not have: "Invalid Conference 9999"}
-    NumErr := 1;
-    ReplyErr[1] := 'invalid conference';
-    End;
   LoadMap := True;
   End;
 
@@ -845,7 +864,13 @@ Function DryRun(Id: String): Integer;
   CtlCount := 0;
   WriteLn(StdErr, 'Dry run of the pass with ', Id, ': nothing is sent, called, moved or written.');
   WriteLn(StdErr, 'User ', UserName, '; reply packets would go to ', Outbound, ', packets from the hub come to ', Inbound);
-  If HubHost <> '' Then
+  If HubExec Then
+    Begin
+    WriteLn(StdErr, 'Hub by programs (transport exec), host ', HubHost, ':', HubPort);
+    WriteLn(StdErr, '  get: ', HubGet);
+    WriteLn(StdErr, '  put: ', HubPut);
+    End
+  Else If HubHost <> '' Then
     WriteLn(StdErr, 'Hub ', HubHost, ':', HubPort, ', profile ', HubProfile, ' ', HubScript)
   Else
     WriteLn(StdErr, 'No hub: the files are moved by something else');
@@ -924,6 +949,14 @@ Function DryRun(Id: String): Integer;
   End;
 
 
+Procedure Say(Text: String);
+  {what the pass tells: to the (absent) caller and to the error output, where whoever started mk -G (an event, cron, a script) sees it}
+  Begin
+  User.DisplayStrLn(Text);
+  WriteLn(StdErr, Text);
+  End;
+
+
 { ---- the call to the hub }
 
 Var
@@ -975,11 +1008,144 @@ Function HubXfer(Upload: Boolean; Arg: ShortString): Boolean;
   End;
 
 
-Function LoadHubScript(Var Text: AnsiString): Boolean;
-  {the script of the map file, or the profile}
+Function ProfileDir(N: Word): String;
+  {where a profile file "<name>.scr" is looked for, in this order: next to the map file, the hubs directory of the BBS, the system directory}
+  Begin
+  Case N Of
+    1: If MapDir = '' Then
+         ProfileDir := './'                      {the map file is in the current directory}
+       Else
+         ProfileDir := MapDir;
+    2: ProfileDir := WithBackSlash(Config^.GetBbsPath) + 'hubs/';
+    3: ProfileDir := '/usr/local/share/mkbbs/hubs/';
+    4: ProfileDir := '/usr/share/mkbbs/hubs/';
+    Else ProfileDir := '';
+    End;
+  End;
+
+
+Function ProfileFile(Name: String): String;
+  {the file of the profile, '' when there is none}
+  Var
+    N: Word;
+    D: String;
+
+  Begin
+  ProfileFile := '';
+  If (Name = '') Or (Pos('/', Name) > 0) Or (Pos('..', Name) > 0) Then
+    Exit;
+  For N := 1 To 4 Do
+    Begin
+    D := ProfileDir(N);
+    If (D <> '') And FileExist(D + Name + '.scr') Then
+      Begin
+      ProfileFile := D + Name + '.scr';
+      Exit;
+      End;
+    End;
+  End;
+
+
+Function ReadTextFile(FileName: String; Var Text: AnsiString): Boolean;
   Var
     F: Text;
     Line: String;
+
+  Begin
+  ReadTextFile := False;
+  Text := '';
+  Assign(F, FileName);
+  Reset(F);
+  If IoResult <> 0 Then
+    Exit;
+  While Not Eof(F) Do
+    Begin
+    ReadLn(F, Line);
+    Text := Text + Line + #10;
+    End;
+  Close(F);
+  ReadTextFile := True;
+  End;
+
+
+Function HeaderValue(Text: AnsiString; Key: String; N: Word): String;
+  {the Nth "# key: value" line in the header of a script (the comment lines before its first command); '' when there is none}
+  Var
+    P, E: LongInt;
+    L, K: String;
+    C: Word;
+
+  Begin
+  HeaderValue := '';
+  C := 0;
+  Key := Lower(Key);
+  P := 1;
+  While P <= Length(Text) Do
+    Begin
+    E := P;
+    While (E <= Length(Text)) And (Text[E] <> #10) Do
+      Inc(E);
+    L := StripBoth(Copy(Text, P, E - P), ' ');
+    If (L <> '') And (L[Length(L)] = #13) Then
+      L := StripBoth(Copy(L, 1, Length(L) - 1), ' ');
+    P := E + 1;
+    If L = '' Then
+      Continue;
+    If (L[1] <> '#') And (L[1] <> ';') Then
+      Exit;                            {the header ends at the first command}
+    L := StripBoth(Copy(L, 2, 250), ' ');
+    E := Pos(':', L);
+    If E > 1 Then
+      Begin
+      K := Lower(Copy(L, 1, E - 1));
+      If K = Key Then
+        Begin
+        Inc(C);
+        If C = N Then
+          Begin
+          HeaderValue := StripBoth(Copy(L, E + 1, 250), ' ');
+          Exit;
+          End;
+        End;
+      End;
+    End;
+  End;
+
+
+Procedure ApplyHeader(Text: AnsiString);
+  {reply-error and reply-ok of the header of the profile are the ones to use when the map file has none}
+  Var
+    N: Word;
+    V: String;
+
+  Begin
+  If (NumErr = 0) And (NumOk = 0) Then
+    Begin
+    For N := 1 To 8 Do
+      Begin
+      V := HeaderValue(Text, 'reply-error', N);
+      If V = '' Then
+        Break;
+      Inc(NumErr);
+      ReplyErr[NumErr] := Lower(V);
+      End;
+    For N := 1 To 8 Do
+      Begin
+      V := HeaderValue(Text, 'reply-ok', N);
+      If V = '' Then
+        Break;
+      Inc(NumOk);
+      ReplyOk[NumOk] := Lower(V);
+      End;
+    End;
+  End;
+
+
+Function LoadHubScript(Var Text: AnsiString): Boolean;
+  {the script of the map file, or the profile (a file <name>.scr, else the one built into the program)}
+  Var
+    Line, Path: String;
+    N: Word;
 
   Begin
   LoadHubScript := False;
@@ -989,31 +1155,45 @@ Function LoadHubScript(Var Text: AnsiString): Boolean;
     Line := HubScript;
     If (Line[1] <> '/') Then
       Line := MapDir + Line;
-    Assign(F, Line);
-    Reset(F);
-    If IoResult <> 0 Then
-      Exit;
-    While Not Eof(F) Do
+    If Not ReadTextFile(Line, Text) Then
       Begin
-      ReadLn(F, Line);
-      Text := Text + Line + #10;
+      Say('The script ' + Line + ' cannot be read');
+      Exit;
       End;
-    Close(F);
-    LoadHubScript := True;
     End
   Else
     Begin
-    Text := MKHubScr.HubProfile(HubProfile);
-    LoadHubScript := Text <> '';
+    Path := ProfileFile(HubProfile);
+    If Path <> '' Then
+      Begin
+      If Not ReadTextFile(Path, Text) Then
+        Begin
+        Say('The profile ' + Path + ' cannot be read');
+        Exit;
+        End;
+      End
+    Else
+      Text := MKHubScr.HubProfile(HubProfile);
+    If Text = '' Then
+      Begin
+      Say('No profile ' + HubProfile + ' (looked for ' + HubProfile + '.scr in:');
+      For N := 1 To 4 Do
+        If ProfileDir(N) <> '' Then
+          Say('  ' + ProfileDir(N));
+      Say('  and the profiles built in: ' + MKHubScr.HubProfileNames + ')');
+      Exit;
+      End;
     End;
+  ApplyHeader(Text);
+  LoadHubScript := True;
   End;
 
 
-Function ReplyRefused(Heard: String; Var Why: String): Boolean;
+Function ReplyRefused(Heard: AnsiString; Var Why: String): Boolean;
   {The hub said something after it got the reply packet: did it refuse it?  "reply-error" texts of the map file (any one seen
    in what the hub said means it did) and "reply-ok" texts (when there are any, one of them has to be seen)}
   Var
-    L: String;
+    L: AnsiString;
     i: Word;
     Seen: Boolean;
 
@@ -1042,6 +1222,211 @@ Function ReplyRefused(Heard: String; Var Why: String): Boolean;
   End;
 
 
+Procedure HubFinish(Id, Rep, RcvDir: String; Var Ok: Boolean);
+  {the reply packet has gone (it is deleted, the control commands are done with) and the packet that came is put in the inbound directory}
+  Var
+    F: File;
+    FI: FindObj;
+    Got, Dest: String;
+
+  Begin
+  If HubSent And (Rep <> '') Then
+    Begin
+    Assign(F, Rep);
+    Erase(F);
+    If IoResult <> 0 Then;
+    CtlSent(Id);                         {the hub has the commands}
+    Say('The reply packet was sent');
+    End;
+  { the packet that came: RemoteId.qwk in the inbound directory }
+  Got := '';
+  FI.Init;
+  FI.FFirst(WithBackSlash(RcvDir) + '*');
+  While FI.Found And (Got = '') Do
+    Begin
+    If Lower(Copy(FI.GetName, Length(FI.GetName) - 3, 4)) = '.qwk' Then
+      Got := FI.GetFullPath;
+    FI.FNext;
+    End;
+  FI.Done;
+  If Got <> '' Then
+    Begin
+    Dest := Inbound + Id + '.qwk';
+    If CopyFile(Got, Dest) Then
+      Say('Packet received: ' + Id + '.qwk')
+    Else
+      Ok := False;
+    End;
+  End;
+
+
+Function HubConfigured: Boolean;
+  {the map file says how to reach a hub: a host to call, or programs (transport exec) that move the files}
+  Begin
+  HubConfigured := (HubHost <> '') Or (HubExec And ((HubGet <> '') Or (HubPut <> '')));
+  End;
+
+
+Function HubLogPath(Id: String): String;
+  Begin
+  If HubLog = '' Then
+    HubLog := MapDir + Id + '.hub.log'
+  Else If HubLog[1] <> '/' Then
+    HubLog := MapDir + HubLog;
+  HubLogPath := HubLog;
+  End;
+
+
+Function Redact(S: AnsiString): AnsiString;
+  {the password of the hub is not written in the transcript}
+  Var
+    P: LongInt;
+
+  Begin
+  If HubPass <> '' Then
+    Begin
+    P := Pos(HubPass, S);
+    While P > 0 Do
+      Begin
+      S := Copy(S, 1, P - 1) + '********' + Copy(S, P + Length(HubPass), Length(S));
+      P := Pos(HubPass, S);
+      End;
+    End;
+  Redact := S;
+  End;
+
+
+Function ExecWhy(R: LongInt; Out: AnsiString): String;
+  Var
+    L: String;
+
+  Begin
+  If R = -2 Then
+    ExecWhy := 'it did not end in ' + Long2Str(HubExecSecs) + ' seconds and was stopped'
+  Else If R = -1 Then
+    ExecWhy := Copy(Redact(Out), 1, 200)
+  Else
+    Begin
+    L := Copy(Redact(Out), Length(Redact(Out)) - 150, 160);
+    While (L <> '') And (L[Length(L)] In [#10, #13]) Do
+      Dec(L[0]);
+    ExecWhy := 'exit status ' + Long2Str(R) + Copy(': ' + L, 1, 170 * Ord(L <> ''));
+    End;
+  End;
+
+
+Function ExecPass(Id, Rep: String): Integer;
+  {transport exec: "get" fetches the packet of the hub, "put" sends the reply packet; 0 done, 5 a program failed, 6 the packet could not be kept, 7 refused}
+  Var
+    Out: AnsiString;
+    R: LongInt;
+    Qwk, RepCopy, Why: String;
+    LogF: Text;
+    LogOk, Failed, Refused, Ok, HaveRep: Boolean;
+
+  Procedure Note(Text: String);
+    Begin
+    If LogOk Then
+      WriteLn(LogF, Text);
+    End;
+
+  Procedure NoteRun(What, Cmd: String; Status: LongInt; Output: AnsiString);
+    Begin
+    Note('== ' + What + ': ' + Cmd);
+    If Output <> '' Then
+      Write(LogF, Redact(Output));
+    If (Output <> '') And (Output[Length(Output)] <> #10) Then
+      Note('');
+    Note('== ' + What + ' ended: ' + Long2Str(Status));
+    End;
+
+  Begin
+  ExecPass := 0;
+  Failed := False;
+  Refused := False;
+  Ok := True;
+  HubSent := False;
+  Qwk := WithBackSlash(HubRcvDir) + Id + '.QWK';
+  Assign(LogF, HubLogPath(Id));
+  Rewrite(LogF);
+  LogOk := IoResult = 0;
+  HubExecClear;
+  HubExecVar('id', Id);
+  HubExecVar('qwk', Qwk);
+  HubExecVar('login', HubLogin);
+  HubExecVar('host', HubHost);
+  HubExecVar('port', Long2Str(HubPort));
+  HubExecEnv('MK_HUB_ID', Id);
+  HubExecEnv('MK_HUB_LOGIN', HubLogin);
+  HubExecEnv('MK_HUB_PASSWORD', HubPass);      {not on the command line: ps would show it}
+  HubExecEnv('MK_HUB_HOST', HubHost);
+  HubExecEnv('MK_HUB_PORT', Long2Str(HubPort));
+  HubExecEnv('MK_HUB_QWK', Qwk);
+  HaveRep := False;
+  If (Rep <> '') And (HubPut <> '') Then
+    Begin
+    RepCopy := WithBackSlash(HubRcvDir) + Id + '.REP';        {the name the hub wants: <QWK id>.REP}
+    If CopyFile(Rep, RepCopy) Then
+      Begin
+      HaveRep := True;
+      HubExecVar('rep', RepCopy);
+      HubExecEnv('MK_HUB_REP', RepCopy);
+      End;
+    End;
+  If HubGet <> '' Then
+    Begin
+    R := HubExecRun(HubGet, MapDir, HubExecSecs, Out);
+    NoteRun('get', HubGet, R, Out);
+    If R = 0 Then
+      Begin
+      If FileExist(Qwk) Then
+        Say('Packet fetched from the hub')
+      Else
+        Say('The get program ended well and left no packet: nothing new');
+      End
+    Else If R = HubNothing Then
+      Say('Nothing new at the hub')
+    Else
+      Begin
+      Failed := True;
+      Say('The get program failed: ' + ExecWhy(R, Out));
+      End;
+    End;
+  If HaveRep Then
+    Begin
+    R := HubExecRun(HubPut, MapDir, HubExecSecs, Out);
+    NoteRun('put', HubPut, R, Out);
+    If R = 0 Then
+      Begin
+      HubSent := True;
+      If (NumErr > 0) Or (NumOk > 0) Then
+        If ReplyRefused(Out, Why) Then
+          Begin
+          Refused := True;
+          HubSent := False;                   {the reply packet stays: the next pass sends it again}
+          Say('The hub did not accept the reply packet: ' + Why + '; it stays in the outbound directory');
+          End;
+      End
+    Else
+      Begin
+      Failed := True;
+      Say('The put program failed: ' + ExecWhy(R, Out) + '; the reply packet stays in the outbound directory');
+      End;
+    End;
+  If LogOk Then
+    Close(LogF);
+  If IoResult <> 0 Then;
+  HubFinish(Id, Rep, HubRcvDir, Ok);
+  HubExecClear;                          {the password is not kept}
+  If Failed Then
+    ExecPass := 5
+  Else If Not Ok Then
+    ExecPass := 6
+  Else If Refused Then
+    ExecPass := 7;
+  End;
+
+
 Function DoHub(Id: String): Integer;
   {0 done, 5 not reached, 6 the script failed, 7 the hub did not accept the reply packet}
   Var
@@ -1049,12 +1434,10 @@ Function DoHub(Id: String): Integer;
     Err: ShortString;
     H: HubScriptObj;
     Text: AnsiString;
-    Rep, Got, Dest: String;
-    FI: FindObj;
+    Rep: String;
     Ok: Boolean;
     OldPort: Word;
     OldRate: LongInt;
-    F: File;
     Refused: Boolean;
     Why: String;
 
@@ -1063,15 +1446,17 @@ Function DoHub(Id: String): Integer;
   Refused := False;
   If OffFindNoCase(Inbound, Id + '.qwk') <> '' Then
     Begin
-    User.DisplayStrLn(Id + '.qwk is still in the inbound directory: no call before it is posted');
+    Say(Id + '.qwk is still in the inbound directory: no call before it is posted');
     Exit;
     End;
-  If Not LoadHubScript(Text) Then
+  If HubExec Then
+    Text := ''
+  Else If Not LoadHubScript(Text) Then
     Begin
-    User.DisplayStrLn('No script for the hub: "profile" or "script" in ' + Id + '.map');
+    Say('No script for the hub: "profile" or "script" in ' + Id + '.map');
     DoHub := 6;
     Exit;
-  End;
+    End;
   HubRcvDir := CreateTempDir(Config^.GetTempPath);
   If HubRcvDir = '' Then
     Begin
@@ -1079,15 +1464,23 @@ Function DoHub(Id: String): Integer;
     Exit;
     End;
   Rep := OffFindNoCase(Outbound, Id + '.rep');
-  S := ConnectTcp(HubHost, HubPort, 20000, True, Err);
+  If HubExec Then
+    S := Nil
+  Else
+    S := ConnectTcp(HubHost, HubPort, 20000, True, Err);
   If S = Nil Then
     Begin
-    User.DisplayStrLn('Hub ' + HubHost + ': ' + Err);
-    DoHub := 5;
+    If HubExec Then
+      DoHub := ExecPass(Id, Rep)
+    Else
+      Begin
+      Say('Hub ' + HubHost + ': ' + Err);
+      DoHub := 5;
+      End;
     End
   Else
     Begin
-    User.DisplayStrLn('Connected to ' + HubHost + ':' + Long2Str(HubPort));
+    Say('Connected to ' + HubHost + ':' + Long2Str(HubPort));
     OldSess := ComSession;
     OldPort := CurrentPort;
     OldRate := CurrentRate;
@@ -1111,21 +1504,17 @@ Function DoHub(Id: String): Integer;
         H.SetVar('have_rep', '1');
         End;
       End;
-    If HubLog = '' Then
-      HubLog := MapDir + Id + '.hub.log'
-    Else If HubLog[1] <> '/' Then
-      HubLog := MapDir + HubLog;
-    H.SetTranscript(HubLog);
+    H.SetTranscript(HubLogPath(Id));
     H.SetXfer(HubXfer);
     Ok := H.Load(Text) And H.Run;
     If Not Ok Then
-      User.DisplayStrLn('The call to the hub failed: ' + H.ErrText);
+      Say('The call to the hub failed: ' + H.ErrText);
     If HubSent And (Rep <> '') And ((NumErr > 0) Or (NumOk > 0)) Then
       If ReplyRefused(H.Heard, Why) Then
         Begin
         Refused := True;
         HubSent := False;                     {the reply packet stays: the next pass sends it again}
-        User.DisplayStrLn('The hub did not accept the reply packet: ' + Why + '; it stays in the outbound directory');
+        Say('The hub did not accept the reply packet: ' + Why + '; it stays in the outbound directory');
         End;
     H.Done;
     S^.Hangup;
@@ -1134,33 +1523,7 @@ Function DoHub(Id: String): Integer;
     ComSession := OldSess;
     CurrentPort := OldPort;
     CurrentRate := OldRate;
-    If HubSent And (Rep <> '') Then
-      Begin
-      Assign(F, Rep);
-      Erase(F);
-      If IoResult <> 0 Then;
-      CtlSent(Id);                         {the hub has the commands}
-      User.DisplayStrLn('The reply packet was sent');
-      End;
-    { the packet that came: RemoteId.qwk in the inbound directory }
-    Got := '';
-    FI.Init;
-    FI.FFirst(WithBackSlash(HubRcvDir) + '*');
-    While FI.Found And (Got = '') Do
-      Begin
-      If Lower(Copy(FI.GetName, Length(FI.GetName) - 3, 4)) = '.qwk' Then
-        Got := FI.GetFullPath;
-      FI.FNext;
-      End;
-    FI.Done;
-    If Got <> '' Then
-      Begin
-      Dest := Inbound + Id + '.qwk';
-      If CopyFile(Got, Dest) Then
-        User.DisplayStrLn('Packet received: ' + Id + '.qwk')
-      Else
-        Ok := False;
-      End;
+    HubFinish(Id, Rep, HubRcvDir, Ok);
     If Not Ok Then
       DoHub := 6
     Else If Refused Then
@@ -1190,7 +1553,7 @@ Function DoPacket(Id: String): Boolean;
   Src := OffFindNoCase(Inbound, Id + '.qwk');
   If Src = '' Then
     Begin
-    User.DisplayStrLn('No packet from ' + Id);
+    Say('No packet from ' + Id);
     Exit;
     End;
   WorkPath := CreateTempDir(Config^.GetTempPath);
@@ -1227,7 +1590,7 @@ Function DoPacket(Id: String): Boolean;
     Offline^.ImportPacket;
     QwkImportLedger := '';
     QwkStripCtrlA := False;
-    User.DisplayStrLn(Long2Str(Offline^.GetImported) + ' message(s) posted from ' + Id);
+    Say(Long2Str(Offline^.GetImported) + ' message(s) posted from ' + Id);
     {the messages just posted are not for the system: its last read goes past them where it can (nothing of
      the area was waiting to be sent, and the new messages follow each other)}
     For A := 1 To Config^.GetMaxMsgAreas Do
@@ -1239,7 +1602,7 @@ Function DoPacket(Id: String): Boolean;
           If (Pending = 0) And (Last - First + 1 = N) Then
             OffSetUserLR(A, Last)
           Else
-            User.DisplayStrLn(Config^.GetMsgName(A) + ': other messages were waiting or came in meanwhile, the ones from the system may go back');
+            Say(Config^.GetMsgName(A) + ': other messages were waiting or came in meanwhile, the ones from the system may go back');
           End;
         End;
     {kept for once}
@@ -1252,7 +1615,7 @@ Function DoPacket(Id: String): Boolean;
     End
   Else
     Begin
-    User.DisplayStrLn('The packet from ' + Id + ' could not be read');
+    Say('The packet from ' + Id + ' could not be read');
     DoPacket := False;
     End;
   Dispose(Offline, Done);
@@ -1277,7 +1640,7 @@ Function QwkNetPass(RemoteId: String): Integer;
   Res := 0;
   If Not LoadMap(RemoteId) Then
     Begin
-    User.DisplayStrLn('No map file ' + RemoteId + '.map');
+    Say('No map file ' + RemoteId + '.map');
     QwkNetPass := 1;
     Exit;
     End;
@@ -1286,7 +1649,7 @@ Function QwkNetPass(RemoteId: String): Integer;
     User.ReadUser;
   If (Not User.UserFound) Or (Not User.GetUserQwkNode) Then
     Begin
-    User.DisplayStrLn('No user ' + UserName + ' with the QWK Node flag');
+    Say('No user ' + UserName + ' with the QWK Node flag');
     QwkNetPass := 2;
     Exit;
     End;
@@ -1305,7 +1668,7 @@ Function QwkNetPass(RemoteId: String): Integer;
     End;
   If Not DoReply(RemoteId) Then
     Res := 3;
-  If HubHost <> '' Then
+  If HubConfigured Then
     Begin
     N := DoHub(RemoteId);
     If N <> 0 Then
@@ -1317,6 +1680,111 @@ Function QwkNetPass(RemoteId: String): Integer;
     Res := 8;
   User.WriteUser;
   QwkNetPass := Res;
+  End;
+
+
+
+Procedure ProfilesTo(Var O: Text; RemoteId, Name: String);
+  {mk -G -P: the profiles that are found (a file <name>.scr in the directories, else built into the program) with what their headers say;
+   mk -G -P<name>: the text of one}
+  Var
+    N, i: Word;
+    D, Text, Names, W: AnsiString;
+    FI: FindObj;
+    Seen: String;
+    Path: String;
+
+  Begin
+  MapDir := '';
+  If RemoteId <> '' Then
+    If LoadMap(RemoteId) Then;
+  If Name <> '' Then
+    Begin
+    Path := ProfileFile(Name);
+    If Path <> '' Then
+      Begin
+      If ReadTextFile(Path, Text) Then
+        Begin
+        WriteLn(O, '# profile ', Name, ': ', Path);
+        Write(O, Text);
+        End;
+      End
+    Else
+      Begin
+      Text := MKHubScr.HubProfile(Name);
+      If Text = '' Then
+        Begin
+        WriteLn(StdErr, 'No profile ', Name, ' (no file ', Name, '.scr in the directories below, and not one of the built in: ', MKHubScr.HubProfileNames, ')');
+        For N := 1 To 4 Do
+          If ProfileDir(N) <> '' Then
+            WriteLn(StdErr, '  ', ProfileDir(N));
+        Exit;
+        End;
+      WriteLn(O, '# profile ', Name, ': built into the program');
+      Write(O, Text);
+      End;
+    Exit;
+    End;
+  Seen := ',';
+  WriteLn(O, 'Hub profiles (a hub in a map file: "profile <name>"; the first file found wins):');
+  For N := 1 To 4 Do
+    Begin
+    D := ProfileDir(N);
+    If (D = '') Or Not DirExist(D) Then
+      Continue;
+    FI.Init;
+    FI.FFirst(D + '*.scr');
+    While FI.Found Do
+      Begin
+      W := FI.GetName;
+      W := Copy(W, 1, Length(W) - 4);
+      If Pos(',' + Lower(W) + ',', Seen) = 0 Then
+        Begin
+        Seen := Seen + Lower(W) + ',';
+        If ReadTextFile(D + FI.GetName, Text) Then
+          Begin
+          WriteLn(O, '  ', W, '   ', D, FI.GetName);
+          If HeaderValue(Text, 'software', 1) <> '' Then
+            WriteLn(O, '      software: ', HeaderValue(Text, 'software', 1));
+          If HeaderValue(Text, 'checked', 1) <> '' Then
+            WriteLn(O, '      checked:  ', HeaderValue(Text, 'checked', 1));
+          If HeaderValue(Text, 'reply-error', 1) <> '' Then
+            WriteLn(O, '      reply-error: ', HeaderValue(Text, 'reply-error', 1));
+          End;
+        End;
+      FI.FNext;
+      End;
+    FI.Done;
+    End;
+  Names := MKHubScr.HubProfileNames + ',';
+  While Names <> '' Do
+    Begin
+    i := Pos(',', Names);
+    W := StripBoth(Copy(Names, 1, i - 1), ' ');
+    Delete(Names, 1, i);
+    If (W <> '') And (Pos(',' + Lower(W) + ',', Seen) = 0) Then
+      Begin
+      Text := MKHubScr.HubProfile(W);
+      WriteLn(O, '  ', W, '   built into the program');
+      If HeaderValue(Text, 'software', 1) <> '' Then
+        WriteLn(O, '      software: ', HeaderValue(Text, 'software', 1));
+      If HeaderValue(Text, 'checked', 1) <> '' Then
+        WriteLn(O, '      checked:  ', HeaderValue(Text, 'checked', 1));
+      End;
+    End;
+  WriteLn(O, 'Looked in: ', ProfileDir(1), ' ', ProfileDir(2), ' ', ProfileDir(3), ' ', ProfileDir(4));
+  End;
+
+
+Procedure QwkNetProfiles(RemoteId, Name: String);
+  Var
+    O: Text;
+
+  Begin
+  Assign(O, '');                         {standard output: Output is the virtual screen in mk}
+  Rewrite(O);
+  ProfilesTo(O, RemoteId, Name);
+  Close(O);
   End;
 
 

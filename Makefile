@@ -63,6 +63,8 @@ install: build/.built
 	  echo "mkbink (the binkp mailer) not found in $(MKBINK): the mailer is not installed (make install MKBINK=<its directory>)"; \
 	fi
 	install -m 755 tools/mkdosdoor $(DESTDIR)$(BINDIR)/mkdosdoor
+	install -d $(DESTDIR)$(PREFIX)/share/mkbbs/hubs
+	install -m 644 hubs/*.scr $(DESTDIR)$(PREFIX)/share/mkbbs/hubs/
 	install -d $(DESTDIR)$(PREFIX)/share/mkbbs/ssh
 	install -m 644 contrib/ssh/* $(DESTDIR)$(PREFIX)/share/mkbbs/ssh/
 	install -m 644 mklisten.example.json $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json

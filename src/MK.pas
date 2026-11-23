@@ -79,6 +79,8 @@ Var
   SessProxy: Boolean;
   RunDir: String;
   NetId: String;
+  NetG, QwkNetList: Boolean;
+  QwkNetListName: String;
   QwkMode: Boolean;
 
 Begin
@@ -93,6 +95,9 @@ SessAddr := '';
 SessRate := 0;
 SessProxy := False;
 NetId := '';
+NetG := False;
+QwkNetList := False;
+QwkNetListName := '';
 QwkMode := False;
 i := 1;
 While i <= ParamCount Do
@@ -116,10 +121,17 @@ While i <= ParamCount Do
              QwkNetCmds[QwkNetNumCmds] := Copy(ParamStr(i), 3, 100);
              End;
       'D': QwkNetDry := True;       {with -G: a dry run, nothing is sent or changed}
-      'G': NetId := Copy(ParamStr(i), 3, 40);   {a pass with a QWK network system (MKQwkNet): no caller}
+      'G': Begin
+           NetId := Copy(ParamStr(i), 3, 40);
+           NetG := True;
+           End;   {a pass with a QWK network system (MKQwkNet): no caller}
       'H': SessProxy := True;      {PROXY header first on the connection}
       'Q': QwkMode := True;          {the login of a QWK network system / script: MKQwkLog}
-      'P': LogToPrinter := True;
+      'P': Begin
+           LogToPrinter := True;
+           QwkNetList := True;             {with -G: the hub profiles are listed (-P<name>: one is shown)}
+           QwkNetListName := Copy(ParamStr(i), 3, 40);
+           End;
       'C': OverridePort := Str2Long(Copy(TmpStr,3,5));
       'E': ExitErrorLevel := Str2Long(Copy(TmpStr,3,5));
       'L': LocalMode := True;
@@ -213,6 +225,15 @@ Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.lc') +
   Config^.GetLangFile(1) + '.lc');
 CommaChar := Prompts.GetChar(320);
 SysStats.Load;
+If NetG And QwkNetList Then
+  Begin
+  {mk -G -P: the hub profiles (nobody is on line)}
+  QwkNetProfiles(NetId, QwkNetListName);
+  User.Done;
+  LogEntry.Done;
+  Config^.Done;
+  Halt(0);
+  End;
 If NetId <> '' Then
   Begin
   {mk -G<id>: the mail of a QWK network system is exchanged, nobody is on line}
