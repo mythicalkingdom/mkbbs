@@ -26,10 +26,10 @@ ssh client  <-- encrypted -->  sshd / dropbear (account bbs, no password)  -->  
    `"proxy": true` needs `"bind": "127.0.0.1"`.  `"charset": "auto"` makes UTF-8 for a terminal that wants it (SSH terminals do).
 2. **`mkbbsssh` and its setting.**  `make install` puts `mkbbsssh` in the bin directory and the files below in `/usr/local/share/mkbbs/ssh/`.  Copy `mkbbsssh.conf` to
    `/etc/mkbbs/mkbbsssh.conf` and make `port` the one of step 1.
-3. **The account `bbs`** (root).  It has no home, no rights, and the shell is `mkbbsssh`; whatever the SSH daemon is asked to run, the account can only do this:
+3. **The account `bbs`** (root).  It has no home directory of its own (the home is set to `/`, so the daemon does not complain), no rights, and the shell is `mkbbsssh`; whatever the SSH daemon is asked to run, the account can only do this:
 
    ```
-   useradd --system --no-create-home --home-dir /nonexistent --shell /usr/local/bin/mkbbsssh bbs
+   useradd --system --no-create-home --home-dir / --shell /usr/local/bin/mkbbsssh bbs
    echo /usr/local/bin/mkbbsssh >> /etc/shells          # Dropbear wants the shell to be listed
    ```
 
