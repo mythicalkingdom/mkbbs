@@ -95,6 +95,7 @@ check('mk -G%s with a hub: exit 0' % hub_id, p.returncode == 0, p.returncode)
 log = open(node_ra + '/' + hub_id + '.hub.log').read() if os.path.exists(node_ra + '/' + hub_id + '.hub.log') else ''
 check('the transcript of the call is next to the map file (password not in it)', '-- upload' in log and '-- download' in log and 'nodepw' not in log, log[-300:])
 after_hub, after_node = dump(hub_env, 6), dump(node_env, 6)
+shutil.copy(node_ra + '/' + hub_id + '.hub.log', work + '/first.hub.log')            # the recording of a real pass: the replay test below
 check('the reply packet reached the hub: the message of the node is in its area 6', 'Message from the node' in after_hub and 'Message from the node' not in before_hub, after_hub[-300:])
 check('the packet of the hub came and was posted: the node has the message of the hub', 'Message from the hub' in after_node and 'Message from the hub' not in before_node, after_node[-300:])
 check('the reply packet is gone from the outbound directory, the packet is kept as .old', not os.listdir(node_ra + '/out') and os.path.exists(node_ra + '/in/' + hub_id + '.qwk.old'), (os.listdir(node_ra + '/out'), os.listdir(node_ra + '/in')))
@@ -184,6 +185,9 @@ check('a reply packet the hub is taken not to have accepted (exit 7) keeps its c
 p = pass_x()
 check('the next pass sends that packet, and then the commands are gone', p.returncode == 0 and not os.path.exists(ctl + '.out') and not [f for f in os.listdir(node_ra + '/out') if f.lower().endswith('.rep')],
       (p.returncode, os.listdir(node_ra), os.listdir(node_ra + '/out')))
+# the recording of the first pass, replayed against the profile (no call): the same way
+p = subprocess.run([build + '/mk', '-L', '-G' + hub_id, '-F' + work + '/first.hub.log'], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+check('the transcript of the first pass replays against the mk profile without a call (-F): the same way', p.returncode == 0 and 'the same way' in p.stdout, (p.returncode, p.stdout, p.stderr[-300:]))
 # a hub that is not there
 open(node_ra + '/' + hub_id + '.map', 'a').write('hub 127.0.0.1:1\n')
 p = subprocess.run([build + '/mk', '-L', '-G' + hub_id], env=node_env, cwd=node_ra, capture_output=True, text=True, timeout=240, stdin=subprocess.DEVNULL)

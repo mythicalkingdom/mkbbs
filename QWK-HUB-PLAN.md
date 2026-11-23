@@ -1,6 +1,6 @@
 # QWK hub profiles: plan
 
-Status (2026-11-23): **phases 1, 2 and 4 are built** (4 as `-I` / `-J` / `-W`: `-L` and `-M` were taken, and the report reads the packet that is there instead of calling the hub) (profiles as files, `mk -G -P`, the `exec` transport; see NETWORKING.md; tests/hubexectest.py, build/hubexectest).  Phases 3, 5, 6 and 7 are not.  Items marked *(verify)* need a transcript or the documentation of a real hub before any code is written;
+Status (2026-11-23): **phases 1, 2, 3 and 4 are built** (3 as `-K` talk and `-F<transcript>` replay: `-T` and `-S` were taken) (4 as `-I` / `-J` / `-W`: `-L` and `-M` were taken, and the report reads the packet that is there instead of calling the hub) (profiles as files, `mk -G -P`, the `exec` transport; see NETWORKING.md; tests/hubexectest.py, build/hubexectest).  Phases 5, 6 and 7 are not.  Items marked *(verify)* need a transcript or the documentation of a real hub before any code is written;
 items marked *(proposal)* are for the sysop to decide.
 
 A *hub* is the system a QWK node calls to take its packet (`<id>.QWK`) and leave its reply packet (`<id>.REP`).  `mk -G<id>` does the exchange with the hub

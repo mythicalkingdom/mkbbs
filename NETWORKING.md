@@ -269,6 +269,18 @@ curl -sS --fail -u "$MK_HUB_LOGIN:$MK_HUB_PASSWORD" -T "$2" "ftp://$MK_HUB_HOST/
 
 For SFTP use `sftp -b` with a key (no password in the environment), for HTTP `curl -F`.
 
+### Writing a profile: `-K` (talk) and `-F` (replay)
+
+* `mk -G<id> -K` calls the hub of the map file (`hub host:port`) and gives you its keyboard and screen: you log in and go through the menus by hand.  What the hub
+  says (cleaned of colour codes) and what you type are written to the transcript (`<id>.hub.log`, or `transcript` in the map file) in the format that `MKHubScr` reads:
+  `<< ` lines are the hub, `>> ` lines are what was sent (up to the Enter key, or the key the hub answered), `-- ` lines are steps.  The password of the map file is
+  written as stars even when you type it.  **Ctrl-]** ends the call, **Ctrl-U** asks for a file name and sends it (Zmodem or the `protocol` of the map file), and when the
+  hub starts a Zmodem send it is received (into `<id>.talk/`).  When the input is a pipe, its end ends the call.  This is the transcript that a profile is written from.
+* `mk -G<id> -F<transcript>` runs the script of the map file (`profile` or `script`) against a recording, no call: it gives the script what the hub said, in order, and
+  waits for the script to send what was sent in the recording (the stars match any password).  Exit 0 and "the same way" when the script did the whole recording;
+  exit 6 and what differed (what the script sent, or waited for, or "the recording goes on") when not; the replay is written in `<id>.replay.log`.  A transcript that
+  somebody sent in is a test for a profile this way, and a profile that was changed can be checked against all the recordings it has to keep working with.
+
 ### Conference numbers: `-I`, `-J`, `-W`
 
 The `conf` lines are the numbers of the hub's conferences, which are in `CONTROL.DAT` of its packet.  Two reports read the packet that is in the inbound directory (or

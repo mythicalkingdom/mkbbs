@@ -117,6 +117,8 @@ Var
   QwkNetConfList: Boolean;               {mk -G<id> -I: list the conferences of the packet of the hub and what they are here}
   QwkNetConfMatch: Boolean;              {mk -G<id> -J: suggest conf lines by the names (with -W: add them to the map file)}
   QwkNetConfWrite: Boolean;
+  QwkNetTalk: Boolean;                   {mk -G<id> -K: talk to the hub by hand and record the call as a transcript}
+  QwkNetReplay: String;                  {mk -G<id> -F<transcript>: run the profile against a recording, no call}
 
 Function QwkNetPass(RemoteId: String): Integer;
 Procedure QwkNetProfiles(RemoteId, Name: String);   {mk -G -P: list the profiles found; mk -G -P<name>: show one}
@@ -125,9 +127,9 @@ Procedure QwkNetProfiles(RemoteId, Name: String);   {mk -G -P: list the profiles
 Implementation
 
 
-Uses MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
+Uses BaseUnix, termio, MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
   MKOffAbs, MKOffQwk, MKQwkImp, MKOffDL, MKOffXfer, MKOfflin,
-  MKComAbs, MKComClient, MKHubScr, MKHubExec, MKProt, MKVideo, MKPlat,
+  MKComAbs, MKComClient, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
   Dos;
 
 
@@ -1871,6 +1873,145 @@ Function ConfReport(Id: String): Integer;
   End;
 
 
+Function TalkPass(Id: String): Integer;
+  {mk -G<id> -K: a call to the hub with the keyboard of whoever started it; the transcript (<id>.hub.log) is what a profile is written from.  0 done, 5 the hub was not reached}
+  Var
+    S, OldSess: AbsComPtr;
+    Err: ShortString;
+    H: HubScriptObj;
+    OldPort: Word;
+    OldRate: LongInt;
+    W: TWinSize;
+
+  Begin
+  TalkPass := 0;
+  If HubHost = '' Then
+    Begin
+    Say('No "hub" in ' + Id + '.map: nobody to talk to');
+    TalkPass := 5;
+    Exit;
+    End;
+  HubRcvDir := MapDir + Id + '.talk/';          {what is received by hand stays here}
+  MkDir(StripTrail(HubRcvDir, '/'));
+  If IoResult <> 0 Then;
+  ClientTerm := GetEnv('TERM');
+  If ClientTerm = '' Then
+    ClientTerm := 'ansi';
+  ClientCols := 80;
+  ClientRows := 24;
+  If fpIoctl(0, TIOCGWINSZ, @W) = 0 Then
+    If (W.ws_col > 0) And (W.ws_row > 0) Then
+      Begin
+      ClientCols := W.ws_col;
+      ClientRows := W.ws_row;
+      End;
+  S := ConnectTcp(HubHost, HubPort, 20000, True, Err);
+  If S = Nil Then
+    Begin
+    Say('Hub ' + HubHost + ': ' + Err);
+    TalkPass := 5;
+    Exit;
+    End;
+  OldSess := ComSession;
+  OldPort := CurrentPort;
+  OldRate := CurrentRate;
+  ComSession := S;
+  CurrentPort := 1;
+  CurrentRate := 38400;
+  ProtQuiet := True;
+  ProtKeepInput := True;
+  HubSent := False;
+  H.Init(S);
+  H.SetVar('login', HubLogin);
+  H.SetVar('password', HubPass);              {typed or not: the stars in the transcript}
+  H.SetTranscript(HubLogPath(Id));
+  H.Note('-- talk: ' + HubHost + ':' + Long2Str(HubPort));
+  HubTalk(H, S, HubXfer, ClientCols, ClientRows);
+  H.Done;
+  S^.Hangup;
+  Dispose(S, Done);
+  ProtKeepInput := False;
+  ComSession := OldSess;
+  CurrentPort := OldPort;
+  CurrentRate := OldRate;
+  Say('The transcript is ' + HubLog + '; files that were received are in ' + HubRcvDir);
+  End;
+
+
+Function ReplayPass(Id, TFile: String): Integer;
+  {mk -G<id> -F<transcript>: the script of the profile against a recording; 0 it went the same way, 6 it did not, 1 the recording is not there}
+  Var
+    R: ReplayPtr;
+    H: HubScriptObj;
+    Script: AnsiString;
+    Ok, Good: Boolean;
+    Why: String;
+    O: Text;
+    LogF: String;
+
+  Begin
+  ReplayPass := 0;
+  If Not LoadHubScript(Script) Then
+    Begin
+    ReplayPass := 6;
+    Exit;
+    End;
+  New(R, InitFile(TFile, Good));
+  If Not Good Then
+    Begin
+    Say('No recording in ' + TFile + ' (a transcript has lines beginning with <<, >> and --)');
+    Dispose(R, Done);
+    ReplayPass := 1;
+    Exit;
+  End;
+  ReplayCur := R;
+  H.Init(R);
+  H.SetVar('login', HubLogin);
+  H.SetVar('password', HubPass);
+  H.SetVar('protocol', HubProto);
+  H.SetVar('id', Id);
+  If R^.HasEvent('U') Then
+    Begin
+    H.SetVar('rep', '/tmp/' + Id + '.REP');
+    H.SetVar('have_rep', '1');
+    End;
+  LogF := MapDir + Id + '.replay.log';
+  H.SetTranscript(LogF);
+  H.SetXfer(ReplayXfer);
+  Ok := H.Load(Script) And H.Run;
+  Assign(O, '');
+  Rewrite(O);
+  If R^.Fault <> '' Then
+    Ok := False;
+  If Ok And (R^.Left > 0) Then
+    Begin
+    Ok := False;
+    R^.Fault := 'the script ended but the recording goes on (' + Long2Str(R^.Left) + ' more step(s) of the script in it)';
+    End;
+  If Ok Then
+    WriteLn(O, 'Replay of ', TFile, ': the script went the same way (', R^.NumEv, ' events). Heard after the upload: ', Length(H.Heard), ' characters.')
+  Else
+    Begin
+    WriteLn(O, 'Replay of ', TFile, ': it did not go the same way.');
+    If R^.Fault <> '' Then
+      WriteLn(O, '  ', R^.Fault);
+    If H.ErrText <> '' Then
+      WriteLn(O, '  script: ', H.ErrText);
+    WriteLn(O, '  the replay is written in ', LogF);
+    ReplayPass := 6;
+    End;
+  If Ok And (NumErr + NumOk > 0) And R^.HasEvent('U') Then
+    If ReplyRefused(H.Heard, Why) Then
+      WriteLn(O, '  the hub would have refused the reply packet: ', Why)
+    Else
+      WriteLn(O, '  the hub accepted the reply packet (reply-error / reply-ok)');
+  Close(O);
+  H.Done;
+  ReplayCur := Nil;
+  Dispose(R, Done);
+  End;
+
+
 Function QwkNetPass(RemoteId: String): Integer;
   Var
     Res, N: Integer;
@@ -1883,6 +2024,16 @@ Function QwkNetPass(RemoteId: String): Integer;
     Begin
     Say('No map file ' + RemoteId + '.map');
     QwkNetPass := 1;
+    Exit;
+    End;
+  If QwkNetTalk Then
+    Begin
+    QwkNetPass := TalkPass(RemoteId);
+    Exit;
+    End;
+  If QwkNetReplay <> '' Then
+    Begin
+    QwkNetPass := ReplayPass(RemoteId, QwkNetReplay);
     Exit;
     End;
   If QwkNetConfList Or QwkNetConfMatch Then

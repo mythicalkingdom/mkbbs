@@ -57,7 +57,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest pwstate eventtest hubexectest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest pwstate eventtest hubexectest hubreplayunit; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -245,6 +245,8 @@ fi
 # the exec transport of a hub (get / put programs) and the hub profiles as files
 if [ -f bbs/bbsc/ra/config.mk ]; then
   build/hubexectest | grep -E "^(FAIL|failures)" | tee build/hubexecunit.txt
+  build/hubreplayunit | grep -E "^(FAIL|failures)" | tee -a build/hubexecunit.txt
+  python3 tests/hubtalktest.py build build/work/hubtalk | grep -E "^(FAIL|skip|failures)" | tee -a build/hubexecresult.txt
   python3 tests/hubexectest.py build build/work/hubexec | grep -E "^(FAIL|skip|failures)" | tee build/hubexecresult.txt
   if grep -q FAIL build/hubexecunit.txt build/hubexecresult.txt; then exit 1; fi
 fi

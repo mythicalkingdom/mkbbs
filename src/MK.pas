@@ -121,6 +121,8 @@ While i <= ParamCount Do
              QwkNetCmds[QwkNetNumCmds] := Copy(ParamStr(i), 3, 100);
              End;
       'I': QwkNetConfList := True;     {with -G: list the conferences of the packet of the hub}
+      'K': QwkNetTalk := True;         {with -G: talk to the hub by hand, record the call}
+      'F': QwkNetReplay := Copy(ParamStr(i), 3, 200);   {with -G: the profile against a recording of a call}
       'J': QwkNetConfMatch := True;    {with -G: suggest conf lines from the names of the areas}
       'W': QwkNetConfWrite := True;    {with -J: add them to the map file}
       'D': QwkNetDry := True;       {with -G: a dry run, nothing is sent or changed}
