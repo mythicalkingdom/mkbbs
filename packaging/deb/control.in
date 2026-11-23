@@ -1,0 +1,23 @@
+Package: mkbbs
+Version: @VERSION@
+Architecture: @ARCH@
+Section: comm
+Priority: optional
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Depends: libc6 (>= 2.34), adduser
+Recommends: zip, unzip, libssl3t64 | libssl3, stunnel4
+Suggests: openssh-server | dropbear-bin, dosemu2, curl
+Homepage: https://github.com/mythicalkingdom/mkbbs
+Description: MK BBS: a bulletin board system with FidoNet and QWK networking
+ A Free Pascal conversion of the DOS MK BBS toolkit.  It has a Telnet, raw,
+ WebSocket and SSH-fronted listener (mklisten), message and file areas, a
+ menu system, an offline mail door (QWK / QWKE), a FidoNet tosser with TIC file
+ echoes and file requests, a binkp mailer interface, QWK network passes (Telnet
+ scripts, FTP, FTPS or your own programs), DOS door support through dosemu2,
+ and the configuration, user and file editors.
+ .
+ The package installs the programs, the systemd unit of the listener (not
+ started: edit /etc/mkbbs/mklisten.json first), the language files and the
+ documentation.  The BBS directory itself (configuration, menus, message
+ bases) is made with mkconfig; see /usr/share/doc/mkbbs/GETTING-STARTED.md.

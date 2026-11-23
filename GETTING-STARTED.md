@@ -43,7 +43,9 @@ part has a document with the details; this one does not repeat them.
 
 ## The path from nothing to a networked BBS
 
-1. **Build and install.**  `make && sudo make install`.  Free Pascal 3.2.2 is needed.  (`MKBBS.md`)
+1. **Build and install.**  `make && sudo make install`.  Free Pascal 3.2.2 is needed.  (`MKBBS.md`)  On Debian and its relatives `make deb` makes a package
+   (`build/mkbbs_<version>_<arch>.deb`, `sudo apt install ./build/mkbbs_*.deb`): the programs go to `/usr/bin`, the unit to the systemd directory, the language files and
+   hub profiles to `/usr/share/mkbbs`, the user `mkbbs` and `/etc/mkbbs/mklisten.json` are made when it is installed, and nothing is started (`packaging/mkdeb.sh`).
 2. **Make the BBS directory** and set `MK` to it.  Convert an existing Remote Access, QuickBBS or SuperBBS configuration
    with `mkcfgcvt`, or start from a sample and run `mklower` to make DOS-style names lower case.  (`MKBBS.md`)
 3. **Configure** with `mkconfig`: the BBS name and paths, security levels, message areas, file areas, protocols, language

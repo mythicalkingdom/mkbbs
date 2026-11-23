@@ -1,0 +1,18 @@
+#!/bin/sh
+# mkbbs: purge removes the configuration file that postinst made.  The user mkbbs, the log directory with its logs and every BBS directory stay (they are your data).
+set -e
+
+case "$1" in
+purge)
+    rm -f /etc/mkbbs/mklisten.json
+    rmdir /etc/mkbbs 2>/dev/null || true
+    ;;
+remove|purge)
+    ;;
+esac
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+
+exit 0

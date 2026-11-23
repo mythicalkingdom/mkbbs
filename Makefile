@@ -6,6 +6,7 @@
 #                         directory, the mkbbs user and the systemd unit (as root)
 #   make uninstall        remove the programs and the unit again (configuration,
 #                         log directory and user stay)
+#   make deb              a Debian package, build/mkbbs_<version>_<arch>.deb (packaging/mkdeb.sh)
 #
 # Variables:  PREFIX=/usr/local  BINDIR=$(PREFIX)/bin  SYSCONFDIR=/etc/mkbbs
 #             LOGDIR=/var/log/mkbbs  MKUSER=mkbbs
@@ -36,7 +37,7 @@ WANTSD = [ "$(SYSTEMD)" != no ] && { [ -n "$(DESTDIR)" ] || { [ "$$(id -u)" = 0 
 
 PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkbbsssh mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents
 
-.PHONY: all test install uninstall clean lang
+.PHONY: all test install uninstall clean lang deb
 
 all: build/.built
 
@@ -111,6 +112,9 @@ uninstall:
 	rm -f $(DESTDIR)$(UNITDIR)/mklisten.service $(DESTDIR)$(SYSUSERSDIR)/mkbbs.conf
 	@if [ -z "$(DESTDIR)" ] && [ "$$(id -u)" = 0 ] && command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi
 	@echo "removed the programs and the unit; $(DESTDIR)$(SYSCONFDIR)/mklisten.json, $(DESTDIR)$(LOGDIR) and the $(MKUSER) user are left alone"
+
+deb: build/.built
+	packaging/mkdeb.sh
 
 clean:
 	rm -rf build

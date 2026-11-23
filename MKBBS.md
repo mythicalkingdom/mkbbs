@@ -164,6 +164,7 @@ of the sample BBS, never on the sample itself.
 | `NETWORKING.md` | QWK and Fido networking set-up |
 | `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |
+| `packaging/` | `mkdeb.sh` and the maintainer scripts of the Debian package (`make deb`) |
 | `HUBS.md` | QWK hubs: every map file setting, switch and exit code, the transports (Telnet, FTP, FTPS, exec), what was checked against what |
 | `hubs/*.scr` | QWK hub profiles (installed in `share/mkbbs/hubs`; `mk -G -P` lists them; NETWORKING.md) |
 | `SSH.md` | SSH for callers: OpenSSH or Dropbear in front, `mkbbsssh`, no password at the SSH level |

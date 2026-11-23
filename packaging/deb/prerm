@@ -1,0 +1,13 @@
+#!/bin/sh
+# mkbbs: the listener is stopped when the package is removed or upgraded (callers that are on carry on: mk is a process of its own, the unit has KillMode=process)
+set -e
+
+case "$1" in
+remove|upgrade|deconfigure)
+    if [ -d /run/systemd/system ] && command -v deb-systemd-invoke >/dev/null 2>&1; then
+        deb-systemd-invoke stop mklisten.service >/dev/null 2>&1 || true
+    fi
+    ;;
+esac
+
+exit 0

@@ -278,7 +278,10 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # TIC files (file echoes): checks, the file area, files.bbs, replaces, bad TICs, the check command
   python3 tests/tictosstest.py build build/tictosswork | grep -E "^(ok|FAIL|skip)" | tee build/tictossresult.txt
   if grep -q FAIL build/tictossresult.txt; then exit 1; fi
-  # native TLS in mklisten ("tls": true): fakemk behind it, a self-signed certificate, no stunnel
+  # the Debian package (packaging/mkdeb.sh): its contents, the scripts, lintian, the programs from the unpacked package
+python3 tests/debtest.py build build/work/deb | grep -E "^(FAIL|skip|failures)" | tee build/debresult.txt
+if grep -q FAIL build/debresult.txt; then exit 1; fi
+# native TLS in mklisten ("tls": true): fakemk behind it, a self-signed certificate, no stunnel
 python3 tests/tlstest.py build build/work/tls | grep -E "^(FAIL|skip|failures)" | tee build/tlsresult.txt
 if grep -q FAIL build/tlsresult.txt; then exit 1; fi
 # the SSH front: mkbbsssh between an SSH daemon (OpenSSH, Dropbear) and mklisten (skipped without ssh and sshd)
