@@ -27,6 +27,10 @@ Function ReadProxyHeader(S: AbsComPtr; Var Addr: String; TimeoutMs: LongInt): Bo
 Function ParseProxyV1(Line: String; Var Addr: String): Boolean;
   {Line without the CRLF; False when it is not a PROXY line}
 
+Function ProxyAddrFromBuf(Var Buf; N: LongInt; Var Addr: String): Integer;
+  {The start of a connection (peeked, not read): 1 = a whole valid header, Addr is the caller's address (left alone for UNKNOWN / LOCAL);
+   0 = more bytes are needed; -1 = it is not a PROXY header.  The listener uses it to know the address before it starts a node.}
+
 Implementation
 
 Uses MKPlat;
@@ -105,6 +109,109 @@ Function HexWord(W: Word): String;
   While (Length(R) > 1) And (R[1] = '0') Do
     Delete(R, 1, 1);
   HexWord := R;
+  End;
+
+
+Function ProxyV2Addr(Fam: Byte; Var Body; Len: Word; Var Addr: String): Boolean;
+  {the address of a version 2 header: Fam is the family / protocol byte, Body the address block}
+  Var
+    B: Array[0..235] Of Byte Absolute Body;
+    i: Word;
+    Tmp: String;
+
+  Begin
+  ProxyV2Addr := False;
+  If (Fam = $11) And (Len >= 12) Then
+    Begin                                {TCP over IPv4}
+    Str(B[0], Addr);
+    For i := 1 To 3 Do
+      Begin
+      Str(B[i], Tmp);
+      Addr := Addr + '.' + Tmp;
+      End;
+    ProxyV2Addr := True;
+    End
+  Else If (Fam = $21) And (Len >= 36) Then
+    Begin                                {TCP over IPv6}
+    Addr := '';
+    For i := 0 To 7 Do
+      Begin
+      If i > 0 Then
+        Addr := Addr + ':';
+      Addr := Addr + HexWord(B[i * 2] * 256 + B[i * 2 + 1]);
+      End;
+    ProxyV2Addr := True;
+    End;
+  End;
+
+
+Function ProxyAddrFromBuf(Var Buf; N: LongInt; Var Addr: String): Integer;
+  Var
+    B: Array[0..255] Of Byte Absolute Buf;
+    i, Len: LongInt;
+    Line: String;
+
+  Begin
+  ProxyAddrFromBuf := 0;
+  If N <= 0 Then
+    Exit;
+  If B[0] = Ord('P') Then
+    Begin                                {version 1: one text line}
+    Line := '';
+    For i := 0 To N - 1 Do
+      Begin
+      If i > 107 Then
+        Begin
+        ProxyAddrFromBuf := -1;
+        Exit;
+        End;
+      If B[i] = 10 Then
+        Begin
+        If (Line <> '') And (Line[Length(Line)] = #13) Then
+          Dec(Line[0]);
+        If ParseProxyV1(Line, Addr) Then
+          ProxyAddrFromBuf := 1
+        Else
+          ProxyAddrFromBuf := -1;
+        Exit;
+        End;
+      Line := Line + Chr(B[i]);
+      End;
+    Exit;                                {no end of line yet}
+    End;
+  If B[0] <> Ord(Sig2[1]) Then
+    Begin
+    ProxyAddrFromBuf := -1;
+    Exit;
+    End;
+  For i := 0 To 11 Do
+    If i < N Then
+      If B[i] <> Ord(Sig2[i + 1]) Then
+        Begin
+        ProxyAddrFromBuf := -1;
+        Exit;
+        End;
+  If N < 16 Then
+    Exit;
+  If (B[12] And $F0) <> $20 Then
+    Begin
+    ProxyAddrFromBuf := -1;
+    Exit;
+    End;
+  Len := B[14] * 256 + B[15];
+  If Len > 236 Then
+    Begin
+    ProxyAddrFromBuf := -1;
+    Exit;
+    End;
+  If N < 16 + Len Then
+    Exit;
+  ProxyAddrFromBuf := 1;
+  If (B[12] And $0F) <> 0 Then
+    If N >= 16 + Len Then
+      Begin
+      If Not ProxyV2Addr(B[13], B[16], Len, Addr) Then;
+      End;
   End;
 
 

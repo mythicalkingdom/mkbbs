@@ -147,7 +147,7 @@ Program MKListen;
 *)
 
 Uses
-  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent;
+  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy;
 
 
 Type
@@ -2685,7 +2685,7 @@ Procedure ReapChildren;
           Begin
           Log('node ' + IntToStr(Children[i].Node) + ' ended (' + How + ') ' +
             Children[i].Addr);
-          If wifexited(Status) And (wexitstatus(Status) = 88) And (Not Ports[Children[i].PortNo].Proxy) Then
+          If wifexited(Status) And (wexitstatus(Status) = 88) And (Not Ports[Children[i].PortNo].Sysop) Then
             NoteFailedLogon(Children[i].Addr);
           DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.info');
           DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.snoop');
@@ -2930,6 +2930,46 @@ Procedure NoteFailedLogon(Const Addr: String);
   End;
 
 
+Procedure PeekProxy(C: LongInt; Var Addr: String);
+  {A port behind a front end ("proxy": true): the PROXY header comes first on the connection.  It is looked at (not read: mk reads it) to know the real
+   address of the caller before a node is used, so that maxperip, the login guard, the log and mkmon have it.  Waits a second at most.}
+  Var
+    Buf: Array[0..255] Of Byte;
+    P: TPollFd;
+    N: LongInt;
+    Tries: Integer;
+    A: ShortString;
+    R: Integer;
+
+  Begin
+  Tries := 0;
+  Repeat
+    P.fd := C;
+    P.events := POLLIN;
+    P.revents := 0;
+    If fpPoll(@P, 1, 200) > 0 Then
+      Begin
+      N := fpRecv(C, @Buf, SizeOf(Buf), MSG_PEEK);
+      If N <= 0 Then
+        Exit;
+      A := Addr;
+      R := ProxyAddrFromBuf(Buf, N, A);
+      If R = 1 Then
+        Begin
+        Addr := A;
+        Exit;
+        End;
+      If R < 0 Then
+        Exit;                            {not a PROXY header: mk refuses the connection}
+      If N >= SizeOf(Buf) Then
+        Exit;
+      Sleep(20);                         {a part of the header: the rest follows}
+      End;
+    Inc(Tries);
+  Until Tries >= 5;
+  End;
+
+
 Procedure Accept(PortNo: Integer);
   Var
     A: TInetSockAddr;
@@ -2944,6 +2984,8 @@ Procedure Accept(PortNo: Integer);
   If C < 0 Then
     Exit;
   Addr := NetAddrToStr(A.sin_addr);
+  If Ports[PortNo].Proxy Then
+    PeekProxy(C, Addr);
   If (Ports[PortNo].MaxPerIp > 0) And (CountFrom(PortNo, Addr) >= Ports[PortNo].MaxPerIp) Then
     Begin
     Refuse(C, 'too many callers from this address', Addr);

@@ -1,0 +1,29 @@
+# A second OpenSSH daemon only for the BBS (it does not touch the system's own sshd): ssh bbs@host, no password, and the BBS asks for the user's login.
+# Install:  /etc/mkbbs/sshd_config   (see SSH.md: the account "bbs", /etc/pam.d/mkbbs-ssh, the host key, the unit mkbbs-sshd.service)
+Port 22                                   # the system's own sshd must be on another port then; or use 2222 here and "ssh -p 2222 bbs@host"
+HostKey /etc/mkbbs/ssh/ssh_host_ed25519_key
+PidFile /run/mkbbs-sshd.pid
+AllowUsers bbs
+UsePAM yes
+PAMServiceName mkbbs-ssh                  # /etc/pam.d/mkbbs-ssh: pam_permit only, so the "password-less" login of "none" goes through
+PasswordAuthentication yes
+PermitEmptyPasswords yes
+KbdInteractiveAuthentication no
+PubkeyAuthentication no
+GSSAPIAuthentication no
+PermitRootLogin no
+MaxAuthTries 2
+LoginGraceTime 30
+MaxStartups 10:30:60
+ClientAliveInterval 60
+ClientAliveCountMax 10
+PermitTTY yes
+AllowTcpForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+PermitUserEnvironment no
+PrintMotd no
+PrintLastLog no
+# the account's shell is mkbbsssh anyway; this makes sure that it is the only thing the daemon runs
+ForceCommand /usr/local/bin/mkbbsssh

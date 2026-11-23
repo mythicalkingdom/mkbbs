@@ -26,6 +26,7 @@ Uses MKComAbs;
 Var
   ClientTerm: String[40];
   ClientCols, ClientRows: Word;
+  ClientPreamble: String;              {sent first, before any Telnet negotiation (a PROXY header for a listener behind a front end); '' = none}
 
 
 Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolean; Var Err: String): AbsComPtr;
@@ -124,6 +125,12 @@ Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolea
   fpFcntl(Fd, F_SETFL, Flags);                  {blocking again: the session waits with select}
   New(Raw, InitFd(Fd, Fd));
   Raw^.SetRemoteAddr(Host + ':' + IntToStr(Port));
+  If ClientPreamble <> '' Then
+    Begin
+    Raw^.OpenSession;
+    Raw^.SendStr(ClientPreamble);
+    Raw^.FlushOut;
+    End;
   If Telnet Then
     Begin
     New(Tel, Init(Raw, True));
@@ -153,4 +160,5 @@ Begin
 ClientTerm := 'ansi';
 ClientCols := 80;
 ClientRows := 24;
+ClientPreamble := '';
 End.

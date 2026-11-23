@@ -101,6 +101,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mknodeidx`, `mknodelist` | build the nodelist index, look an address up |
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
+| `mkbbsssh` | the shell of the SSH account of the BBS: connects an SSH daemon to `mklisten` (`SSH.md`) |
 | `mkhatch` | put files into a file echo (TIC): stored in the file area and sent to the systems the echo goes to |
 | `mkqwk`, `mkqwkcfg` | the older offline mail door and its configuration (`config.mko`): kept for systems that do not run `mk`; nothing else in MK uses it |
 | `mkfreq` | answers FTN file requests for `mkbink` (see `NETWORKING.md`) |
@@ -163,5 +164,6 @@ of the sample BBS, never on the sample itself.
 | `NETWORKING.md` | QWK and Fido networking set-up |
 | `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |
+| `SSH.md` | SSH for callers: OpenSSH or Dropbear in front, `mkbbsssh`, no password at the SSH level |
 | `DOS-DOORS.md` | DOS doors on Linux: dosemu2 and `mkdosdoor` |
 | `TIC-PLAN.md` | file echoes (TIC): how they work, what each part does, the decisions |

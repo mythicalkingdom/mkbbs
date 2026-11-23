@@ -103,6 +103,7 @@ Type TelnetComObj = Object(AbsComObj)
   Procedure SetClient(Term: String; AC, AR: Word); {this side is the caller: Term = terminal type, AC x AR = window}
   Function  Can(Opt: Byte; Mine: Boolean): Boolean; {Internal: the option is supported}
   Procedure SendNaws;                  {Internal: client}
+  Procedure Resize(AC, AR: Word);      {client: the window of the caller changed: told to the server (when it asked for the size)}
   Procedure Command(V, Opt: Byte);     {Internal: send IAC V Opt}
   Procedure Offer(Opt: Byte; Mine: Boolean); {Internal}
   Procedure GotOption(V, Opt: Byte);   {Internal}
@@ -145,6 +146,18 @@ Procedure TelnetComObj.SetClient(Term: String; AC, AR: Word);
   CTerm := Term;
   CCols := AC;
   CRows := AR;
+  End;
+
+
+Procedure TelnetComObj.Resize(AC, AR: Word);
+  Begin
+  CCols := AC;
+  CRows := AR;
+  If Client And (Us[TelOptNaws] = 1) Then
+    Begin
+    SendNaws;
+    Inner^.FlushOut;
+    End;
   End;
 
 

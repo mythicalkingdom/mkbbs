@@ -1,6 +1,6 @@
 # MK BBS (Free Pascal)
 #
-#   make                  build the programs (build/mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents)
+#   make                  build the programs (build/mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkbbsssh mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents)
 #   make test             build and run all the tests (./build.sh)
 #   make install          install into /usr/local/bin and /etc/mkbbs, create the log
 #                         directory, the mkbbs user and the systemd unit (as root)
@@ -34,7 +34,7 @@ PRIV = [ -n "$(DESTDIR)" ] || [ "$$(id -u)" = 0 ]
 # true when the systemd pieces (unit, user) are wanted
 WANTSD = [ "$(SYSTEMD)" != no ] && { [ -n "$(DESTDIR)" ] || { [ "$$(id -u)" = 0 ] && [ -d /run/systemd/system ]; }; }
 
-PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents
+PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkbbsssh mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents
 
 .PHONY: all test install uninstall clean lang
 
@@ -63,6 +63,8 @@ install: build/.built
 	  echo "mkbink (the binkp mailer) not found in $(MKBINK): the mailer is not installed (make install MKBINK=<its directory>)"; \
 	fi
 	install -m 755 tools/mkdosdoor $(DESTDIR)$(BINDIR)/mkdosdoor
+	install -d $(DESTDIR)$(PREFIX)/share/mkbbs/ssh
+	install -m 644 contrib/ssh/* $(DESTDIR)$(PREFIX)/share/mkbbs/ssh/
 	install -m 644 mklisten.example.json $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
 	@if [ -e $(DESTDIR)$(SYSCONFDIR)/mklisten.json ]; then \
 	  echo "keeping $(DESTDIR)$(SYSCONFDIR)/mklisten.json"; \

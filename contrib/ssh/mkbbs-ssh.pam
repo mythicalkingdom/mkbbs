@@ -1,0 +1,5 @@
+# /etc/pam.d/mkbbs-ssh: for the second sshd of the BBS only (PAMServiceName in its sshd_config).  The account "bbs" is let in without a password;
+# the BBS itself asks for the login and password of the caller.  No other service uses this file.
+auth     required pam_permit.so
+account  required pam_permit.so
+session  required pam_permit.so

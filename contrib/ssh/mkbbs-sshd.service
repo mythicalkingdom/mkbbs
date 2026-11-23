@@ -1,0 +1,14 @@
+[Unit]
+Description=SSH front of the MK BBS (a second OpenSSH daemon, account bbs)
+After=network.target mklisten.service
+Wants=mklisten.service
+
+[Service]
+ExecStartPre=/bin/mkdir -p -m 0755 /run/sshd
+ExecStartPre=/usr/sbin/sshd -t -f /etc/mkbbs/sshd_config
+ExecStart=/usr/sbin/sshd -D -e -f /etc/mkbbs/sshd_config
+Restart=on-failure
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

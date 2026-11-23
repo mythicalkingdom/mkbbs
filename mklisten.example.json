@@ -32,6 +32,16 @@
       "config": "/bbs/ra"
     },
     {
+      "_note": "SSH: a second sshd (or Dropbear) lets the account bbs in and runs mkbbsssh, which connects here (SSH.md)",
+      "port": 2327,
+      "type": "telnet",
+      "bind": "127.0.0.1",
+      "proxy": true,
+      "baud": 38400,
+      "charset": "auto",
+      "config": "/bbs/ra"
+    },
+    {
       "_note": "wss: stunnel accepts TLS (for example on 443) and connects here with protocol = proxy",
       "port": 2326,
       "type": "ws",

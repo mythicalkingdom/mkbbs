@@ -1,0 +1,13 @@
+[Unit]
+Description=SSH front of the MK BBS (Dropbear, account bbs)
+After=network.target mklisten.service
+Wants=mklisten.service
+
+[Service]
+# -B: the account "bbs" has an empty password and is let in at once; -G bbs: only members of the group bbs; -c: always mkbbsssh; no forwarding
+# (-R makes the host key when there is none).  Change -p to 2222 when the system's own sshd is on port 22.
+ExecStart=/usr/sbin/dropbear -F -E -R -p 22 -r /etc/mkbbs/ssh/dropbear_ed25519_host_key -B -G bbs -j -k -w -c /usr/local/bin/mkbbsssh -P /run/mkbbs-dropbear.pid
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
