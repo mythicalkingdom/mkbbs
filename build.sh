@@ -247,6 +247,7 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   build/hubexectest | grep -E "^(FAIL|failures)" | tee build/hubexecunit.txt
   build/hubreplayunit | grep -E "^(FAIL|failures)" | tee -a build/hubexecunit.txt
   python3 tests/hubtalktest.py build build/work/hubtalk | grep -E "^(FAIL|skip|failures)" | tee -a build/hubexecresult.txt
+  python3 tests/hubftptest.py build build/work/hubftp | grep -E "^(FAIL|skip|failures)" | tee -a build/hubexecresult.txt
   python3 tests/hubexectest.py build build/work/hubexec | grep -E "^(FAIL|skip|failures)" | tee build/hubexecresult.txt
   if grep -q FAIL build/hubexecunit.txt build/hubexecresult.txt; then exit 1; fi
 fi

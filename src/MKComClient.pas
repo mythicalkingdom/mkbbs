@@ -51,7 +51,7 @@ Function Resolve(Host: String; Var Addr: TInAddr): Boolean;
     Exit;
   If ResolveHostByName(Host, H) Then
     Begin
-    Addr.s_addr := htonl(H.Addr.s_addr);
+    Addr := H.Addr;                      {ResolveHostByName gives the address in network byte order}
     Exit;
     End;
   Resolve := False;

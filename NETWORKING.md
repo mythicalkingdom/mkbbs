@@ -269,6 +269,34 @@ curl -sS --fail -u "$MK_HUB_LOGIN:$MK_HUB_PASSWORD" -T "$2" "ftp://$MK_HUB_HOST/
 
 For SFTP use `sftp -b` with a key (no password in the environment), for HTTP `curl -F`.
 
+### A hub reached by FTP: `transport ftp` and `ftps`
+
+When the hub offers its packets by FTP, MK has a client of its own (no `curl` needed): log in, fetch one file, send one file, optionally delete one.
+
+```
+hub        ftp.example.com:21          # the port is 21 when it is left out
+transport  ftp                         # ftp, or ftps = explicit TLS (AUTH TLS, PROT P)
+login      lion
+password   secret
+get        qwk/%id%.qwk                # the remote name of the packet (default %id%.qwk)
+put        qwk/%id%.rep                # the remote name of the reply packet (default %id%.rep)
+ftp-delete yes                         # delete the packet at the hub after it was fetched (default no)
+ftp-timeout 60                         # seconds without a byte before it is given up (default 60)
+tls-ca     /etc/mkbbs/hub-ca.pem       # ftps: the CA (or the certificate itself) that is trusted; default: the CAs of the system
+tls-verify yes                         # ftps: no turns the checking of the certificate off (default yes)
+```
+
+* Passive mode only (EPSV, then PASV), binary, IPv4.  `get` / `put` are the remote **names** here (with `%id%`); with `transport exec` they are programs.
+* A packet that is not at the hub (550) is "nothing new", not an error.  A hub that keeps the packet until somebody deletes it needs `ftp-delete yes` (or a hub that
+  makes a new one each time), or the same packet is fetched again by each pass.  The messages that came before are not posted twice (the duplicate ledger), but it is
+  wasted time.
+* **FTPS** uses the OpenSSL libraries of the system (`libssl.so.3` or `.1.1`, loaded when it is wanted: without them only plain FTP works).  The certificate must be
+  valid (the CAs of the system, or `tls-ca`) **and be for the name in the `hub` line** (so use a name, not an address, or `tls-verify no`).  The data connection reuses the
+  TLS session of the control connection.  Nothing is sent without TLS: a server that does not do AUTH TLS is a failure.  Implicit FTPS (port 990) is not supported.
+* Exit codes and what is written to the transcript are as for `exec`: 5 the FTP failed, 7 the hub did not accept the reply packet (`reply-error` / `reply-ok` look at the
+  last reply of the server, for example `226 Transfer complete`); the transcript (`<id>.hub.log`) has the FTP dialogue with the password as stars.
+* SFTP (SSH) is not built in: use `transport exec` with `sftp -b` and a key.
+
 ### Writing a profile: `-K` (talk) and `-F` (replay)
 
 * `mk -G<id> -K` calls the hub of the map file (`hub host:port`) and gives you its keyboard and screen: you log in and go through the menus by hand.  What the hub

@@ -84,7 +84,7 @@ def session(c):
 
 threading.Thread(target=serve, daemon=True).start()
 time.sleep(0.5)
-open(mapf, 'w').write('inbound %s\noutbound %s\nuser Chuck Ebenschweiger\nhub 127.0.0.1:%d\nscript hub.scr\nlogin lion\npassword %s\nconf 6 6\n' % (ra, ra, port, PW))
+open(mapf, 'w').write('inbound %s\noutbound %s\nuser Chuck Ebenschweiger\nhub localhost:%d\nscript hub.scr\nlogin lion\npassword %s\nconf 6 6\n' % (ra, ra, port, PW))
 SCRIPT = '''timeout 10
 expect "login:"
 sendln "%login%"

@@ -129,7 +129,7 @@ Implementation
 
 Uses BaseUnix, termio, MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
   MKOffAbs, MKOffQwk, MKQwkImp, MKOffDL, MKOffXfer, MKOfflin,
-  MKComAbs, MKComClient, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
+  MKComAbs, MKComClient, MKFtp, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
   Dos;
 
 
@@ -149,6 +149,10 @@ Var
   HubPort: Word;
   HubExec: Boolean;                      {transport exec: programs move the files (get / put) instead of a Telnet call}
   HubGet, HubPut: String;
+  HubFtp: Byte;                          {transport ftp (1) or ftps (2): the files move by FTP}
+  HubFtpDel, HubTlsVerify, HubPortGiven: Boolean;
+  HubTlsCa: String;
+  HubFtpSecs: LongInt;
   HubNothing: LongInt;                   {the exit status of get that means "nothing new" (default 3)}
   HubExecSecs: LongInt;                  {exec-timeout}
   SelIdx: Word;
@@ -210,6 +214,12 @@ Function LoadMap(Id: String): Boolean;
   HubProto := 'Z';
   HubLog := '';
   HubExec := False;
+  HubFtp := 0;
+  HubFtpDel := False;
+  HubTlsVerify := True;
+  HubTlsCa := '';
+  HubFtpSecs := 60;
+  HubPortGiven := False;
   HubGet := '';
   HubPut := '';
   HubNothing := 3;
@@ -251,6 +261,7 @@ Function LoadMap(Id: String): Boolean;
         P := Pos(':', Rest);
         If P > 0 Then
           Begin
+          HubPortGiven := True;
           HubPort := Str2Long(Copy(Rest, P + 1, 6));
           HubHost := Copy(Rest, 1, P - 1);
           End
@@ -270,7 +281,22 @@ Function LoadMap(Id: String): Boolean;
       Else If Key = 'transcript' Then
         HubLog := Rest
       Else If Key = 'transport' Then
-        HubExec := Lower(ExtractWord(Rest, 1)) = 'exec'
+        Begin
+        HubExec := Lower(ExtractWord(Rest, 1)) = 'exec';
+        HubFtp := Ord(Lower(ExtractWord(Rest, 1)) = 'ftp') + 2 * Ord(Lower(ExtractWord(Rest, 1)) = 'ftps');
+        End
+      Else If Key = 'ftp-delete' Then
+        HubFtpDel := Lower(ExtractWord(Rest, 1)) = 'yes'
+      Else If Key = 'tls-verify' Then
+        HubTlsVerify := Lower(ExtractWord(Rest, 1)) <> 'no'
+      Else If Key = 'tls-ca' Then
+        HubTlsCa := Rest
+      Else If Key = 'ftp-timeout' Then
+        Begin
+        HubFtpSecs := Str2Long(ExtractWord(Rest, 1));
+        If HubFtpSecs < 5 Then
+          HubFtpSecs := 60;
+        End
       Else If Key = 'get' Then
         HubGet := Rest
       Else If Key = 'put' Then
@@ -313,6 +339,8 @@ Function LoadMap(Id: String): Boolean;
     End;
   Close(F);
   If IoResult <> 0 Then;
+  If (HubFtp > 0) And Not HubPortGiven Then
+    HubPort := 21;
   LoadMap := True;
   End;
 
@@ -853,6 +881,24 @@ Function ListControls(Id: String): Word;
   End;
 
 
+Function FtpName(Pat, Default, Id: String): String;
+  {the remote name: the setting (or its default) with %id% replaced}
+  Var
+    P: Word;
+
+  Begin
+  If Pat = '' Then
+    Pat := Default;
+  P := Pos('%id%', Lower(Pat));
+  While P > 0 Do
+    Begin
+    Pat := Copy(Pat, 1, P - 1) + Id + Copy(Pat, P + 4, 250);
+    P := Pos('%id%', Lower(Pat));
+    End;
+  FtpName := Pat;
+  End;
+
+
 Function DryRun(Id: String): Integer;
   {Does what DoReply does up to the packet (the messages are looked at, nothing is written but a work directory that is
    removed again) and does not move any last read pointer, call the hub or touch a file of the BBS.  mk -G<id> -D}
@@ -874,6 +920,11 @@ Function DryRun(Id: String): Integer;
     WriteLn(StdErr, 'Hub by programs (transport exec), host ', HubHost, ':', HubPort);
     WriteLn(StdErr, '  get: ', HubGet);
     WriteLn(StdErr, '  put: ', HubPut);
+    End
+  Else If HubFtp > 0 Then
+    Begin
+    WriteLn(StdErr, 'Hub by ', Copy('FTPS', 1, 3 + Ord(HubFtp = 2)), ' at ', HubHost, ':', HubPort);
+    WriteLn(StdErr, '  get: ', FtpName(HubGet, '%id%.qwk', Id), '   put: ', FtpName(HubPut, '%id%.rep', Id));
     End
   Else If HubHost <> '' Then
     WriteLn(StdErr, 'Hub ', HubHost, ':', HubPort, ', profile ', HubProfile, ' ', HubScript)
@@ -1432,6 +1483,97 @@ Function ExecPass(Id, Rep: String): Integer;
   End;
 
 
+Function FtpPass(Id, Rep: String): Integer;
+  {transport ftp / ftps: "get" is the remote name of the packet, "put" the remote name of the reply packet; 0 done, 5 the FTP failed, 6 the packet could not be kept, 7 refused}
+  Var
+    F: TFtp;
+    Err: ShortString;
+    Why, Qwk, Remote: String;
+    LogF: Text;
+    R: Integer;
+    LogOk, Failed, Refused, Ok: Boolean;
+
+  Begin
+  FtpPass := 0;
+  Failed := False;
+  Refused := False;
+  Ok := True;
+  HubSent := False;
+  Qwk := WithBackSlash(HubRcvDir) + Id + '.QWK';
+  Assign(LogF, HubLogPath(Id));
+  Rewrite(LogF);
+  LogOk := IoResult = 0;
+  Err := '';
+  F := FtpOpen(HubHost, HubPort, HubFtp = 2, HubTlsCa, HubTlsVerify, HubFtpSecs, Err);
+  If F = Nil Then
+    Failed := True
+  Else If Not F.Login(HubLogin, HubPass) Then
+    Begin
+    Err := F.Err;
+    Failed := True;
+    End;
+  If Failed Then
+    Say('FTP with ' + HubHost + ' failed: ' + Err)
+  Else
+    Begin
+    Say('Connected by ' + Copy('FTPS', 1, 3 + Ord(HubFtp = 2)) + ' to ' + HubHost + ':' + Long2Str(HubPort));
+    Remote := FtpName(HubGet, '%id%.qwk', Id);
+    R := F.Retr(Remote, Qwk);
+    If R = 0 Then
+      Begin
+      Say('Packet fetched from the hub (' + Remote + ')');
+      If HubFtpDel Then
+        If Not F.Dele(Remote) Then
+          Say('The packet could not be deleted at the hub: ' + Copy(F.Reply, 1, 80));
+      End
+    Else If R = 1 Then
+      Say('Nothing new at the hub (' + Remote + ' is not there)')
+    Else
+      Begin
+      Failed := True;
+      Say('The fetch failed: ' + F.Err);
+      End;
+    If Rep <> '' Then
+      Begin
+      Remote := FtpName(HubPut, '%id%.rep', Id);
+      If F.Stor(Rep, Remote) Then
+        Begin
+        HubSent := True;
+        If (NumErr > 0) Or (NumOk > 0) Then
+          If ReplyRefused(F.Reply, Why) Then
+            Begin
+            Refused := True;
+            HubSent := False;
+            Say('The hub did not accept the reply packet: ' + Why + '; it stays in the outbound directory');
+            End;
+        End
+      Else
+        Begin
+        Failed := True;
+        Say('Sending the reply packet failed: ' + F.Err + '; it stays in the outbound directory');
+        End;
+      End;
+    F.Quit;
+    End;
+  If LogOk Then
+    Begin
+    If F <> Nil Then
+      Write(LogF, F.Trace);
+    Close(LogF);
+    End;
+  If IoResult <> 0 Then;
+  If F <> Nil Then
+    F.Free;
+  HubFinish(Id, Rep, HubRcvDir, Ok);
+  If Failed Then
+    FtpPass := 5
+  Else If Not Ok Then
+    FtpPass := 6
+  Else If Refused Then
+    FtpPass := 7;
+  End;
+
+
 Function DoHub(Id: String): Integer;
   {0 done, 5 not reached, 6 the script failed, 7 the hub did not accept the reply packet}
   Var
@@ -1454,7 +1596,7 @@ Function DoHub(Id: String): Integer;
     Say(Id + '.qwk is still in the inbound directory: no call before it is posted');
     Exit;
     End;
-  If HubExec Then
+  If HubExec Or (HubFtp > 0) Then
     Text := ''
   Else If Not LoadHubScript(Text) Then
     Begin
@@ -1469,7 +1611,7 @@ Function DoHub(Id: String): Integer;
     Exit;
     End;
   Rep := OffFindNoCase(Outbound, Id + '.rep');
-  If HubExec Then
+  If HubExec Or (HubFtp > 0) Then
     S := Nil
   Else
     S := ConnectTcp(HubHost, HubPort, 20000, True, Err);
@@ -1477,6 +1619,8 @@ Function DoHub(Id: String): Integer;
     Begin
     If HubExec Then
       DoHub := ExecPass(Id, Rep)
+    Else If HubFtp > 0 Then
+      DoHub := FtpPass(Id, Rep)
     Else
       Begin
       Say('Hub ' + HubHost + ': ' + Err);
