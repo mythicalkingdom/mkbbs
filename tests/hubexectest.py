@@ -195,6 +195,40 @@ for n in ('mk', 'synchronet'):
     f = open(os.path.join(repo, 'hubs', n + '.scr')).read()
     check('hubs/%s.scr is the profile built into the program (regenerate: mk -G -P%s > hubs/%s.scr)' % (n, n, n), p.stdout == f, (len(p.stdout), len(f)))
 # the header gives reply-error: a hub profile file with one, the map file with none: a Synchronet-like fake
+# 12. the conferences of a packet: -I lists, -J suggests, -W writes
+confs = [(100, 'LOCAL-General'), (101, 'Comments to Sysop'), (102, 'NC Mail'), (103, 'Zzz Unknown Echo')]
+ctl = 'The Hub\r\nHub City\r\n555-1212\r\nSysop, Sysop\r\n0000,%s\r\n01-01-2026,00:00:00\r\nChuck Ebenschweiger\r\n\r\n0\r\n0\r\n%d\r\n' % (HUB, len(confs) - 1)
+ctl += ''.join('%d\r\n%s\r\n' % c for c in confs)
+clean(); write_map('')
+for f in os.listdir(ra + '/in'):
+    os.remove(ra + '/in/' + f)
+with zipfile.ZipFile(ra + '/in/' + HUB + '.qwk', 'w') as z:
+    z.writestr('CONTROL.DAT', ctl)
+    z.writestr('MESSAGES.DAT', b'Produced by Qmail...Copyright (c) 1987 by Sparkware.  All Rights Reserved' + b' ' * (128 - 73))
+mapbefore = open(mapf).read()
+p = run('-I')
+check('-I lists the conferences of the packet with number and name, the one that has a conf line says its area, the others say so',
+      p.returncode == 0 and '4 conference(s)' in p.stdout and re.search(r'100\s+LOCAL-General\s+-  \(no conf line\)', p.stdout) and '103  Zzz Unknown Echo' in p.stdout, (p.returncode, p.stdout, p.stderr[-300:]))
+check('-I: a conf line for a conference that is not in the packet is named', 'conf 6 6' in p.stdout, p.stdout)
+check('-I changes nothing: the packet is still there, the map file is as it was, nothing is called', os.path.exists(ra + '/in/' + HUB + '.qwk') and open(mapf).read() == mapbefore)
+p = run('-J')
+check('-J: an exact name is a conf line (LOCAL-General = area 1, NC Mail = area 3), a part of a name is a line with ; in front (Comments to Sysop ? area 2), no match is left out',
+      p.returncode == 0 and re.search(r'^conf 100 1 ', p.stdout, re.M) and re.search(r'^conf 102 3 ', p.stdout, re.M) and re.search(r'^; conf 101 2 ', p.stdout, re.M) and 'conf 103' not in p.stdout and 'Nothing is written' in p.stdout, (p.returncode, p.stdout))
+check('... and nothing was written without -W', open(mapf).read() == mapbefore)
+p = run('-J', '-W')
+mp = open(mapf).read()
+check('-J -W: the lines are added to the map file (the sure ones as conf lines, the unsure ones as comments)', p.returncode == 0 and re.search(r'^conf 100 1 ', mp, re.M) and re.search(r'^conf 102 3 ', mp, re.M) and re.search(r'^; conf 101 2 ', mp, re.M) and mp.startswith(mapbefore), (p.returncode, mp[-500:]))
+p = run('-I')
+check('-I again: the two now have their area', re.search(r'100\s+LOCAL-General\s+area 1 ', p.stdout) and re.search(r'102\s+NC Mail\s+area 3 ', p.stdout), p.stdout)
+p = run('-J')
+check('-J again: the mapped conferences and areas are not suggested again', not re.search(r'^conf 10[02] ', p.stdout, re.M), p.stdout)
+os.rename(ra + '/in/' + HUB + '.qwk', ra + '/in/' + HUB + '.qwk.old')
+p = run('-I')
+check('the packet that the last pass kept (.qwk.old) is read when there is no new one', p.returncode == 0 and '4 conference(s)' in p.stdout, (p.returncode, p.stderr[-200:]))
+os.remove(ra + '/in/' + HUB + '.qwk.old')
+p = run('-I')
+check('no packet at all: exit 9, says the hub is not called', p.returncode == 9 and 'not called' in p.stderr, (p.returncode, p.stderr[-300:]))
+
 # 11. the header of a profile gives reply-error / reply-ok; the map file's own lines win. A scripted hub (the fake) needs a listener: see hubpasstest.
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

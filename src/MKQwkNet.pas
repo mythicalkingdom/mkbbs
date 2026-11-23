@@ -114,6 +114,9 @@ Var
   QwkNetNumCmds: Word;
   QwkNetCtlBad: Boolean;                 {a control command was not valid (exit code 8)}
   QwkNetDry: Boolean;                    {mk -G<id> -D: only say what a pass would send, change nothing}
+  QwkNetConfList: Boolean;               {mk -G<id> -I: list the conferences of the packet of the hub and what they are here}
+  QwkNetConfMatch: Boolean;              {mk -G<id> -J: suggest conf lines by the names (with -W: add them to the map file)}
+  QwkNetConfWrite: Boolean;
 
 Function QwkNetPass(RemoteId: String): Integer;
 Procedure QwkNetProfiles(RemoteId, Name: String);   {mk -G -P: list the profiles found; mk -G -P<name>: show one}
@@ -1535,13 +1538,36 @@ Function DoHub(Id: String): Integer;
   End;
 
 
+Function UnpackCmds(Offline: QwkOffPtr; WorkPath: String): Boolean;
+  {the packet is WorkPath/upload.1: unpacked with the packer of the system (the one it uses, then any other that is set up)}
+  Var
+    Cmds: OffCmdList;
+    NumCmds, k, i: Word;
+
+  Begin
+  NumCmds := 0;
+  k := PackerNum;
+  If k > 0 Then
+    Begin
+    Inc(NumCmds);
+    Cmds[NumCmds] := Config^.GetUnPackCmdLine(k);
+    End;
+  For i := 1 To 10 Do
+    If (i <> k) And Config^.GetPackAvail(i) And (NumCmds < 11) Then
+      Begin
+      Inc(NumCmds);
+      Cmds[NumCmds] := Config^.GetUnPackCmdLine(i);
+      End;
+  UnpackCmds := OffUnpackReply(Offline, WorkPath, StartUpPath, Cmds, NumCmds);
+  End;
+
+
 Function DoPacket(Id: String): Boolean;
   {the packet of the system; False when it is there and could not be read}
   Var
     Offline: QwkOffPtr;
     WorkPath, Src: String;
-    Cmds: OffCmdList;
-    NumCmds, k, i, N: Word;
+    N: Word;
     ImpO: OffImportOpts;
     Cont: Boolean;
     A: Word;
@@ -1563,20 +1589,7 @@ Function DoPacket(Id: String): Boolean;
     Begin
     Offline^.SetPath(WorkPath);
     Offline^.SetLink(Id, NetConfOf, NetAreaOf);
-    NumCmds := 0;
-    k := PackerNum;
-    If k > 0 Then
-      Begin
-      Inc(NumCmds);
-      Cmds[NumCmds] := Config^.GetUnPackCmdLine(k);
-      End;
-    For i := 1 To 10 Do
-      If (i <> k) And Config^.GetPackAvail(i) And (NumCmds < 11) Then
-        Begin
-        Inc(NumCmds);
-        Cmds[NumCmds] := Config^.GetUnPackCmdLine(i);
-        End;
-    Cont := OffUnpackReply(Offline, WorkPath, StartUpPath, Cmds, NumCmds);
+    Cont := UnpackCmds(Offline, WorkPath);
     End;
   If Cont Then
     Begin
@@ -1630,6 +1643,234 @@ Function DoPacket(Id: String): Boolean;
   End;
 
 
+Function Norm(S: String): String;
+  {a name for comparing: letters and digits, upper case}
+  Var
+    R: String;
+    i: Word;
+
+  Begin
+  R := '';
+  For i := 1 To Length(S) Do
+    If UpCase(S[i]) In ['A'..'Z', '0'..'9'] Then
+      R := R + UpCase(S[i]);
+  Norm := R;
+  End;
+
+
+Function ConfReport(Id: String): Integer;
+  {mk -G<id> -I / -J: the conferences in CONTROL.DAT of the packet that is in the inbound directory (or that the last pass kept as .old), what each is here,
+   and with -J suggestions for the ones that have no conf line, from the names of the message areas.  The hub is not called: asking it for a packet
+   makes it move its pointers.  0 done, 4 the packet could not be read, 9 there is no packet}
+  Const
+    MaxC = 400;
+
+  Var
+    Src, WorkPath, Ctl, Line: String;
+    Offline: QwkOffPtr;
+    Cont: Boolean;
+    T: Text;
+    O: Text;
+    BbsName: String;
+    CNum: Array[1..MaxC] Of LongInt;
+    CName: Array[1..MaxC] Of String[40];
+    N, i, j, A, Best, Sure: Word;
+    Total, V: LongInt;
+    Seen, Found: Boolean;
+    Used: Array[1..OffAreas] Of Boolean;
+    Lines: String;
+    MapF: Text;
+    Wrote: Word;
+
+  Begin
+  ConfReport := 0;
+  Assign(O, '');
+  Rewrite(O);
+  Src := OffFindNoCase(Inbound, Id + '.qwk');
+  If Src = '' Then
+    Src := OffFindNoCase(Inbound, Id + '.qwk.old');
+  If Src = '' Then
+    Begin
+    WriteLn(StdErr, 'No packet from ', Id, ' in ', Inbound, ' (nor ', Id, '.qwk.old, kept by the last pass).  The hub is not called for this: asking it for a packet makes it move its pointers.');
+    ConfReport := 9;
+    Close(O);
+    Exit;
+    End;
+  WorkPath := CreateTempDir(Config^.GetTempPath);
+  Cont := (Length(WorkPath) > 0) And CopyFile(Src, WithBackSlash(WorkPath) + 'upload.1');
+  Offline := New(QwkOffPtr, Init);
+  N := 0;
+  BbsName := '';
+  If Cont Then
+    Begin
+    Offline^.SetPath(WorkPath);
+    Offline^.SetLink(Id, NetConfOf, NetAreaOf);
+    Cont := UnpackCmds(Offline, WorkPath);
+    End;
+  Ctl := '';
+  If Cont Then
+    Ctl := OffFindNoCase(WithBackSlash(WorkPath), 'control.dat');
+  If Ctl = '' Then
+    Cont := False;
+  If Cont Then
+    Begin
+    Assign(T, Ctl);
+    Reset(T);
+    If IoResult <> 0 Then
+      Cont := False
+    Else
+      Begin
+      i := 0;
+      Total := -1;
+      While (Not Eof(T)) And Cont Do
+        Begin
+        ReadLn(T, Line);
+        Line := StripBoth(Line, ' ');
+        Inc(i);
+        If i = 1 Then
+          BbsName := Line
+        Else If i = 11 Then
+          Total := Str2Long(Line) + 1                   {the line holds the number of conferences less one}
+        Else If (i > 11) And (Total > 0) Then
+          Begin
+          If Not Odd(i) Then
+            Begin                                       {12: number, 13: name, 14: number ...}
+            V := Str2Long(Line);
+            If N < MaxC Then
+              Begin
+              Inc(N);
+              CNum[N] := V;
+              CName[N] := '';
+              End;
+            End
+          Else If N > 0 Then
+            CName[N] := Copy(Line, 1, 40);
+          End;
+        End;
+      Close(T);
+      If Total < 0 Then
+        Cont := False;
+      End;
+    End;
+  Dispose(Offline, Done);
+  ChDir(StripTrail(StartUpPath, '/'));
+  If IoResult <> 0 Then;
+  If Length(WorkPath) > 0 Then
+    Begin
+    CleanDir(WithBackSlash(WorkPath));
+    RmDir(StripTrail(WorkPath, '/'));
+    If IoResult <> 0 Then;
+    End;
+  If Not Cont Then
+    Begin
+    WriteLn(StdErr, 'The packet ', Src, ' could not be read (no CONTROL.DAT, or it cannot be unpacked)');
+    ConfReport := 4;
+    Close(O);
+    Exit;
+    End;
+  If QwkNetConfList Then
+    Begin
+    WriteLn(O, 'Packet ', Src, ' (', BbsName, '): ', N, ' conference(s)');
+    WriteLn(O, '  conf  name                              here');
+    For i := 1 To N Do
+      Begin
+      Write(O, CNum[i]:6, '  ', CName[i], '':36 - Length(CName[i]));
+      If (CNum[i] >= 0) And (CNum[i] <= 65535) And (ConfArea[CNum[i]] <> 0) Then
+        WriteLn(O, 'area ', ConfArea[CNum[i]], ' ', Config^.GetMsgName(ConfArea[CNum[i]]))
+      Else
+        WriteLn(O, '-  (no conf line)');
+      End;
+    Seen := False;
+    For A := 0 To 65535 Do
+      If ConfArea[A] <> 0 Then
+        Begin
+        Found := False;
+        For i := 1 To N Do
+          If CNum[i] = A Then
+            Found := True;
+        If Not Found Then
+          Begin
+          If Not Seen Then
+            WriteLn(O, 'Lines of the map file for conferences that are not in the packet:');
+          Seen := True;
+          WriteLn(O, '  conf ', A, ' ', ConfArea[A]);
+          End;
+        End;
+    End;
+  If QwkNetConfMatch Then
+    Begin
+    FillChar(Used, SizeOf(Used), 0);
+    For A := 1 To OffAreas Do
+      If AreaConf[A] >= 0 Then
+        Used[A] := True;                                {has a conf line already}
+    Lines := '';
+    Wrote := 0;
+    WriteLn(O, 'Suggestions for the map file (by the names of the message areas; ; = not sure, look at it first):');
+    For i := 1 To N Do
+      If (CNum[i] >= 0) And (CNum[i] <= 65535) And (ConfArea[CNum[i]] = 0) Then
+        Begin
+        Best := 0;
+        Sure := 0;
+        For A := 1 To OffAreas Do
+          If (Not Used[A]) And (A <= Config^.GetMaxMsgAreas) And (Config^.GetMsgName(A) <> '') Then
+            Begin
+            If (Norm(CName[i]) <> '') And ((Norm(CName[i]) = Norm(Config^.GetMsgName(A))) Or (Norm(CName[i]) = Norm(Config^.GetMsgShortName(A)))) Then
+              Begin
+              If Sure = 0 Then
+                Sure := A;
+              End
+            Else If (Best = 0) And (Length(Norm(CName[i])) >= 4) And (Length(Norm(Config^.GetMsgName(A))) >= 4) And
+              ((Pos(Norm(CName[i]), Norm(Config^.GetMsgName(A))) > 0) Or (Pos(Norm(Config^.GetMsgName(A)), Norm(CName[i])) > 0)) Then
+              Best := A;
+            End;
+        If Sure > 0 Then
+          Begin
+          Line := 'conf ' + Long2Str(CNum[i]) + ' ' + Long2Str(Sure) + '          ; ' + CName[i] + ' = ' + Config^.GetMsgName(Sure);
+          Used[Sure] := True;
+          Inc(Wrote);
+          End
+        Else If Best > 0 Then
+          Line := '; conf ' + Long2Str(CNum[i]) + ' ' + Long2Str(Best) + '          ; ' + CName[i] + ' ? ' + Config^.GetMsgName(Best)
+        Else
+          Line := '';
+        If Line <> '' Then
+          Begin
+          WriteLn(O, Line);
+          Lines := Lines + Line + #10;
+          End;
+        End;
+    If Lines = '' Then
+      WriteLn(O, '  (nothing: no conference without a conf line matches the name of a free message area)');
+    If QwkNetConfWrite And (Lines <> '') Then
+      Begin
+      Assign(MapF, MapDir + Id + '.map');
+      Append(MapF);
+      If IoResult = 0 Then
+        Begin
+        WriteLn(MapF);
+        WriteLn(MapF, '; added by mk -G', Id, ' -J -W: the sure ones are conf lines, the ones with ; in front are to be looked at');
+        While Lines <> '' Do
+          Begin
+          j := Pos(#10, Lines);
+          WriteLn(MapF, Copy(Lines, 1, j - 1));
+          Delete(Lines, 1, j);
+          End;
+        Close(MapF);
+        WriteLn(O, 'Added to ', MapDir + Id + '.map', ' (', Wrote, ' conf line(s)).');
+        End
+      Else
+        Begin
+        WriteLn(StdErr, 'The map file could not be written');
+        ConfReport := 1;
+        End;
+      End
+    Else If Lines <> '' Then
+      WriteLn(O, 'Nothing is written: -W adds these lines to ', Id, '.map.');
+    End;
+  Close(O);
+  End;
+
+
 Function QwkNetPass(RemoteId: String): Integer;
   Var
     Res, N: Integer;
@@ -1642,6 +1883,11 @@ Function QwkNetPass(RemoteId: String): Integer;
     Begin
     Say('No map file ' + RemoteId + '.map');
     QwkNetPass := 1;
+    Exit;
+    End;
+  If QwkNetConfList Or QwkNetConfMatch Then
+    Begin                                {a report on the packet: nothing is sent, called or changed}
+    QwkNetPass := ConfReport(RemoteId);
     Exit;
     End;
   User.GetUserPos(UserName);

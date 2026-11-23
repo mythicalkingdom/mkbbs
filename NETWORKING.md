@@ -269,6 +269,19 @@ curl -sS --fail -u "$MK_HUB_LOGIN:$MK_HUB_PASSWORD" -T "$2" "ftp://$MK_HUB_HOST/
 
 For SFTP use `sftp -b` with a key (no password in the environment), for HTTP `curl -F`.
 
+### Conference numbers: `-I`, `-J`, `-W`
+
+The `conf` lines are the numbers of the hub's conferences, which are in `CONTROL.DAT` of its packet.  Two reports read the packet that is in the inbound directory (or
+the one the last pass kept as `<id>.qwk.old`); they **do not call the hub** (asking for a packet makes the hub move its pointers) and change nothing:
+
+* `mk -G<id> -I` lists the conferences of the packet with number and name, says which message area each one is here (or that it has no `conf` line), and names
+  `conf` lines that the packet does not have.
+* `mk -G<id> -J` suggests `conf` lines for the conferences that have none, by comparing the hub's names with the names and short names of the message areas that have
+  no `conf` line yet (letters and digits only, case does not matter): an exact match is a `conf` line, a name that contains the other is a line with `;` in front
+  to look at first.  `-J -W` adds them to the map file (appended, the existing lines are not touched).
+
+(`-L` and `-M` already mean local mode and the mail-type switch of `mk`, hence `-I` and `-J`.)
+
 ### What to check on a Synchronet hub
 
 * The sub-boards you want must be allowed for **QWK networking** (the sub's settings), and, if they come from another

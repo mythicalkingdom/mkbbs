@@ -120,6 +120,9 @@ While i <= ParamCount Do
              Inc(QwkNetNumCmds);
              QwkNetCmds[QwkNetNumCmds] := Copy(ParamStr(i), 3, 100);
              End;
+      'I': QwkNetConfList := True;     {with -G: list the conferences of the packet of the hub}
+      'J': QwkNetConfMatch := True;    {with -G: suggest conf lines from the names of the areas}
+      'W': QwkNetConfWrite := True;    {with -J: add them to the map file}
       'D': QwkNetDry := True;       {with -G: a dry run, nothing is sent or changed}
       'G': Begin
            NetId := Copy(ParamStr(i), 3, 40);
