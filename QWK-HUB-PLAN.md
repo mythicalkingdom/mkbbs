@@ -1,7 +1,9 @@
 # QWK hub profiles: plan
 
-Status (2026-11-23): **phases 1, 2, 3, 4 and 5 are built** (5 as native FTP and explicit FTPS, `transport ftp|ftps`; SFTP stays with `exec`) (3 as `-K` talk and `-F<transcript>` replay: `-T` and `-S` were taken) (4 as `-I` / `-J` / `-W`: `-L` and `-M` were taken, and the report reads the packet that is there instead of calling the hub) (profiles as files, `mk -G -P`, the `exec` transport; see NETWORKING.md; tests/hubexectest.py, build/hubexectest).  Phase 6 is skipped (no transcripts); 7 is not built.  Items marked *(verify)* need a transcript or the documentation of a real hub before any code is written;
-items marked *(proposal)* are for the sysop to decide.
+Status (2026-11-23): **built: phases 1-5 and 8; phase 6 skipped (no transcripts available); phase 7 (details that differ between hubs) is built only as they show.**  The reference and the
+status of what was checked against which hub is **`HUBS.md`**.  What differs from the plan below: `-L` / `-M` / `-T` / `-S` were taken, so the switches are `-I` / `-J` / `-W` (conference lists
+and suggestions: they read the packet that is there instead of calling the hub, which would move the hub's pointers), `-K` (talk) and `-F<transcript>` (replay); native FTP is `transport ftp|ftps`
+(SFTP stays with `exec`).  Items marked *(verify)* needed a transcript or the documentation of a real hub; items marked *(proposal)* were for the sysop to decide.
 
 A *hub* is the system a QWK node calls to take its packet (`<id>.QWK`) and leave its reply packet (`<id>.REP`).  `mk -G<id>` does the exchange with the hub
 (`NETWORKING.md`, section B).  How the files get to and from the hub is the part that differs from hub to hub, and it is what a **profile** is.

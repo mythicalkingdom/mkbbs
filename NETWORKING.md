@@ -94,6 +94,8 @@ call a hub, such as a Synchronet BBS), or both with different systems.
 
 ### B. Be a node: call a hub
 
+(The reference for everything below -- every setting, switch and exit code, and what has been checked against which hub software -- is **`HUBS.md`**.)
+
 Do this on your system when you want to take mail from a hub.
 
 1. **A user for the hub.**  Make a user record for the hub (any name; it is called the *system's id* below) and switch on
@@ -123,8 +125,8 @@ Do this on your system when you want to take mail from a hub.
 
    An area without a `conf` line is not sent; a conference without one is not posted.  Keep the file private
    (`chmod 600`: it has the password).
-4. **Find the conference numbers.**  Call the hub once by hand, or look at `CONTROL.DAT` in a packet it made: it lists
-   every conference with its number and name.
+4. **Find the conference numbers.**  They are in `CONTROL.DAT` of a packet the hub made.  After the first packet has arrived, `mk -G<id> -I` lists them with their names and
+   `mk -G<id> -J` suggests the `conf` lines (see *Conference numbers* below); or call the hub once by hand (`mk -G<id> -K`).
 5. **Run a pass:**
 
    ```
@@ -528,7 +530,8 @@ go from the inbound to the attach directory under the name in the subject.
 
 * **Nothing is sent to a QWK hub:** the hub user cannot read the area (security or flags), or the area has no `conf`
   line in the map file, or the last read pointer is already at the end.
-* **A QWK pass ends with exit 5 or 6:** read `<id>.hub.log`; it shows each prompt the script waited for.
+* **A QWK pass ends with exit 5 or 6:** read `<id>.hub.log`; it shows each prompt the script waited for (`HUBS.md` has a section for each exit code).  To change a profile, record
+  the call with `mk -G<id> -K` and replay it with `-F` instead of calling the hub each time.
 * **A packet is waiting and nothing new is taken:** `<id>.QWK` is still in the inbound; it could not be read.  Fix or
   remove it, then run the pass again.
 * **Fido mail does not arrive in an area:** is the system in the list, linked to the area, and is the area's tag the
