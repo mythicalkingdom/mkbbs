@@ -24,7 +24,7 @@ overview and the steps to set it up.
   |---|---|---|
   | `telnet` | a Telnet client | negotiation handled, terminal type seen (it decides the character set with `"charset": "auto"`) |
   | `raw` | a plain TCP stream | for programs and simple terminals |
-  | `ws` | a web socket (a browser terminal) | text is UTF-8; for `wss://` put `stunnel` in front |
+  | `ws` | a web socket (a browser terminal) | text is UTF-8; for `wss://` use `"tls": true` or put `stunnel` in front |
   | `qwk` | a QWK network system or script | `mk -Q`: `Login:`, `Password:`, then `QWK:` with D, U, B, Q; only users with the QWK Node flag may enter |
   | `sysop` | the sysop, not a caller | opens the monitor `mkmon` (see below) |
 
@@ -128,14 +128,34 @@ telnet localhost 2323          # a caller
 telnet 127.0.0.1 2330          # the sysop monitor (asks for the password)
 ```
 
-Callers over a network from outside: open the port in the firewall, or put a TLS front in front of it (below).
+Callers over a network from outside: open the port in the firewall, and encrypt it (TLS: two ways, below).
 
 ## Optional parts
 
-### Encrypted connections (telnets, wss)
+### Encrypted connections (telnets, wss): two ways
 
-`mklisten` does not do TLS itself.  Let `stunnel` accept it and pass the connection on with a PROXY header, so the real
-address of the caller is kept:
+Both give the same to a caller (an encrypted Telnet, or `wss://` for a browser terminal) and to the BBS (the real address of the caller, so `maxperip`, the login guard,
+the log and `mkmon` work).  A port uses one of them.
+
+**Way 1: native TLS, no other program.**  `mklisten` and `mk` use the OpenSSL library (`libssl`, version 3 or 1.1) of the system, loaded only when it is wanted:
+
+```
+"tls": { "cert": "/etc/ssl/mkbbs/fullchain.pem", "key": "/etc/ssl/mkbbs/privkey.pem" },
+"ports": [
+  { "port": 992,  "type": "telnet", "tls": true, "charset": "auto", "config": "/bbs/ra" },
+  { "port": 2333, "type": "ws",     "tls": true, "config": "/bbs/ra" }
+]
+```
+
+* The certificate is a PEM file with the chain (Let's Encrypt's `fullchain.pem`), the key a PEM file **without a pass phrase**; both must be readable by the user `mklisten`
+  runs as (the `user` setting; for Let's Encrypt give a group access to the files, or copy them with a deploy hook).  TLS 1.2 and up.
+* Each call reads the files again, so a **renewed certificate is used by the next caller** with no reload or restart.
+* `mklisten` checks the libraries, the files and that the key belongs to the certificate when it starts (as the user it runs as).  If something is wrong **that port is not opened,
+  the log says why, and the other ports run** (without libssl the BBS works as before, only the TLS ports are missing).  `mklisten -t` says the same without starting.
+* A caller that does not speak TLS is dropped; the refusal texts of `mklisten` (busy, blocked) are plain text, before the handshake, so a TLS caller sees a failed handshake then.
+* A sysop port cannot be TLS (it is on `127.0.0.1`: use an ssh tunnel), and `"tls"` and `"proxy"` do not go together.
+
+**Way 2: `stunnel` in front** (the front end does the TLS, the BBS needs no library): stunnel passes the connection on with a PROXY header, so the real address of the caller is kept:
 
 ```
 stunnel:   [mkbbs-wss]  accept = 443  connect = 127.0.0.1:2325
@@ -143,7 +163,8 @@ stunnel:   [mkbbs-wss]  accept = 443  connect = 127.0.0.1:2325
 mklisten:  { "port": 2325, "type": "ws", "bind": "127.0.0.1", "proxy": true, "config": "/bbs/ra" }
 ```
 
-`"proxy": true` needs `"bind": "127.0.0.1"`.
+`"proxy": true` needs `"bind": "127.0.0.1"`.  Choose this one when you already run stunnel (or nginx / haproxy with the PROXY protocol) for other services, want one place for all
+the certificates and cipher settings, or do not want the OpenSSL libraries used by the BBS programs.  `mklisten.example.json` has an example of each.
 
 ### Sysop monitor from elsewhere
 

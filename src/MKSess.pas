@@ -15,6 +15,11 @@ Unit MKSess;   {Builds the caller's session from the command line options}
         -H          a PROXY protocol header (stunnel "protocol = proxy") comes
                     first on the connection and tells the real address
 
+        -Y          the connection is TLS and this program is the server (no
+                    stunnel): the handshake is done first, with the certificate
+                    and key named by the environment MK_TLS_CERT and MK_TLS_KEY
+                    (mklisten sets them); TLS goes under Telnet or WebSocket (wss)
+
      CreateSession returns the session (Nil for an unknown type) so MK.pas and
      the test programs build it the same way.
 }
@@ -24,6 +29,7 @@ Interface
 Uses MKComAbs;
 
 Var
+  SessTls: Boolean;                    {-Y: do the TLS handshake first}
   SessionError: String;                {Why CreateSession returned Nil}
 
 Function CreateSession(SType: String; Rate: LongInt; Addr: String;
@@ -33,7 +39,37 @@ Function CreateSession(SType: String; Rate: LongInt; Addr: String;
 
 Implementation
 
-Uses MKComFd, MKComStd, MKComTelnet, MKComWS, MKProxy;
+Uses SysUtils, MKComFd, MKComStd, MKComTelnet, MKComWS, MKProxy, MKTls;
+
+Function TlsAttach(Std: StdComPtr): Boolean;
+  {the handshake on the connection (stdin / stdout are the socket), then the descriptors read and write through TLS}
+  Var
+    Conn: Pointer;
+    Err: AnsiString;
+    Cert, Key: String;
+
+  Begin
+  TlsAttach := False;
+  Cert := GetEnvironmentVariable('MK_TLS_CERT');
+  Key := GetEnvironmentVariable('MK_TLS_KEY');
+  If (Cert = '') Or (Key = '') Then
+    Begin
+    SessionError := 'TLS (-Y) needs MK_TLS_CERT and MK_TLS_KEY';
+    Exit;
+    End;
+  If Not TlsAccept(Std^.InFd, Cert, Key, 20, Conn, Err) Then
+    Begin
+    SessionError := Err;
+    Exit;
+    End;
+  Std^.Tls := Conn;
+  Std^.TlsRd := TlsReadFn(@TlsRead);
+  Std^.TlsWr := TlsWriteFn(@TlsWrite);
+  Std^.TlsPend := TlsPendFn(@TlsPending);
+  Std^.TlsFree := TlsFreeFn(@TlsClose);
+  TlsAttach := True;
+  End;
+
 
 Function CreateSession(SType: String; Rate: LongInt; Addr: String;
   Proxy: Boolean): AbsComPtr;
@@ -54,6 +90,14 @@ Function CreateSession(SType: String; Rate: LongInt; Addr: String;
      (SType = 'WS') Then
     Begin
     Std := New(StdComPtr, Init);
+    If SessTls Then
+      Begin
+      If Not TlsAttach(Std) Then
+        Begin
+        Dispose(Std, Done);
+        Exit;
+        End;
+      End;
     If Proxy Then
       Begin
       If Not ReadProxyHeader(Std, Addr, 5000) Then
@@ -77,4 +121,6 @@ Function CreateSession(SType: String; Rate: LongInt; Addr: String;
     SessionError := 'unknown session type -S' + SType + ' (STD, RAW, TELNET or WS)';
   End;
 
+Begin
+SessTls := False;
 End.

@@ -20,7 +20,7 @@ ssh client  <-- encrypted -->  sshd / dropbear (account bbs, no password)  -->  
 1. **The port of `mklisten`** (`mklisten.json`), behind the front end only:
 
    ```
-   { "port": 2327, "type": "telnet", "bind": "127.0.0.1", "proxy": true, "charset": "auto", "config": "/bbs/ra" }
+   { "port": 2328, "type": "telnet", "bind": "127.0.0.1", "proxy": true, "charset": "auto", "config": "/bbs/ra" }
    ```
 
    `"proxy": true` needs `"bind": "127.0.0.1"`.  `"charset": "auto"` makes UTF-8 for a terminal that wants it (SSH terminals do).

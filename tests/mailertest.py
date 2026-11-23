@@ -22,7 +22,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch;
 # mailer.mk made by hand there) would be found, and saved over, through them
 cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),
                lambda p: (cfg + '/').encode() + p[len((src + '/').encode()):] if p.startswith((src + '/').encode()) else p)
-guard = {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in os.listdir(src) if f.lower() in ('mailer.mk', 'mkbink.conf', 'echocfg.mk', 'config.mk')}
+import hashlib
+# what the sample holds, by content (the time of a file can change when the daemon that runs on the sample, or a person, saves the same settings again)
+sample_state = lambda: {f: hashlib.sha256(open(os.path.join(src, f), 'rb').read()).hexdigest() for f in os.listdir(src) if f.lower() in ('mailer.mk', 'echocfg.mk', 'config.mk') and os.access(os.path.join(src, f), os.R_OK)}
+guard = sample_state()
 # the sample may have been configured by hand (mailer on, echo paths): start from one without
 for f in os.listdir(cfg):
     if f.lower() in ('mailer.mk', 'mkbink.conf'):
@@ -251,6 +254,6 @@ before = area_attr(1)
 screen('\x1bf', 'a', '\r', *(['\t'] * 13), ' ', '\r', '\x1b', '\x1bx', 'y')
 check('... the box is saved in the area (bit 32 of Attr), the other bits are as they were', area_attr(1) == (before ^ 32))
 
-check('the sample BBS itself was not touched', guard == {f: os.stat(os.path.join(src, f)).st_mtime_ns for f in guard})
+check('the sample BBS itself was not touched (the content of its mailer.mk, echocfg.mk and config.mk)', guard == sample_state())
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

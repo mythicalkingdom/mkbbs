@@ -147,7 +147,7 @@ Program MKListen;
 *)
 
 Uses
-  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy;
+  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy, MKTls;
 
 
 Type
@@ -161,6 +161,7 @@ Type
     Env: TStringList;
     Args: String;
     Proxy: Boolean;
+    Tls: Boolean;                      {native TLS: mk does the handshake (-Y) with the certificate and key of the "tls" section}
     Charset: String;                   {auto, cp437 or utf8}
     Sysop: Boolean;
     Password: String;
@@ -229,6 +230,7 @@ Var
   GuardFails: Integer = 0;             {loginguard: failed log-ons from one address within GuardWindow seconds that block it (0 = off)}
   GuardWindow: Integer = 600;
   GuardBlock: Integer = 900;           {seconds the address stays blocked}
+  TlsCert, TlsKey: String;             {the "tls" section: the certificate chain and the key (PEM) for the ports with "tls": true}
   GuardMsg: String = 'Too many failed log-ons from this address. Please try again later.';
   GuardIp: Array Of String;            {the failed log-ons: address, time}
   GuardAt: Array Of LongInt;
@@ -389,6 +391,7 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   P.Env := TStringList.Create;
   P.Args := '';
   P.Proxy := False;
+  P.Tls := False;
   P.Charset := 'auto';
   P.Sysop := False;
   P.Password := '';
@@ -413,7 +416,7 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
         P.SType := 'telnet';
         End
       Else If (P.SType <> 'telnet') And (P.SType <> 'raw') And (P.SType <> 'ws') Then
-        Die(Where + '.type must be "telnet", "raw", "ws", "qwk" or "sysop" (TLS: put stunnel in front)');
+        Die(Where + '.type must be "telnet", "raw", "ws", "qwk" or "sysop" (TLS: "tls": true, or stunnel in front)');
       End
     Else If Key = 'qwk' Then
       Qwk := JBool(V, Where + '.qwk')
@@ -429,6 +432,8 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
       P.Env.Add('MK=' + JStr(V, Where + '.config'))
     Else If Key = 'proxy' Then
       P.Proxy := JBool(V, Where + '.proxy')
+    Else If Key = 'tls' Then
+      P.Tls := JBool(V, Where + '.tls')
     Else If Key = 'charset' Then
       Begin
       P.Charset := LowerCase(JStr(V, Where + '.charset'));
@@ -470,6 +475,12 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   If P.Proxy And (P.Bind <> '127.0.0.1') Then
     Die('port ' + IntToStr(P.Port) +
       ': "proxy": true needs "bind": "127.0.0.1" (anyone able to connect could fake an address)');
+  If P.Tls And ((TlsCert = '') Or (TlsKey = '')) Then
+    Die('port ' + IntToStr(P.Port) + ': "tls": true needs a "tls" section with "cert" and "key"');
+  If P.Tls And P.Proxy Then
+    Die('port ' + IntToStr(P.Port) + ': "tls" and "proxy" do not go together (a TLS front end sends the PROXY header, native TLS has the address already)');
+  If P.Tls And P.Sysop Then
+    Die('port ' + IntToStr(P.Port) + ': a sysop port is not for TLS (it is on 127.0.0.1: reach it with ssh port forwarding)');
   If P.Sysop Then
     Begin
     If P.Bind <> '127.0.0.1' Then
@@ -579,6 +590,28 @@ Procedure LoadEvents(O: TJSONObject);
   End;
 
 
+Procedure ParseTls(V: TJSONData);
+  {"tls": { "cert": "/etc/ssl/mkbbs/fullchain.pem", "key": "/etc/ssl/mkbbs/privkey.pem" }: the certificate (with its chain) and the key, PEM files that the user the
+   daemon runs as can read.  Ports with "tls": true use them (native TLS, libssl); the files are read again by each connection}
+  Var
+    O: TJSONObject;
+    j: Integer;
+    K: String;
+
+  Begin
+  If V.JSONType <> jtObject Then
+    Die('tls must be an object: { "cert": "/path/fullchain.pem", "key": "/path/privkey.pem" }');
+  O := TJSONObject(V);
+  For j := 0 To O.Count - 1 Do
+    Begin
+    K := LowerCase(O.Names[j]);
+    If K = 'cert' Then TlsCert := JStr(O.Items[j], 'tls.cert')
+    Else If K = 'key' Then TlsKey := JStr(O.Items[j], 'tls.key')
+    Else If Copy(K, 1, 1) <> '_' Then Die('tls: unknown key "' + O.Names[j] + '"');
+    End;
+  End;
+
+
 Procedure ParseGuard(V: TJSONData);
   {"loginguard": { "fails": 5, "window": 600, "block": 900, "message": "..." }: an address with that many failed log-ons within "window" seconds is
    refused for "block" seconds}
@@ -650,6 +683,7 @@ Procedure LoadConfig;
     Else If Key = 'nodes' Then ParseNodes(V, GFirst, GLast, 'nodes')
     Else If Key = 'maxperip' Then GMaxPerIp := JInt(V, 'maxperip', 0, 1000)
     Else If Key = 'loginguard' Then ParseGuard(V)
+    Else If Key = 'tls' Then ParseTls(V)
     Else If Key = 'ports' Then
       Begin
       If V.JSONType <> jtArray Then
@@ -751,9 +785,34 @@ Procedure OpenListeners;
       Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' sysop monitor')
     Else
       Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' ' +
-        Ports[i].SType + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
+        Ports[i].SType + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls)) + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
         IntToStr(Ports[i].First) + '-' + IntToStr(Ports[i].Last));
     End;
+  End;
+
+
+Procedure CheckTlsPorts;
+  {native TLS: the libraries, the certificate and the key are looked at by the user the daemon runs as.  A port that cannot have TLS is not opened (the others run).}
+  Var
+    i: Integer;
+    Why: String;
+    Ok: Boolean;
+
+  Begin
+  For i := 0 To High(Ports) Do
+    If Ports[i].Tls Then
+      Begin
+      Ok := TlsCheckServer(TlsCert, TlsKey, Why);
+      If Ok Then
+        Log('port ' + IntToStr(Ports[i].Port) + ': native TLS ready (certificate ' + TlsCert + ')')
+      Else
+        Begin
+        Log('port ' + IntToStr(Ports[i].Port) + ' is NOT opened: native TLS is not available: ' + Why);
+        If Ports[i].Fd >= 0 Then
+          fpClose(Ports[i].Fd);
+        Ports[i].Fd := -1;
+        End;
+      End;
   End;
 
 
@@ -2771,6 +2830,8 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     ArgS.Add('-B' + IntToStr(P.Baud));
   If P.Proxy Then
     ArgS.Add('-H');
+  If P.Tls Then
+    ArgS.Add('-Y');
   If (Not P.Sysop) And (P.Charset <> 'auto') Then
     ArgS.Add('-U' + UpperCase(P.Charset));
   ArgS.Add('-A' + Addr);
@@ -2804,6 +2865,11 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
   For j := 0 To P.Env.Count - 1 Do
     EnvS.Add(P.Env[j]);
   EnvS.Add('MKRUN=' + RunDir);
+  If P.Tls Then
+    Begin
+    EnvS.Add('MK_TLS_CERT=' + TlsCert);
+    EnvS.Add('MK_TLS_KEY=' + TlsKey);
+    End;
   If P.Sysop Then
     Begin
     EnvS.Add('MKMON_PASSWORD=' + P.Password);
@@ -3070,7 +3136,7 @@ Procedure MainLoop;
 
 Var
   i: Integer;
-  S: String;
+  S, Why: String;
   F: Text;
 
 Begin
@@ -3114,6 +3180,14 @@ Begin
       If MailScan > 0 Then
         WriteLn('          tosser scan every ', MailScan, ' s: ', MailToss, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MailToss)), 11));
       End;
+    For i := 0 To High(Ports) Do
+      If Ports[i].Tls Then
+        Begin
+        If TlsCheckServer(TlsCert, TlsKey, Why) Then
+          WriteLn('  TLS: native TLS is ready (', TlsCert, '), used by port ', Ports[i].Port)
+        Else
+          WriteLn('  TLS: port ', Ports[i].Port, ' would NOT be opened: ', Why);
+        End;
     If EvOn Then
       Begin
       WriteLn('  events: ', EvTool, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(EvTool)), 11));
@@ -3151,6 +3225,7 @@ Begin
     If IOResult <> 0 Then ;
     End;
   DropPrivileges;
+  CheckTlsPorts;
   PrepareRunDir;
   MainLoop;
   If PidPath <> '' Then

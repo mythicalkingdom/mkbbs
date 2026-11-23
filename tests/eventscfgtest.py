@@ -35,9 +35,19 @@ assert len(rec()) == 150
 shutil.rmtree(work, ignore_errors=True)
 inp, jdir, mk2, nofile, jdir2 = [os.path.join(work, d) for d in ('in', 'json', 'mk2', 'nofile', 'json2')]
 os.makedirs(work)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cfgpatch
+inp = cfgpatch.short_dir() + '/in'                     # short paths: the configuration holds them in fixed size fields
+nofile = cfgpatch.short_dir() + '/no'
 ign = lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'events.mk')) or not os.access(os.path.join(d, f), os.R_OK)]
 shutil.copytree(sample, inp, ignore=ign)
 shutil.copytree(sample, nofile, ignore=ign)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cfgpatch
+# the paths in config.mk lead to the sample: point them at the copy, or a file that is only in the sample (fileecho.mk, events.mk ...) is found through them
+for _d in (inp, nofile):
+    cfgpatch.patch(os.path.join(_d, 'config.mk'), (repo + '/bbs/').encode(),
+                   lambda p, _d=_d: (_d + '/').encode() + p[len((sample + '/').encode()):] if p.startswith((sample + '/').encode()) else p)
 for d in (jdir, mk2, jdir2):
     os.makedirs(d)
 

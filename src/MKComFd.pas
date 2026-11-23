@@ -26,6 +26,12 @@ Interface
 Uses MKComAbs;
 
 
+Type
+  TlsReadFn = Function(Conn: Pointer; Buf: Pointer; N: LongInt): LongInt;   {n bytes; 0 closed; -1 failed; -2 try again}
+  TlsWriteFn = Function(Conn: Pointer; Buf: Pointer; N: LongInt): LongInt;  {n bytes; -1 failed; -2 try again}
+  TlsPendFn = Function(Conn: Pointer): LongInt;                             {bytes already decrypted and waiting}
+  TlsFreeFn = Procedure(Conn: Pointer);
+
 Type FdComObj = Object(AbsComObj)
   InFd: LongInt;                       {Descriptor to read from (-1: none)}
   OutFd: LongInt;                      {Descriptor to write to}
@@ -36,6 +42,11 @@ Type FdComObj = Object(AbsComObj)
   Pace: LongInt;                       {Emulated bits per second, 0 = none}
   PaceDue: Int64;                      {MKTicks when the emulated line is free}
   RemoteAddr: String[64];              {Caller's address, if the owner knows it}
+  Tls: Pointer;                        {Nil, or the TLS connection that the descriptors carry: the four functions below do the reading and writing}
+  TlsRd: TlsReadFn;
+  TlsWr: TlsWriteFn;
+  TlsPend: TlsPendFn;
+  TlsFree: TlsFreeFn;
   OutLen: Word;
   OutBuf: Array[0..4095] Of Char;
   Constructor Init;
@@ -93,6 +104,7 @@ Constructor FdComObj.InitFd(AIn, AOut: LongInt);
   Pace := 0;
   PaceDue := 0;
   RemoteAddr := '';
+  Tls := Nil;
   OutLen := 0;
   fpSignal(SIGPIPE, SignalHandler(SIG_IGN));   {a dropped caller is an error code, not a kill}
   End;
@@ -129,6 +141,11 @@ Procedure FdComObj.CloseSession;
 
 Procedure FdComObj.DropFds;
   Begin
+  If Tls <> Nil Then
+    Begin
+    TlsFree(Tls);
+    Tls := Nil;
+    End;
   If CloseFds Then
     Begin
     If OutFd >= 0 Then
@@ -175,16 +192,21 @@ Procedure FdComObj.PutOut;
       If PaceDue - Now > 50 Then
         MKDelay(PaceDue - Now - 50);
       End;
-    N := fpWrite(OutFd, OutBuf[Sent], Chunk);
+    If Tls <> Nil Then
+      N := TlsWr(Tls, @OutBuf[Sent], Chunk)
+    Else
+      N := fpWrite(OutFd, OutBuf[Sent], Chunk);
     If N > 0 Then
       Begin
       Inc(Sent, N);
       If Pace > 0 Then
         Inc(PaceDue, (N * 10000) Div Pace);
       End
-    Else If (N < 0) And (fpGetErrno = ESysEINTR) Then
+    Else If (Tls <> Nil) And (N = -2) Then
+      MKDelay(5)
+    Else If (Tls = Nil) And (N < 0) And (fpGetErrno = ESysEINTR) Then
       Continue
-    Else If (N < 0) And (fpGetErrno = ESysEAGAIN) Then
+    Else If (Tls = Nil) And (N < 0) And (fpGetErrno = ESysEAGAIN) Then
       MKDelay(5)
     Else
       Up := False;                       {broken pipe/socket: the caller dropped}
@@ -211,22 +233,32 @@ Procedure FdComObj.Fill(WaitMs: LongInt);
     Up := False;
     Exit;
     End;
-  P.fd := InFd;
-  P.events := POLLIN;
-  P.revents := 0;
-  R := fpPoll(@P, 1, WaitMs);
-  If R <= 0 Then
-    Exit;
-  If (P.revents And (POLLIN Or POLLHUP Or POLLERR)) = 0 Then
-    Exit;
-  N := fpRead(InFd, C, 1);
-  If N = 1 Then
+  If (Tls = Nil) Or (TlsPend(Tls) <= 0) Then
+    Begin                                {(TLS: a character may already be decrypted and waiting: the descriptor shows nothing then)}
+    P.fd := InFd;
+    P.events := POLLIN;
+    P.revents := 0;
+    R := fpPoll(@P, 1, WaitMs);
+    If R <= 0 Then
+      Exit;
+    If (P.revents And (POLLIN Or POLLHUP Or POLLERR)) = 0 Then
+      Exit;
+    End;
+  If Tls <> Nil Then
+    N := TlsRd(Tls, @C, 1)
+  Else
+    N := fpRead(InFd, C, 1);
+  If (Tls <> Nil) And (N = -2) Then
+    Exit
+  Else If N = 1 Then
     Begin
     PeekCh := C;
     HavePeek := True;
     End
   Else If N = 0 Then
     Up := False                          {end of file: the caller hung up}
+  Else If Tls <> Nil Then
+    Up := False                          {TLS: a failed read}
   Else If (fpGetErrno <> ESysEINTR) And (fpGetErrno <> ESysEAGAIN) Then
     Up := False;
   End;

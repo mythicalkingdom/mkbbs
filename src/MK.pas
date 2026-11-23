@@ -131,6 +131,7 @@ While i <= ParamCount Do
            NetG := True;
            End;   {a pass with a QWK network system (MKQwkNet): no caller}
       'H': SessProxy := True;      {PROXY header first on the connection}
+      'Y': SessTls := True;        {TLS on the connection, this program is the server (MK_TLS_CERT, MK_TLS_KEY)}
       'Q': QwkMode := True;          {the login of a QWK network system / script: MKQwkLog}
       'P': Begin
            LogToPrinter := True;

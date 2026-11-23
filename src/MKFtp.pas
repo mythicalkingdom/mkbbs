@@ -56,73 +56,10 @@ function FtpOpen(const AHost: String; Port: Word; Tls: Boolean; const ACa: Strin
 
 Implementation
 
-Uses SysUtils, Classes, BaseUnix, Sockets, NetDB, DynLibs, ctypes, openssl;
+Uses SysUtils, Classes, BaseUnix, Sockets, NetDB, DynLibs, ctypes, openssl, MKTlsLib;
 
 Const
-  SSL_CTRL_SET_TLSEXT_HOSTNAME = 55;
-  SSL_VERIFY_PEER = 1;
   CrLf = #13#10;
-
-Type
-  TGetSession = function(S: Pointer): Pointer; cdecl;
-  TSetSession = function(S, Sess: Pointer): cint; cdecl;
-  TFreeSession = procedure(Sess: Pointer); cdecl;
-  TPeerCert = function(S: Pointer): Pointer; cdecl;
-  TFreeX509 = procedure(X: Pointer); cdecl;
-  TTlsMethod = function: Pointer; cdecl;
-  TCheckHost = function(Cert: Pointer; Name: PChar; Len: PtrUInt; Flags: cuint; Peer: PPChar): cint; cdecl;
-
-Var
-  LibSsl, LibCrypto: TLibHandle;
-  pGetSession: TGetSession;
-  pSetSession: TSetSession;
-  pFreeSession: TFreeSession;
-  pCheckHost: TCheckHost;
-  pTlsMethod: TTlsMethod;
-  pPeerCert: TPeerCert;
-  pFreeX509: TFreeX509;
-  Loaded: Boolean;
-
-
-function LoadTls: Boolean;
-  Const
-    SslNames: array[0..2] of String = ('libssl.so.3', 'libssl.so.1.1', 'libssl.so');
-    CrNames: array[0..2] of String = ('libcrypto.so.3', 'libcrypto.so.1.1', 'libcrypto.so');
-  Var
-    i: Integer;
-
-  Begin
-  If Loaded Then
-    Begin
-    LoadTls := True;
-    Exit;
-    End;
-  LoadTls := False;
-  If Not InitSSLInterface Then
-    Exit;
-  LibSsl := NilHandle;
-  LibCrypto := NilHandle;
-  For i := 0 To 2 Do
-    If LibSsl = NilHandle Then
-      LibSsl := LoadLibrary(SslNames[i]);
-  For i := 0 To 2 Do
-    If LibCrypto = NilHandle Then
-      LibCrypto := LoadLibrary(CrNames[i]);
-  If (LibSsl = NilHandle) Or (LibCrypto = NilHandle) Then
-    Exit;
-  pGetSession := TGetSession(GetProcedureAddress(LibSsl, 'SSL_get1_session'));
-  pSetSession := TSetSession(GetProcedureAddress(LibSsl, 'SSL_set_session'));
-  pFreeSession := TFreeSession(GetProcedureAddress(LibSsl, 'SSL_SESSION_free'));
-  pPeerCert := TPeerCert(GetProcedureAddress(LibSsl, 'SSL_get1_peer_certificate'));      {OpenSSL 3}
-  If Not Assigned(pPeerCert) Then
-    pPeerCert := TPeerCert(GetProcedureAddress(LibSsl, 'SSL_get_peer_certificate'));    {1.1}
-  pFreeX509 := TFreeX509(GetProcedureAddress(LibCrypto, 'X509_free'));
-  pTlsMethod := TTlsMethod(GetProcedureAddress(LibSsl, 'TLS_client_method'));
-  pCheckHost := TCheckHost(GetProcedureAddress(LibCrypto, 'X509_check_host'));
-  Loaded := True;
-  LoadTls := True;
-  End;
-
 
 function Resolve(const H: String; var Addr: TInAddr): Boolean;
   Var
@@ -714,6 +651,4 @@ destructor TFtp.Destroy;
   End;
 
 
-Initialization
-  Loaded := False;
 End.

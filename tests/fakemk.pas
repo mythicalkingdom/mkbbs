@@ -32,6 +32,7 @@ begin
         'B': Rate := Str2Long(Copy(S, 3, 7));
         'A': Addr := Copy(S, 3, 64);
         'H': Proxy := True;
+        'Y': SessTls := True;
       end;
   end;
   Cfg := GetEnv('MK');

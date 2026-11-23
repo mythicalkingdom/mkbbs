@@ -23,6 +23,9 @@ for d in (inb, outb, unsec):
     os.makedirs(d)
 shutil.copytree(srcra, cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 cfgpatch.fix_sample(cfg)
+# the paths in config.mk lead to the sample: point them at the copy, or a file that is only in the sample (fileecho.mk, events.mk ...) would be found through them
+cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),
+               lambda p: (cfg + '/').encode() + p[len((srcra + '/').encode()):] if p.startswith((srcra + '/').encode()) else p)
 env = dict(os.environ, MK=cfg)
 fails = 0
 

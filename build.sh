@@ -278,7 +278,10 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # TIC files (file echoes): checks, the file area, files.bbs, replaces, bad TICs, the check command
   python3 tests/tictosstest.py build build/tictosswork | grep -E "^(ok|FAIL|skip)" | tee build/tictossresult.txt
   if grep -q FAIL build/tictossresult.txt; then exit 1; fi
-  # the SSH front: mkbbsssh between an SSH daemon (OpenSSH, Dropbear) and mklisten (skipped without ssh and sshd)
+  # native TLS in mklisten ("tls": true): fakemk behind it, a self-signed certificate, no stunnel
+python3 tests/tlstest.py build build/work/tls | grep -E "^(FAIL|skip|failures)" | tee build/tlsresult.txt
+if grep -q FAIL build/tlsresult.txt; then exit 1; fi
+# the SSH front: mkbbsssh between an SSH daemon (OpenSSH, Dropbear) and mklisten (skipped without ssh and sshd)
   python3 tests/sshtest.py build/work/ssh | grep -E "^(ok|FAIL|skip)" | tee build/sshresult.txt
   if grep -q FAIL build/sshresult.txt; then exit 1; fi
   # DOS doors: tools/mkdosdoor runs a door in dosemu2 with COM1 on the terminal (skipped without dosemu2)
