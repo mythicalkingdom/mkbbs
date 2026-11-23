@@ -141,7 +141,9 @@ bar (Alt-key shortcuts, `F1` for help, `Esc` to leave).
 ## Doors and extensions
 
 * **Programs:** menu command 7 (`*N` node, `*D` DOOR.SYS, `*F`/`*L` names, `*T` minutes left, `*S` give the program the
-  caller's connection itself, and others).  Without `*S` the program runs on a pseudo terminal.
+  caller's connection itself, and others).  Without `*S` the program runs on a pseudo terminal.  It runs in `node<N>` below the BBS
+  directory, a directory of its own for each node, where the drop files and `EXITINFO.BBS` are written.
+* **DOS doors:** `tools/mkdosdoor` runs them in dosemu2 with COM1 on the terminal of command 7 (`DOS-DOORS.md`).
 * **BASIC and Pascal:** commands 169 and 170 run a program for the caller inside a sandbox (`games/` has an example).
 * **Network doors:** a port of type `qwk` (`MKLISTEN.md`) is the entrance for QWK network systems.
 
@@ -161,4 +163,5 @@ of the sample BBS, never on the sample itself.
 | `NETWORKING.md` | QWK and Fido networking set-up |
 | `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |
+| `DOS-DOORS.md` | DOS doors on Linux: dosemu2 and `mkdosdoor` |
 | `TIC-PLAN.md` | file echoes (TIC): how they work, what each part does, the decisions |

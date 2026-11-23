@@ -303,6 +303,7 @@ Var
 
 
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
+Function ShellProgram(Name: String): String; {The program of a command line: DOS style path made Unix style, a bare name looked for in the current directory, then the path}
 Function DoorPtyWanted: Boolean;       {a program is run on a pseudo terminal (a caller is connected, no *S, MK_NOPTY not set)}
 Var
   DoorRaw: Boolean;                    {the next DoShell gives the program the caller's connection itself (TypeSeven *S), no terminal}

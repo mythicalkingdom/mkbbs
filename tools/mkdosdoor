@@ -1,0 +1,100 @@
+#!/bin/sh
+# mkdosdoor: run a DOS door for the caller of this node in dosemu2.  The door talks to COM1 (a FOSSIL or INT 14h or the UART); dosemu2 connects
+# that port to its standard input and output, which is the pseudo terminal MK gives a program that menu command 7 runs (no *S).
+#
+# THE MENU ITEM (mkmenu: command 7, the data field; the door is in /bbs/doors/lord and is started by LORD.EXE):
+#
+#     /usr/local/bin/mkdosdoor -n *N -d /bbs/doors/lord -- LORD.EXE
+#
+#   *N is the node.  MK runs the program in the directory of the node (node<N> below the BBS directory) and writes the drop files there
+#   (DORINFO1.DEF always, DOOR.SYS with *D in the data, CALLINFO.BBS with *W), so this tool finds them in its current directory.
+#   Put *D in the data when the door wants DOOR.SYS:  mkdosdoor -n *N -d /bbs/doors/lord *D -- LORD.EXE   (MK takes the *D out)
+#   A door that wants a batch file does it in one:  mkdosdoor -n *N -d /bbs/doors/lord -- START.BAT
+#
+#   mkdosdoor [-n node] [-d doordir] [-w subdir] [-c comport] [-t dosemu] [-k] [--] DOSCOMMAND [arguments]
+#
+#     -n   the node (default 1): it names the work directory of this call, so nodes do not meet
+#     -d   the directory of the door (give it: the current directory is the node's); its files are linked into the work directory (a file that the door
+#          changes and that is there already is the shared one; a new file is new for this call)
+#     -w   a directory below the door directory to run the command in (DOS style or Unix style)
+#     -c   the COM port number the door is told (default 1): the drop files get it, dosemu2 gets it
+#     -t   the dosemu program (default dosemu); MKDOS_DOSEMU in the environment says the same
+#     -k   keep the work directory afterwards (to look at it)
+#
+#   The drop files DOOR.SYS, DORINFO1.DEF and CALLINFO.BBS that MK wrote in the current directory (the node's) are copied into the work directory (the
+#   door finds them in the directory it runs in) with the COM port line changed to the one given.  The work directory is
+#   $MKDOS_TMP/node<N> (default /tmp/mkdosdoor-<uid>), made new for each call, and deleted at the end.
+#   Exit status: that of dosemu2; 2 for a wrong call; 3 when dosemu2 is not there.
+
+node=1; doors=; sub=; com=1; dosemu=${MKDOS_DOSEMU:-dosemu}; keep=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -n) node=$2; shift 2;;
+    -d) doors=$2; shift 2;;
+    -w) sub=$2; shift 2;;
+    -c) com=$2; shift 2;;
+    -t) dosemu=$2; shift 2;;
+    -k) keep=1; shift;;
+    --) shift; break;;
+    -*) echo "mkdosdoor: unknown option $1" >&2; exit 2;;
+    *) break;;
+  esac
+done
+[ $# -ge 1 ] || { echo "usage: mkdosdoor [-n node] [-d doordir] [-w subdir] [-c comport] [-t dosemu] [-k] [--] DOSCOMMAND [arguments]" >&2; exit 2; }
+case "$node$com" in *[!0-9]*|'') echo "mkdosdoor: the node and the COM port are numbers" >&2; exit 2;; esac
+command -v "$dosemu" >/dev/null 2>&1 || { echo "mkdosdoor: $dosemu is not installed (dosemu2)" >&2; exit 3; }
+[ -n "$doors" ] || { echo "mkdosdoor: say where the door is: -d <directory>" >&2; exit 2; }
+[ -d "$doors" ] || { echo "mkdosdoor: no directory $doors" >&2; exit 2; }
+doors=$(cd "$doors" && pwd)
+here=$PWD
+base=${MKDOS_TMP:-/tmp/mkdosdoor-$(id -u)}
+mkdir -p "$base" && chmod 700 "$base" || exit 2
+# old work directories of calls that ended badly
+find "$base" -maxdepth 1 -name 'node*' -mmin +1440 -exec rm -rf {} + 2>/dev/null
+work=$base/node$node
+rm -rf "$work"
+mkdir -p "$work" || exit 2
+# the door: its files, as links (directories as directories)
+cp -rs "$doors"/. "$work"/ 2>/dev/null
+# the drop files (lower case names, as MK writes them), with the COM port the door is told
+for f in door.sys dorinfo1.def callinfo.bbs; do
+  [ -f "$here/$f" ] || continue
+  rm -f "$work/$f"
+  case "$f" in
+    door.sys) awk -v c="COM$com:" 'NR==1 { $0 = c } { sub(/\r$/, ""); printf "%s\r\n", $0 }' "$here/$f" > "$work/$f";;
+    dorinfo1.def) awk -v c="COM$com" 'NR==4 { sub(/.*/, c) } { sub(/\r$/, ""); printf "%s\r\n", $0 }' "$here/$f" > "$work/$f";;
+    *) cp "$here/$f" "$work/$f";;
+  esac
+done
+# the batch file the door is started with: the command line is DOS's, as the sysop wrote it in the menu
+{
+  printf '@echo off\r\n'
+  if [ -n "$sub" ]; then printf 'cd %s\r\n' "$(printf '%s' "$sub" | tr '/' '\\')"; fi
+  printf '%s\r\n' "$*"
+} > "$work/mkdoor.bat"
+cleanup() { [ "$keep" = 1 ] || rm -rf "$work"; }
+pid=
+stop() {
+  # the caller is gone (SIGHUP when the terminal goes) or MK stops the program: dosemu2 does not leave by itself
+  if [ -n "$pid" ]; then
+    kill -TERM "$pid" 2>/dev/null
+    n=0
+    while kill -0 "$pid" 2>/dev/null && [ $n -lt 20 ]; do sleep 0.2; n=$((n + 1)); done
+    pkill -KILL -P "$pid" 2>/dev/null
+    kill -KILL "$pid" 2>/dev/null
+  fi
+  cleanup
+  exit "$1"
+}
+trap 'stop 129' HUP
+trap 'stop 143' TERM
+trap 'stop 130' INT
+# in the background so that the signals are dealt with at once; the terminal is handed on explicitly (a background job gets /dev/null otherwise)
+exec 3<&0
+"$dosemu" -dumb -quiet -K "$work" -I "serial { virtual com $com }" -E mkdoor.bat <&3 &
+pid=$!
+wait "$pid"
+rc=$?
+pid=
+cleanup
+exit $rc

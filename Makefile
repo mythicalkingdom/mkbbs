@@ -62,6 +62,7 @@ install: build/.built
 	else \
 	  echo "mkbink (the binkp mailer) not found in $(MKBINK): the mailer is not installed (make install MKBINK=<its directory>)"; \
 	fi
+	install -m 755 tools/mkdosdoor $(DESTDIR)$(BINDIR)/mkdosdoor
 	install -m 644 mklisten.example.json $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
 	@if [ -e $(DESTDIR)$(SYSCONFDIR)/mklisten.json ]; then \
 	  echo "keeping $(DESTDIR)$(SYSCONFDIR)/mklisten.json"; \
@@ -101,7 +102,7 @@ install: build/.built
 	fi
 
 uninstall:
-	for p in $(PROGRAMS) mkbink; do rm -f $(DESTDIR)$(BINDIR)/$$p; done
+	for p in $(PROGRAMS) mkbink mkdosdoor; do rm -f $(DESTDIR)$(BINDIR)/$$p; done
 	rm -f $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
 	rm -f $(DESTDIR)$(UNITDIR)/mklisten.service $(DESTDIR)$(SYSUSERSDIR)/mkbbs.conf
 	@if [ -z "$(DESTDIR)" ] && [ "$$(id -u)" = 0 ] && command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi

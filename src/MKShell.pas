@@ -14,7 +14,9 @@ Procedure TypeSeven(Cmd: String);
          program runs on a pseudo terminal (MKPty: echo, CR LF, TERM / COLUMNS / LINES from the caller's terminal, raw mode
          for curses; MK_NOPTY in the environment turns the terminal off for all)
    The program name may have a DOS style path (backslashes), without a path it is looked for in the BBS directory, then in
-   the path.  One that cannot be run is reported to the caller and logged.}
+   the path.  One that cannot be run is reported to the caller and logged.
+   The program runs in node<N> below the BBS directory (made when it is needed), where the drop files DORINFO1.DEF, DOOR.SYS, CALLINFO.BBS and
+   EXITINFO.BBS are written: every node has a directory of its own.}
 
 
 Implementation
@@ -531,6 +533,8 @@ Procedure TypeSeven(Cmd: String);
     Failed: Word;
     RawDoor: Boolean;
     UsePty: Boolean;
+    HomeDir, NodeDir, Prog: String;
+    InNode: Boolean;
 
   Begin
   Failed := 0;
@@ -593,6 +597,27 @@ Procedure TypeSeven(Cmd: String);
     End;
   If LastStar Then
     CmdStr := CmdStr + '*';               {a * that ends the command line is a * (a wildcard: *.*)}
+  {the program runs in a directory of its own for this node (node<N> in the BBS directory): the drop files, exitinfo.bbs and what the program
+   writes without a path are there, so two nodes do not meet.  A program that is named without a full path is looked for as before (the BBS
+   directory first, then the path) and made a full path, since the directory changes; a parameter that is a relative path is not changed}
+  HomeDir := GetCurrentPath;
+  Prog := ShellProgram(ExtractWord(CmdStr, 1));
+  If (Prog <> '') And (Prog[1] <> '/') And FileExist(Prog) Then
+    Begin
+    If Copy(Prog, 1, 2) = './' Then
+      Delete(Prog, 1, 2);
+    CmdStr := HomeDir + Prog + Copy(CmdStr, Length(ExtractWord(CmdStr, 1)) + 1, 255);
+    End;
+  NodeDir := HomeDir + 'node' + Long2Str(User.GetUserLineNum);
+  InNode := False;
+  If Not DirExist(NodeDir) Then
+    MkDir(NodeDir);
+  If IoResult <> 0 Then;
+  If DirExist(NodeDir) Then
+    Begin
+    ChDir(NodeDir);
+    InNode := IoResult = 0;
+    End;
   Error := WriteDorInfo;
   If ((Error = 0) And (DoorSys)) Then
     Error := WriteDoorSys;
@@ -629,6 +654,11 @@ Procedure TypeSeven(Cmd: String);
   GoToXy(Tx, Ty);
   If Error = 0 Then
     User.ReadExit('');
+  If InNode Then
+    Begin
+    ChDir(StripTrail(HomeDir, DirectorySeparator));
+    If IoResult <> 0 Then;
+    End;
   If Failed <> 0 Then
     Begin
     {the caller is told: a door that does not start must not look like nothing happened}

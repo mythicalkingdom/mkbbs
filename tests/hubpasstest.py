@@ -65,7 +65,7 @@ subprocess.run([build + '/postmsg', '6', 'Hub Poster', 'All', 'Message from the 
 r = subprocess.run([build + '/netsetup', 'Chuck Ebenschweiger', '6'], env=node_env, capture_output=True, text=True)
 check('the hub is a user of the node (QWK node flag, area 6)', 'ok' in r.stdout)
 subprocess.run([build + '/postmsg', '6', 'Node Poster', 'All', 'Message from the node', 'written on the node'], env=node_env, capture_output=True, text=True)
-port = 24800 + os.getpid() % 150
+port = 25100 + os.getpid() % 300
 os.makedirs(node_ra + '/in'); os.makedirs(node_ra + '/out')
 open(node_ra + '/' + hub_id + '.map', 'w').write(
     'inbound %s/in\noutbound %s/out\nuser Chuck Ebenschweiger\nhub 127.0.0.1:%d\nprofile mk\nlogin Mark May\npassword nodepw\nprotocol Z\nconf 6 6\n' % (node_ra, node_ra, port))

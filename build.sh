@@ -268,6 +268,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # TIC files (file echoes): checks, the file area, files.bbs, replaces, bad TICs, the check command
   python3 tests/tictosstest.py build build/tictosswork | grep -E "^(ok|FAIL|skip)" | tee build/tictossresult.txt
   if grep -q FAIL build/tictossresult.txt; then exit 1; fi
+  # DOS doors: tools/mkdosdoor runs a door in dosemu2 with COM1 on the terminal (skipped without dosemu2)
+  python3 tests/dosdoortest.py build/work/dosdoor | grep -E "^(ok|FAIL|skip)" | tee build/dosdoorresult.txt
+  if grep -q FAIL build/dosdoorresult.txt; then exit 1; fi
   # FileFix: netmail to FileFix links and unlinks file echoes
   python3 tests/filefixtest.py build build/filefixwork | grep -E "^(ok|FAIL|skip)" | tee build/filefixresult.txt
   if grep -q FAIL build/filefixresult.txt; then exit 1; fi

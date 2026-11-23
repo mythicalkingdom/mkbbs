@@ -53,7 +53,7 @@ def wait(cond, secs=30):
     return cond()
 
 
-PORT_B, PORT_A = 24801, 24802
+PORT_B, PORT_A = 24891, 24892
 check('the BBS is made ready (tosser on, mailer on)', run('tosssetup', inb, outb, unsec, str(PORT_B)).returncode == 0)
 
 # the files and the settings of file requests (through the JSON form, as other tests do)

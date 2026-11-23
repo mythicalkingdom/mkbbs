@@ -38,6 +38,8 @@ Function LoadQwkCfg: Boolean;
 
   Begin
   CfgPath := FindPath('config.mko');
+  If (Not FileExist(CfgPath)) And (GetEnv('MK') <> '') And FileExist(WithBackSlash(GetEnv('MK')) + 'config.mko') Then
+    CfgPath := WithBackSlash(GetEnv('MK')) + 'config.mko';      {run from mk it is in the directory of the node: the BBS directory is the one MK names}
   If FileExist(CfgPath) Then
     LoadQwkCfg := (LoadFile(CfgPath, QCfg, SizeOf(QCfg)) = 0)
   Else

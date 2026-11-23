@@ -92,6 +92,11 @@ else:
     have_qwk = False
 script(ra + '/lineread.sh', 'printf "name? "\nread x\necho "got:$x"\n')
 script(ra + '/rawkey.sh', 'stty raw -echo\nk=$(dd bs=1 count=1 2>/dev/null)\nstty sane\necho "key=$k"\n')
+# a program runs in the directory of its node (node1 below the BBS directory): what it writes without a path is there
+shutil.rmtree(ra + '/node1', ignore_errors=True)     # the sample has the node directories of its DOS days (with another config.mko in node1)
+os.makedirs(ra + '/node1')
+for _n in ('aa.mko', 'bb.mko', 'noext'):
+    open(ra + '/node1/' + _n, 'w').write('x')
 script(ra + '/hang.sh', 'echo $$ > hang.pid\necho started\nexec sleep 60\n')
 script(ra + '/tty.sh', 'tty\necho "TERM=$TERM COLUMNS=$COLUMNS LINES=$LINES"\nstty size\n')
 
@@ -104,8 +109,16 @@ for f in os.listdir(menus):
 d = bytearray(open(path, 'rb').read())
 REC = 167
 used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if d[i * REC] != 0}
-free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV890' if k not in used] + [k for k in '=;/!+' if k not in used]   # more keys when the sample menu has many items
-items = [('bare', 'echo hello-bare'), ('abs', '/bin/echo hello-abs'), ('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('qwkul', repo + '/build/mkqwk -U'), ('qwkin', '#156'), ('qwkout', '#157'), ('setprot', '#153'), ('missing', 'nope-door-xyz')]
+free = [k for k in 'WXYZ' if k not in used] + [k for k in '1234567' if k not in used] + [k for k in 'ABCDEFGHJKLNOPQRSTUV890' if k not in used] + [k for k in '=' if k not in used]   # more keys when the sample menu has many items
+# a DOS door through mkdosdoor and dosemu2 (when it is installed): COM1 of the door is the terminal MK gives the program of command 7
+have_dos = bool(shutil.which('dosemu'))
+if have_dos:
+    from dosdoor_com import build_door
+    os.makedirs(ra + '/dosdoors', exist_ok=True)
+    os.symlink(repo + '/tools/mkdosdoor', ra + '/mkdosdoor')        # the menu data holds 75 characters: a short name, found in the BBS directory
+    open(ra + '/dosdoors/ECHO1.COM', 'wb').write(build_door())
+    os.environ['MKDOS_TMP'] = work + '/dostmp'
+items = [('bare', 'echo hello-bare')] + ([] if have_dos else [('abs', '/bin/echo hello-abs')]) + [('script', './door.sh *N *B *F'), ('script2', 'door.sh *N'), ('dos path', 'games\\door2.sh'), ('input', './lineread.sh'), ('tty', './tty.sh'), ('raw', './tty.sh *S'), ('rawkey', './rawkey.sh'), ('hang', './hang.sh'), ('glob', '/bin/echo *.mko'), ('glob2', '/bin/echo noex*.* zz*.*'), ('qwk', repo + '/build/mkqwk'), ('qwkul', repo + '/build/mkqwk -U'), ('qwkin', '#156'), ('qwkout', '#157'), ('setprot', '#153'), ('missing', 'nope-door-xyz')] + ([('dosdoor', './mkdosdoor -n *N -d ' + ra + '/dosdoors *D -- ECHO1.COM')] if have_dos else [])
 keys = {}
 slot = 1
 for name, data in items:
@@ -224,6 +237,7 @@ def drive(s, rules, stop, secs=20):
 def until(s, needle, secs=8):
     s.settimeout(0.2)
     b = b''
+    mores = 0
     end = time.time() + secs
     while time.time() < end and needle not in strip(b):
         try:
@@ -233,6 +247,9 @@ def until(s, needle, secs=8):
             b += d
             if b'\x1b[6n' in d:
                 s.sendall(b'\x1b[1;1R')
+            if strip(b).count(b'More? (Y)es (N)o (C)ontinuous?') > mores:      # a long screen is paged (the sample menu has many items): continuous
+                mores += 1
+                s.sendall(b'c')
         except socket.timeout:
             pass
     return strip(b)
@@ -294,11 +311,15 @@ try:
     b = run_item('bare', b'hello-bare')
     check('a command without a path is found in the path (echo)', b'hello-bare' in b and b'Command >' in b)
     check('the terminal ends lines the way a caller needs: CR LF (the program wrote a plain LF)', b'hello-bare\r\n' in b)
-    b = run_item('abs', b'hello-abs')
-    check('a full path', b'hello-abs' in b and b'Command >' in b)
+    if not have_dos:      # (the DOS door below is started by a full path: the sample menu has no more free keys)
+        b = run_item('abs', b'hello-abs')
+        check('a full path', b'hello-abs' in b and b'Command >' in b)
     b = run_item('script', b'DOOR node=')
     check('a program in the BBS directory (./door.sh): *N node, *B baud, *F first name; the drop files were written',
           b'DOOR node=1 baud=38400 user=Mark' in b and b'door.sys' in b and b'dorinfo1.def' in b and b'Command >' in b)
+    check('the drop files are in the directory of the node (node1 below the BBS directory, the program runs there) and not in the BBS directory itself',
+          all(os.path.exists(ra + '/node1/' + f) and time.time() - os.path.getmtime(ra + '/node1/' + f) < 300 for f in ('dorinfo1.def', 'exitinfo.bbs'))
+          and all(not os.path.exists(ra + '/' + f) or time.time() - os.path.getmtime(ra + '/' + f) > 300 for f in ('dorinfo1.def', 'exitinfo.bbs')))      # (the sample has old ones; door.sys is only written with *D in the data)
     b = run_item('script2', b'DOOR node=')
     check('a name without a path is looked for in the BBS directory first (door.sh)', b'DOOR node=1' in b and b'Command >' in b)
     b = run_item('dos path', b'DOOR2 here')
@@ -317,8 +338,18 @@ try:
     check('the program has a terminal: tty names it, TERM, COLUMNS, LINES and the window size are set (the caller reported 100 x 30)', b'/dev/pts/' in b and b'TERM=' in b and b'COLUMNS=100 LINES=30' in b and b'30 100' in b)
     b = run_item('raw', b'TERM=')
     check('*S: no terminal, the program gets the caller\'s connection itself (not a tty)', b'not a tty' in b and b'/dev/pts/' not in b)
-    b = run_item('glob', b'users.mko')
-    check('a * or ? in the arguments is expanded (there is no shell), sorted: echo *.mko', b'confs.mko users.mko' in b and b'*.mko' not in b)
+    if have_dos:
+        c.sendall(keys['dosdoor'].encode())
+        b = until(c, b'HELLO FROM DOS', 25)
+        c.sendall(b'x')
+        b += until(c, b'GOT:x', 10)
+        b += until(c, b'Command >', 10)
+        check('a DOS door (mkdosdoor, dosemu2): it reads DOOR.SYS from the node directory (COM1:), says hello, gets the character the caller types and answers',
+              b'COM1:' in b)
+        check('... through the pseudo terminal of command 7, the program found in the BBS directory and made a full path (the directory changes to that of the node): HELLO FROM DOS and GOT:x reach the caller, and the menu is back', b'HELLO FROM DOS' in b and b'GOT:x' in b and b'Command >' in b)
+        check('... the drop file the door read was the node\'s own (node1), made by MK', os.path.exists(ra + '/node1/door.sys') and time.time() - os.path.getmtime(ra + '/node1/door.sys') < 300)
+    b = run_item('glob', b'bb.mko')
+    check('a * or ? in the arguments is expanded (there is no shell), sorted: echo *.mko', b'aa.mko bb.mko' in b and b'*.mko' not in b)
     b = run_item('glob2', b'noext')
     check('a name ending in .* also fits a file without an extension (as in DOS); nothing fits: left as it is', b'noext' in b and b'zz*.*' in b)
     if have_qwk:
@@ -455,7 +486,7 @@ try:
     c.sendall(keys['hang'].encode())
     check('a program that waits', b'started' in until(c, b'started', 5))
     time.sleep(0.5)
-    hp = ra + '/hang.pid'
+    hp = ra + '/node1/hang.pid'
     pid = int(open(hp).read()) if os.path.exists(hp) else 0
     c.close()
     gone = False
