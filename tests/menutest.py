@@ -130,6 +130,13 @@ run(p, '\x1b[2~', '\x1bs', '\r', '\x1bx')
 d = open(p, 'rb').read()
 check('insert: a blank item 1, the old item 1 is item 2', rec(d, 1)[0] == 0 and rec(d, 2) == rec(orig, 1))
 
+# a new item gets light grey on black (07), not black on black (an invisible prompt)
+p = fresh()
+run(p, '\x1b[2~', '\r', '\t', '\t', 'New item', '\r', '\x1bs', '\r', '\x1bx')
+d = open(p, 'rb').read()
+check('a new item that is filled in has the color 07: %r %d %d' % (prompt(rec(d, 1)), rec(d, 1)[165], rec(d, 1)[166]), prompt(rec(d, 1)) == 'New item' and rec(d, 1)[165] == 7 and rec(d, 1)[166] == 0)
+check('... and the old item 1 (colors as they were) is item 2', rec(d, 2) == rec(orig, 1))
+
 # leaving with unsaved changes asks; No leaves the file alone
 p = fresh()
 run(p, '\x1b[3~', '\x1bx', 'n')

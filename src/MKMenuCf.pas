@@ -398,6 +398,8 @@ Procedure EditMenuItem(Item: Word);
   ER.FlagsD := Flag2Str(ByteArray(MA[Item].Flags)[4]);
   OldColor := MA[Item].FgColor Or (MA[Item].BgColor Shl 4);
   ER.Color := OldColor;
+  If (MA[Item].Typ = 0) And (MA[Item].Key = #0) And (MA[Item].Prompt = '') And (MA[Item].Data = '') And (OldColor = 0) Then
+    ER.Color := $07;                   {a new item: light grey on black, not black on black (an invisible prompt); saved when the dialog is accepted}
   F.Init('Menu Item ' + Long2Str(Item));
   F.Window(3, 5, 76, 17);
   F.At(2, 4, 2, 9);
