@@ -1,6 +1,6 @@
 # User packer: plan
 
-Status (2026-11-24): **plan only.**  `mkuserpurge` marks users deleted and leaves the records where they are (`MAINT.md`).  This plan is for taking the deleted records out of the user files, **keeping a map from the old user
+Status (2026-11-24): **plan agreed, no code yet.**  `mkuserpurge` marks users deleted and leaves the records where they are (`MAINT.md`).  This plan is for taking the deleted records out of the user files, **keeping a map from the old user
 numbers to the new ones** so that everything that holds a user number can be brought along.  The question that came first is in `MAINT.md` and the notes below: what holds the number.
 
 ## What holds a user number
@@ -47,9 +47,8 @@ the blocks of removed users dropped).  The other kinds (JAM, Fido `*.msg`, Squis
 3. The other base kinds, one by one, each after reading how it keeps the number (JAM `.jlr` has the number and a name CRC).
 4. Docs (`MAINT.md`, the event recipe, a note for door authors about `usermap.txt`).
 
-## Questions for the sysop
+## Decisions (sysop, 2026-11-24)
 
-1. The map file name and place: `usermap.txt` in the BBS directory, dated copies beside it: right?
-2. Should the pack also be allowed to **close the gaps only for a trailing run** (users at the end of the file: no renumbering at all), as an option for BBSs that have doors they cannot convert?  (It removes only the deleted
-   users after the last live one; numbers of everyone else stay.)
-3. A limit of "do not pack more often than": a guard against doing it every night (the maps pile up)?
+1. The map is `usermap.txt` in the BBS directory, with dated copies beside it: **yes**.
+2. No option to remove only trailing deleted users: **not needed**.
+3. No minimum interval: how often the pack runs is up to the event schedule.
