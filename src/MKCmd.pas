@@ -613,7 +613,10 @@ Procedure ProcessCmd(Item: Word);
     005: Begin                              {Screen display}
          BbsDisplay.DisplayBbsFile(ExtractWord(Menu.GetData(Item),1), ' ');
          If (BbsDisplay.GetError <> 0) Then
+           Begin
+           BbsDisplay.LogError;
            User.DisplayStr('Error: ' + Menu.GetData(Item) + ' Not Found');
+           End;
          End;
     006: DisplayBulletin(Menu.GetData(Item));             {Bulletin display}
     007: TypeSeven(Menu.GetData(Item));     {Execute external program}
@@ -714,7 +717,10 @@ Procedure ProcessCmd(Item: Word);
            Key := BbsDisplay.DisplayBbsFile(ExtractWord(Menu.GetData(Item),1),
              Menu.GetHotKeys);
            If (BbsDisplay.GetError <> 0) Then
+             Begin
+             BbsDisplay.LogError;
              User.DisplayStr('Error: ' + Menu.GetData(Item) + ' Not Found');
+             End;
            End;
          End;
     041: Begin                              {Toggle full screen editor}
@@ -732,7 +738,10 @@ Procedure ProcessCmd(Item: Word);
     045: Begin                              {Screen display with press enter}
          BbsDisplay.DisplayBbsFile(ExtractWord(Menu.GetData(Item),1), ' ');
          If (BbsDisplay.GetError <> 0) Then
+           Begin
+           BbsDisplay.LogError;
            User.DisplayStr('Error: ' + Menu.GetData(Item) + ' Not Found');
+           End;
          User.PressEnter;
          End;
     047: LogEntry.WriteEntry(Menu.GetData(Item)); {Write log entry}

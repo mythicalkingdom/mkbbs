@@ -27,6 +27,7 @@ Type BbsDisplayObj = Object
   Procedure Init;
   Procedure Done;
   Function GetError: Word;
+  Procedure LogError;                       {a screen that a menu item or a questionnaire names could not be displayed: said in the log}
   Function DisplayBbsFile(FileName: String; HotStr: String): Char;
   Function ScreenFileExpand(FileName: String): String;
   Procedure DisplayStr(Var DStr: String); {translate codes and display}
@@ -42,7 +43,7 @@ Implementation
 
 Uses
       MKVCrt,
-  MKDoor, MKCfgAbs, MKString, MKSys, MKDos, MKAvatar, MKOfflin;
+  MKDoor, MKCfgAbs, MKString, MKSys, MKDos, MKAvatar, MKOfflin, MKLogHook;
 
 
 
@@ -50,6 +51,13 @@ Procedure BbsDisplayObj.Init;
   Begin
   New(DInfo);
   ResetState;
+  End;
+
+
+Procedure BbsDisplayObj.LogError;
+  Begin
+  If DInfo^.DisplayError <> 0 Then
+    BbsLog('Screen ' + DInfo^.FileName + ' could not be displayed (' + LoadWhy(DInfo^.DisplayError) + ')');
   End;
 
 

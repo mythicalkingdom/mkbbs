@@ -6,11 +6,17 @@ Program MK;
 Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
-MKSys, MKCodes, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
+MKSys, MKCodes, MKLogHook, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
 MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, Dos
   ;
 
 
+
+
+Procedure LogWrite(S: String);
+  Begin
+  LogEntry.WriteEntry(S);
+  End;
 
 
 Function SysopCommand(Cmd: Char; Arg: LongInt): String;
@@ -223,6 +229,7 @@ If UserBaud = 0 Then
   UserBaud := 38400;                    {nominal speed of a network session}
 LogEntry.Init;
 If IoResult <> 0 Then;
+LogHook := LogWrite;                    {what the low level units say (a menu, a screen, a language file that is not there) goes in the log}
 If LogToPrinter Then
   LogEntry.SetPrnName(Config^.GetPrnName);
 ClrScr;

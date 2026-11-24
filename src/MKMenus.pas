@@ -56,7 +56,7 @@ Var
 Implementation
 
 
-Uses MKFile, MKString, MKCfgAbs, MKDoor,
+Uses MKFile, MKString, MKCfgAbs, MKDoor, MKLogHook,
   Dos;
 
 
@@ -125,7 +125,10 @@ Procedure MenuObj.Load(FN: String);          {Load file name}
   If MenuInfo^.Error = 0 Then
     Dec(MenuInfo^.NumItems)
   Else
+    Begin
     MenuInfo^.NumItems := 0;
+    BbsLog('Menu ' + FN + ' could not be loaded (' + LoadWhy(MenuInfo^.Error) + '; looked in ' + Config^.GetMnuPath(User.GetUserLanguage) + Copy(' and ' + Config^.GetMnuPath(1), 1, 200 * Ord(Config^.GetMnuPath(User.GetUserLanguage) <> Config^.GetMnuPath(1))) + ')');
+    End;
   MenuInfo^.HotString := LoadHotKeys;
   End;
 
@@ -165,7 +168,11 @@ Procedure MenuObj.GlobalLoad(FN: String);
   If Error = 0 Then
     Dec(MenuInfo^.GlobalItems)
   Else
+    Begin
     MenuInfo^.GlobalItems := 0;
+    If Error <> 1000 Then                  {a BBS may have no global menu: only one that is there and cannot be read is a fault}
+      BbsLog('Menu ' + FN + ' could not be loaded (' + LoadWhy(Error) + ')');
+    End;
   MenuInfo^.HotString := LoadHotKeys;
   End;
 

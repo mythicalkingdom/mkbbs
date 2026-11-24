@@ -46,7 +46,7 @@ Type StrObjPtr = ^StrObj;
 Implementation
 
 
-Uses MKFile, MKString,
+Uses MKFile, MKString, MKLogHook,
   Dos;
 
 
@@ -97,7 +97,10 @@ Procedure StrObj.Load(FN: String);          {Load file name}
   If StrInfo^.Loaded Then
     StrInfo^.HighNum := WordPtr(Work)^
   Else
+    Begin
     StrInfo^.HighNum := 0;               {nothing loaded: every string is empty}
+    BbsLog('Language file ' + FN + ' could not be loaded (' + LoadWhy(StrInfo^.Error) + ')');
+    End;
   End;
 
 

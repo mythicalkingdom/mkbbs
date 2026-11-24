@@ -270,6 +270,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # the Debian package (packaging/mkdeb.sh): its contents, the scripts, lintian, the programs from the unpacked package
 python3 tests/debtest.py build build/work/deb | grep -E "^(FAIL|skip|failures)" | tee build/debresult.txt
 if grep -q FAIL build/debresult.txt; then exit 1; fi
+# mk logs a language file, menu, screen or questionnaire that it cannot load (real mk over telnet, private copy)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/missingtest.py build/work/missing | grep -E "^(ok|FAIL|skip|failures)" | tee build/missingresult.txt
+  if grep -q FAIL build/missingresult.txt; then exit 1; fi
+fi
 # mkbackup: backup, list, test, restore on a private copy
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/backuptest.py build build/work/backup | grep -E "^(ok|FAIL|skip|failures)" | tee build/backupresult.txt

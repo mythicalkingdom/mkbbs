@@ -44,7 +44,7 @@ Implementation
 
 
 Uses MKString, MKGlobT, MKCfgAbs, MKDoor, MKCodes, MKShell, MKDos, MKMisc,
-  MKComAbs, MKCmd, MKRCfgMK,
+  MKComAbs, MKCmd, MKRCfgMK, MKLogHook,
     MKVCrt,
     Dos;
 
@@ -353,7 +353,10 @@ Procedure QuestObj.DoCmd(TmpStr: String);
              If User.Ok Then
                TmpStr2 := BbsDisplay.DisplayBbsFile(ExtractWord(TmpStr, 2), '');
              If (BbsDisplay.GetError <> 0) Then
+               Begin
+               BbsDisplay.LogError;
                User.DisplayStrLn(Prompts.GetString(195));
+               End;
              End;
            End;
       'E': Begin
@@ -634,6 +637,8 @@ Procedure QuestObj.Process(FN: String);      {Load Q-A file and execute}
     If Not QI^.QF.OpenTextFile(FilePath) Then
       QI^.Error := 1010;
     End;
+  If QI^.Error <> 0 Then
+    BbsLog('Questionnaire ' + FilePath + ' could not be loaded (' + LoadWhy(QI^.Error) + ')');
   While ((QI^.Error = 0) And (Not QI^.Finished)) Do
     Begin
     TmpStr := QI^.QF.GetString;

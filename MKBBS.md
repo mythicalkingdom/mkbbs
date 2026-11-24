@@ -129,6 +129,23 @@ bar (Alt-key shortcuts, `F1` for help, `Esc` to leave).
 | `-D` | with `-G`: a dry run, it says what would be sent and changes nothing |
 | `-C<port>`, `-E<level>`, `-P`, `-R`, `-T<min>`, `-V`, `-Z<baud>` | as in the DOS version: port, exit level, log to printer, reload, minutes to the next exclusive event (`mklisten` sets it: the call ends then), 80x25, forced baud |
 
+### Files that `mk` cannot load: the log says so
+
+When `mk` cannot load one of these, a line goes into the BBS log (the file named in `mkconfig`, `/var/log/mkbbs/mk.log` in the installed setup), with the full name of what it looked for:
+
+```
+Language file /bbs/ra/american.lc could not be loaded (not found)
+Menu nomenuhere.mnu could not be loaded (not found; looked in /bbs/menus/ and /bbs/menus/)
+Screen /bbs/txt/noscreenhere.ans could not be displayed (not found)
+Questionnaire /bbs/ra/noquesthere.q-a could not be loaded (not found)
+```
+
+* The reason is `not found`, `cannot be opened` or `cannot be read`.  A language file that is missing leaves the prompts empty, a menu leaves the caller without items: this is where to look first.
+* The same line is written **once in a call** (a missing menu is asked for each time its key is pressed).
+* **Screens:** only the ones a sysop *names* are reported: a menu item that shows a screen (commands 5, 40, 45) or a questionnaire that does.  The screens that `mk` tries on its own (`welcome`, `news`,
+  `goodbye`, `sec<level>`, `birthday` ... most of them optional) are not, or every call would write a line for each.
+* The global menu (`global.mnu`) is optional: it is reported only when it is there and cannot be read.
+
 ## Setting up a BBS in short
 
 1. Build and install (`make`, `sudo make install`).  Needs Free Pascal 3.2.2.
