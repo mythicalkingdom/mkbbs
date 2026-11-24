@@ -470,6 +470,25 @@ Procedure GetNewUserScrClr;
 
 
 
+
+Procedure SetFirstAreas;
+  Var
+    i: Word;
+
+  Begin
+  i := 1;
+  While (i < Config^.GetMaxMsgAreas) And (Config^.GetMsgName(i) = '') Do
+    Inc(i);
+  If Config^.GetMsgName(i) <> '' Then
+    User.SetUserMsgTemplate(i);
+  i := 1;
+  While (i < Config^.GetMaxFileAreas) And (Config^.GetFileAreaName(i) = '') Do
+    Inc(i);
+  If Config^.GetFileAreaName(i) <> '' Then
+    User.SetUserFileTemplate(i);
+  End;
+
+
 Procedure ProcessNewUser;
   Var
     Sec: SecType;
@@ -527,6 +546,7 @@ Procedure ProcessNewUser;
     DoQuest('newuser');
   If User.Ok Then
     Begin
+    SetFirstAreas;                       {a new caller starts in the first message and file area, not in area 0 (which nobody may use)}
     User.AddUser;
     LogOnUser;
     End;

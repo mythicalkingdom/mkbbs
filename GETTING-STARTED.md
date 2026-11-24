@@ -13,6 +13,7 @@ part has a document with the details; this one does not repeat them.
 | **`EVENTS-PLAN.md`** | schedule work: events that run commands, mailer polls and hub passes, maintenance that needs the BBS quiet |
 | **`PASSWORDS.md`** | keep passwords plain or as hashes, and convert the user base |
 | **`TOSSER.md`** | understand the Fido tosser: toss, scan, pack, areafix, routing, file attach |
+| **`SETUP.md`** | the quick start: `mksetup` makes a BBS that runs, to change afterwards |
 | **`API.md`** | read the BBS from scripts and dashboards: the read only JSON API (`mkapi`, `mkapitoken`), tokens, scopes, TLS |
 | **`STATS.md`** | see the calls: totals, busiest hours, top callers (`mkstats`) |
 | **`MAINT.md`** | purge and pack old messages (`mkmaint`), purge and pack users (`mkuserpurge`, `mkuserpack`), check the file lists (`mkfilecheck`) |
@@ -50,7 +51,7 @@ part has a document with the details; this one does not repeat them.
 1. **Build and install.**  `make && sudo make install`.  Free Pascal 3.2.2 is needed.  (`MKBBS.md`)  On Debian and its relatives `make deb` makes a package
    (`build/mkbbs_<version>_<arch>.deb`, `sudo apt install ./build/mkbbs_*.deb`): the programs go to `/usr/bin`, the unit to the systemd directory, the language files and
    hub profiles to `/usr/share/mkbbs`, the user `mkbbs` and `/etc/mkbbs/mklisten.json` are made when it is installed, and nothing is started (`packaging/mkdeb.sh`).
-2. **Make the BBS directory** and set `MK` to it.  Convert an existing Remote Access, QuickBBS or SuperBBS configuration
+2. **Make the BBS directory** and set `MK` to it (**`mksetup`** does steps 2 to 4 for a first BBS: `SETUP.md`).  Convert an existing Remote Access, QuickBBS or SuperBBS configuration
    with `mkcfgcvt`, or start from a sample and run `mklower` to make DOS-style names lower case.  (`MKBBS.md`)
 3. **Configure** with `mkconfig`: the BBS name and paths, security levels, message areas, file areas, protocols, language
    files.  Put the language text through `mklc`.  (`MKBBS.md`)

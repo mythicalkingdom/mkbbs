@@ -23,7 +23,7 @@ Var
 Implementation
 
 
-Uses MKFile, MKString, MKCodes, MKDoor, MKMenus, MKCfgAbs, MKComAbs,
+Uses MKFile, MKString, MKCodes, MKPromptEsc, MKDoor, MKMenus, MKCfgAbs, MKComAbs,
   MKCFile, MKMRead, MKEnter, MKName, MKMisc, MKDos, MKShell, MKPage,
   MKQuest, MKMsgSel, MKProt, MKLogEnt, MKMiscB, MKCD, MKRCfgMK, MKLogOn,
   MKOfflin, MKBasicRun, MKPascalRun,
@@ -100,6 +100,7 @@ Function CvtMenuStr(MStr:String; MenuItem: Byte; IsPrompt: Boolean): String;
     Else
       DoCR := True;
     End;
+  MStr := ExpandPromptEscapes(MStr);          {\n \f<c> \k<c> \\}
   i := 1;
   If Length(MStr) > 0 Then
     TStr := User.GetAttrStr(Menu.GetNormal(MenuItem))
@@ -118,6 +119,14 @@ Function CvtMenuStr(MStr:String; MenuItem: Byte; IsPrompt: Boolean): String;
            End;
       '@': TStr := TStr + Config^.GetFileAreaName(User.GetUserFileTemplate);
       '`': TStr := TStr + Config^.GetMsgName(User.GetUserMsgTemplate);
+      #6, #11: Begin                        {a display code ^F or ^K: its letter goes with it, whatever the letter is}
+           TStr := TStr + MStr[i];
+           If i < Length(MStr) Then
+             Begin
+             Inc(i);
+             TStr := TStr + MStr[i];
+             End;
+           End;
       Else
         TStr := TStr + MStr[i];
       End;

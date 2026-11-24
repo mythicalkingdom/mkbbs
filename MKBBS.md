@@ -102,6 +102,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
 | `mkuserpurge` | marks users deleted who have not called for a long time (keep file, security level, a warning list) (`MAINT.md`) |
+| `mksetup` | makes a new BBS that `mk` can run: folder, configuration, two message areas, a file area, a sample door, the menu and screens (`SETUP.md`) |
 | `mkapi`, `mkapitoken` | the read only JSON API (a port of the type `api` in `mklisten`) and its tokens (`API-PLAN.md`) |
 | `mkuserpack` | takes deleted users out of the user files (exclusive event), writes `usermap.txt` old→new numbers (`MAINT.md`) |
 | `mkfilecheck` | checks the file areas against their lists: files missing, not listed, listed twice, wrong case; can fix (`MAINT.md`) |
@@ -170,16 +171,29 @@ the prompt's own and the **highlight** colour that `^` switches to.  Each item h
 * `^` turns the highlight colour on and off: `(^R^)ead messages` shows the R highlighted;
 * a **`;` at the end** keeps the cursor on the line, so the next prompt follows on the same line (without it every prompt ends its line);
 * `@` is replaced by the name of the caller's current **file area**, `` ` `` (a backtick) by the name of the current **message area**;
-* `~` resets the colour.
+* `~` is replaced by the number of **minutes left** in this call;
+* **backslash codes**, because the prompt field of `mkmenu` takes no control characters: `\n` is a **line break**, `\\` is a backslash, `\f<c>` is the user display code **^F**`<c>` and `\k<c>` the system code
+  **^K**`<c>` (the same codes a screen made with `mkdraw` can hold; they work in a prompt too).  Any other backslash is kept as it is.  The codes that are worth having in a menu:
+
+  | `\f`… (the caller) | | `\k`… (the system and the call) | |
+  |---|---|---|---|
+  | `A` name, `W` first name, `B` city | | `I` time, `J` date, `G` / `S` day of the week | |
+  | `O` security level, `P` calls, `M` messages entered | | `O` / `P` minutes / seconds left, `K` / `L` minutes / seconds on, `Q` time limit | |
+  | `Q` / `R` files / K uploaded, `S` / `T` downloaded | | `Y` / `Z` current message / file area (`1` / `2` their numbers) | |
+  | `F` / `G` date / time of the last call, `H`..`K` the flags | | `A` calls of the system, `B` last caller, `H` users, `C` messages, `V` the next event | |
+  | `X` ANSI, `Y` more, `Z` clear screen, `0` full screen editor, `8` AVATAR (yes or no) | | `R` the caller's speed, `T` the download limit | |
+
+  So `Message area: \kY\nFile area: \kZ` is two lines, and `(^R^)ead mail ;` stays one.  A heading made of type 0 items, one for each line, is still the way to show several lines in the colours of the item.
 
 **Type 0 is no command**: the item only shows its prompt and does nothing when its key is pressed (a space or a blank key just shows the menu again).  Use it for a heading, a line of explanation, or a value
-(`Message area: ` followed by the backtick code), above or between the choices.  `mkmenu` lists such an item as "Prompt only (no command)" and offers it with the Menu Commands.  A small menu made of type 0 lines and
+(`Message area: ` followed by the backtick code or `\kY`), above or between the choices; a type 0 item with an empty prompt is a blank line.  `mkmenu` lists such an item as "Prompt only (no command)" and offers it with the Menu Commands.  A small menu made of type 0 lines and
 a few keyed items is a simple text interface: the lines say where the caller is, the keyed items do the work.
 
 ## Setting up a BBS in short
 
 1. Build and install (`make`, `sudo make install`).  Needs Free Pascal 3.2.2.
-2. Make a directory for the BBS and give it to the user the BBS runs as (the install makes a `mkbbs` user).
+2. **The quick way: `mksetup`** (`SETUP.md`) asks for the folder (`/opt/bbs`), the name of the BBS and of the sysop, and makes a BBS that `mk` can run at once; then go on with step 5 and change what you want
+   with the editors.  The long way, by hand:  make a directory for the BBS and give it to the user the BBS runs as (the install makes a `mkbbs` user).
 3. Run `mkconfig` with `MK` set to that directory (`MK=/bbs/ra mkconfig`) and set the names, paths, security levels, message
    areas, file areas, protocols and language files.
 4. Edit the menus (`mkmenu`) and screens (`mkdraw`), or start from a sample BBS (they come as DOS-style data; `mklower`
