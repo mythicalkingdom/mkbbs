@@ -1,7 +1,7 @@
 program postmsg;
 {$mode tp}
 {$H+}
-{ postmsg <area> <from> <to> <subject> <text line> [<text line> ...]: writes a public local message (an echomail one with the environment variable POSTTYPE=echo) in a message area of the BBS
+{ POSTPRIV=1 makes it private, POSTRCVD=1 read.   postmsg <area> <from> <to> <subject> <text line> [<text line> ...]: writes a public local message (an echomail one with the environment variable POSTTYPE=echo) in a message area of the BBS
   (MK=<config dir>) the way mk's editor does; the message base is made when it is not there yet (tests/hubsetup.py). }
 uses Dos, MKString, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKMsgAbs, MKOpen;
 var P: AbsMsgPtr; Yy, Mo, Dd, Dw, Hh, Mi, Ss, Cs: Word; i: Integer; Area: Word;
@@ -17,7 +17,8 @@ begin
   P^.StartNewMsg;
   P^.SetFrom(ParamStr(2)); P^.SetTo(ParamStr(3)); P^.SetSubj(ParamStr(4));
   P^.SetDate(Z2(Mo) + '-' + Z2(Dd) + '-' + Z2(Yy mod 100)); P^.SetTime(Z2(Hh) + ':' + Z2(Mi));
-  P^.SetPriv(False); P^.SetLocal(True); P^.SetEcho(True);
+  P^.SetPriv(GetEnv('POSTPRIV') <> ''); P^.SetLocal(True); P^.SetEcho(True);
+  if GetEnv('POSTRCVD') <> '' then P^.SetRcvd(True);
   for i := 5 to ParamCount do P^.DoStringLn(ParamStr(i));
   if P^.WriteMsg <> 0 then begin writeln('write failed'); halt(1); end;
   writeln('posted as message ', P^.GetMsgNum, ' in area ', Area, ' (', Config^.GetMsgName(Area), ')');

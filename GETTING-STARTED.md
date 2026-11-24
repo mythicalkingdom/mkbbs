@@ -13,6 +13,7 @@ part has a document with the details; this one does not repeat them.
 | **`EVENTS-PLAN.md`** | schedule work: events that run commands, mailer polls and hub passes, maintenance that needs the BBS quiet |
 | **`PASSWORDS.md`** | keep passwords plain or as hashes, and convert the user base |
 | **`TOSSER.md`** | understand the Fido tosser: toss, scan, pack, areafix, routing, file attach |
+| **`MAINT.md`** | purge old messages by the limits of the areas (`mkmaint`) |
 | **`BACKUP.md`** | back the BBS up and restore it (`mkbackup`), and the `.bak` copies of the configuration files |
 | `mklisten.example.json` | a starting configuration for the listener |
 

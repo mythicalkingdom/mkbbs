@@ -101,6 +101,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mknodeidx`, `mknodelist` | build the nodelist index, look an address up |
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
+| `mkmaint` | purges the message areas by their limits (days kept, received days, messages kept); never unread private mail or a message waiting to be sent (`MAINT.md`) |
 | `mkbackup` | a backup of the BBS in one `.tar.gz` (made while it runs), its list, test and restore (`BACKUP.md`) |
 | `mkbbsssh` | the shell of the SSH account of the BBS: connects an SSH daemon to `mklisten` (`SSH.md`) |
 | `mkhatch` | put files into a file echo (TIC): stored in the file area and sent to the systems the echo goes to |
@@ -185,6 +186,7 @@ of the sample BBS, never on the sample itself.
 | `packaging/` | `mkdeb.sh` and the maintainer scripts of the Debian package (`make deb`) |
 | `HUBS.md` | QWK hubs: every map file setting, switch and exit code, the transports (Telnet, FTP, FTPS, exec), what was checked against what |
 | `hubs/*.scr` | QWK hub profiles (installed in `share/mkbbs/hubs`; `mk -G -P` lists them; NETWORKING.md) |
+| `MAINT.md` | message base maintenance: the purge rules, a dry run, what never goes |
 | `BACKUP.md` | backing up and restoring the BBS: what is held, `mkbackup`, the `.bak` of the configuration files, an event for it |
 | `SSH.md` | SSH for callers: OpenSSH or Dropbear in front, `mkbbsssh`, no password at the SSH level |
 | `DOS-DOORS.md` | DOS doors on Linux: dosemu2 and `mkdosdoor` |

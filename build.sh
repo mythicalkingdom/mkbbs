@@ -42,6 +42,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkpwconv src/MKPwConv.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfreq src/MKFreq.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkevents src/MKEvents.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbackup src/MKBackup.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmaint src/MKMaint.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -274,6 +275,11 @@ if grep -q FAIL build/debresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/missingtest.py build/work/missing | grep -E "^(ok|FAIL|skip|failures)" | tee build/missingresult.txt
   if grep -q FAIL build/missingresult.txt; then exit 1; fi
+fi
+# mkmaint: the purge of message areas by their limits, on private copies
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/maintest.py build build/work/maint | grep -E "^(ok|FAIL|skip|failures)" | tee build/maintresult.txt
+  if grep -q FAIL build/maintresult.txt; then exit 1; fi
 fi
 # mkbackup: backup, list, test, restore on a private copy
 if [ -f bbs/bbsc/ra/config.mk ]; then

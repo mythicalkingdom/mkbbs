@@ -1,6 +1,6 @@
 # Housekeeping: plan (test fixture, message base maintenance, backup, statistics)
 
-Status (2026-11-23): **1 (the test fixture) is built; 3 (backup) is built** (config `.bak`, `mkbackup`, `BACKUP.md`).  2 (`mkmaint`) and 4 (statistics) are next.  Your answers to the questions: never purge unread private mail; Squish and `*.msg` bases get `DaysKept` / `RcvdDays` too; file areas only with a switch and backups in `<BBS dir>/backup/`; one `.bak` generation; statistics for the sysop only (later: display codes callers' screens can embed); backup first.
+Status (2026-11-23): **1 (the test fixture) and 3 (backup) are built; 2 (`mkmaint`): the purge is built** (`MAINT.md`), packing is next; 4 (statistics) after that.  Your answers to the questions: never purge unread private mail; Squish and `*.msg` bases get `DaysKept` / `RcvdDays` too; file areas only with a switch and backups in `<BBS dir>/backup/`; one `.bak` generation; statistics for the sysop only (later: display codes callers' screens can embed); backup first.
 
 The four pieces, in the order they are done:
 
@@ -87,3 +87,13 @@ mkstats [-d day | -m month | -y year] [-by node|port|user|hour|day] [-top N] [-c
 4. **Config history**: one `.bak` generation per file (proposal), or a few (dated copies in a `history/` directory, the last 10)?
 5. **Statistics for callers**: a statistics screen that callers see, or only for the sysop?  Which numbers are fine to show (calls, minutes, top uploaders)?
 6. **Order**: 2 (mkmaint) before 3 (backup), so that backup can use the same lock?  Or backup first, since a purge is a good thing to have a backup before?  Proposal: **backup first**.
+
+## Future ideas (not planned yet)
+
+* **A setup wizard and a configuration checker** (asked for 2026-11-23): a first-run wizard (`mkconfig` or a `mksetup`) that makes a working BBS directory step by step -- paths, the sysop account, the
+  language files and menus from `/usr/share/mkbbs`, a first message and file area, `mklisten.json` with the ports the sysop wants (plain, TLS, SSH), the systemd unit -- and a **checker**
+  (`mkcheck`) that reads an existing configuration and reports what is wrong or missing before callers find it: paths that do not exist or that the listener user cannot write, language
+  files, menus and screens named but not there, message bases that cannot be opened, areas with no `conf` line for a network, a mailer link without a password, ports that are already
+  in use, a TLS certificate that is unreadable or about to expire, an expired or missing sysop password, a login guard that would block the sysop's own address.  The checker is the smaller piece
+  and is useful alone (it can run from an event and from the package's `postinst`); the wizard can then use it for its last step.
+* A JSON API (read-only first), native packaging for other systems, Windows, ban lists (see the roadmap notes).
