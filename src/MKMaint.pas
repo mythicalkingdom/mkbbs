@@ -8,7 +8,7 @@ Program MKMaint;
        mkmaint [-c config dir] [-n] [-p] [-x] [-a area] [-v] [-q]
 
          -c    the configuration directory (instead of MK in the environment)
-         -p    pack the Hudson bases afterwards: the room of deleted messages is given back (see below)
+         -p    pack the Hudson and JAM bases afterwards: the room of deleted messages is given back (see below)
          -x    with -p: the copies of the old files (name.prepack) are removed at the end
          -n    a dry run: says what would be purged, changes nothing
          -a    only this area (its number)
@@ -34,7 +34,7 @@ Program MKMaint;
 }
 
 Uses SysUtils, Classes, DateUtils, BaseUnix, Unix,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKMsgAbs, MKOpen;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKMsgAbs, MKMsgJam, MKOpen;
 
 Type
   TMsg = Record
@@ -358,16 +358,216 @@ Procedure PackHudson(Dir, AreaId: String);
   End;
 
 
+Function W32(const D: TBytes; At: LongInt): LongInt;
+  Begin
+  Result := LongInt(D[At] Or (D[At + 1] Shl 8) Or (D[At + 2] Shl 16) Or (Cardinal(D[At + 3]) Shl 24));
+  End;
+
+
+Procedure P32(var D: TBytes; At: LongInt; V: LongInt);
+  Begin
+  D[At] := V And 255;
+  D[At + 1] := (V Shr 8) And 255;
+  D[At + 2] := (V Shr 16) And 255;
+  D[At + 3] := (V Shr 24) And 255;
+  End;
+
+
+Procedure PackJam(Base, AreaId: String);
+  {Base: the path of the base without the extension (name.jhr, .jdt, .jdx, .jlr); message numbers stay: deleted messages at the start leave the index (the number of the first
+   message moves up), the ones in the middle and at the end stay in the index as empty entries; their headers and texts go}
+  Const
+    BaseHdrSize = 1024;
+    MsgHdrSize = 76;
+    JamDeleted = LongInt($80000000);
+
+  Var
+    Hhr, Dt, Dx, NHr, NDt, NDx: TBytes;
+    Names: Array[0..2] Of String;
+    pos, n, kept, gone, i, cnt, lead, L, TOfs, TLen, Sub, NewLoc: LongInt;
+    Locs: Array Of LongInt;                  {the old offset of a header -> the new one}
+    OldLocs, NewLocs: Array Of LongInt;
+    M: AbsMsgPtr;
+    Locked, Good: Boolean;
+    Before, After: Int64;
+    OldNum: LongInt;
+    Active: LongInt;
+
+  Function NewOf(Old: LongInt): LongInt;
+    Var
+      k: LongInt;
+
+    Begin
+    Result := -1;
+    For k := 0 To High(OldLocs) Do
+      If OldLocs[k] = Old Then
+        Exit(NewLocs[k]);
+    End;
+
+  Begin
+  Names[0] := Base + '.jhr'; Names[1] := Base + '.jdt'; Names[2] := Base + '.jdx';
+  If Not (ReadAll(Names[0], Hhr) And ReadAll(Names[1], Dt) And ReadAll(Names[2], Dx)) Then
+    Exit;
+  If Length(Hhr) < BaseHdrSize Then
+    Exit;
+  {the headers: one after the other, each with its subfields}
+  pos := BaseHdrSize;
+  gone := 0;
+  kept := 0;
+  While pos + MsgHdrSize <= Length(Hhr) Do
+    Begin
+    Sub := W32(Hhr, pos + 8);
+    If (Sub < 0) Or (pos + MsgHdrSize + Sub > Length(Hhr)) Then
+      Break;
+    If (W32(Hhr, pos + 52) And JamDeleted) <> 0 Then
+      Inc(gone)
+    Else
+      Inc(kept);
+    Inc(pos, MsgHdrSize + Sub);
+    End;
+  If gone = 0 Then
+    Exit;
+  Before := Length(Hhr) + Length(Dt) + Length(Dx);
+  If Dry Then
+    Begin
+    WriteLn('pack ', Base, ' (JAM): ', gone, ' deleted message(s), ', kept, ' stay: would be packed');
+    Inc(NumPacked);
+    Exit;
+    End;
+  M := Nil;
+  Locked := False;
+  If OpenMsgArea(M, AreaId) Then
+    Locked := M^.LockMsgBase;
+  If Not Locked Then
+    Begin
+    WriteLn(StdErr, 'pack ', Base, ' (JAM): the base could not be locked: not packed');
+    If M <> Nil Then
+      DoneMsgPtr(M);
+    Failed := True;
+    Exit;
+    End;
+  Good := ReadAll(Names[0], Hhr) And ReadAll(Names[1], Dt) And ReadAll(Names[2], Dx);
+  If Good Then
+    Good := (Length(Hhr) >= BaseHdrSize) And (Length(Dx) Mod 8 = 0);
+  If Not Good Then
+    Begin
+    WriteLn(StdErr, 'pack ', Base, ' (JAM): the files cannot be read as a JAM base: not packed');
+    M^.UnLockMsgBase;
+    DoneMsgPtr(M);
+    Failed := True;
+    Exit;
+    End;
+  { copy what stays: the headers (with the new place of the text), the texts }
+  SetLength(NHr, Length(Hhr));
+  SetLength(NDt, Length(Dt));
+  Move(Hhr[0], NHr[0], BaseHdrSize);
+  SetLength(OldLocs, 0);
+  SetLength(NewLocs, 0);
+  pos := BaseHdrSize;
+  NewLoc := BaseHdrSize;
+  TLen := 0;
+  kept := 0;
+  While pos + MsgHdrSize <= Length(Hhr) Do
+    Begin
+    Sub := W32(Hhr, pos + 8);
+    If (Sub < 0) Or (pos + MsgHdrSize + Sub > Length(Hhr)) Then
+      Break;
+    If (W32(Hhr, pos + 52) And JamDeleted) = 0 Then
+      Begin
+      L := MsgHdrSize + Sub;
+      Move(Hhr[pos], NHr[NewLoc], L);
+      TOfs := W32(Hhr, pos + 60);
+      n := W32(Hhr, pos + 64);
+      If (TOfs < 0) Or (n < 0) Or (TOfs + n > Length(Dt)) Then
+        n := 0;
+      If n > 0 Then
+        Move(Dt[TOfs], NDt[TLen], n);
+      P32(NHr, NewLoc + 60, TLen);
+      P32(NHr, NewLoc + 64, n);
+      SetLength(OldLocs, Length(OldLocs) + 1);
+      SetLength(NewLocs, Length(NewLocs) + 1);
+      OldLocs[High(OldLocs)] := pos;
+      NewLocs[High(NewLocs)] := NewLoc;
+      Inc(TLen, n);
+      Inc(NewLoc, L);
+      Inc(kept);
+      End;
+    Inc(pos, MsgHdrSize + Sub);
+    End;
+  { the index: the empty entries at the start go (the number of the first message moves up), the others keep their place }
+  cnt := Length(Dx) Div 8;
+  lead := 0;
+  While (lead < cnt) And (W32(Dx, lead * 8 + 4) = -1) Do
+    Inc(lead);
+  SetLength(NDx, (cnt - lead) * 8);
+  For i := lead To cnt - 1 Do
+    Begin
+    If W32(Dx, i * 8 + 4) = -1 Then
+      Begin
+      P32(NDx, (i - lead) * 8, -1);
+      P32(NDx, (i - lead) * 8 + 4, -1);
+      End
+    Else
+      Begin
+      P32(NDx, (i - lead) * 8, W32(Dx, i * 8));
+      OldNum := NewOf(W32(Dx, i * 8 + 4));
+      If OldNum < 0 Then
+        Begin
+        P32(NDx, (i - lead) * 8, -1);                          {an index entry without a header: empty}
+        P32(NDx, (i - lead) * 8 + 4, -1);
+        End
+      Else
+        P32(NDx, (i - lead) * 8 + 4, OldNum);
+      End;
+    End;
+  Active := kept;
+  P32(NHr, 12, Active);
+  P32(NHr, 8, W32(Hhr, 8) + 1);                                {ModCounter}
+  P32(NHr, 20, W32(Hhr, 20) + lead);                           {BaseMsgNum}
+  CopyFileTo(Names[0], Names[0] + '.prepack');
+  CopyFileTo(Names[1], Names[1] + '.prepack');
+  CopyFileTo(Names[2], Names[2] + '.prepack');
+  Good := WriteAll(Names[1], NDt, TLen) And WriteAll(Names[0], NHr, NewLoc) And WriteAll(Names[2], NDx, Length(NDx));
+  If Good Then
+    Begin                                {the object writes its copy of the base header back when it unlocks: the new numbers go in it}
+    JamMsgPtr(M)^.JM^.BaseHdr.BaseMsgNum := W32(NHr, 20);
+    JamMsgPtr(M)^.JM^.BaseHdr.ActiveMsgs := W32(NHr, 12);
+    JamMsgPtr(M)^.JM^.BaseHdr.ModCounter := W32(NHr, 8);
+    End;
+  M^.UnLockMsgBase;
+  DoneMsgPtr(M);
+  If Not Good Then
+    Begin
+    WriteLn(StdErr, 'pack ', Base, ' (JAM): writing failed: the old files are in ', Base, '.*.prepack');
+    Failed := True;
+    Exit;
+    End;
+  After := NewLoc + TLen + Length(NDx);
+  WriteLn('pack ', Base, ' (JAM): ', gone, ' deleted message(s) removed, ', kept, ' stay, ', Before - After, ' bytes given back (', Before, ' -> ', After, ')');
+  Inc(NumPacked);
+  Inc(PackBytes, Before - After);
+  If Not KeepOld Then
+    Begin
+    DeleteFile(Names[0] + '.prepack');
+    DeleteFile(Names[1] + '.prepack');
+    DeleteFile(Names[2] + '.prepack');
+    End;
+  End;
+
+
 Procedure PackAll;
   Var
-    Dirs, Ids: TStringList;
+    Dirs, Ids, JamBases, JamIds: TStringList;
     i: Integer;
     Id, Dir: String;
 
   Begin
   Dirs := TStringList.Create;
   Ids := TStringList.Create;
+  JamBases := TStringList.Create;
+  JamIds := TStringList.Create;
   Dirs.CaseSensitive := True;
+  JamBases.CaseSensitive := True;
   For i := 1 To Config^.GetMaxMsgAreas Do
     If Config^.GetMsgName(i) <> '' Then
       Begin
@@ -382,13 +582,26 @@ Procedure PackAll;
           Dirs.Add(Dir);
           Ids.Add(Id);
           End;
+        End
+      Else If (Id <> '') And (UpCase(Id[1]) = 'J') Then
+        Begin
+        If JamBases.IndexOf(Copy(Id, 2, 200)) < 0 Then
+          Begin
+          JamBases.Add(Copy(Id, 2, 200));
+          JamIds.Add(Id);
+          End;
         End;
       End;
   For i := 0 To Dirs.Count - 1 Do
     If FileExists(Dirs[i] + 'msghdr.bbs') Then
       PackHudson(Dirs[i], Ids[i]);
+  For i := 0 To JamBases.Count - 1 Do
+    If FileExists(JamBases[i] + '.jhr') Then
+      PackJam(JamBases[i], JamIds[i]);
   Dirs.Free;
   Ids.Free;
+  JamBases.Free;
+  JamIds.Free;
   End;
 
 
@@ -624,7 +837,7 @@ If DoPack Then
   PackAll;
 WriteLn(Verb, TotalPurged, ' message(s) in ', TotalAreas, ' area(s) with a limit, ', TotalKept, ' stay', Copy(' (a dry run: nothing was changed)', 1, 34 * Ord(Dry)));
 If DoPack Then
-  WriteLn(NumPacked, ' Hudson base(s) ', Copy('would be ', 1, 9 * Ord(Dry)), 'packed', Copy(', ' + IntToStr(PackBytes) + ' bytes given back', 1, 40 * Ord(Not Dry)));
+  WriteLn(NumPacked, ' message base(s) ', Copy('would be ', 1, 9 * Ord(Dry)), 'packed', Copy(', ' + IntToStr(PackBytes) + ' bytes given back', 1, 40 * Ord(Not Dry)));
 If Failed Then
   Halt(2);
 End.

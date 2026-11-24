@@ -6,7 +6,7 @@ The message areas have limits that `mkconfig` stores (Messages: **Days kept**, *
 mkmaint [-c config dir] [-n] [-p] [-x] [-a area] [-v] [-q]
    -c   the configuration directory, instead of MK in the environment
    -n   a dry run: says what would be purged, changes nothing
-   -p   pack the Hudson bases afterwards (see Packing)
+   -p   pack the Hudson and JAM bases afterwards (see Packing)
    -x   with -p: remove the .prepack copies at the end
    -a   only this area (its number)
    -v   each message that goes, and why
@@ -54,7 +54,15 @@ sysops delete messages, too):
   while the base is packed may see a wrong one until the next message he opens, so run it when few are on (an event in the small hours).
 * `-n -p` says which bases would be packed and how many deleted messages each holds.
 
-Not yet: JAM bases, and the Synchronet and Fido `*.msg` kinds (a Squish base reuses the room itself).
+### JAM bases
+
+A JAM base (`name.jhr`, `.jdt`, `.jdx`, `.jlr`) is packed the same way, keeping the **numbers of the messages** (a JAM message number is its place in the index):
+* the headers and texts of deleted messages leave `.jhr` and `.jdt`; the text of each message that stays moves up;
+* in `.jdx` the empty entries at the **start** go (the number of the first message in the base header moves up by as many); the ones in the middle and at the end stay, as empty entries, so that no number is used again;
+* the active count and the modification counter of the base header are made again; the last-read file `.jlr` is not touched (the numbers did not change);
+* the same lock, the same `name.prepack` copies, the same `-x`.
+
+Not yet: the Synchronet and Fido `*.msg` kinds (a Squish base reuses the room itself).
 
 **When.**  Make an event (`mkconfig` > Events, action *Command*): `/usr/bin/mkmaint -c /bbs/ra -q`, or use cron:
 

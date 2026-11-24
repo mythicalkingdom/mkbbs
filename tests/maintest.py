@@ -29,7 +29,7 @@ shutil.rmtree(work, ignore_errors=True)
 os.makedirs(work)
 
 
-def private(limits, squish=False):
+def private(limits, squish=False, kind=''):
     """a private copy of the sample; limits = {area: (days, rcvd, kept)}"""
     tmp = cfgpatch.short_dir()
     ra = tmp + '/r'
@@ -58,6 +58,8 @@ def private(limits, squish=False):
         m = d['messages'][str(a)]
         m['DaysKept'], m['RcvdDays'], m['MsgsKept'] = dk, rd, kp
         if squish:
+            if kind:
+                m['MsgBaseType'] = kind
             m['MsgType'] = 0                  # a local area: nothing waits to be sent (an echomail area would keep the message that was just posted)
     json.dump(d, open(cj + '/bbsconfig.json', 'w', encoding='utf-8'), ensure_ascii=False)
     subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True)
@@ -185,12 +187,42 @@ before_high = int.from_bytes(info[2:4], 'little')
 post(env, 6, 'after the pack')
 check('a message can be written after the pack and gets the next number', [n for n, t in dump(env, 6) if t == 'after the pack'] == [before_high + 1], (before_high, dump(env, 6)[-2:]))
 r = mk(env, '-p')
-check('a second -p finds nothing to pack', '0 Hudson base(s) packed' in r.stdout, r.stdout[-200:])
+check('a second -p finds nothing to pack', '0 message base(s) packed' in r.stdout, r.stdout[-200:])
 # -x: the copies are removed at once
 ra, env = private({183: (365, 0, 0)})
 mk(env)
 r = mk(env, '-p', '-x')
 check('-p -x: packed, no .prepack files are left', r.returncode == 0 and 'bytes given back' in r.stdout and not [f for f in os.listdir(ra) if f.endswith('.prepack')], (r.stdout[-200:], [f for f in os.listdir(ra) if f.endswith('.prepack')]))
+
+# packing a JAM base (the area of the Squish test, made a JAM base): numbers stay, the headers and texts of deleted messages go, the empty entries at the start of the index leave
+ra, env = private({SQ: (30, 0, 0)}, squish=True, kind='J')
+for subj, fl in (('j1 public', {}), ('j2 private', dict(POSTPRIV='1')), ('j3 public', {}), ('j4 private', dict(POSTPRIV='1')), ('j5 public', {})):
+    post(env, SQ, subj, **fl)
+before = dump(env, SQ)
+check('JAM: five messages are in the base', [t for n, t in before] == ['j1 public', 'j2 private', 'j3 public', 'j4 private', 'j5 public'], before)
+r = mk(env, today=future)
+mid = dump(env, SQ)
+check('JAM: the purge by age deletes the public ones, the unread private ones stay (numbers 2 and 4)', mid == [before[1], before[3]], (mid, r.stdout[-300:]))
+base = [f for f in os.listdir(ra + '/sqp') if f.endswith('.jhr')][0][:-4]
+sz = lambda: sum(os.path.getsize(ra + '/sqp/' + base + e) for e in ('.jhr', '.jdt', '.jdx'))
+s0 = sz()
+r = mk(env, '-n', '-p', today=future)
+check('JAM: -n -p says the base would be packed and changes nothing', 'would be packed' in r.stdout and sz() == s0, r.stdout[-300:])
+text_before = full(SQ) if False else subprocess.run([build + '/tossdump', str(SQ)], env=env, capture_output=True, text=True, encoding='latin-1').stdout
+r = mk(env, '-p', today=future)
+s1 = sz()
+check('JAM: -p removes the deleted messages: the files are smaller by the bytes said', r.returncode == 0 and s1 < s0 and re.search(r'\(JAM\): 3 deleted message\(s\) removed, 2 stay, %d bytes given back' % (s0 - s1), r.stdout), (s0, s1, r.stdout[-300:]))
+after = dump(env, SQ)
+text_after = subprocess.run([build + '/tossdump', str(SQ)], env=env, capture_output=True, text=True, encoding='latin-1').stdout
+check('JAM: the two messages are as they were, with the same numbers and texts', after == mid and text_after.split('\n', 1)[1] == text_before.split('\n', 1)[1], (after, mid))
+hdr = open(ra + '/sqp/' + base + '.jhr', 'rb').read()
+basenum = int.from_bytes(hdr[20:24], 'little')
+check('JAM: the number of the first message moved up past the deleted one at the start (2); the active count is 2', basenum == 2 and int.from_bytes(hdr[12:16], 'little') == 2, (basenum, int.from_bytes(hdr[12:16], 'little')))
+post(env, SQ, 'j6 after')
+check('JAM: the next message gets the next number (6): numbers are not used again', [n for n, t in dump(env, SQ) if t == 'j6 after'] == [6], dump(env, SQ))
+check('JAM: the old files are kept as .prepack', all(os.path.exists(ra + '/sqp/' + base + e + '.prepack') for e in ('.jhr', '.jdt', '.jdx')))
+r = mk(env, '-p')
+check('JAM: a second pack finds nothing to pack', '0 message base(s) packed' in r.stdout, r.stdout[-200:])
 
 import fixture
 check('nothing was written into the live sample', fixture.live_state() == live_before)
