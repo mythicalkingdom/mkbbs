@@ -5,9 +5,11 @@ Program MKMaint;
 {
      mkmaint: message base maintenance, by the settings of each message area (mkconfig: Messages, "Days kept", "Messages kept", "Received days").
 
-       mkmaint [-c config dir] [-n] [-a area] [-v] [-q]
+       mkmaint [-c config dir] [-n] [-p] [-x] [-a area] [-v] [-q]
 
          -c    the configuration directory (instead of MK in the environment)
+         -p    pack the Hudson bases afterwards: the room of deleted messages is given back (see below)
+         -x    with -p: the copies of the old files (name.prepack) are removed at the end
          -n    a dry run: says what would be purged, changes nothing
          -a    only this area (its number)
          -v    each message that goes (or would go)
@@ -21,6 +23,10 @@ Program MKMaint;
        * unread private mail,
        * a message waiting to be sent: a local echomail message that the tosser has not scanned yet, a local netmail that has not been sent.
      The age is that of the date in the message (mm-dd-yy); a message whose date cannot be read is not purged for its age.  MKMAINT_TODAY=yyyy-mm-dd takes another day for today (a test aid).
+     Packing (-p) is done for every Hudson message base (a directory with msghdr.bbs, msgtxt.bbs, msgidx.bbs, msgtoidx.bbs, msginfo.bbs) that holds deleted messages, whether or not the purge
+     deleted them: the deleted messages leave the five files and the text records of the others move up, so the files get smaller (and a base that is near its limit of 65280 text records
+     can take messages again).  Message numbers do not change (last-read pointers, reply links stay valid); the positions in echomail.bbs and netmail.bbs are moved with the messages.  The base is
+     locked while it is packed (the callers and the tosser wait), the old files are kept as name.prepack until the next pack (-x removes them at once).
      The messages are deleted through the message object of the kind of base (Hudson, Squish, JAM, Fido *.msg, Synchronet ...), so every kind works the same way; the space is given back by
      packing (a later switch).
 
@@ -91,6 +97,298 @@ Function WhyText(C: Char): String;
     'R': Result := 'read, and older than Received days';
     Else Result := 'over the limit of messages kept';
     End;
+  End;
+
+
+
+Const
+  HdrSize = 187;
+  IdxSize = 3;
+  ToIdxSize = 36;
+  TxtSize = 256;
+  InfoSize = 406;
+  AttrOfs = 24;
+  AreaOfs = 26;
+  StartOfs = 8;
+  NumOfs = 10;
+  maDeleted = 1;
+
+Var
+  NumPacked, PackBytes: LongInt;
+  KeepOld: Boolean = True;
+  DoPack: Boolean = False;
+
+
+Function ReadAll(const FN: String; var D: TBytes): Boolean;
+  Var
+    F: TFileStream;
+
+  Begin
+  Result := False;
+  SetLength(D, 0);
+  Try
+    F := TFileStream.Create(FN, fmOpenRead Or fmShareDenyNone);
+  Except
+    Exit;
+  End;
+  SetLength(D, F.Size);
+  If F.Size > 0 Then
+    F.ReadBuffer(D[0], F.Size);
+  F.Free;
+  Result := True;
+  End;
+
+
+Function WriteAll(const FN: String; const D: TBytes; N: LongInt): Boolean;
+  {the file keeps its identity (the same file, the same inode): it is cut to the new size and written again}
+  Var
+    F: TFileStream;
+
+  Begin
+  Result := False;
+  Try
+    If FileExists(FN) Then
+      F := TFileStream.Create(FN, fmOpenReadWrite Or fmShareDenyNone)
+    Else
+      F := TFileStream.Create(FN, fmCreate);
+  Except
+    Exit;
+  End;
+  F.Size := 0;
+  If N > 0 Then
+    F.WriteBuffer(D[0], N);
+  F.Free;
+  Result := True;
+  End;
+
+
+Function W16(const D: TBytes; At: LongInt): Word;
+  Begin
+  Result := D[At] Or (D[At + 1] Shl 8);
+  End;
+
+
+Procedure P16(var D: TBytes; At: LongInt; V: Word);
+  Begin
+  D[At] := V And 255;
+  D[At + 1] := V Shr 8;
+  End;
+
+
+Procedure CopyFileTo(const Src, Dst: String);
+  Var
+    D: TBytes;
+
+  Begin
+  If ReadAll(Src, D) Then
+    WriteAll(Dst, D, Length(D));
+  End;
+
+
+Function RemapList(const FN: String; const Remap: Array Of LongInt; N: LongInt): TBytes;
+  {echomail.bbs / netmail.bbs: a list of header positions (words); the ones of deleted messages go, the others become the new positions}
+  Var
+    Old: TBytes;
+    e, k, ne: LongInt;
+
+  Begin
+  Result := Nil;
+  If Not ReadAll(FN, Old) Then
+    Exit;
+  SetLength(Result, Length(Old));
+  ne := 0;
+  For e := 0 To (Length(Old) Div 2) - 1 Do
+    Begin
+    k := W16(Old, e * 2);
+    If (k < N) And (Remap[k] >= 0) Then
+      Begin
+      P16(Result, ne * 2, Remap[k]);
+      Inc(ne);
+      End;
+    End;
+  SetLength(Result, ne * 2);
+  End;
+
+
+Procedure PackHudson(Dir, AreaId: String);
+  {Dir: the directory of the base (with the slash at the end); AreaId: an area of the base, for its lock}
+  Var
+    Hdr, Idx, ToIdx, Txt, Info, NHdr, NIdx, NToIdx, NTxt, NInfo, NEch, NNet: TBytes;
+    n, i, kept, gone, tpos, S, C: LongInt;
+    Remap: Array Of LongInt;               {the old position of a header -> the new one, -1 for a deleted message}
+    Names: Array[0..4] Of String;
+    Active: Array[0..255] Of LongInt;
+    Low: LongInt;
+    M: AbsMsgPtr;
+    Locked: Boolean;
+    Before, After: Int64;
+    j: LongInt;
+    Good: Boolean;
+
+  Begin
+  Names[0] := 'msghdr.bbs'; Names[1] := 'msgidx.bbs'; Names[2] := 'msgtoidx.bbs'; Names[3] := 'msgtxt.bbs'; Names[4] := 'msginfo.bbs';
+  If Not (ReadAll(Dir + Names[0], Hdr) And ReadAll(Dir + Names[1], Idx) And ReadAll(Dir + Names[2], ToIdx) And ReadAll(Dir + Names[3], Txt) And ReadAll(Dir + Names[4], Info)) Then
+    Exit;
+  n := Length(Hdr) Div HdrSize;
+  gone := 0;
+  For i := 0 To n - 1 Do
+    If (Hdr[i * HdrSize + AttrOfs] And maDeleted) <> 0 Then
+      Inc(gone);
+  If gone = 0 Then
+    Exit;
+  Before := Length(Hdr) + Length(Idx) + Length(ToIdx) + Length(Txt);
+  If Dry Then
+    Begin
+    WriteLn('pack ', Dir, ': ', gone, ' deleted message(s) of ', n, ' would be removed');
+    Inc(NumPacked);
+    Exit;
+    End;
+  M := Nil;
+  Locked := False;
+  If OpenMsgArea(M, AreaId) Then
+    Locked := M^.LockMsgBase;
+  If Not Locked Then
+    Begin
+    WriteLn(StdErr, 'pack ', Dir, ': the base could not be locked: not packed');
+    If M <> Nil Then
+      DoneMsgPtr(M);
+    Failed := True;
+    Exit;
+    End;
+  {the files again, now that nobody can write: what was read before the lock may be old}
+  Good := ReadAll(Dir + Names[0], Hdr) And ReadAll(Dir + Names[1], Idx) And ReadAll(Dir + Names[2], ToIdx) And ReadAll(Dir + Names[3], Txt) And ReadAll(Dir + Names[4], Info);
+  If Good Then
+    Begin
+    n := Length(Hdr) Div HdrSize;
+    Good := (Length(Idx) Div IdxSize = n) And (Length(ToIdx) Div ToIdxSize = n) And (Length(Info) >= InfoSize);
+    End;
+  If Not Good Then
+    Begin
+    WriteLn(StdErr, 'pack ', Dir, ': the five files do not belong together (different numbers of records): not packed');
+    M^.UnLockMsgBase;
+    DoneMsgPtr(M);
+    Failed := True;
+    Exit;
+    End;
+  SetLength(Remap, n);
+  SetLength(NHdr, Length(Hdr));
+  SetLength(NIdx, Length(Idx));
+  SetLength(NToIdx, Length(ToIdx));
+  SetLength(NTxt, Length(Txt));
+  FillChar(Active, SizeOf(Active), 0);
+  kept := 0;
+  tpos := 0;
+  Low := 65535;
+  For i := 0 To n - 1 Do
+    Begin
+    If (Hdr[i * HdrSize + AttrOfs] And maDeleted) <> 0 Then
+      Remap[i] := -1
+    Else
+      Begin
+      Remap[i] := kept;
+      Move(Hdr[i * HdrSize], NHdr[kept * HdrSize], HdrSize);
+      Move(Idx[i * IdxSize], NIdx[kept * IdxSize], IdxSize);
+      Move(ToIdx[i * ToIdxSize], NToIdx[kept * ToIdxSize], ToIdxSize);
+      S := W16(Hdr, i * HdrSize + StartOfs);
+      C := W16(Hdr, i * HdrSize + NumOfs);
+      If (S + C) * TxtSize > Length(Txt) Then
+        C := (Length(Txt) Div TxtSize) - S;                {a header that points past the end of the text: what is there}
+      If C < 0 Then
+        C := 0;
+      If C > 0 Then
+        Move(Txt[S * TxtSize], NTxt[tpos * TxtSize], C * TxtSize);
+      P16(NHdr, kept * HdrSize + StartOfs, tpos);
+      P16(NHdr, kept * HdrSize + NumOfs, C);
+      Inc(tpos, C);
+      Inc(Active[Hdr[i * HdrSize + AreaOfs]]);
+      If W16(Hdr, i * HdrSize) < Low Then
+        Low := W16(Hdr, i * HdrSize);
+      Inc(kept);
+      End;
+    End;
+  NInfo := Copy(Info, 0, Length(Info));
+  If kept = 0 Then
+    P16(NInfo, 0, W16(Info, 2) + 1)                         {nothing left: the low number is above the high one}
+  Else
+    P16(NInfo, 0, Low);
+  P16(NInfo, 4, kept);
+  For i := 1 To 200 Do
+    P16(NInfo, 4 + i * 2, Active[i]);
+  { echomail.bbs and netmail.bbs: positions of the headers of the messages that wait to be exported }
+  NEch := Nil;
+  NNet := Nil;
+  If FileExists(Dir + 'echomail.bbs') Then
+    NEch := RemapList(Dir + 'echomail.bbs', Remap, n);
+  If FileExists(Dir + 'netmail.bbs') Then
+    NNet := RemapList(Dir + 'netmail.bbs', Remap, n);
+  { the old files are kept (name.prepack), then the files are written again, cut to the new size }
+  For i := 0 To 4 Do
+    CopyFileTo(Dir + Names[i], Dir + Names[i] + '.prepack');
+  Good := WriteAll(Dir + Names[3], NTxt, tpos * TxtSize) And WriteAll(Dir + Names[0], NHdr, kept * HdrSize) And WriteAll(Dir + Names[2], NToIdx, kept * ToIdxSize) And
+    WriteAll(Dir + Names[1], NIdx, kept * IdxSize) And WriteAll(Dir + Names[4], NInfo, Length(NInfo));
+  If FileExists(Dir + 'echomail.bbs') Then
+    Begin
+    CopyFileTo(Dir + 'echomail.bbs', Dir + 'echomail.bbs.prepack');
+    WriteAll(Dir + 'echomail.bbs', NEch, Length(NEch));
+    End;
+  If FileExists(Dir + 'netmail.bbs') Then
+    Begin
+    CopyFileTo(Dir + 'netmail.bbs', Dir + 'netmail.bbs.prepack');
+    WriteAll(Dir + 'netmail.bbs', NNet, Length(NNet));
+    End;
+  M^.UnLockMsgBase;
+  DoneMsgPtr(M);
+  If Not Good Then
+    Begin
+    WriteLn(StdErr, 'pack ', Dir, ': writing failed: the old files are in ', Dir, '*.prepack');
+    Failed := True;
+    Exit;
+    End;
+  After := kept * HdrSize + kept * IdxSize + kept * ToIdxSize + tpos * TxtSize;
+  WriteLn('pack ', Dir, ': ', gone, ' deleted message(s) removed, ', kept, ' stay, ', Before - After, ' bytes given back (', Before, ' -> ', After, ')');
+  Inc(NumPacked);
+  Inc(PackBytes, Before - After);
+  If Not KeepOld Then
+    Begin
+    For i := 0 To 4 Do
+      DeleteFile(Dir + Names[i] + '.prepack');
+    DeleteFile(Dir + 'echomail.bbs.prepack');
+    DeleteFile(Dir + 'netmail.bbs.prepack');
+    End;
+  End;
+
+
+Procedure PackAll;
+  Var
+    Dirs, Ids: TStringList;
+    i: Integer;
+    Id, Dir: String;
+
+  Begin
+  Dirs := TStringList.Create;
+  Ids := TStringList.Create;
+  Dirs.CaseSensitive := True;
+  For i := 1 To Config^.GetMaxMsgAreas Do
+    If Config^.GetMsgName(i) <> '' Then
+      Begin
+      Id := Config^.GetMsgAreaId(i);
+      If (Id <> '') And (UpCase(Id[1]) = 'H') Then
+        Begin
+        Dir := Copy(Id, 5, 200);
+        If (Dir <> '') And (Dir[Length(Dir)] <> '/') Then
+          Dir := Dir + '/';
+        If Dirs.IndexOf(Dir) < 0 Then
+          Begin
+          Dirs.Add(Dir);
+          Ids.Add(Id);
+          End;
+        End;
+      End;
+  For i := 0 To Dirs.Count - 1 Do
+    If FileExists(Dirs[i] + 'msghdr.bbs') Then
+      PackHudson(Dirs[i], Ids[i]);
+  Dirs.Free;
+  Ids.Free;
   End;
 
 
@@ -232,6 +530,8 @@ While i <= ParamCount Do
   If A = '-n' Then Dry := True
   Else If A = '-v' Then Verbose := True
   Else If A = '-q' Then Quiet := True
+  Else If A = '-p' Then DoPack := True
+  Else If A = '-x' Then KeepOld := False
   Else If A = '-c' Then
     Begin
     Inc(i);
@@ -246,7 +546,7 @@ While i <= ParamCount Do
     End
   Else
     Begin
-    WriteLn('usage: mkmaint [-c config dir] [-n] [-a area] [-v] [-q]     -n dry run  -a one area  -v each message  -q the summary only');
+    WriteLn('usage: mkmaint [-c config dir] [-n] [-p] [-x] [-a area] [-v] [-q]     -n dry run  -p pack the Hudson bases  -x remove the .prepack files  -a one area  -v each message  -q the summary only');
     Halt(1);
     End;
   Inc(i);
@@ -320,7 +620,11 @@ Else
   For i := 1 To Config^.GetMaxMsgAreas Do
     If Config^.GetMsgName(i) <> '' Then
       Area(i);
+If DoPack Then
+  PackAll;
 WriteLn(Verb, TotalPurged, ' message(s) in ', TotalAreas, ' area(s) with a limit, ', TotalKept, ' stay', Copy(' (a dry run: nothing was changed)', 1, 34 * Ord(Dry)));
+If DoPack Then
+  WriteLn(NumPacked, ' Hudson base(s) ', Copy('would be ', 1, 9 * Ord(Dry)), 'packed', Copy(', ' + IntToStr(PackBytes) + ' bytes given back', 1, 40 * Ord(Not Dry)));
 If Failed Then
   Halt(2);
 End.

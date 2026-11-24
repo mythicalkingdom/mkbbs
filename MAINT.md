@@ -3,9 +3,11 @@
 The message areas have limits that `mkconfig` stores (Messages: **Days kept**, **Messages kept**, **Received days**).  Nothing applied them: the bases only grew.  `mkmaint` applies them.
 
 ```
-mkmaint [-c config dir] [-n] [-a area] [-v] [-q]
+mkmaint [-c config dir] [-n] [-p] [-x] [-a area] [-v] [-q]
    -c   the configuration directory, instead of MK in the environment
    -n   a dry run: says what would be purged, changes nothing
+   -p   pack the Hudson bases afterwards (see Packing)
+   -x   with -p: remove the .prepack copies at the end
    -a   only this area (its number)
    -v   each message that goes, and why
    -q   only the areas where something goes, and the total
@@ -33,8 +35,26 @@ The age is the date in the message (month-day-year); a message whose date cannot
 held: if there are more held messages than the limit, the limit is not reached.
 
 **How.**  The messages are deleted through the message object of the kind of base (Hudson, Squish, JAM, Fido `*.msg`, Synchronet ...), so all kinds follow the same rules.  Deleting marks a message deleted
-and takes it out of the indexes; the space it took in the files is given back by packing (not yet part of `mkmaint`).  Last-read pointers of callers are not changed: a pointer behind the first message
+and takes it out of the indexes; the space it took in the files is given back by **packing** (`-p`, below).  Last-read pointers of callers are not changed: a pointer behind the first message
 that is left simply finds the next one.  The tosser's scan marks (`mktoss -R`) notice that the base changed and look again from the start where they must.
+
+## Packing Hudson bases (`-p`)
+
+A deleted Hudson message keeps its header, its place in the indexes and its text records: the files only grow, and a base that has used 65280 text records cannot take another message.  With `-p`, after the
+purge, every Hudson base (a directory with `msghdr.bbs`, `msgtxt.bbs`, `msgidx.bbs`, `msgtoidx.bbs` and `msginfo.bbs`) that holds **deleted messages** is packed, whether or not this run deleted them (callers and
+sysops delete messages, too):
+
+* the deleted messages leave the five files, the text records of the others move up, `msginfo.bbs` is made again (the number of active messages, in all and for each area; the low number);
+* **message numbers do not change**, nor does the high number (a number is never used again): last-read pointers of callers and reply links stay valid;
+* `echomail.bbs` and `netmail.bbs` (the lists of messages that wait to be exported, written for other tossers) follow the messages to their new places; entries of deleted messages go;
+* the base is **locked** for the time it takes (a second or two for a base of a few megabytes): a caller or the tosser who writes meanwhile waits;
+* before the files are written again they are copied to `name.prepack` (one generation, until the next pack); `-x` removes the copies at the end.  If a pack fails in the middle, the message says so and the `.prepack`
+  files are the base as it was: copy them back over the files.
+* the files are written **in place** (cut and written again, they stay the same files), so a program that has them open is not left with a deleted file; but a caller who is in the middle of reading a message
+  while the base is packed may see a wrong one until the next message he opens, so run it when few are on (an event in the small hours).
+* `-n -p` says which bases would be packed and how many deleted messages each holds.
+
+Not yet: JAM bases, and the Synchronet and Fido `*.msg` kinds (a Squish base reuses the room itself).
 
 **When.**  Make an event (`mkconfig` > Events, action *Command*): `/usr/bin/mkmaint -c /bbs/ra -q`, or use cron:
 

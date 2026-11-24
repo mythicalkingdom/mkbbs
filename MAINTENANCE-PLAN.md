@@ -1,6 +1,6 @@
 # Housekeeping: plan (test fixture, message base maintenance, backup, statistics)
 
-Status (2026-11-23): **1 (the test fixture) and 3 (backup) are built; 2 (`mkmaint`): the purge is built** (`MAINT.md`), packing is next; 4 (statistics) after that.  Your answers to the questions: never purge unread private mail; Squish and `*.msg` bases get `DaysKept` / `RcvdDays` too; file areas only with a switch and backups in `<BBS dir>/backup/`; one `.bak` generation; statistics for the sysop only (later: display codes callers' screens can embed); backup first.
+Status (2026-11-23): **1 (the test fixture) and 3 (backup) are built; 2 (`mkmaint`): the purge and the Hudson pack are built** (`MAINT.md`; JAM pack still to do); 4 (statistics) is next.  Your answers to the questions: never purge unread private mail; Squish and `*.msg` bases get `DaysKept` / `RcvdDays` too; file areas only with a switch and backups in `<BBS dir>/backup/`; one `.bak` generation; statistics for the sysop only (later: display codes callers' screens can embed); backup first.
 
 The four pieces, in the order they are done:
 

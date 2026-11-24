@@ -149,6 +149,49 @@ post(env, SQ, 'squish private', POSTPRIV='1')
 r = mk(env, today=future)
 a112 = [s for n, s in dump(env, SQ)]
 check('a Squish base: a message that is old goes, an unread private one stays', 'squish old' not in a112 and 'squish private' in a112 and r.returncode == 0, (a112, r.stdout[-300:], r.stderr[-200:]))
+# packing the Hudson bases (-p): the deleted messages leave the files, the others are as they were
+ra, env = private({183: (365, 0, 0)})
+post(env, 6, 'echo A', POSTTYPE='echo')
+post(env, 6, 'echo B', POSTTYPE='echo')
+def full(area):
+    return subprocess.run([build + '/tossdump', str(area)], env=env, capture_output=True, text=True, encoding='latin-1').stdout
+keep_before = {a: full(a) for a in (1, 4, 6)}
+big = lambda: sum(os.path.getsize(ra + '/' + f) for f in ('msghdr.bbs', 'msgidx.bbs', 'msgtoidx.bbs', 'msgtxt.bbs'))
+size0 = big()
+echo0 = open(ra + '/echomail.bbs', 'rb').read() if os.path.exists(ra + '/echomail.bbs') else b''
+r = mk(env, '-n', '-p')
+check('-n -p: says which base has deleted messages and would be packed (after nothing is deleted yet: none), changes nothing', r.returncode == 0 and big() == size0, r.stdout[-300:])
+r = mk(env)
+size1 = big()
+check('the purge only marks the messages deleted: the files are as big as before', size1 == size0, (size0, size1))
+r = mk(env, '-n', '-p')
+check('-n -p after the purge: the base would be packed, nothing is changed', re.search(r'pack \S+/: \d+ deleted message\(s\) of \d+ would be removed', r.stdout) and big() == size1 and 'would be packed' in r.stdout, r.stdout[-400:])
+r = mk(env, '-p')
+size2 = big()
+check('-p: the deleted messages leave the files, the files are smaller, the bytes given back are said', r.returncode == 0 and size2 < size1 and re.search(r'deleted message\(s\) removed, \d+ stay, %d bytes given back' % (size1 - size2), r.stdout), (size1, size2, r.stdout[-400:]))
+check('the messages of the other areas are the same, with their texts (areas 1, 4 and 6)', all(full(a) == keep_before[a] for a in (1, 4, 6)))
+check('area 183 is empty', len(dump(env, 183)) == 0)
+info = open(ra + '/msginfo.bbs', 'rb').read()
+nhdr = os.path.getsize(ra + '/msghdr.bbs') // 187
+act = int.from_bytes(info[4:6], 'little')
+check('msginfo.bbs counts the messages that are left (Active, the high number is kept so that numbers are not used again)', act == nhdr and act > 0, (act, nhdr))
+hdr = open(ra + '/msghdr.bbs', 'rb').read()
+ech = open(ra + '/echomail.bbs', 'rb').read() if os.path.exists(ra + '/echomail.bbs') else b''
+pos = [int.from_bytes(ech[i:i + 2], 'little') for i in range(0, len(ech), 2)]
+subjects = [hdr[p * 187 + 114 + 1: p * 187 + 114 + 1 + hdr[p * 187 + 114]].decode('latin-1') for p in pos if p < nhdr]
+check('echomail.bbs (the messages waiting to be exported) points at the headers of the same messages in their new places', subjects[-2:] == ['echo A', 'echo B'] and len(subjects) == len(pos), (pos[-3:], subjects[-3:]))
+check('the old files are kept as name.prepack', all(os.path.exists(ra + '/' + f + '.prepack') for f in ('msghdr.bbs', 'msgtxt.bbs', 'msgidx.bbs', 'msgtoidx.bbs', 'msginfo.bbs')))
+before_high = int.from_bytes(info[2:4], 'little')
+post(env, 6, 'after the pack')
+check('a message can be written after the pack and gets the next number', [n for n, t in dump(env, 6) if t == 'after the pack'] == [before_high + 1], (before_high, dump(env, 6)[-2:]))
+r = mk(env, '-p')
+check('a second -p finds nothing to pack', '0 Hudson base(s) packed' in r.stdout, r.stdout[-200:])
+# -x: the copies are removed at once
+ra, env = private({183: (365, 0, 0)})
+mk(env)
+r = mk(env, '-p', '-x')
+check('-p -x: packed, no .prepack files are left', r.returncode == 0 and 'bytes given back' in r.stdout and not [f for f in os.listdir(ra) if f.endswith('.prepack')], (r.stdout[-200:], [f for f in os.listdir(ra) if f.endswith('.prepack')]))
+
 import fixture
 check('nothing was written into the live sample', fixture.live_state() == live_before)
 print('failures: %d' % fails)
