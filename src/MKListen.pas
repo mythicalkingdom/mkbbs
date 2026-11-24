@@ -227,9 +227,10 @@ Var
   GFirst: Integer = 1;
   GLast: Integer = 8;
   GMaxPerIp: Integer = 0;
-  GuardFails: Integer = 0;             {loginguard: failed log-ons from one address within GuardWindow seconds that block it (0 = off)}
+  GuardFails: Integer = 5;             {loginguard: failed log-ons from one address within GuardWindow seconds that block it (0 = off); on by default}
   GuardWindow: Integer = 600;
-  GuardBlock: Integer = 900;           {seconds the address stays blocked}
+  GuardBlock: Integer = 3600;          {seconds the address stays blocked}
+  GuardAllow: TStringList = Nil;       {addresses and nets (a.b.c.d/n) that are never counted or blocked: the machine itself by default}
   TlsCert, TlsKey: String;             {the "tls" section: the certificate chain and the key (PEM) for the ports with "tls": true}
   GuardMsg: String = 'Too many failed log-ons from this address. Please try again later.';
   GuardIp: Array Of String;            {the failed log-ons: address, time}
@@ -613,16 +614,16 @@ Procedure ParseTls(V: TJSONData);
 
 
 Procedure ParseGuard(V: TJSONData);
-  {"loginguard": { "fails": 5, "window": 600, "block": 900, "message": "..." }: an address with that many failed log-ons within "window" seconds is
-   refused for "block" seconds}
+  {"loginguard": { "fails": 5, "window": 600, "block": 3600, "allow": ["127.0.0.1"], "message": "..." }: an address with that many failed log-ons within "window" seconds is
+   refused for "block" seconds; the addresses of "allow" are never counted}
   Var
     O: TJSONObject;
-    j: Integer;
+    j, n: Integer;
     K: String;
 
   Begin
   If V.JSONType <> jtObject Then
-    Die('loginguard must be an object: { "fails": 5, "window": 600, "block": 900 }');
+    Die('loginguard must be an object: { "fails": 5, "window": 600, "block": 3600 }');
   O := TJSONObject(V);
   For j := 0 To O.Count - 1 Do
     Begin
@@ -631,6 +632,14 @@ Procedure ParseGuard(V: TJSONData);
     Else If K = 'window' Then GuardWindow := JInt(O.Items[j], 'loginguard.window', 1, 86400)
     Else If K = 'block' Then GuardBlock := JInt(O.Items[j], 'loginguard.block', 1, 604800)
     Else If K = 'message' Then GuardMsg := JStr(O.Items[j], 'loginguard.message')
+    Else If K = 'allow' Then
+      Begin
+      If O.Items[j].JSONType <> jtArray Then
+        Die('loginguard.allow must be a list of addresses: ["127.0.0.1", "10.0.0.0/8"]');
+      GuardAllow.Clear;
+      For n := 0 To O.Items[j].Count - 1 Do
+        GuardAllow.Add(Trim(JStr(O.Items[j].Items[n], 'loginguard.allow')));
+      End
     Else If Copy(K, 1, 1) <> '_' Then Die('loginguard: unknown key "' + O.Names[j] + '"');
     End;
   End;
@@ -2908,6 +2917,69 @@ Procedure Refuse(Client: LongInt; Const Why: String; Const Addr: String; Const M
   End;
 
 
+Function AddrNum(Const A: String; Var V: LongWord): Boolean;
+  {a dotted IPv4 address as a number}
+  Var
+    P: Integer;
+    S, T: String;
+    N, i: Integer;
+
+  Begin
+  AddrNum := False;
+  V := 0;
+  S := A + '.';
+  For i := 1 To 4 Do
+    Begin
+    P := Pos('.', S);
+    If P = 0 Then
+      Exit;
+    T := Copy(S, 1, P - 1);
+    Delete(S, 1, P);
+    N := StrToIntDef(T, -1);
+    If (N < 0) Or (N > 255) Then
+      Exit;
+    V := (V Shl 8) Or LongWord(N);
+    End;
+  AddrNum := S = '';
+  End;
+
+
+Function GuardAllowed(Const Addr: String): Boolean;
+  {the address is one that is never counted: listed in "allow", exactly or as a net a.b.c.d/n}
+  Var
+    i, P, Bits: Integer;
+    E, Net: String;
+    A, B, Mask: LongWord;
+
+  Begin
+  GuardAllowed := False;
+  For i := 0 To GuardAllow.Count - 1 Do
+    Begin
+    E := GuardAllow[i];
+    P := Pos('/', E);
+    If P = 0 Then
+      Begin
+      If E = Addr Then
+        Exit(True);
+      End
+    Else
+      Begin
+      Net := Copy(E, 1, P - 1);
+      Bits := StrToIntDef(Copy(E, P + 1, 3), -1);
+      If (Bits >= 0) And (Bits <= 32) And AddrNum(Net, B) And AddrNum(Addr, A) Then
+        Begin
+        If Bits = 0 Then
+          Mask := 0
+        Else
+          Mask := LongWord($FFFFFFFF) Shl (32 - Bits);
+        If (A And Mask) = (B And Mask) Then
+          Exit(True);
+        End;
+      End;
+    End;
+  End;
+
+
 Function Blocked(Const Addr: String): Boolean;
   {the address is blocked now; blocks that are over are dropped}
   Var
@@ -2947,7 +3019,7 @@ Procedure NoteFailedLogon(Const Addr: String);
     Now: LongInt;
 
   Begin
-  If (GuardFails <= 0) Or (Addr = '') Then
+  If (GuardFails <= 0) Or (Addr = '') Or GuardAllowed(Addr) Then
     Exit;
   Now := fpTime;
   {what is older than the window goes}
@@ -3161,6 +3233,9 @@ Begin
       End;
     Inc(i);
     End;
+  GuardAllow := TStringList.Create;
+  GuardAllow.Add('127.0.0.1');
+  GuardAllow.Add('::1');
   LoadConfig;
   If TestOnly Then
     Begin
@@ -3188,6 +3263,12 @@ Begin
         Else
           WriteLn('  TLS: port ', Ports[i].Port, ' would NOT be opened: ', Why);
         End;
+    If GuardFails > 0 Then
+      Begin
+      WriteLn('  login guard: ', GuardFails, ' failed log-ons within ', GuardWindow, ' s block the address for ', GuardBlock, ' s; never blocked: ', Trim(StringReplace(GuardAllow.Text, #10, ' ', [rfReplaceAll])));
+      End
+    Else
+      WriteLn('  login guard: off');
     If EvOn Then
       Begin
       WriteLn('  events: ', EvTool, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(EvTool)), 11));

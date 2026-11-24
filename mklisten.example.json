@@ -6,6 +6,8 @@
   "nodes": "1-8",
   "_note_localnode": "the L key in mkmon (sysop port) runs mk -L on this node number and returns to mkmon when it ends; use a number that is not one of the nodes above or of a port. Remove the line for no L key",
   "localnode": 9,
+  "_note_loginguard": "failed log-ons: this many from one address within window seconds keep it out for block seconds (on by default: 5, 600, 3600; fails 0 = off). allow: addresses and nets that are never blocked (replaces the default list: keep 127.0.0.1 and add your own network)",
+  "loginguard": { "fails": 5, "window": 600, "block": 3600, "allow": ["127.0.0.1", "::1"] },
   "_note_mailer": "the binkp mailer (mkbink): mklisten makes its settings with mkbinkcfg from the BBS configuration (mkconfig: EchoMail > Mailer) and runs it while the mailer is switched on there; without this section nothing is run",
   "mailer": {
     "config": "/bbs/ra",

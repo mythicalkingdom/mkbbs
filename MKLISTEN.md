@@ -214,17 +214,23 @@ A port with `"proxy": true` (and `"bind": "127.0.0.1"`) is for a front end that 
 
 `mklisten` can keep an address out that fails to log on again and again (guessing names and passwords), before it uses a node:
 
+The guard is **on by default**: 5 failed log-ons from one address within 10 minutes keep that address out for **one hour**.  Nothing has to be written for that; a section changes it:
+
 ```
-"loginguard": { "fails": 5,                   failed log-ons from one address that block it (0 = off, the default)
-                "window": 600,                within this many seconds
-                "block": 900,                 and the address is refused for this many seconds
+"loginguard": { "fails": 5,                   failed log-ons from one address that block it (0 = off); default 5
+                "window": 600,                within this many seconds; default 600
+                "block": 3600,                and the address is refused for this many seconds; default 3600 (an hour)
+                "allow": ["127.0.0.1", "::1"],   addresses and nets that are never counted or blocked (the default is the machine itself)
                 "message": "Too many failed log-ons from this address. Please try again later." }
 ```
+
+`"allow"` takes single addresses and IPv4 nets (`"10.0.0.0/8"`); naming it **replaces** the default list, so keep `127.0.0.1` in it when you want the machine itself exempt.  Put your own
+network (the address you log on from) in it, or you can lock yourself out for an hour; a restart of `mklisten` also clears the blocks.  `mklisten -t` says what is in force.
 
 A caller who did not get in (wrong passwords, too many tries at the name) makes `mk` end with the errorlevel **88**; `mklisten` counts that
 for the address of the connection (not for the sysop port; behind a front end it is the real address from the PROXY header).  The address
 that reaches `fails` within `window` is refused (the message, no node) for `block` seconds and the log says so (`loginguard: 1.2.3.4 is blocked
-for 900 seconds after 5 failed log-ons`, `refused 1.2.3.4: blocked after failed log-ons`).  The counts are in memory: a restart clears them.
+for 3600 seconds after 5 failed log-ons`, `refused 1.2.3.4: blocked after failed log-ons`).  The counts and the blocks are in memory: a restart clears them.
 This is separate from the lock on the account (`PASSWORDS.md`: Lock After Failures), which follows the user name whatever the address.
 
 ### Events

@@ -32,7 +32,7 @@ cfgpatch.fix_sample(ra)
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: (ra + '/').encode() if s == (src + '/').encode() else s)
 env = dict(os.environ, MK=ra)
 cfg = {'mk': build + '/mk', 'mkmon': build + '/mkmon', 'rundir': tmp + '/run', 'logfile': work + '/listen.log', 'workdir': ra, 'nodes': '1-4',
-       'loginguard': {'fails': 2, 'window': 60, 'block': 6, 'message': 'GUARD: try later'},
+       'loginguard': {'fails': 2, 'window': 60, 'block': 6, 'allow': [], 'message': 'GUARD: try later'},
        'ports': [{'port': 24841, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra},
                  {'port': 24842, 'type': 'sysop', 'bind': '127.0.0.1', 'password': 'pw', 'config': ra}]}
 json.dump(cfg, open(work + '/listen.json', 'w'))
@@ -42,6 +42,25 @@ bad = dict(cfg, loginguard={'fails': 2, 'nonsense': 1})
 json.dump(bad, open(work + '/bad.json', 'w'))
 r = subprocess.run([build + '/mklisten', '-c', work + '/bad.json', '-t'], capture_output=True, text=True)
 check('an unknown key in "loginguard" is refused', r.returncode != 0 and 'loginguard' in (r.stdout + r.stderr), r.stdout + r.stderr)
+# the defaults: on, 5 failures, 600 s, an hour; the machine itself is never blocked; off with fails 0; allow takes addresses and nets
+def guardline(guard):
+    c = dict(cfg)
+    if guard is None:
+        c.pop('loginguard')
+    else:
+        c['loginguard'] = guard
+    json.dump(c, open(work + '/g.json', 'w'))
+    r = subprocess.run([build + '/mklisten', '-c', work + '/g.json', '-t'], capture_output=True, text=True)
+    return [l for l in r.stdout.splitlines() if 'login guard' in l], r
+gl, r = guardline(None)
+check('without a "loginguard" section the guard is on: 5 failed log-ons within 600 s block the address for 3600 s, the machine itself is never blocked',
+      gl and '5 failed log-ons within 600 s' in gl[0] and 'for 3600 s' in gl[0] and '127.0.0.1' in gl[0], (gl, r.stdout))
+gl, r = guardline({'fails': 0})
+check('"fails": 0 turns it off', gl and gl[0].strip().endswith('off'), gl)
+gl, r = guardline({'allow': ['10.0.0.0/8', '192.168.1.5']})
+check('"allow" replaces the list: nets (a.b.c.d/n) and single addresses', gl and '10.0.0.0/8' in gl[0] and '192.168.1.5' in gl[0] and '127.0.0.1' not in gl[0], gl)
+gl, r = guardline({'allow': 'x'})
+check('"allow" must be a list', r.returncode != 0 and 'allow' in (r.stdout + r.stderr), r.stdout + r.stderr)
 lst = subprocess.Popen([build + '/mklisten', '-c', work + '/listen.json'], stdout=subprocess.DEVNULL)
 
 
@@ -120,6 +139,17 @@ try:
     time.sleep(7)
     seen, ok = attempt(['windows'])
     check('when the block is over the address can log on again', ok, seen[-200:])
+    # the machine itself (the default "allow"): failures from 127.0.0.1 never block it
+    lst.terminate(); lst.wait()
+    c2 = dict(cfg, loginguard={'fails': 1, 'window': 60, 'block': 30}, ports=[{'port': 24841, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra}], logfile=work + '/listen2.log')
+    json.dump(c2, open(work + '/listen2.json', 'w'))
+    lst = subprocess.Popen([build + '/mklisten', '-c', work + '/listen2.json'], stdout=subprocess.DEVNULL)
+    time.sleep(2)
+    attempt(['bad1', 'bad2', 'bad3'])
+    time.sleep(1.5)
+    seen, ok = attempt(['windows'])
+    log2 = open(work + '/listen2.log').read()
+    check('failed log-ons from the machine itself (allowed by default) do not block it, even with "fails": 1', ok and 'is blocked' not in log2, (seen[-150:], log2[-300:]))
 finally:
     lst.terminate()
     lst.wait()
