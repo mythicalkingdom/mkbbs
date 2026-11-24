@@ -132,8 +132,8 @@ InstallKeyboard;
 MaroonOn;
 A.Init;
 A.Run;
-MaroonOff;
 A.Done;
+MaroonOff;                             {after the video is closed: the screen is given back}
 If A.Chosen = 1 Then
   Begin
   If SaveQwkCfg Then

@@ -181,5 +181,38 @@ if os.path.exists(newp):
     os.remove(newp)
 run(p, '\x1bs', '\x15', newp, '\r', '\x1bx')
 check('save as a new name', os.path.exists(newp) and open(newp, 'rb').read() == orig)
+
+# the screen is cleared when the program ends (and MKCONFIG_SCREEN=none leaves it)
+import pty, select, time
+
+
+def raw_exit(screen):
+    env = dict(os.environ, TERM='xterm-256color', CFGDIR=tmpcfg, MK=tmpcfg)
+    if screen:
+        env['MKCONFIG_SCREEN'] = screen
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.environ.clear(); os.environ.update(env)
+        os.execv(os.path.join(root, 'build', 'mkmenu'), ['mkmenu', fresh()])
+    buf = b''
+    def drain(t):
+        nonlocal buf
+        end = time.time() + t
+        while time.time() < end:
+            r, _, _ = select.select([fd], [], [], 0.1)
+            if r:
+                try: buf += os.read(fd, 65536)
+                except OSError: return
+    drain(1.5)
+    os.write(fd, b'\x1bx'); drain(1.5)
+    try: os.waitpid(pid, 0)
+    except OSError: pass
+    return buf
+
+
+b = raw_exit('')
+check('the program ends with the screen cleared and the cursor at the top: ESC[2J ESC[H', b.endswith(b'\x1b[2J\x1b[H'))
+b = raw_exit('none')
+check('MKCONFIG_SCREEN=none: nothing is added at the end', not b.endswith(b'\x1b[0m\x1b[?25h\x1b[2J\x1b[H'))
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)
