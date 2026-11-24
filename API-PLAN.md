@@ -1,6 +1,6 @@
 # JSON API: plan
 
-Status (2026-11-24): **phases 1 and 2 built** (`mkapi`: HTTP, TLS, tokens and scopes and every endpoint of the table below in `MKApiData.pas`; the `api` port type; `mkapitoken`; `tests/apitest.py`); phase 3 (`API.md`) to do.  Decisions: `users:private` is a reserved scope name; deleted users are hidden unless asked for; message text is deferred.  Decisions of the sysop: first audience is the **sysop** (scripts, dashboards, monitoring), but the design **keeps the caller option open** (offline messages, BBS-to-BBS later);
+Status (2026-11-24): **phases 1 and 2 built** (`mkapi`: HTTP, TLS, tokens and scopes and every endpoint of the table below in `MKApiData.pas`; the `api` port type; `mkapitoken`; `tests/apitest.py`); phase 3 built: `API.md`, the example port in `mklisten.example.json`, the deb.  Decisions: `users:private` is a reserved scope name; deleted users are hidden unless asked for; message text is deferred.  Decisions of the sysop: first audience is the **sysop** (scripts, dashboards, monitoring), but the design **keeps the caller option open** (offline messages, BBS-to-BBS later);
 **version 1 is strictly read-only**; **TLS is included from the start**.  (The web UI was dropped earlier; this is only the API.)
 
 ## Shape

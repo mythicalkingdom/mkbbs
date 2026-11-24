@@ -13,6 +13,7 @@ part has a document with the details; this one does not repeat them.
 | **`EVENTS-PLAN.md`** | schedule work: events that run commands, mailer polls and hub passes, maintenance that needs the BBS quiet |
 | **`PASSWORDS.md`** | keep passwords plain or as hashes, and convert the user base |
 | **`TOSSER.md`** | understand the Fido tosser: toss, scan, pack, areafix, routing, file attach |
+| **`API.md`** | read the BBS from scripts and dashboards: the read only JSON API (`mkapi`, `mkapitoken`), tokens, scopes, TLS |
 | **`STATS.md`** | see the calls: totals, busiest hours, top callers (`mkstats`) |
 | **`MAINT.md`** | purge and pack old messages (`mkmaint`), purge and pack users (`mkuserpurge`, `mkuserpack`), check the file lists (`mkfilecheck`) |
 | **`BACKUP.md`** | back the BBS up and restore it (`mkbackup`), and the `.bak` copies of the configuration files |

@@ -88,6 +88,12 @@
       "bind": "127.0.0.1",
       "password": "change-me",
       "config": "/bbs/ra"
+    },
+    {
+      "_note": "the read only JSON API (API.md): on 127.0.0.1 by default; every request needs a token (mkapitoken add). For other addresses add \"tls\": true (the \"tls\" section above), or put a TLS front end on loopback and use \"proxy\": true",
+      "port": 2340,
+      "type": "api",
+      "config": "/bbs/ra"
     }
   ]
 }
