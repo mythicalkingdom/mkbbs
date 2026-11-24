@@ -1,6 +1,6 @@
 # User packer: plan
 
-Status (2026-11-24): **plan agreed, no code yet.**  `mkuserpurge` marks users deleted and leaves the records where they are (`MAINT.md`).  This plan is for taking the deleted records out of the user files, **keeping a map from the old user
+Status (2026-11-24): **phases 1-3 built** (`mkuserpack`, `usermap.txt`, the last-read step for Hudson, Squish, Fido, JAM, Merlin, Synchronet with `usermap.state`, tests); phase 4 built (docs in `MAINT.md`: the event recipe, a note for door authors).  **Done.**  `mkuserpurge` marks users deleted and leaves the records where they are (`MAINT.md`).  This plan is for taking the deleted records out of the user files, **keeping a map from the old user
 numbers to the new ones** so that everything that holds a user number can be brought along.  The question that came first is in `MAINT.md` and the notes below: what holds the number.
 
 ## What holds a user number

@@ -92,6 +92,61 @@ stay right); `mkusered` shows them as deleted and the sysop can take the mark of
 * **`-w DAYS` is the warning list:** only a list, nothing is changed: the users who would be purged within the next DAYS days, with the days to go.  Use it to write to them first.
 * `MKPURGE_TODAY=yyyy-mm-dd` takes another day for today (a test aid).  Exit codes: 0 done, 1 not usable.
 
+# Packing users: `mkuserpack`
+
+```
+mkuserpack [-c config dir] [-n] [-f] [-q] [-a | -L]
+```
+
+Takes the users marked **deleted** (by `mkuserpurge` or the editor) out of `users.bbs` and `extusers.bbs` (the same records, the others keep their order) and makes `usersidx.bbs` again, so the numbers of the
+users behind them move up.  **Run it as an exclusive event** (nobody on, nobody coming); it refuses (exit 3) while a `mk` or `mklisten` of this BBS is running, `-f` packs anyway.  `-n` is a dry run.  Each file changed
+is first copied to `name.prepack`; take an `mkbackup` before the first time.  Only MK user files are handled.
+
+**The map** is written first, to `usermap.txt` in the BBS directory (the last pack) and `usermap.YYYYMMDD-HHMMSS.txt` (kept): `old<TAB>new<TAB>name` for every user that was there, `-` as the new number for a user
+who went, numbers from 0, `#` lines are comments.  **Doors that keep files by user number must be converted with it** (that is the door's own business: the map is there to make it possible).
+**The last-read step** (`-L`, or `-a` = pack and step in one run, the way to run it in the event) applies the newest map to the last-read pointers of the message bases.  A Hudson `lastread.bbs` has a block
+for each user number (the boards are inside the block), and **many areas share one file**: every file is moved **once**, whatever the number of areas, and `usermap.state` remembers which files are done for which map,
+so running it again (or after a stop) moves nothing twice.  The old file is kept as `lastread.bbs.prepack`.  It refuses when `users.bbs` has more records than the pack left (users came after the pack: their new
+numbers would be taken for old ones; `-f` overrides), and while a `mk` runs.  **Every kind of base the BBS has is handled**, each once per file: Hudson (`lastread.bbs`, a block of 400 bytes for each user), Squish (`<base>.sql`, a long for each user), Fido `*.msg` (`LastRead` in the
+directory, a word for each user), JAM (`<base>.jlr`: records `[NameCrc, UserNum, LastRead, HighRead]`, the user number is changed and the records of users who went are dropped), Merlin (the pointers inside the
+message file, moved through the base's own calls) and Synchronet (keeps no pointers).  A kind that is not known is listed as "NOT handled" and left alone (exit 2).
+
+## Packing users in an event (the recipe)
+
+1. **Once, before anything:** `mkbackup` the BBS, and `mkuserpack -n` to see what would go.  Put the users who must stay in `keepusers.txt` (`mkuserpurge`).
+2. **A script**, for example `/bbs/bin/userhousekeeping.sh` (an event *Command* is a program with arguments and no shell, so a script does the steps):
+
+   ```sh
+   #!/bin/sh
+   BBS=/bbs/ra
+   mkbackup -c $BBS || exit 1                  # a backup first; stop if it fails
+   mkuserpurge -c $BBS -d 365 -u 60 -q         # mark users deleted: no call for a year, never called for 60 days
+   mkuserpack -c $BBS -a                       # take them out, move the last-read pointers (exit 2: a base kind was not handled)
+   ```
+
+3. **The event** (`mkconfig` > Events): the action *Command* `/bbs/bin/userhousekeeping.sh`, **Exclusive**, and *Forced* if callers should be asked to leave (with `"warn"` minutes in
+   `mklisten.json`).  How often is the event's own schedule: weekly or monthly is plenty; there is no minimum between packs.  Set *If it was missed* to *Skip* or *Run* as you like.
+4. **Afterwards** look at `usermap.txt` (how many went), and give the map to the authors of doors that keep files by user number.
+   If the script's `mkuserpack` ends with 2 or 3, something was not done: run `mkuserpack -L` again after fixing it (it never moves a file twice).  `events.sh` gets the errorlevel.
+
+## For the authors of doors
+
+A door that keeps its own files by the user number it was given (`DOOR.SYS`, `DORINFO1.DEF`, the `*R` macro) must follow a pack.  After a pack `usermap.txt` in the BBS directory (and the dated copies,
+`usermap.YYYYMMDD-HHMMSS.txt`, one for each pack) says for every old number what the new one is:
+
+```
+# usermap: user numbers before and after the pack of 2026-11-24 03:00:01
+# format 1: old<TAB>new<TAB>name; "-" is a user who went; numbers start at 0
+# records before: 1090  after: 18
+0	0	Sysop
+1	-	Some Old User
+```
+
+* Numbers start at 0 as in `users.bbs`.  A `-` means the user is gone: delete the door's data for him.
+* The map is the only record of the old numbers: a door that is not converted before the **next** pack has to use both maps in order (the dated copies are kept).
+* A door can check which pack it has converted by the first line of the map (`# usermap: ... of <date time>`).
+* Plain text on purpose: `awk -F'\t' '$2 != "-" {print $1, $2}' usermap.txt` is a conversion table.
+
 # File areas: `mkfilecheck`
 
 ```

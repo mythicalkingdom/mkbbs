@@ -14,7 +14,7 @@ part has a document with the details; this one does not repeat them.
 | **`PASSWORDS.md`** | keep passwords plain or as hashes, and convert the user base |
 | **`TOSSER.md`** | understand the Fido tosser: toss, scan, pack, areafix, routing, file attach |
 | **`STATS.md`** | see the calls: totals, busiest hours, top callers (`mkstats`) |
-| **`MAINT.md`** | purge old messages by the limits of the areas (`mkmaint`) |
+| **`MAINT.md`** | purge and pack old messages (`mkmaint`), purge and pack users (`mkuserpurge`, `mkuserpack`), check the file lists (`mkfilecheck`) |
 | **`BACKUP.md`** | back the BBS up and restore it (`mkbackup`), and the `.bak` copies of the configuration files |
 | `mklisten.example.json` | a starting configuration for the listener |
 

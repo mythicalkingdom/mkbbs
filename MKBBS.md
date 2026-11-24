@@ -102,6 +102,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
 | `mkuserpurge` | marks users deleted who have not called for a long time (keep file, security level, a warning list) (`MAINT.md`) |
+| `mkuserpack` | takes deleted users out of the user files (exclusive event), writes `usermap.txt` old→new numbers (`MAINT.md`) |
 | `mkfilecheck` | checks the file areas against their lists: files missing, not listed, listed twice, wrong case; can fix (`MAINT.md`) |
 | `mkstats` | reports on the calls (totals, by day, hour, node, port, user), from the line that `mk` writes for each call (`STATS.md`) |
 | `mkmaint` | purges the message areas by their limits (days kept, received days, messages kept); never unread private mail or a message waiting to be sent (`MAINT.md`) |

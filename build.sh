@@ -46,6 +46,8 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmaint src/MKMaint.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkstats src/MKStatsRep.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpurge src/MKUserPurge.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfilecheck src/MKFileCheck.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpack src/MKUserPack.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -283,7 +285,8 @@ fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/userpurgetest.py build build/work/userpurge | grep -E "^(ok|FAIL|skip|failures)" | tee build/userpurgeresult.txt
   python3 tests/filechecktest.py build build/work/filecheck | grep -E "^(ok|FAIL|skip|failures)" | tee build/filecheckresult.txt
-  if grep -q FAIL build/userpurgeresult.txt build/filecheckresult.txt; then exit 1; fi
+  python3 tests/userpacktest.py build build/work/userpack | grep -E "^(ok|FAIL|skip|failures)" | tee build/userpackresult.txt
+  if grep -q FAIL build/userpurgeresult.txt build/filecheckresult.txt build/userpackresult.txt; then exit 1; fi
 fi
 # the statistics screen of the sysop monitor (S)
 if [ -f bbs/bbsc/ra/config.mk ]; then
