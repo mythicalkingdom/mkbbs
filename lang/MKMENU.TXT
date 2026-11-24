@@ -7,6 +7,8 @@
 ;  Menu command definitions
 ;  The menu name is defined on the menu type number
 ;  The menu command line is defined on the menu type number + 256
+;  Type 0 is no command: the item only shows its prompt (a heading, a line of text or a value
+;  such as @ and ` for the current file and message area); it is listed with the Menu Commands.
 ;
 001 Go To Menu
 257 Menu Name {/F=+-} {/M=+-} {Password}
@@ -163,7 +165,7 @@
 ; end menu group definition
 ;
 550 Menu Commands
-551 1 2 3 4
+551 1 2 3 4 0
 552 File Commands
 553 30 31 32 33 34 35 36 37 38 48 50 150
 554 Message Commands

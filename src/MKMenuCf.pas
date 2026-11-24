@@ -208,7 +208,7 @@ Function ItemStr(Item: Word): String;
     ItemStr := '';
     Exit;
     End;
-  If MA[Item].Typ <> 0 Then
+  If (MA[Item].Typ <> 0) Or (MA[Item].Prompt <> '') Or (MA[Item].Key > ' ') Then
     Begin
     If MA[Item].Key = #1 Then
       S := ' ^A '
@@ -216,8 +216,16 @@ Function ItemStr(Item: Word): String;
       S := '  ? '
     Else
       S := ' ' + MA[Item].Key + '  ';
-    S := S + #179 + ' ' + Copy(PadRight(Prompts.GetString(MA[Item].Typ), ' ', 35), 1, 35) + ' ' + #179 + ' ';
-    S := S + Copy(MA[Item].Data, 1, 20);
+    If MA[Item].Typ = 0 Then
+      Begin                            {type 0: the prompt is shown, nothing is done}
+      S := S + #179 + ' ' + Copy(PadRight('Prompt only (no command)', ' ', 35), 1, 35) + ' ' + #179 + ' ';
+      S := S + Copy(MA[Item].Prompt, 1, 20);
+      End
+    Else
+      Begin
+      S := S + #179 + ' ' + Copy(PadRight(Prompts.GetString(MA[Item].Typ), ' ', 35), 1, 35) + ' ' + #179 + ' ';
+      S := S + Copy(MA[Item].Data, 1, 20);
+      End;
     End
   Else
     S := '    ' + #179 + ' ' + PadRight('', ' ', 35) + ' ' + #179;
@@ -258,7 +266,10 @@ Function CmdStr(Item: Word): String;
   Begin
   SubStr := Prompts.GetString(551 + (GroupNo - 1) * 2);
   Num := Str2Long(ExtractWord(SubStr, Item));
-  CmdStr := ' ' + PadLeft(Long2Str(Num), ' ', 3) + '  ' + Copy(Prompts.GetString(Num), 1, 30);
+  If Num = 0 Then
+    CmdStr := ' ' + PadLeft('0', ' ', 3) + '  Prompt only (no command)'
+  Else
+    CmdStr := ' ' + PadLeft(Long2Str(Num), ' ', 3) + '  ' + Copy(Prompts.GetString(Num), 1, 30);
   End;
 
 
@@ -350,8 +361,8 @@ Procedure RefreshDesc;
     End
   Else
     Begin
-    ER.TypeDesc := '';
-    ER.DataDesc := '';
+    ER.TypeDesc := 'Prompt only (no command)';
+    ER.DataDesc := 'Not used: the prompt is shown, nothing is done';
     End;
   End;
 

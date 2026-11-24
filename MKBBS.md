@@ -152,6 +152,30 @@ Questionnaire /bbs/ra/noquesthere.q-a could not be loaded (not found)
   `goodbye`, `sec<level>`, `birthday` ... most of them optional) are not, or every call would write a line for each.
 * The global menu (`global.mnu`) is optional: it is reported only when it is there and cannot be read.
 
+## Menu items (`*.mnu`, edited with `mkmenu`)
+
+A menu file has a **header** (item 0) and up to 50 **items**.  The header holds the menu **prompt**, the text at the bottom where the caller types a key (it is shown without a line break), and the colours:
+the prompt's own and the **highlight** colour that `^` switches to.  Each item has:
+
+| field | meaning |
+|---|---|
+| **Key** | the letter that runs the item (blank: none); `^A` makes it **automatic**: it runs every time the menu is shown, after the prompts of the items before it |
+| **Type** | the command (`mkmenu`: F2 picks it from the groups), with its **Data** line (the menu name, a file, a program ...) |
+| **Prompt** | the text of the item in the menu (below) |
+| **Security**, flags A to D | who sees the item and may use it (an item the caller has no access to is neither shown nor run) |
+| **Color** | the colour of the prompt as `bf` in hexadecimal: background, foreground (`07` light grey on black; a new item starts with `07`: colour `00` is black on black, an invisible prompt) |
+
+**The prompt.**  When a menu is shown, the prompt of every item the caller may use is displayed, one line each, in the order of the file; then the menu prompt, and the program waits for a key.  In a prompt:
+
+* `^` turns the highlight colour on and off: `(^R^)ead messages` shows the R highlighted;
+* a **`;` at the end** keeps the cursor on the line, so the next prompt follows on the same line (without it every prompt ends its line);
+* `@` is replaced by the name of the caller's current **file area**, `` ` `` (a backtick) by the name of the current **message area**;
+* `~` resets the colour.
+
+**Type 0 is no command**: the item only shows its prompt and does nothing when its key is pressed (a space or a blank key just shows the menu again).  Use it for a heading, a line of explanation, or a value
+(`Message area: ` followed by the backtick code), above or between the choices.  `mkmenu` lists such an item as "Prompt only (no command)" and offers it with the Menu Commands.  A small menu made of type 0 lines and
+a few keyed items is a simple text interface: the lines say where the caller is, the keyed items do the work.
+
 ## Setting up a BBS in short
 
 1. Build and install (`make`, `sudo make install`).  Needs Free Pascal 3.2.2.

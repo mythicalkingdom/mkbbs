@@ -182,6 +182,14 @@ if os.path.exists(newp):
 run(p, '\x1bs', '\x15', newp, '\r', '\x1bx')
 check('save as a new name', os.path.exists(newp) and open(newp, 'rb').read() == orig)
 
+# type 0 is a command of its own: a prompt only
+p = fresh()
+s = run(p, '\x1b[2~', '\r')
+check('the form of a new (type 0) item says "Prompt only (no command)"', 'Prompt only (no command)' in s)
+p = fresh()
+s = run(p, '\x1b[2~', '\r', '\t', '\t', 'Message area: `', '\r', '')
+check('the list shows an item of type 0 with its prompt as "Prompt only"', 'Prompt only (no command)' in s and 'Message area' in s)
+
 # the screen is cleared when the program ends (and MKCONFIG_SCREEN=none leaves it)
 import pty, select, time
 
