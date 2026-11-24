@@ -809,7 +809,7 @@ Procedure KeepBak(FN: String; Var Rec; FS: Word);
   FileMode := fmReadOnly + fmDenyNone;
   {$I-}
   Reset(F, 1);
-  {$I+}
+  {$I-}
   If IoResult <> 0 Then
     Exit;
   N := FileSize(F);
@@ -829,7 +829,7 @@ Procedure KeepBak(FN: String; Var Rec; FS: Word);
   {$I-}
   BlockRead(F, Old^, N, Got);
   Close(F);
-  {$I+}
+  {$I-}
   If (IoResult = 0) And (Got = N) Then
     Begin
     Same := (N = FS) And (CompareByte(Old^, Rec, FS) = 0);
@@ -843,7 +843,7 @@ Procedure KeepBak(FN: String; Var Rec; FS: Word);
         BlockWrite(B, Old^, N, Put);
         Close(B);
         End;
-      {$I+}
+      {$I-}
       If IoResult <> 0 Then;
       End;
     End;

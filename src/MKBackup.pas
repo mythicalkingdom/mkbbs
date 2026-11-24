@@ -217,9 +217,14 @@ Procedure Gather;
   For i := 1 To Config^.GetMaxFileAreas Do
     If Config^.GetFileAreaName(i) <> '' Then
       Begin
-      P := Config^.GetFileListPath(i);
+      P := Config^.GetFileListPath(i);          {the name of the list (MK), or its directory}
       If P <> '' Then
-        AddByMask(P, 'files.bbs', '', '');
+        Begin
+        If DirectoryExists(P) Then
+          AddByMask(P, 'files.bbs', '', '')
+        Else If FileExists(P) Then
+          Add(P, '', '');
+        End;
       If WithFiles Then
         Begin
         P := Config^.GetFileAreaPath(i);

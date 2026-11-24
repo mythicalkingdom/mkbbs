@@ -386,7 +386,7 @@ Procedure ShowNodes(Typed: String);
     SayLn('(nobody is online)');
   SayLn('');
   SayLn('Type a node number, then:  Enter watch   C chat   K disconnect   + / - ' + Long2Str(TimeStep) + ' min');
-  Say('R refresh, M mailer, E events, L local BBS, Q quit: ' + Typed);
+  Say('R refresh, M mailer, E events, S statistics, L local BBS, Q quit: ' + Typed);
   CommFlushOut;
   End;
 
@@ -1062,6 +1062,18 @@ Procedure Monitor;
         'E': Begin
              Typed := '';
              Msg := EventsScreen(RunDir);       {the events mklisten runs}
+             ShowNodes('');
+             If Msg <> '' Then
+               Begin
+               SayLn('');
+               SayLn(Msg);
+               CommFlushOut;
+               Msg := '';
+               End;
+             End;
+        'S': Begin
+             Typed := '';
+             Msg := StatsScreen(RunDir);        {the calls: today, the week, the month, the year}
              ShowNodes('');
              If Msg <> '' Then
                Begin

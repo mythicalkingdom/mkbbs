@@ -55,6 +55,7 @@ cfgname = ra.lstrip('/') + '/config.mk'
 check('the configuration directory is in it (config.mk, the user files, the message base files of the area directory)', cfgname in names and ra.lstrip('/') + '/msgidx.bbs' in names and ra.lstrip('/') + '/users.bbs' in names, [n for n in names if n.endswith('.mk')][:5])
 if ok_tar and cfgname in names:
     check('the content is the file as it was', hashlib.sha256(t.extractfile(cfgname).read()).hexdigest() == before['config.mk'])
+check('the lists of the file areas (files.bbs of each area that has one) are in it', any(n.endswith('/files.bbs') and not n.startswith(ra.lstrip('/')) for n in names), [n for n in names if 'files.bbs' in n][:3])
 check('the node directories, locks and the backup directory itself are not in it', not any('/node1/' in n or n.endswith('.lock') or '/backup/' in n for n in names))
 r = run('-l', arc)
 check('-l lists the files with size and time', r.returncode == 0 and ra + '/config.mk' in r.stdout and 'file(s)' in r.stdout, r.stdout[-200:])

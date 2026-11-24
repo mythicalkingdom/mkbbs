@@ -75,3 +75,38 @@ Run `mkbackup` first (`BACKUP.md`) the first time, and `mkmaint -n` to see what 
 **Test aid.**  `MKMAINT_TODAY=yyyy-mm-dd` takes another day for today (the tests use it); do not set it on a live system.
 
 **Exit codes:** 0 done, 1 not usable (options, no configuration, no such area), 2 an area's base could not be opened.
+
+# Users: `mkuserpurge`
+
+```
+mkuserpurge [-c config dir] -d DAYS [-u DAYS] [-s LEVEL] [-k file] [-w DAYS] [-n] [-v] [-q]
+```
+
+Marks the users **deleted** who have not called for more than `-d` days.  The records stay in the user file (nothing is renumbered, so last-read pointers and everything that counts users by position
+stay right); `mkusered` shows them as deleted and the sysop can take the mark off (Delete in the editor), a deleted user cannot log on.  Without `-d` nothing is purged.
+
+* `-u DAYS`: a user who registered and never called again (no call is recorded) is purged when he registered more than this many days ago (default: the same as `-d`).
+* **Never purged:** a user who is already deleted, with **Do not purge** set in the editor, a **QWK network node**, a name in the keep file (`-k`, default `keepusers.txt` in the BBS directory when it is there:
+  one name a line, `;` begins a comment, any case), a user with the security level of `-s` or more.  A user whose dates cannot be read is not purged.
+* `-n` a dry run (who would go), `-v` each user, `-q` the summary only.
+* **`-w DAYS` is the warning list:** only a list, nothing is changed: the users who would be purged within the next DAYS days, with the days to go.  Use it to write to them first.
+* `MKPURGE_TODAY=yyyy-mm-dd` takes another day for today (a test aid).  Exit codes: 0 done, 1 not usable.
+
+# File areas: `mkfilecheck`
+
+```
+mkfilecheck [-c config dir] [-a area] [-f] [-l] [-v] [-q]
+```
+
+Checks every file area against its list (`files.bbs` of the area) and says:
+
+* **listed, not there**: the list names a file that is not in the directory;
+* **there, not listed**: a file in the directory that the list does not have (`files.bbs`, hidden files, `.bak` and directories are not files of the area);
+* **listed twice**;
+* **case**: the list writes a name in another case than the file on the disk.  This one is a fault: the BBS uses names exactly as they are written, so the download would not find the file.
+
+`-f` takes the lines of the missing files out of the list (with the description lines under them) and writes the names in the case of the files; `-l` adds a line `NAME  (not described)` for each file that is
+there and not listed.  The list is written whole as a new file that replaces the old one; the old one is kept as `files.bbs.bak`.  Several areas that share a directory are checked once.
+Exit codes: 0 nothing wrong (or all of it fixed), 1 not usable, 2 something is wrong and was left: so a cron job can mail the output when it is not 0.  `mkbackup` holds the lists (and `-a` the files).
+
+(The duplicate list of the file echoes, `ticdupe.dat`, trims itself: entries older than 30 days go whenever a TIC is tossed.)

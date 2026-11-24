@@ -44,6 +44,8 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkevents src/MKEvents.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbackup src/MKBackup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmaint src/MKMaint.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkstats src/MKStatsRep.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpurge src/MKUserPurge.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfilecheck src/MKFileCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -276,6 +278,17 @@ if grep -q FAIL build/debresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/missingtest.py build/work/missing | grep -E "^(ok|FAIL|skip|failures)" | tee build/missingresult.txt
   if grep -q FAIL build/missingresult.txt; then exit 1; fi
+fi
+# housekeeping of users (mkuserpurge) and of the file areas (mkfilecheck), on private copies
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/userpurgetest.py build build/work/userpurge | grep -E "^(ok|FAIL|skip|failures)" | tee build/userpurgeresult.txt
+  python3 tests/filechecktest.py build build/work/filecheck | grep -E "^(ok|FAIL|skip|failures)" | tee build/filecheckresult.txt
+  if grep -q FAIL build/userpurgeresult.txt build/filecheckresult.txt; then exit 1; fi
+fi
+# the statistics screen of the sysop monitor (S)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/statsmontest.py build/work/statsmon | grep -E "^(ok|FAIL|skip|failures)" | tee build/statsmonresult.txt
+  if grep -q FAIL build/statsmonresult.txt; then exit 1; fi
 fi
 # the statistics: mk writes a line for each call, mkstats reports (real mk over telnet, private copy)
 if [ -f bbs/bbsc/ra/config.mk ]; then

@@ -38,6 +38,8 @@ Function MailerScreen(RunDir: String): String;
 
 Function EventsScreen(RunDir: String): String;
   {The events mklisten runs (events.info of the run directory); R runs one now.  The result is a message for the node list}
+Function StatsScreen(RunDir: String): String;
+  {The statistics: the calls of today, the week, the month or the year from <MK>/stats/*.tsv (what mk writes for each call): totals, calls by hour, the last calls}
 
 
 Implementation
@@ -1525,6 +1527,335 @@ Function EventsScreen(RunDir: String): String;
                If IoResult <> 0 Then;
                MsgU := fpTime + 4;
                End;
+        End;
+      End;
+  Until False;
+  ComSession^.SendStr(Esc + '[0;37;40m' + Esc + '[2J' + Esc + '[H');
+  End;
+
+
+Function DayNum(Y, M, D: LongInt): LongInt;
+  {days since 0000-03-01 of a date (civil calendar), so that dates can be subtracted}
+  Var
+    Era, Yoe, Doy, Doe: LongInt;
+
+  Begin
+  If M <= 2 Then
+    Y := Y - 1;
+  If Y >= 0 Then
+    Era := Y Div 400
+  Else
+    Era := (Y - 399) Div 400;
+  Yoe := Y - Era * 400;
+  If M > 2 Then
+    Doy := (153 * (M - 3) + 2) Div 5 + D - 1
+  Else
+    Doy := (153 * (M + 9) + 2) Div 5 + D - 1;
+  Doe := Yoe * 365 + Yoe Div 4 - Yoe Div 100 + Doy;
+  DayNum := Era * 146097 + Doe;
+  End;
+
+
+Function TsvField(Const S: String; N: Word): String;
+  Var
+    P, i: Word;
+    T: String;
+
+  Begin
+  T := S;
+  For i := 1 To N Do
+    Begin
+    P := Pos(#9, T);
+    If P = 0 Then
+      Begin
+      TsvField := '';
+      Exit;
+      End;
+    Delete(T, 1, P);
+    End;
+  P := Pos(#9, T);
+  If P = 0 Then
+    TsvField := T
+  Else
+    TsvField := Copy(T, 1, P - 1);
+  End;
+
+
+Function StatsScreen(RunDir: String): String;
+  Type
+    CallRec = Record
+      Start: LongInt;
+      Node: LongInt;
+      Lab: String[14];
+      User: String[22];
+      Res: String[8];
+      Secs: LongInt;
+      End;
+
+  Var
+    C, Per: Char;
+    Idle: Word;
+    Cols_, Rows_: Word;
+    LastLoad: Int64;
+    Calls, Ok, Failed, NoLog: LongInt;
+    SecsOk, Ul, Dl, Ulk, Dlk, Msgs, Longest: LongInt;
+    Hours: Array[0..23] Of LongInt;
+    Last: Array[1..80] Of CallRec;
+    NLast: Word;
+    Users: Array[1..400] Of String[24];
+    NUsers: Word;
+    Dir, Title: String;
+    Found: Boolean;
+
+  Procedure Load;
+    Var
+      Y, M, D, Dw: Word;
+      T0, T1, Y0, M0, ym, k: LongInt;
+      F: Text;
+      L, FN, U, Res: String;
+      DY, DM, DD, DNum, H: LongInt;
+      i: Word;
+      Hit: Boolean;
+      Rec: CallRec;
+
+    Begin
+    Calls := 0; Ok := 0; Failed := 0; NoLog := 0;
+    SecsOk := 0; Ul := 0; Dl := 0; Ulk := 0; Dlk := 0; Msgs := 0; Longest := 0;
+    FillChar(Hours, SizeOf(Hours), 0);
+    NLast := 0;
+    NUsers := 0;
+    Found := False;
+    GetDate(Y, M, D, Dw);
+    T1 := DayNum(Y, M, D);
+    Case Per Of
+      'T': Begin T0 := T1; Title := 'today'; End;
+      'W': Begin T0 := T1 - 6; Title := 'the last 7 days'; End;
+      'Y': Begin T0 := DayNum(Y, 1, 1); Title := Num(Y); End;
+      Else Begin T0 := DayNum(Y, M, 1); Title := 'this month'; End;
+      End;
+    FrameU := fpTime;
+    FrameLocal := fpTime;
+    { the files of the months from the start of the period to now (the start can be in the month before) }
+    Y0 := Y;
+    M0 := M;
+    For k := 0 To 13 Do
+      Begin
+      If DayNum(Y0, M0, 28) + 3 >= T0 Then
+        Begin
+        FN := Dir + '/' + Num(Y0) + '-' + Two(M0) + '.tsv';
+        Assign(F, FN);
+        {$I-}
+        Reset(F);
+        {$I+}
+        If IoResult = 0 Then
+          Begin
+          Found := True;
+          While Not Eof(F) Do
+            Begin
+            ReadLn(F, L);
+            If (L = '') Or (L[1] = '#') Then
+              Continue;
+            U := TsvField(L, 2);
+            DY := Str2Long(Copy(U, 1, 4));
+            DM := Str2Long(Copy(U, 6, 2));
+            DD := Str2Long(Copy(U, 9, 2));
+            DNum := DayNum(DY, DM, DD);
+            If (DNum < T0) Or (DNum > T1) Then
+              Continue;
+            Res := TsvField(L, 9);
+            Inc(Calls);
+            If Res = 'ok' Then
+              Begin
+              Inc(Ok);
+              Inc(SecsOk, Str2Long(TsvField(L, 10)));
+              If Str2Long(TsvField(L, 10)) > Longest Then
+                Longest := Str2Long(TsvField(L, 10));
+              End
+            Else If Res = 'failed' Then
+              Inc(Failed)
+            Else
+              Inc(NoLog);
+            Inc(Ul, Str2Long(TsvField(L, 11)));
+            Inc(Dl, Str2Long(TsvField(L, 12)));
+            Inc(Ulk, Str2Long(TsvField(L, 13)));
+            Inc(Dlk, Str2Long(TsvField(L, 14)));
+            Inc(Msgs, Str2Long(TsvField(L, 15)));
+            Rec.Start := Str2Long(TsvField(L, 0));
+            H := Str2Long(Copy(ClockOf(Rec.Start), 1, 2));
+            If (H >= 0) And (H <= 23) Then
+              Inc(Hours[H]);
+            Rec.Node := Str2Long(TsvField(L, 3));
+            Rec.Lab := Copy(TsvField(L, 5), 1, 14);
+            Rec.User := Copy(TsvField(L, 8), 1, 22);
+            Rec.Res := Copy(Res, 1, 8);
+            Rec.Secs := Str2Long(TsvField(L, 10));
+            If (Res = 'ok') And (Rec.User <> '') Then
+              Begin
+              Hit := False;
+              For i := 1 To NUsers Do
+                If Users[i] = Rec.User Then
+                  Hit := True;
+              If (Not Hit) And (NUsers < 400) Then
+                Begin
+                Inc(NUsers);
+                Users[NUsers] := Rec.User;
+                End;
+              End;
+            If NLast >= 80 Then
+              Begin
+              For i := 1 To 79 Do
+                Last[i] := Last[i + 1];
+              NLast := 79;
+              End;
+            Inc(NLast);
+            Last[NLast] := Rec;
+            End;
+          Close(F);
+          End;
+        End;
+      If M0 = 1 Then
+        Begin
+        M0 := 12;
+        Dec(Y0);
+        End
+      Else
+        Dec(M0);
+      End;
+    End;
+
+  Procedure DrawSt;
+    Var
+      i, r, h, mx, bar, maxr: Integer;
+      S: String;
+      A: Byte;
+
+    Begin
+    Clear;
+    FillAt(1, 1, Cols, aTitle, ' ');
+    PutAt(1, 2, aTitle, 'statistics: ' + Title);
+    Box(2, 1, Rows - 1, Cols, 'Calls');
+    If Not Found Then
+      Begin
+      PutAt(4, 3, aDim, 'No statistics yet: mk writes a line for each call that ends, in');
+      PutAt(5, 3, aDim, Dir + '/');
+      End
+    Else
+      Begin
+      PutAt(3, 3, aLabel, 'Calls');
+      PutAt(3, 20, aBright, Num(Calls));
+      PutAt(4, 3, aLabel, 'Log-ons');
+      PutAt(4, 20, aGood, Num(Ok));
+      PutAt(5, 3, aLabel, 'Failed log-ons');
+      PutAt(5, 20, aBad, Num(Failed));
+      PutAt(6, 3, aLabel, 'No log-on');
+      PutAt(6, 20, aDim, Num(NoLog));
+      PutAt(7, 3, aLabel, 'Callers');
+      PutAt(7, 20, aBright, Num(NUsers));
+      S := Num(SecsOk Div 60) + ' min';
+      If Ok > 0 Then
+        S := S + ' (' + Num((SecsOk Div Ok) Div 60) + ' per call)';
+      PutAt(8, 3, aLabel, 'Time on-line');
+      PutAt(8, 20, aNorm, S);
+      PutAt(9, 3, aLabel, 'Uploads');
+      PutAt(9, 20, aNorm, Num(Ul) + ' files, ' + Num(Ulk) + ' K');
+      PutAt(10, 3, aLabel, 'Downloads');
+      PutAt(10, 20, aNorm, Num(Dl) + ' files, ' + Num(Dlk) + ' K');
+      PutAt(11, 3, aLabel, 'Messages posted');
+      PutAt(11, 20, aNorm, Num(Msgs));
+      { calls by hour: one column for each hour }
+      PutAt(3, 46, aLabel, 'Calls by hour');
+      mx := 0;
+      For h := 0 To 23 Do
+        If Hours[h] > mx Then
+          mx := Hours[h];
+      maxr := 6;
+      For r := 1 To maxr Do
+        For h := 0 To 23 Do
+          Begin
+          bar := 0;
+          If mx > 0 Then
+            bar := (Hours[h] * maxr + mx - 1) Div mx;
+          If bar >= (maxr - r + 1) Then
+            PutAt(3 + r, 46 + h + h Div 6, aGood, bFull)
+          Else If (Hours[h] > 0) And (r = maxr) Then
+            PutAt(3 + r, 46 + h + h Div 6, aGood, bLight);
+          End;
+      For h := 0 To 23 Do
+        If (h Mod 6) = 0 Then
+          PutAt(3 + maxr + 1, 46 + h + h Div 6, aDim, Num(h));
+      PutAt(3 + maxr + 2, 46, aDim, 'busiest hour: ' + Num(mx) + ' call(s)');
+      { the last calls }
+      FillAt(13, 2, Cols - 1, aBox, bH);
+      PutAt(13, 3, aBoxTitle, ' Last calls ');
+      PutAt(14, 3, aLabel, Pad('Time', 7) + Pad('Node', 5) + Pad('Port', 15) + Pad('User', 24) + Pad('Result', 9) + 'Min');
+      maxr := Rows - 3 - 14;
+      For i := 1 To maxr Do
+        If i <= NLast Then
+          Begin
+          r := NLast - i + 1;
+          A := aNorm;
+          If Last[r].Res = 'failed' Then A := aBad
+          Else If Last[r].Res <> 'ok' Then A := aDim;
+          PutAt(14 + i, 3, A, Pad(ClockOf(Last[r].Start), 7) + Pad(Num(Last[r].Node), 5) + Pad(Last[r].Lab, 15) + Pad(Last[r].User, 24) + Pad(Last[r].Res, 9) + Num((Last[r].Secs + 30) Div 60));
+          End;
+      End;
+    FillAt(Rows, 1, Cols, aKey, ' ');
+    PutAt(Rows, 2, aKeyHi, 'T');
+    PutAt(Rows, 3, aKey, 'oday  ');
+    PutAt(Rows, 10, aKeyHi, 'W');
+    PutAt(Rows, 11, aKey, 'eek  ');
+    PutAt(Rows, 17, aKeyHi, 'M');
+    PutAt(Rows, 18, aKey, 'onth  ');
+    PutAt(Rows, 25, aKeyHi, 'Y');
+    PutAt(Rows, 26, aKey, 'ear  ');
+    PutAt(Rows, 33, aKeyHi, 'Q');
+    PutAt(Rows, 34, aKey, 'uit      (mkstats makes tables and CSV)');
+    End;
+
+  Begin
+  StatsScreen := '';
+  Dir := GetEnv('MK');
+  If Dir = '' Then
+    Begin
+    StatsScreen := 'No statistics: the monitor was not started with the configuration directory (MK).';
+    Exit;
+    End;
+  If Dir[Length(Dir)] = '/' Then
+    Dir := Copy(Dir, 1, Length(Dir) - 1);
+  Dir := Dir + '/stats';
+  Rows := 25;
+  If ComSession^.GetWindowSize(Cols_, Rows_) Then
+    If (Rows_ > 25) And (Rows_ <= MaxRows) Then
+      Rows := Rows_;
+  Utf8 := TermWantsUtf8(ComSession^.GetTermType);
+  ForceAll := True;
+  Per := 'T';
+  Idle := 0;
+  LastLoad := 0;
+  Repeat
+    If NowMs - LastLoad >= 5000 Then
+      Begin
+      Load;
+      LastLoad := NowMs;
+      End;
+    DrawSt;
+    Flush;
+    C := GetKey(200);
+    If C = #0 Then
+      Begin
+      Inc(Idle);
+      If Idle > 3000 Then
+        Break;
+      End
+    Else
+      Begin
+      Idle := 0;
+      Case UpCase(C) Of
+        'Q', #27, #24, #3: Break;
+        'T', 'W', 'M', 'Y': Begin
+                            Per := UpCase(C);
+                            LastLoad := 0;
+                            End;
         End;
       End;
   Until False;

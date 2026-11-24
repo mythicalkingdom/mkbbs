@@ -26,6 +26,12 @@ The files are plain text: read them with anything, keep them as long as you like
 A caller who has gone before the BBS is through with the log-on is **no longer a failed log-on** (the call ended with the errorlevel 88 before): a port scan or a dropped connection does not count against the
 address in `loginguard` and is `nologin` here.
 
+## In the monitor
+
+`mkmon` (the sysop monitor, `MKLISTEN.md`) has a statistics screen: **S** in the node list.  It shows the calls of **today** (T), the last **week** (W), the **month** (M) or the **year** (Y): the totals,
+a bar for each hour of the day, and the last calls (time, node, port label, user, result, minutes; failed log-ons in red).  It is read from the files above (the monitor must have been started with the
+configuration directory, which the sysop port of `mklisten` does), and is read again every 5 seconds.
+
 ## `mkstats`
 
 ```
