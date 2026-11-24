@@ -127,7 +127,7 @@ Procedure MenuObj.Load(FN: String);          {Load file name}
   Else
     Begin
     MenuInfo^.NumItems := 0;
-    BbsLog('Menu ' + FN + ' could not be loaded (' + LoadWhy(MenuInfo^.Error) + '; looked in ' + Config^.GetMnuPath(User.GetUserLanguage) + Copy(' and ' + Config^.GetMnuPath(1), 1, 200 * Ord(Config^.GetMnuPath(User.GetUserLanguage) <> Config^.GetMnuPath(1))) + ')');
+    BbsLog('Menu ' + FN + ' could not be loaded (' + LoadWhy(MenuInfo^.Error) + '; looked in ' + Config^.GetMnuPath(1) + Copy(' and ' + Config^.GetMnuPath(User.GetUserLanguage), 1, 200 * Ord((User.GetUserLanguage > 1) And (User.GetUserLanguage <= 10) And (Config^.GetMnuPath(User.GetUserLanguage) <> Config^.GetMnuPath(1)))) + ')');
     End;
   MenuInfo^.HotString := LoadHotKeys;
   End;

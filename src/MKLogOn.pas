@@ -803,7 +803,8 @@ Procedure PasswordNotices;
 
 Procedure BadPassword;
   Begin
-  ExitErrorLevel := LoginFailLevel;      {mklisten counts these per address}
+  If CommCarrier Then
+    ExitErrorLevel := LoginFailLevel;    {mklisten counts these per address; a caller who is gone (a port scan, a changed mind) is not a failed log-on}
   LogEntry.WriteEntry('Password Failure');
   LogEntry.WriteEntry('User off-line');
   User.SetOk(False);
@@ -975,8 +976,8 @@ Function AskName: String;
     End
   Else
     Begin
-    If User.Ok Then
-      ExitErrorLevel := LoginFailLevel;    {no name was accepted (too many tries), the caller did not just hang up}
+    If User.Ok And CommCarrier Then
+      ExitErrorLevel := LoginFailLevel;    {no name was accepted (too many tries), the caller did not just hang up (a caller who is gone is no failed log-on: a port scan, a changed mind)}
     User.SetOk(False);
       If CurrentPort <> 0 Then
       Begin

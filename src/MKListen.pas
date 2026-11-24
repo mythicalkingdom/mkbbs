@@ -161,6 +161,7 @@ Type
     Env: TStringList;
     Args: String;
     Proxy: Boolean;
+    Label_: String;                    {what the port is for, in the statistics (default: its type)}
     Tls: Boolean;                      {native TLS: mk does the handshake (-Y) with the certificate and key of the "tls" section}
     Charset: String;                   {auto, cp437 or utf8}
     Sysop: Boolean;
@@ -393,6 +394,7 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   P.Args := '';
   P.Proxy := False;
   P.Tls := False;
+  P.Label_ := '';
   P.Charset := 'auto';
   P.Sysop := False;
   P.Password := '';
@@ -435,6 +437,8 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
       P.Proxy := JBool(V, Where + '.proxy')
     Else If Key = 'tls' Then
       P.Tls := JBool(V, Where + '.tls')
+    Else If Key = 'label' Then
+      P.Label_ := Copy(JStr(V, Where + '.label'), 1, 20)
     Else If Key = 'charset' Then
       Begin
       P.Charset := LowerCase(JStr(V, Where + '.charset'));
@@ -2874,6 +2878,15 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
   For j := 0 To P.Env.Count - 1 Do
     EnvS.Add(P.Env[j]);
   EnvS.Add('MKRUN=' + RunDir);
+  EnvS.Add('MKPORT=' + IntToStr(P.Port));
+  If P.Label_ <> '' Then
+    EnvS.Add('MKLABEL=' + P.Label_)
+  Else If P.Sysop Then
+    EnvS.Add('MKLABEL=sysop')
+  Else If P.Tls Then
+    EnvS.Add('MKLABEL=' + P.SType + '-tls')
+  Else
+    EnvS.Add('MKLABEL=' + P.SType);
   If P.Tls Then
     Begin
     EnvS.Add('MK_TLS_CERT=' + TlsCert);

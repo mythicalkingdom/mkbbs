@@ -39,8 +39,9 @@
       "config": "/bbs/ra"
     },
     {
-      "_note": "SSH: a second sshd (or Dropbear) lets the account bbs in and runs mkbbsssh, which connects here (SSH.md)",
+      "_note": "SSH: a second sshd (or Dropbear) lets the account bbs in and runs mkbbsssh, which connects here (SSH.md); the label is for the statistics (mkstats -by label)",
       "port": 2328,
+      "label": "ssh",
       "type": "telnet",
       "bind": "127.0.0.1",
       "proxy": true,

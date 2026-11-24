@@ -92,6 +92,7 @@ Rules:
 * `port` is required for each port.  A port starts from the global `nodes` and `maxperip`.
 * `config` is the same as `"env": {"MK": "..."}`; `env` adds other variables; `args` adds words to the `mk` command line
   (for example `["-L", "-X"]`).
+* `label` names what a port is for in the statistics (`STATS.md`): `"label": "ssh"` on the port that `mkbbsssh` connects to; without it the label is the type of the port (`telnet-tls` for a TLS port).
 * `bind` limits a port to an address (default all IPv4 addresses).  Keep the `sysop` port on `127.0.0.1`.
 * `localnode` must not be one of the nodes of any port (the listener refuses to start otherwise).
 * A `sysop` `password` is the text itself, or `sha1:` followed by the lower case hex digest.  To make one:
@@ -227,7 +228,7 @@ The guard is **on by default**: 5 failed log-ons from one address within 10 minu
 `"allow"` takes single addresses and IPv4 nets (`"10.0.0.0/8"`); naming it **replaces** the default list, so keep `127.0.0.1` in it when you want the machine itself exempt.  Put your own
 network (the address you log on from) in it, or you can lock yourself out for an hour; a restart of `mklisten` also clears the blocks.  `mklisten -t` says what is in force.
 
-A caller who did not get in (wrong passwords, too many tries at the name) makes `mk` end with the errorlevel **88**; `mklisten` counts that
+A caller who did not get in (wrong passwords, too many tries at the name; **not** one who has gone away: a port scan or a dropped connection) makes `mk` end with the errorlevel **88**; `mklisten` counts that
 for the address of the connection (not for the sysop port; behind a front end it is the real address from the PROXY header).  The address
 that reaches `fails` within `window` is refused (the message, no node) for `block` seconds and the log says so (`loginguard: 1.2.3.4 is blocked
 for 3600 seconds after 5 failed log-ons`, `refused 1.2.3.4: blocked after failed log-ons`).  The counts and the blocks are in memory: a restart clears them.

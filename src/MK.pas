@@ -6,7 +6,7 @@ Program MK;
 Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
-MKSys, MKCodes, MKLogHook, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
+MKSys, MKCodes, MKLogHook, MKStats, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
 MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, Dos
   ;
 
@@ -229,6 +229,7 @@ If UserBaud = 0 Then
   UserBaud := 38400;                    {nominal speed of a network session}
 LogEntry.Init;
 If IoResult <> 0 Then;
+StatsBegin(SessType, ComSession^.GetRemoteAddr, NodeNumber, LocalMode);
 LogHook := LogWrite;                    {what the low level units say (a menu, a screen, a language file that is not there) goes in the log}
 If LogToPrinter Then
   LogEntry.SetPrnName(Config^.GetPrnName);
@@ -322,6 +323,7 @@ Else
     BbsDisplay.DisplayBbsFile('logo', '');
     StartUpUser;
     AskName;
+    StatsLoggedOn;
     End;
   End;
 If QwkMode Then
@@ -342,6 +344,7 @@ Else
   If Menu.GetError <> 0 Then
     Begin
     User.DisplayStrLn('Unable to load top menu ' + Long2Str(Menu.GetError));
+    StatsEnd(False);
     Halt(1);
     End;
   MenuState := 1;
@@ -369,6 +372,7 @@ Else
   End;
 User.PostStatus(uoNotAvail);
 User.Done;
+StatsEnd(ExitErrorLevel = LoginFailLevel);
 LogEntry.WriteEntry('Leaving MK Bbs');
 LogEntry.Done;
 Config^.Done;

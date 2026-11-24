@@ -43,6 +43,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfreq src/MKFreq.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkevents src/MKEvents.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbackup src/MKBackup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmaint src/MKMaint.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkstats src/MKStatsRep.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -275,6 +276,11 @@ if grep -q FAIL build/debresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/missingtest.py build/work/missing | grep -E "^(ok|FAIL|skip|failures)" | tee build/missingresult.txt
   if grep -q FAIL build/missingresult.txt; then exit 1; fi
+fi
+# the statistics: mk writes a line for each call, mkstats reports (real mk over telnet, private copy)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/statstest.py build build/work/stats | grep -E "^(ok|FAIL|skip|failures)" | tee build/statsresult.txt
+  if grep -q FAIL build/statsresult.txt; then exit 1; fi
 fi
 # mkmaint: the purge of message areas by their limits, on private copies
 if [ -f bbs/bbsc/ra/config.mk ]; then
