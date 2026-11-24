@@ -1,6 +1,6 @@
 # Housekeeping: plan (test fixture, message base maintenance, backup, statistics)
 
-Status (2026-11-23): **1 (the test fixture) is built.**  2 to 4 are planned here; the questions at the end need your answers before anything is written.
+Status (2026-11-23): **1 (the test fixture) is built; 3 (backup) is built** (config `.bak`, `mkbackup`, `BACKUP.md`).  2 (`mkmaint`) and 4 (statistics) are next.  Your answers to the questions: never purge unread private mail; Squish and `*.msg` bases get `DaysKept` / `RcvdDays` too; file areas only with a switch and backups in `<BBS dir>/backup/`; one `.bak` generation; statistics for the sysop only (later: display codes callers' screens can embed); backup first.
 
 The four pieces, in the order they are done:
 

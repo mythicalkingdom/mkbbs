@@ -41,6 +41,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkusered src/MKUserEd.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkpwconv src/MKPwConv.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfreq src/MKFreq.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkevents src/MKEvents.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkbackup src/MKBackup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omknodelist src/MKNodeList.pas
@@ -269,6 +270,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   # the Debian package (packaging/mkdeb.sh): its contents, the scripts, lintian, the programs from the unpacked package
 python3 tests/debtest.py build build/work/deb | grep -E "^(FAIL|skip|failures)" | tee build/debresult.txt
 if grep -q FAIL build/debresult.txt; then exit 1; fi
+# mkbackup: backup, list, test, restore on a private copy
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/backuptest.py build build/work/backup | grep -E "^(ok|FAIL|skip|failures)" | tee build/backupresult.txt
+  if grep -q FAIL build/backupresult.txt; then exit 1; fi
+fi
 # native TLS in mklisten ("tls": true): fakemk behind it, a self-signed certificate, no stunnel
 python3 tests/tlstest.py build build/work/tls | grep -E "^(FAIL|skip|failures)" | tee build/tlsresult.txt
 if grep -q FAIL build/tlsresult.txt; then exit 1; fi

@@ -127,6 +127,8 @@ Function  LoadFilePos(FN: String; Var Rec; FS: Word; FPos: LongInt): Word;
 Function  LoadFile(FN: String; Var Rec; FS: Word): Word;
 Function  SaveFilePos(FN: String; Var Rec; FS: Word; FPos: LongInt): Word;
 Function  SaveFile(FN: String; Var Rec; FS: Word): Word;
+Function  SaveFileBak(FN: String; Var Rec; FS: Word): Word;
+  {SaveFile, and the file that is replaced is kept as FN.bak (one generation) when what is written is not the same: a save that changes nothing leaves the .bak alone}
 Function  ExtendFile(FN: String; ToSize: LongInt): Word;
 Function  CreateTempDir(FN: String): String;
 Function  GetTempName(FN: String): String;
@@ -790,6 +792,70 @@ Function SaveFile(FN: String; Var Rec; FS: Word): Word;
    Begin
    SaveFile := SaveFilePos(FN, Rec, FS, 0);
    End;
+
+
+Procedure KeepBak(FN: String; Var Rec; FS: Word);
+  {FN is going to be replaced by Rec: when it holds something else (another size or other bytes) it is copied to FN.bak first}
+  Var
+    F, B: File;
+    Old: Pointer;
+    N, Got, Put: LongInt;
+    Same: Boolean;
+
+  Begin
+  If Not FileExist(FN) Then
+    Exit;
+  Assign(F, FN);
+  FileMode := fmReadOnly + fmDenyNone;
+  {$I-}
+  Reset(F, 1);
+  {$I+}
+  If IoResult <> 0 Then
+    Exit;
+  N := FileSize(F);
+  If N = 0 Then
+    Begin
+    Close(F);
+    If IoResult <> 0 Then;
+    Exit;
+    End;
+  If N > 16777216 Then
+    Begin
+    Close(F);
+    If IoResult <> 0 Then;
+    Exit;
+    End;
+  GetMem(Old, N);
+  {$I-}
+  BlockRead(F, Old^, N, Got);
+  Close(F);
+  {$I+}
+  If (IoResult = 0) And (Got = N) Then
+    Begin
+    Same := (N = FS) And (CompareByte(Old^, Rec, FS) = 0);
+    If Not Same Then
+      Begin
+      Assign(B, FN + '.bak');
+      {$I-}
+      Rewrite(B, 1);
+      If IoResult = 0 Then
+        Begin
+        BlockWrite(B, Old^, N, Put);
+        Close(B);
+        End;
+      {$I+}
+      If IoResult <> 0 Then;
+      End;
+    End;
+  FreeMem(Old, N);
+  End;
+
+
+Function SaveFileBak(FN: String; Var Rec; FS: Word): Word;
+  Begin
+  KeepBak(FN, Rec, FS);
+  SaveFileBak := SaveFile(FN, Rec, FS);
+  End;
 
 
 

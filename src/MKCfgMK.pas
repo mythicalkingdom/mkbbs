@@ -823,31 +823,31 @@ Function MKCfgObj.SaveFileName(FN: String): String;
 
 Function MKCfgObj.SaveFileEcho: Word;
   Begin
-  SaveFileEcho := SaveFile(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
+  SaveFileEcho := SaveFileBak(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
   End;
 
 
 Function MKCfgObj.SaveEchoCfg: Word;
   Begin
-  SaveEchoCfg := SaveFile(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
+  SaveEchoCfg := SaveFileBak(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
   End;
 
 
 Procedure MKCfgObj.MKSave;
   Begin
-  Error := SaveFile(SaveFileName('config.mk'), MKCfg^, SizeOf(MKCfg^));
+  Error := SaveFileBak(SaveFileName('config.mk'), MKCfg^, SizeOf(MKCfg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('messages.mk'), MKMsg^, SizeOf(MKMsg^));
+    Error := SaveFileBak(SaveFileName('messages.mk'), MKMsg^, SizeOf(MKMsg^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('files.mk'), MKFile^, SizeOf(MKFile^));
+    Error := SaveFileBak(SaveFileName('files.mk'), MKFile^, SizeOf(MKFile^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
+    Error := SaveFileBak(SaveFileName('echocfg.mk'), MKEcho^, SizeOf(MKEcho^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('mailer.mk'), MKMail^, SizeOf(MKMail^));
+    Error := SaveFileBak(SaveFileName('mailer.mk'), MKMail^, SizeOf(MKMail^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('events.mk'), MKEvents^, SizeOf(MKEvents^));
+    Error := SaveFileBak(SaveFileName('events.mk'), MKEvents^, SizeOf(MKEvents^));
   If Error = 0 Then
-    Error := SaveFile(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
+    Error := SaveFileBak(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
   End;
 
 

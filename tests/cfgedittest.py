@@ -43,10 +43,17 @@ def has(d, pat):
 
 
 d = private()
+rd = lambda dd, n: open(os.path.join(dd, n), 'rb').read() if os.path.exists(os.path.join(dd, n)) else None
+orig = rd(d, 'config.mk')
 shot(d, '\\x1bg', '\\x1b[B', '\\r', '\\t\\t\\t\\t', '/x\\\\y', '\\r', '\\x1bx', 'y')
 check('edited path saved with slashes', has(d, rb'/x/y/'))
+check('the file that was replaced is kept as config.mk.bak (one generation)', rd(d, 'config.mk.bak') == orig and rd(d, 'config.mk') != orig)
+first = rd(d, 'config.mk')
 shot(d, '\\x1bg', '\\r', '\\t\\t\\t', 'ZZQ', '\\r', '\\x1bx', 'y')
 check('General screen edit saved', has(d, rb'ZZQ'))
+check('the next save replaces the .bak with the version before it (not the original)', rd(d, 'config.mk.bak') == first)
+shot(d, '\\x1bg', '\\x1bx', 'y')
+check('a save that changes nothing leaves the .bak alone', rd(d, 'config.mk.bak') == first)
 d2 = private()
 before = open(os.path.join(d2, 'config.mk'), 'rb').read()
 shot(d2, '\\x1be', '\\r', ' ', '\\r', '\\x1b', '\\x1bx', 'y')
