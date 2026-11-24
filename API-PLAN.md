@@ -1,6 +1,6 @@
 # JSON API: plan
 
-Status (2026-11-24): **plan only.**  Decisions of the sysop: first audience is the **sysop** (scripts, dashboards, monitoring), but the design **keeps the caller option open** (offline messages, BBS-to-BBS later);
+Status (2026-11-24): **phases 1 and 2 built** (`mkapi`: HTTP, TLS, tokens and scopes and every endpoint of the table below in `MKApiData.pas`; the `api` port type; `mkapitoken`; `tests/apitest.py`); phase 3 (`API.md`) to do.  Decisions: `users:private` is a reserved scope name; deleted users are hidden unless asked for; message text is deferred.  Decisions of the sysop: first audience is the **sysop** (scripts, dashboards, monitoring), but the design **keeps the caller option open** (offline messages, BBS-to-BBS later);
 **version 1 is strictly read-only**; **TLS is included from the start**.  (The web UI was dropped earlier; this is only the API.)
 
 ## Shape
@@ -45,6 +45,7 @@ In the BBS directory, **mode 600**, never in `mklisten.json`.  Written only by *
 | `/v1/stats?from=&to=&by=` | `stats` | what `mkstats` shows: totals, or by day / hour / node / label / port / user / result / type |
 | `/v1/calls?limit=&since=` | `calls` | the last calls (the statistics lines) |
 | `/v1/areas/messages`, `/v1/areas/files` | `areas` | areas with their numbers of messages / files, last date, sizes |
+| `/v1/areas/files/{area}?q=&limit=&after=` | `files` | the files of one area: name, description (from `files.bbs`, continuation lines joined with a line feed), size, date; a file the list does not name has description null; paged by name (`next` is the last name), `q` searches names and descriptions |
 | `/v1/users?q=&limit=&after=` , `/v1/users/{name}` | `users` | name, city, security level, calls, last call, flags; paged; no password, no phone numbers unless the token also has `users:private` |
 
 Everything comes from files and sockets that exist (`stats/*.tsv`, `events.info`, node files, the mailer socket, the message and file bases opened read-only); `mkapi` writes nothing but its log line and the

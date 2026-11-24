@@ -27,6 +27,7 @@ overview and the steps to set it up.
   | `ws` | a web socket (a browser terminal) | text is UTF-8; for `wss://` use `"tls": true` or put `stunnel` in front |
   | `qwk` | a QWK network system or script | `mk -Q`: `Login:`, `Password:`, then `QWK:` with D, U, B, Q; only users with the QWK Node flag may enter |
   | `sysop` | the sysop, not a caller | opens the monitor `mkmon` (see below) |
+  | `api` | a program or script of the sysop | the read only JSON API: `mkapi` answers one HTTP request per connection (`API-PLAN.md`); needs a token (`mkapitoken`); on `127.0.0.1` by default, TLS (`"tls": true`) for any other address, `"insecure": true` to say you know; bad tokens count for the login guard |
 
   Any caller port can also have `"qwk": true` to give its callers the QWK login.
 * **Limits.**  `nodes` are the node numbers handed out (`"1-8"`, one number, or a list), `maxperip` is how many callers one

@@ -47,6 +47,8 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkstats src/MKStatsRep.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpurge src/MKUserPurge.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfilecheck src/MKFileCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpack src/MKUserPack.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapi src/MKApi.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapitoken src/MKApiTokTool.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
@@ -280,6 +282,11 @@ if grep -q FAIL build/debresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/missingtest.py build/work/missing | grep -E "^(ok|FAIL|skip|failures)" | tee build/missingresult.txt
   if grep -q FAIL build/missingresult.txt; then exit 1; fi
+fi
+# the JSON API: tokens, mkapi over HTTP and TLS, the login guard
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/apitest.py build/work/api | grep -E "^(ok|FAIL|skip|failures)" | tee build/apiresult.txt
+  if grep -q FAIL build/apiresult.txt; then exit 1; fi
 fi
 # housekeeping of users (mkuserpurge) and of the file areas (mkfilecheck), on private copies
 if [ -f bbs/bbsc/ra/config.mk ]; then

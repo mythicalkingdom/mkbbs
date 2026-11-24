@@ -165,6 +165,8 @@ Type
     Tls: Boolean;                      {native TLS: mk does the handshake (-Y) with the certificate and key of the "tls" section}
     Charset: String;                   {auto, cp437 or utf8}
     Sysop: Boolean;
+    Api: Boolean;                      {the JSON API (mkapi): one process for each request, no node}
+    Insecure: Boolean;                 {an api port that is not on loopback may go without TLS only with this}
     Password: String;
     Fd: LongInt;
     End;
@@ -220,6 +222,7 @@ Var
   TestOnly: Boolean = False;
   MkPath: String = 'mk';
   MonPath: String = '';
+  ApiPath: String = '';
   LocalNode: Integer = 0;              {node number of the local MK that the L key of mkmon runs, 0 = no L key}
   RunDir: String = '';
   RunUser, RunGroup: String;
@@ -379,6 +382,7 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     V: TJSONData;
     E: TJSONObject;
     Qwk: Boolean;
+    BindGiven: Boolean;
 
   Begin
   Qwk := False;
@@ -397,6 +401,9 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   P.Label_ := '';
   P.Charset := 'auto';
   P.Sysop := False;
+  P.Api := False;
+  P.Insecure := False;
+  BindGiven := False;
   P.Password := '';
   P.Fd := -1;
   For i := 0 To O.Count - 1 Do
@@ -418,15 +425,25 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
         P.Sysop := True;
         P.SType := 'telnet';
         End
+      Else If P.SType = 'api' Then
+        Begin
+        P.Api := True;                   {HTTP and JSON, read only: mkapi}
+        P.SType := 'api';
+        End
       Else If (P.SType <> 'telnet') And (P.SType <> 'raw') And (P.SType <> 'ws') Then
-        Die(Where + '.type must be "telnet", "raw", "ws", "qwk" or "sysop" (TLS: "tls": true, or stunnel in front)');
+        Die(Where + '.type must be "telnet", "raw", "ws", "qwk", "sysop" or "api" (TLS: "tls": true, or stunnel in front)');
       End
     Else If Key = 'qwk' Then
       Qwk := JBool(V, Where + '.qwk')
     Else If Key = 'baud' Then
       P.Baud := JInt(V, Where + '.baud', 0, 1000000)
     Else If Key = 'bind' Then
-      P.Bind := JStr(V, Where + '.bind')
+      Begin
+      P.Bind := JStr(V, Where + '.bind');
+      BindGiven := True;
+      End
+    Else If Key = 'insecure' Then
+      P.Insecure := JBool(V, Where + '.insecure')
     Else If Key = 'nodes' Then
       ParseNodes(V, P.First, P.Last, Where)
     Else If Key = 'maxperip' Then
@@ -484,6 +501,17 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     Die('port ' + IntToStr(P.Port) + ': "tls": true needs a "tls" section with "cert" and "key"');
   If P.Tls And P.Proxy Then
     Die('port ' + IntToStr(P.Port) + ': "tls" and "proxy" do not go together (a TLS front end sends the PROXY header, native TLS has the address already)');
+  If P.Api And (Not BindGiven) Then
+    P.Bind := '127.0.0.1';             {an api port is on loopback unless it is told otherwise}
+  If P.Api Then
+    Begin
+    If P.MaxPerIp = 0 Then
+      P.MaxPerIp := 10;
+    If (P.Bind <> '127.0.0.1') And (Not P.Tls) And (Not P.Insecure) Then
+      Die('port ' + IntToStr(P.Port) + ': an api port that is not on 127.0.0.1 needs "tls": true (or a TLS front end on loopback with "proxy": true); "insecure": true says you know that tokens then travel in the clear');
+    If P.Insecure And (P.Bind <> '127.0.0.1') Then
+      Log('port ' + IntToStr(P.Port) + ': api without TLS on ' + P.Bind + ' (insecure)');
+    End;
   If P.Tls And P.Sysop Then
     Die('port ' + IntToStr(P.Port) + ': a sysop port is not for TLS (it is on 127.0.0.1: reach it with ssh port forwarding)');
   If P.Sysop Then
@@ -685,6 +713,7 @@ Procedure LoadConfig;
     V := O.Items[i];
     If Key = 'mk' Then MkPath := JStr(V, 'mk')
     Else If Key = 'mkmon' Then MonPath := JStr(V, 'mkmon')
+    Else If Key = 'mkapi' Then ApiPath := JStr(V, 'mkapi')
     Else If Key = 'rundir' Then RunDir := JStr(V, 'rundir')
     Else If Key = 'localnode' Then LocalNode := JInt(V, 'localnode', 0, 255)
     Else If Key = 'user' Then RunUser := JStr(V, 'user')
@@ -729,7 +758,7 @@ Procedure LoadConfig;
   Root.Free;
   If LocalNode > 0 Then
     For i := 0 To High(Ports) Do
-      If (Not Ports[i].Sysop) And (LocalNode >= Ports[i].First) And (LocalNode <= Ports[i].Last) Then
+      If (Not Ports[i].Sysop) And (Not Ports[i].Api) And (LocalNode >= Ports[i].First) And (LocalNode <= Ports[i].Last) Then
         Die(CfgFile + ': "localnode" ' + IntToStr(LocalNode) + ' is one of the nodes of port ' + IntToStr(Ports[i].Port));
   MkPath := ResolveProg(MkPath);
   If MonPath = '' Then
@@ -740,6 +769,14 @@ Procedure LoadConfig;
       MonPath := 'mkmon';
     End;
   MonPath := ResolveProg(MonPath);
+  If ApiPath = '' Then
+    Begin
+    If Pos('/', MkPath) > 0 Then
+      ApiPath := ExtractFilePath(MkPath) + 'mkapi'
+    Else
+      ApiPath := 'mkapi';
+    End;
+  ApiPath := ResolveProg(ApiPath);
   If EvOn Then
     Begin
     If EvConfig = '' Then
@@ -796,6 +833,8 @@ Procedure OpenListeners;
     Ports[i].Fd := S;
     If Ports[i].Sysop Then
       Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' sysop monitor')
+    Else If Ports[i].Api Then
+      Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' api' + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls)))
     Else
       Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' ' +
         Ports[i].SType + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls)) + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
@@ -2762,6 +2801,12 @@ Procedure ReapChildren;
           DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.info');
           DeleteFile(RunDir + '/node' + IntToStr(Children[i].Node) + '.snoop');
           End
+        Else If Ports[Children[i].PortNo].Api Then
+          Begin
+          Log('api request ended (' + How + ') ' + Children[i].Addr);
+          If wifexited(Status) And (wexitstatus(Status) = 88) Then
+            NoteFailedLogon(Children[i].Addr);      {a token that was not good counts as a failed log-on}
+          End
         Else
           Log('sysop monitor ended (' + How + ') ' + Children[i].Addr);
         For j := i To High(Children) - 1 Do
@@ -2807,6 +2852,8 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
       WriteNodeInfo(Children[High(Children)]);
     If P.Sysop Then
       Log('sysop monitor on port ' + IntToStr(P.Port) + ' from ' + Addr + ' pid ' + IntToStr(Pid))
+    Else If P.Api Then
+      Log('api request on port ' + IntToStr(P.Port) + ' from ' + Addr + ' pid ' + IntToStr(Pid))
     Else
     Log('node ' + IntToStr(Node) + ' ' + P.SType + ':' + IntToStr(P.Port) + ' from ' +
       Addr + ' pid ' + IntToStr(Pid));
@@ -2830,6 +2877,8 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
   ArgS := TStringList.Create;
   If P.Sysop Then
     ArgS.Add(MonPath)
+  Else If P.Api Then
+    ArgS.Add(ApiPath)
   Else
     Begin
     ArgS.Add(MkPath);
@@ -2838,14 +2887,15 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     If (i >= 1) And (i <= 1440) Then
       ArgS.Add('-T' + IntToStr(i));
     End;
-  ArgS.Add('-S' + UpperCase(P.SType));
-  If (P.Baud > 0) And (Not P.Sysop) Then
+  If Not P.Api Then
+    ArgS.Add('-S' + UpperCase(P.SType));
+  If (P.Baud > 0) And (Not P.Sysop) And (Not P.Api) Then
     ArgS.Add('-B' + IntToStr(P.Baud));
   If P.Proxy Then
     ArgS.Add('-H');
   If P.Tls Then
     ArgS.Add('-Y');
-  If (Not P.Sysop) And (P.Charset <> 'auto') Then
+  If (Not P.Sysop) And (Not P.Api) And (P.Charset <> 'auto') Then
     ArgS.Add('-U' + UpperCase(P.Charset));
   ArgS.Add('-A' + Addr);
   W := Trim(P.Args);
@@ -2883,6 +2933,8 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
     EnvS.Add('MKLABEL=' + P.Label_)
   Else If P.Sysop Then
     EnvS.Add('MKLABEL=sysop')
+  Else If P.Api Then
+    EnvS.Add('MKLABEL=api' + Copy('-tls', 1, 4 * Ord(P.Tls)))
   Else If P.Tls Then
     EnvS.Add('MKLABEL=' + P.SType + '-tls')
   Else
@@ -2905,6 +2957,8 @@ Procedure StartChild(Client: LongInt; PortNo, Node: Integer; Const Addr: String)
   Envv[EnvS.Count] := Nil;
   If P.Sysop Then
     fpExecve(MonPath, PPChar(@Argv[0]), PPChar(@Envv[0]))
+  Else If P.Api Then
+    fpExecve(ApiPath, PPChar(@Argv[0]), PPChar(@Envv[0]))
   Else
     fpExecve(MkPath, PPChar(@Argv[0]), PPChar(@Envv[0]));
   Ch := fpGetErrno;
@@ -3147,16 +3201,16 @@ Procedure Accept(PortNo: Integer);
     Refuse(C, 'blocked after failed log-ons', Addr, GuardMsg);
     Exit;
     End;
-  If (Not Ports[PortNo].Sysop) And EventsBlockLogins Then
+  If (Not Ports[PortNo].Sysop) And (Not Ports[PortNo].Api) And EventsBlockLogins Then
     Begin
     Refuse(C, 'closed for an event', Addr, EvClosedMsg);
     Exit;
     End;
-  If Ports[PortNo].Sysop Then
+  If Ports[PortNo].Sysop Or Ports[PortNo].Api Then
     Node := 0
   Else
     Node := FreeNode(Ports[PortNo]);
-  If (Node = 0) And (Not Ports[PortNo].Sysop) Then
+  If (Node = 0) And (Not Ports[PortNo].Sysop) And (Not Ports[PortNo].Api) Then
     Begin
     Refuse(C, 'no free node on port ' + IntToStr(Ports[PortNo].Port), Addr);
     Exit;
@@ -3254,6 +3308,12 @@ Begin
     Begin
     WriteLn('mklisten: ', CfgFile, ' ok, ', Length(Ports), ' port(s)');
     WriteLn('  mk:    ', MkPath, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MkPath)), 11));
+    For i := 0 To High(Ports) Do
+      If Ports[i].Api Then
+        Begin
+        WriteLn('  mkapi: ', ApiPath, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(ApiPath)), 11));
+        Break;
+        End;
     For i := 0 To High(Ports) Do
       If Ports[i].Sysop Then
         Begin
