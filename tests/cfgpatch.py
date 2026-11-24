@@ -50,3 +50,17 @@ def log_file(cfg_dir):
     """Where the BBS log of the private copy in cfg_dir is written (see fix_sample)"""
     import os
     return os.path.join(os.path.dirname(os.path.abspath(cfg_dir)), 'l')
+
+
+def snapshot(path):
+    """The place to copy a part of the sample BBS from: the snapshot of the fixture (tests/fixture.py) for the live sample directory, the menus, the node list
+    and the mkqwk configuration, the path itself for anything else.  The snapshot is made when it is not there (build.sh makes it at its start)."""
+    import os, sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import fixture
+    real = os.path.realpath(path)
+    for name in fixture.PARTS:
+        if real == os.path.realpath(fixture.live(name)):
+            fixture.ensure()
+            return fixture.fix(name)
+    return path

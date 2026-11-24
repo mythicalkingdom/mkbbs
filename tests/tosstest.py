@@ -20,7 +20,7 @@ cfg = tmp + '/r'
 inb, outb, unsec = tmp + '/in', tmp + '/out', tmp + '/un'
 for d in (inb, outb, unsec):
     os.makedirs(d)
-shutil.copytree(srcra, cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'echocfg.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(srcra), cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'echocfg.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 shutil.copy2(os.path.join(srcra, [f for f in os.listdir(srcra) if f.lower() == 'echocfg.mk'][0]), cfg + '/echocfg.mk') if any(f.lower() == 'echocfg.mk' for f in os.listdir(srcra)) else None
 cfgpatch.fix_sample(cfg)
 assert cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),

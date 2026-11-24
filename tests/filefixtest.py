@@ -19,7 +19,7 @@ cfg = tmp + '/r'
 inb, outb, unsec = tmp + '/in', tmp + '/out', tmp + '/un'
 for d in (inb, outb, unsec):
     os.makedirs(d)
-shutil.copytree(srcra, cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(srcra), cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 cfgpatch.fix_sample(cfg)
 # the message bases of the sample are in the sample BBS itself: the copy must have its own, or the replies of the tosser land in the real ones
 assert cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),

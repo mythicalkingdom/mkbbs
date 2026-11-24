@@ -63,6 +63,8 @@ for t in smoke mertest merstress comtest dupetest doortest stdtest opentest synt
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
 done
 mkdir -p build/work
+# the tests copy a snapshot of the sample BBS (build/fixture), not the sample that a running BBS may use; at the end it says if anything changed meanwhile
+if [ -f bbs/bbsc/ra/config.mk ]; then python3 tests/fixture.py make > /dev/null; fi
 build/smoke build/work
 # The slow tests run in four lanes at the same time (a lane runs its tests one after the other, in the order they are given here),
 # next to the rest of the tests, which run one after the other.  Each lane writes its own log; the logs are shown, and the build
@@ -95,7 +97,7 @@ mkdir -p build/work/pwconv
 python3 tests/pwconvtest.py build build/work/pwconv | grep -E '^(ok|FAIL|skip|failures)'
 par_1() {
 if [ -f bbs/bbsc/ra/config.mk ]; then
-  rm -rf build/work/pwuser; mkdir -p build/work/pwuser; cp -r bbs/bbsc/ra/. build/work/pwuser/ 2>/dev/null || true
+  rm -rf build/work/pwuser; mkdir -p build/work/pwuser; cp -r "$(python3 tests/fixture.py path ra)"/. build/work/pwuser/ 2>/dev/null || true
   MK=$PWD/build/work/pwuser build/pwusertest | grep -E 'FAIL|failures'
   python3 tests/pwlogintest.py build build/work/pwlogin | grep -E '^(FAIL|skip|failures)'
 fi
@@ -129,23 +131,9 @@ if [ -f javascript/message_bases/synchronet/fsx_bbs.shd ]; then
   build/syntest check build/work/fsx_bbs | grep -E 'FAIL|failures'
 fi
 [ "$(printf 'abc' | build/stdtest)" = 'ABC' ] && echo 'ok   MKComStd on a pipe' || { echo 'FAIL MKComStd on a pipe'; exit 1; }
-# configuration editor: edit a path on a copy of the sample config through a pseudo terminal, check the file
+# configuration editor: edits through a pseudo terminal on private copies of the sample config (paths patched: a save cannot reach the sample), the saved file is checked
 if [ -f bbs/bbsc/ra/config.mk ]; then
-  mkdir -p build/cfgwork/ra; (cd bbs/bbsc/ra && tar cf - --exclude='mkbink.conf*' --exclude='Mailer.Mk' .) | tar xf - -C build/cfgwork/ra
-  CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\x1b[B' '\r' '\t\t\t\t' '/x\\y' '\r' '\x1bx' 'y' > /dev/null 2>&1
-  strings build/cfgwork/ra/config.mk | grep -q '^/x/y/' && echo 'ok   mkconfig: edited path saved with slashes' || { echo 'FAIL mkconfig: edit not saved'; exit 1; }
-  # General screen (converted layout): replace the BBS id, save
-  CFGDIR=$PWD/build/cfgwork/ra python3 tests/cfgshot.py '\x1bg' '\r' '\t\t\t' 'ZZQ' '\r' '\x1bx' 'y' > /dev/null 2>&1
-  strings build/cfgwork/ra/config.mk | grep -q 'ZZQ' && echo 'ok   mkconfig: General screen edit saved' || { echo 'FAIL mkconfig: General edit not saved'; exit 1; }
-  # Events list -> event 1 -> Space changes the status choice -> OK, quit and save: the config file must change
-  mkdir -p build/cfgwork2/ra; (cd bbs/bbsc/ra && tar cf - --exclude='mkbink.conf*' --exclude='Mailer.Mk' .) | tar xf - -C build/cfgwork2/ra
-  CFGDIR=$PWD/build/cfgwork2/ra python3 tests/cfgshot.py '\x1be' '\r' ' ' '\r' '\x1b' '\x1bx' 'y' > /dev/null 2>&1
-  N=$(cmp -l bbs/bbsc/ra/config.mk build/cfgwork2/ra/config.mk | wc -l)
-  [ "$N" -ge 1 ] && [ "$N" -le 4 ] && echo 'ok   mkconfig: event status choice saved' || { echo "FAIL mkconfig: event edit ($N bytes differ)"; exit 1; }
-  # Transfer Protocols (General menu): external protocol 11 gets a key and a "send | receive" command line
-  mkdir -p build/cfgwork3/ra; (cd bbs/bbsc/ra && tar cf - --exclude='mkbink.conf*' --exclude='Mailer.Mk' .) | tar xf - -C build/cfgwork3/ra
-  CFGDIR=$PWD/build/cfgwork3/ra python3 tests/cfgshot.py '\x1bg' 't' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\x1b[B' '\r' 'Zed' '\t' 'R' '\t' '\t' '\t' 'sz %F | rz' '\r' '\x1b' '\x1bx' 'y' > /dev/null 2>&1
-  strings build/cfgwork3/ra/config.mk | grep -q 'sz %F | rz' && echo 'ok   mkconfig: external protocol command line saved' || { echo 'FAIL mkconfig: protocol edit not saved'; exit 1; }
+  python3 tests/cfgedittest.py build/work/cfgedit | grep -E "^(ok|FAIL|skip|failures)"
 fi
 # MKRead: read a message and write a reply on a private copy of the sample BBS
 if [ -f bbs/bbsc/ra/config.mk ]; then
@@ -415,3 +403,5 @@ fi
 }
 lane B par_12
 lanewait
+# nothing of the live sample and nothing of the snapshot may have changed during the run
+if [ -f build/fixture/live.json ]; then python3 tests/fixture.py verify; fi

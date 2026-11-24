@@ -24,7 +24,7 @@ a_dir, c_dir = work + '/a', work + '/c'
 area = tmp + '/fa/'
 for d in (inb, outb, unsec, a_dir + '/in', a_dir + '/out', c_dir + '/in', c_dir + '/out', area):
     os.makedirs(d)
-shutil.copytree(srcra, cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)
+shutil.copytree(cfgpatch.snapshot(srcra), cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)
                                                  or f.lower().endswith(('.pwbak', '.old'))])
 cfgpatch.fix_sample(cfg)
 assert cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),

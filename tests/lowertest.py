@@ -16,8 +16,8 @@ if not (os.path.isdir(src) and os.path.isdir(srcmenus)):
 ign = lambda d, n: [f for f in n if f.endswith('.mixedcase') or f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)]
 ra = cfgpatch.short_dir() + '/r'
 menus = ra.rsplit('/', 1)[0] + '/m'
-shutil.copytree(src, ra, ignore=ign)
-shutil.copytree(srcmenus, menus, ignore=ign)
+shutil.copytree(cfgpatch.snapshot(src), ra, ignore=ign)
+shutil.copytree(cfgpatch.snapshot(srcmenus), menus, ignore=ign)
 maps = {(src + '/').encode(): (ra + '/').encode(), (srcmenus + '/').encode(): (menus + '/').encode()}
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: maps.get(s, s))
 # the sample may have been migrated already: put the mixed case back in the copy (language file names, and the first word of

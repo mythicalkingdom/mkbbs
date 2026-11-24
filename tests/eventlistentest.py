@@ -51,7 +51,7 @@ sunday_based_weekday = (_lt.tm_wday + 1) % 7                                    
 def make_cfg(name, events):
     """A configuration directory (private copy of the sample) whose events are `events`: {n: dict}; the others are deleted"""
     d = os.path.join(cfgpatch.short_dir(), 'c')
-    shutil.copytree(sample, d, ignore=lambda a, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'events.mk', 'events.run')) or
+    shutil.copytree(cfgpatch.snapshot(sample), d, ignore=lambda a, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'events.mk', 'events.run')) or
                                                     not os.access(os.path.join(a, f), os.R_OK)])
     j = os.path.join(work, name + '-json')
     os.makedirs(j)

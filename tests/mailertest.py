@@ -16,7 +16,7 @@ if not os.path.isdir(src):
 shutil.rmtree(work, ignore_errors=True)
 os.makedirs(work)
 cfg = cfgpatch.short_dir() + '/r'
-shutil.copytree(src, cfg, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
+shutil.copytree(cfgpatch.snapshot(src), cfg, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(cfg)
 # the paths in config.mk lead to the sample: point them at the copy, or a file that is only in the sample (a
 # mailer.mk made by hand there) would be found, and saved over, through them

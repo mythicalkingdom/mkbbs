@@ -20,7 +20,7 @@ tmp = cfgpatch.short_dir()
 dst = os.path.join(tmp, 'r')
 nl = os.path.join(tmp, 'n')
 os.makedirs(nl)
-shutil.copytree(srcra, dst, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(srcra), dst, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(dst)
 for f in ('nodelist.262', 'techlist.346', 'icdmlist.353'):
     shutil.copy2(os.path.join(srcnl, f), nl)             # keeps the file dates (they go into the index)

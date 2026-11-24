@@ -27,7 +27,8 @@ before = snapshot()
 shutil.rmtree(work, ignore_errors=True)
 inp, out, outq, outs = [os.path.join(work, d) for d in ('in', 'out', 'quick', 'sbbs')]
 os.makedirs(work)
-shutil.copytree(sample, inp, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch
+shutil.copytree(cfgpatch.snapshot(sample), inp, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(inp)
 for d in (out, outq, outs):
     os.makedirs(d)

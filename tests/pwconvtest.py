@@ -53,7 +53,7 @@ check(r.returncode == 0 and 'nothing to do' in r.stdout, 'no file: nothing to do
 src = os.path.join(here, '..', 'bbs', 'bbsc', 'ra')
 if os.path.isdir(src) and os.path.exists(src + '/extusers.bbs.old'):
     dst = cfgpatch.short_dir() + '/r'
-    shutil.copytree(src, dst, ignore=lambda dd, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(dd, f), os.R_OK)])
+    shutil.copytree(cfgpatch.snapshot(src), dst, ignore=lambda dd, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(dd, f), os.R_OK)])
     shutil.copy(dst + '/extusers.bbs.old', dst + '/extusers.bbs')
     env = dict(os.environ, MK=dst)
     for prog, args in (('mk', ['-L']), ('mkusered', [])):
@@ -79,7 +79,7 @@ if os.path.isdir(src) and os.path.exists(build + '/netsetup'):
     tmp = cfgpatch.short_dir()
     ra = tmp + '/r'
     repo = os.path.realpath(os.path.join(here, '..'))
-    shutil.copytree(src, ra, ignore=lambda dd, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(dd, f), os.R_OK)
+    shutil.copytree(cfgpatch.snapshot(src), ra, ignore=lambda dd, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(dd, f), os.R_OK)
                                                     or f.lower().endswith(('.pwbak', '.old'))])
     cfgpatch.fix_sample(ra)
     cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: (ra + '/').encode() if s == (src + '/').encode() else s)

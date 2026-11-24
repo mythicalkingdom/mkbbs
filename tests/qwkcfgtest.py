@@ -26,7 +26,7 @@ shutil.rmtree(work, ignore_errors=True)
 os.makedirs(work)
 tmp = cfgpatch.short_dir()
 ra = tmp + '/r'
-shutil.copytree(src, ra, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'config.mko', 'users.mko', 'confs.mko')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(src), ra, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'config.mko', 'users.mko', 'confs.mko')) or not os.access(os.path.join(d, f), os.R_OK)])
 cfgpatch.fix_sample(ra)
 cfgpatch.patch(os.path.join(ra, 'config.mk'), (repo + '/bbs/').encode(), lambda s: (ra + '/').encode() if s == (src + '/').encode() else s)
 

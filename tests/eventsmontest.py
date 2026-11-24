@@ -143,7 +143,7 @@ class Term:
 
 tmp = cfgpatch.short_dir()
 ra = tmp + '/r'
-shutil.copytree(src, ra, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(src), ra, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 cj = os.path.join(work, 'cj'); os.makedirs(cj)
 env = dict(os.environ, MK=ra)
 subprocess.run([build + '/mkcfgcvt', '-y', '1', '5'], env=dict(env, MKJSON=cj), capture_output=True, input='', text=True)

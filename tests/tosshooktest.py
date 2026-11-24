@@ -22,7 +22,7 @@ inb, outb, unsec = tmp + '/in', tmp + '/out', tmp + '/un'
 a_dir = work + '/a'
 for d in (inb, outb, unsec, a_dir + '/in', a_dir + '/out'):
     os.makedirs(d)
-shutil.copytree(srcra, cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(srcra), cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 cfgpatch.fix_sample(cfg)
 assert cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(),
                       lambda s: (cfg + '/').encode() + s[len((srcra + '/').encode()):] if s.startswith((srcra + '/').encode()) else s) >= 1

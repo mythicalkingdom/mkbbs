@@ -18,7 +18,7 @@ os.makedirs(work)
 tmp = cfgpatch.short_dir()
 cfg, nl = tmp + '/r', tmp + '/n'
 os.makedirs(nl)
-shutil.copytree(srcra, cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(srcra), cfg, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 cfgpatch.fix_sample(cfg)
 maps = {(srcra + '/').encode(): (cfg + '/').encode(), (srcnl + '/').encode(): (nl + '/').encode()}
 assert cfgpatch.patch(os.path.join(cfg, 'config.mk'), (repo + '/bbs/').encode(), lambda s: maps.get(s, s)) >= 2

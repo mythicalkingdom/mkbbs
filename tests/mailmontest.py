@@ -133,7 +133,8 @@ class Term:
 
 try:
     real = os.path.join(work, 'real')
-    shutil.copytree(sample, real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch
+    shutil.copytree(cfgpatch.snapshot(sample), real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(real)
     # two small nodelists in a private directory: Fidonet's zone 1 and a network with a zone of its own (77), both with binkp hosts
     nl = os.path.join(work, 'nl'); os.makedirs(nl)

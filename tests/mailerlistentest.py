@@ -220,7 +220,8 @@ binkcfg = os.path.join(repo, 'build', 'mkbinkcfg')
 sample = os.path.join(repo, 'bbs', 'bbsc', 'ra')
 if os.path.exists(mkbink) and os.path.exists(binkcfg) and os.path.isdir(sample):
     real = os.path.join(work, 'real')
-    shutil.copytree(sample, real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch
+    shutil.copytree(cfgpatch.snapshot(sample), real, ignore=lambda d, names: [n for n in names if n.lower().startswith(('mkbink.conf', 'mailer.mk'))])
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cfgpatch; cfgpatch.fix_sample(real)
     ec = os.path.join(real, 'echocfg.mk')
     d = bytearray(open(ec, 'rb').read())

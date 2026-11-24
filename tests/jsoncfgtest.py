@@ -37,7 +37,7 @@ os.makedirs(work)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cfgpatch
 inp = cfgpatch.short_dir() + '/in'                     # a short path: the configuration holds it in a fixed size field
-shutil.copytree(sample, inp, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'events.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
+shutil.copytree(cfgpatch.snapshot(sample), inp, ignore=lambda d, n: [f for f in n if f.lower().startswith(('mkbink.conf', 'mailer.mk', 'events.mk', 'fileecho.mk')) or not os.access(os.path.join(d, f), os.R_OK)])
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cfgpatch
 # the paths in config.mk lead to the sample: point them at the copy, or a file that is only in the sample (fileecho.mk, events.mk ...) is found through them
