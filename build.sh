@@ -69,7 +69,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
-for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest pwstate eventtest hubexectest hubreplayunit; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest pwstate eventtest hubexectest hubreplayunit nettest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 if [ "$1" = "--build-only" ]; then touch build/.built; exit 0; fi   # make / make install
 for t in smoke mertest merstress comtest dupetest doortest stdtest opentest syntest teltest wstest fakemk listentest charsettest; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew tests/$t.pas
@@ -296,6 +296,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doortest.py build/work/door | grep -E "^(ok|FAIL|skip|failures)" | tee build/doorresult.txt
   if grep -q "^FAIL" build/doorresult.txt; then exit 1; fi
 fi
+# MKNet: addresses, connect and listen over IPv4 and IPv6 on the loopback (IPV6-PLAN.md)
+build/nettest | grep -E "^(ok|FAIL|skip|failures)" | tee build/netresult.txt
+if grep -q "^FAIL" build/netresult.txt; then exit 1; fi
 # the door sandbox (bubblewrap; skipped when bwrap is not installed)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/sandboxtest.py build/work/sandbox | grep -E "^(ok|FAIL|skip|failures)" | tee build/sandboxresult.txt

@@ -31,6 +31,8 @@ Function NetIsLoopback(Addr: String): Boolean;
 Function NetSplitHostPort(S: String; Out Host: String; Out Port: Integer): Boolean;   {host:port, [v6]:port, a URL's authority}
 ```
 
+**Status:** phase 1 is built (`src/MKNet.pas`, `tests/nettest.pas` in `build.sh`).
+
 ## Phases
 
 1. **`MKNet.pas`** and `tests/nettest.pas` (the pure functions: normalise, match, loopback, split; connect and listen on `::1` and `127.0.0.1` in loopback, dual stack accepts both, `bind` on one family refuses the other, a name with an IPv6 address, a name with both, a refused first address and a second that works).
