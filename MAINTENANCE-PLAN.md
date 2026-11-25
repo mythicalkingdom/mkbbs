@@ -100,3 +100,12 @@ mkstats [-d day | -m month | -y year] [-by node|port|user|hour|day] [-top N] [-c
   folders, user files in step, the sysop account, the listener with `mklisten -t`).  **Not yet in `mkcheck`:** network areas without a link, a mailer link without a password, ports already in use, a TLS
   certificate that cannot be read or is about to expire, the listener user's write access, the login guard against the sysop's own address, an event that runs a command that is not there.
 * The JSON API is built (`API.md`).  Native packaging for other systems, Windows, ban lists remain (see the roadmap notes).
+* **To do (added 2026-11-25, in the order of the list; none started):**
+  1. **`DOOR32.SYS`**: the drop file that modern doors want (with the socket / handle of the caller's connection), next to `DOOR.SYS` and `DORINFO1.DEF` (`DOS-DOORS.md`, command 7).
+  2. **IPv6**: `mklisten` binds IPv4 only (`MKLISTEN.md`); the listener, the guard and the proxy header, and the FTP / HTTP clients (`MKFtp`, `MKHttp`) need IPv6 addresses.
+  3. **Upload handling**: after an upload a test (`unzip -t`, an antivirus command), `FILE_ID.DIZ` as the description, reject or quarantine, a log line; settings per file area.
+  4. **`/v1/metrics`** in the JSON API (Prometheus text: calls, nodes in use, failed log-ons, the mailer, events) and a systemd watchdog / `sd_notify` for `mklisten`.
+  5. **Message base converter** (`mkmsgconv`): Hudson, JAM, Merlin, Squish and `*.msg` into one another (the DOS-era Hudson bases of the sample are the reason), numbers and dates kept, a dry run.
+  6. **Door sandbox**: run command 7 programs (and `mkdosdoor`) in a restricted environment (for example `bubblewrap`: no network, a private `/tmp`, the node directory and the door directory only).
+  7. **Optional multi-node chat**: a chat room across nodes and a message from the sysop to every node (`mkmon`), switched on per BBS.
+  Still open from before: ban lists, the remaining `mkcheck` checks, the API's writes (run an event, poll a link, disconnect a node), the `self:` calls of callers, logrotate and a JSON-lines log.
