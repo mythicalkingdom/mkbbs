@@ -24,7 +24,7 @@ and in the tear line of the messages the BBS writes: `--- MK Bbs v0.2`); the Deb
   and upload replies.
 * **Doors.**  Menu command 7 runs a program with the caller's connection and writes the drop files (`DOOR.SYS`,
   `DORINFO1.DEF`, `CALLINFO.BBS`); on Linux a program can run on a pseudo terminal (with a terminal type and size that
-  match the caller) or get the connection directly.  Commands 169 and 170 run a BASIC or a Pascal program inside the
+  match the caller) or get the connection directly.  Command 172 runs a door described in `doors.cfg` (a DOS door in dosemu2, or a native one).  Commands 169 and 170 run a BASIC or a Pascal program inside the
   BBS for the caller, locked to its own directory.
 * **Chat, paging, bulletins, questionnaires.**  As the menus are set up.
 * **Events.**  `mkconfig` > Events: a time, the days, and what it does (a command, a poll / hold / free of the mailer, a hub pass), what
@@ -213,7 +213,7 @@ a few keyed items is a simple text interface: the lines say where the caller is,
 * **Programs:** menu command 7 (`*N` node, `*D` DOOR.SYS, `*F`/`*L` names, `*T` minutes left, `*S` give the program the
   caller's connection itself, and others).  Without `*S` the program runs on a pseudo terminal.  It runs in `node<N>` below the BBS
   directory, a directory of its own for each node, where the drop files and `EXITINFO.BBS` are written.
-* **DOS doors:** `tools/mkdosdoor` runs them in dosemu2 with COM1 on the terminal of command 7 (`DOS-DOORS.md`).
+* **DOS doors:** menu command 172 runs a door of `doors.cfg` (a DOS door in dosemu2 with its COM port on the caller's terminal, or a native one) with no script; `tools/mkdosdoor` is the old way (`DOS-DOORS.md`).
 * **BASIC and Pascal:** commands 169 and 170 run a program for the caller inside a sandbox (`games/` has an example).
 * **Network doors:** a port of type `qwk` (`MKLISTEN.md`) is the entrance for QWK network systems.
 
@@ -240,5 +240,5 @@ of the sample BBS, never on the sample itself.
 | `MAINT.md` | message base maintenance: the purge rules, a dry run, what never goes |
 | `BACKUP.md` | backing up and restoring the BBS: what is held, `mkbackup`, the `.bak` of the configuration files, an event for it |
 | `SSH.md` | SSH for callers: OpenSSH or Dropbear in front, `mkbbsssh`, no password at the SSH level |
-| `DOS-DOORS.md` | DOS doors on Linux: dosemu2 and `mkdosdoor` |
+| `DOS-DOORS.md` | Doors on Linux: command 172 and `doors.cfg`, DOS doors in dosemu2, the old `mkdosdoor` |
 | `TIC-PLAN.md` | file echoes (TIC): how they work, what each part does, the decisions |

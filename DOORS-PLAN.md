@@ -5,7 +5,7 @@ native doors, **C** a sandbox for every door.  Today (`DOS-DOORS.md`, `src/MKShe
 `DORINFO1.DEF`, `DOOR.SYS` (`*D`) and `CALLINFO.BBS` (`*W`); a DOS door goes through the shell script `tools/mkdosdoor` (dosemu2, a work directory of links, drop files copied with the COM port
 line changed, `mkdoor.bat`), and the whole call has to fit the 75 characters of the menu data field.
 
-**Status (2026-11-25):** your answers: all six as proposed.  **A phase 1 is built** (command 172, `doors.cfg` reader `MKDoorCfg.pas`, `MKDosDoor.pas`, `mkcheck` rules, `tests/doortest.py` with a fake dosemu, `checktest` additions); **A phase 2 is built** (`tests/dosdoorcmdtest.py`: the real dosemu2 through telnet, the answer through COM1, drop files, cleanup of the work directory, old work directories, hang-up leaves no dosemu2); not yet: docs (A phase 3), B, C.
+**Status (2026-11-25):** your answers: all six as proposed.  **A phase 1 is built** (command 172, `doors.cfg` reader `MKDoorCfg.pas`, `MKDosDoor.pas`, `mkcheck` rules, `tests/doortest.py` with a fake dosemu, `checktest` additions); **A phase 2 is built** (`tests/dosdoorcmdtest.py`: the real dosemu2 through telnet, the answer through COM1, drop files, cleanup of the work directory, old work directories, hang-up leaves no dosemu2); **A phase 3 (docs) is built** (`DOS-DOORS.md` rewritten around `doors.cfg`, `MKBBS.md`); A is done.  Not yet: B, C.
 
 ## A. The DOS door command
 
