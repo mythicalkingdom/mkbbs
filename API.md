@@ -61,6 +61,8 @@ mkapitoken [-c config dir] list | revoke ID | rotate ID [-q]
 | `messages:private` | with `messages`: private messages too (netmail, mail between users) |
 | `users` | `/v1/users`, `/v1/users/<name>` |
 | `users:private` | reserved: nothing in version 1 gives phone numbers or addresses |
+| `qwk` | the QWK packet of a node and its acknowledgement (below); the token must name the user of a QWK node (`-u "User"`) |
+| `qwk:reply` | uploading a reply packet (`QWK-API-PLAN.md`, phase 3: not built yet) |
 
 A request with no token, a token that is not known, expired or used from the wrong address gets **401**, a token without the scope **403**.  The answer never says which check failed.  Both count for the **login guard**
 of `mklisten` (`MKLISTEN.md`): five of them from one address within ten minutes block the address for an hour (the machine itself, `127.0.0.1`, is never blocked unless you change `allow`).
@@ -135,6 +137,30 @@ characters).  Reading a message through the API does **not** mark it as read or 
 
 ### `GET /v1/users/<name>`  (`users`)
 One user by name (any case, URL encoded: `/v1/users/Mark%20May`); 404 when there is none.
+
+## QWK packets for a node
+
+A **QWK node** (a user record with the QWK Node flag: `NETWORKING.md`) can take its packet with two requests.  The token names the node's user (`mkapitoken add node5 -s qwk -u "Chuck Ebenschweiger" -f 203.0.113.0/24`);
+the node gets what `mk -Q` would give it: the areas of its **offline mail** (what it chose, or what the sysop set), its packet type (QWK) and packer, its limits.  The flag is checked at every request.
+
+| request | |
+|---|---|
+| `GET /v1/qwk` | the node, `bbs_id`, `packet_type`, its `conferences` (number, name), `limits` (`max_packet` 10 MB, `max_reply` 5 MB, `keep_days` 7, `messages_per_packet`) and `waiting` (the packet that waits for its acknowledgement: `id`, `messages`, `bytes`, `since`, or null) |
+| `GET /v1/qwk/packet` | **step 1.**  `200`, `application/zip`, the body is `<BBSID>.QWK`; headers `X-QWK-Packet` (the id), `X-QWK-Messages`, `X-QWK-SHA256` (hex), `Content-Disposition`.  **Nothing is marked as sent.**  **`204`** with `X-QWK-Packet: none` when there is nothing new.  A packet that is waiting is sent **again, the same** (same id, same bytes); `?rebuild=1` throws it away and builds a new one.  `HEAD` makes the waiting packet the same way and sends the headers only |
+| `POST /v1/qwk/packet/<id>/ack` | **step 2**, when the node has the file: the last-read pointers move and the waiting packet is deleted: `{"acknowledged": true, "packet": "<id>", "messages": n}`.  The same acknowledgement again (a lost answer) is `200` with `"already": true`.  An id that was never waiting: `404`; a packet that expired: `410`; **`409`** when the node's pointers are not where they were when the packet was made (it fetched by Telnet meanwhile, or the sysop reset them): nothing moves, the packet is dropped, the next `GET` builds a new one |
+
+* **The size limit.**  A packet is at most `max_packet` bytes (and the node's own `messages_per_packet`); what does not fit **waits for the next packet**: ask again after the acknowledgement until `204`.  Change the limits in
+  the `"qwk"` object of `apitokens.json` (`{"qwk": {"max_packet": 5000000, "keep_days": 14}}`); `mkapitoken limits` shows what is in effect.
+* **Expiry.**  A packet that is not acknowledged within `keep_days` is dropped at the next request of the node; its acknowledgement is then `410`.
+* **One request at a time for a node** (`423` while another one is running).  The state is in `qwkapi/<user>/` in the BBS folder (the waiting packet, its state file, `acked.log`).
+* **A script** (a node that fetches with `curl`):
+
+  ```
+  curl -sf -D h.txt -H "Authorization: Bearer $TOKEN" -o mail.qwk https://hub.example.org:2341/v1/qwk/packet   # 200: the file; 204: nothing new
+  ID=$(awk -F': ' 'tolower($1)=="x-qwk-packet"{print $2}' h.txt | tr -d '\r')
+  # check the packet, toss it ... then, only when it is safe:
+  curl -sf -X POST -H "Authorization: Bearer $TOKEN" https://hub.example.org:2341/v1/qwk/packet/$ID/ack
+  ```
 
 ## TLS
 

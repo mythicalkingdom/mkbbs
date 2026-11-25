@@ -3,6 +3,15 @@ Unit MKOfflin; {Offline mail functions}
 
 Interface
 
+Uses MKOffDL;
+
+Type OffBuild = Record                 {a packet made without a caller on the line (the JSON API): see OfflineBuildPacket}
+  ArcPath: String;                     {the packed packet (<BBSID>.QWK ...) in the work directory}
+  Messages: LongInt;                   {messages in it}
+  R: OffDLResult;                      {how far the user was taken in each area: OffCommitLR(R) when he has the packet}
+  Why: String;                         {what went wrong}
+  End;
+
 Procedure SetPacker;
 Procedure SetProtocol;
 Procedure SetOffType;
@@ -23,13 +32,16 @@ Procedure OfflineDL;
 Function  GetUserPackerNum: Word;
 Function  GetUserProtNum: Word;
 Function  GetUserOffTypeNum: Word;
+Function  OfflineBuildPacket(WorkPath: String; MaxMsgs: LongInt; Var B: OffBuild): Integer;
+  {Makes the offline mail packet of the user that is loaded (User) in WorkPath, packs it with his packer: no display, no transfer, and the last read pointers are NOT moved (the caller commits them
+   when the user has the packet).  MaxMsgs > 0 is a limit of the packet below the user's and the system's.  0 = made, 1 = nothing new for him, 2 = failed (B.Why)}
 
 Implementation
 
 
 Uses MKFile, MKString, MKDoor, MKCfgAbs, MKGlobT, MKCFile,
   MKOffAbs, MKOffQwk, MKOffTxt, MKOffXrs, MKOffBwv,
-  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKOffDL, MKOffXfer, MKOffExt,
+  MKMsgOpn, MKMsgAbs, MKDos, MKRCfgMK, MKComAbs, MKProt, MKOffXfer, MKOffExt,
   Dos;
 
 
@@ -711,6 +723,131 @@ Procedure OfflineDL;
     If IoResult <> 0 Then;
     End;
   User.PostStatus(uoBrowse);
+  End;
+
+
+Function OfflineBuildPacket(WorkPath: String; MaxMsgs: LongInt; Var B: OffBuild): Integer;
+  Var
+    Offline: AbsOffPtr;
+    OffType: Word;
+    P: OffDLParams;
+    PackNum: Word;
+    ArcName, Found: String;
+    Quiet0: Boolean;
+    Cont: Boolean;
+
+  Begin
+  OfflineBuildPacket := 2;
+  B.ArcPath := '';
+  B.Messages := 0;
+  B.Why := '';
+  FillChar(B.R, SizeOf(B.R), 0);
+  Quiet0 := OfflineQuiet;
+  OfflineQuiet := True;
+  Offline := Nil;
+  Cont := ValidateOffline;
+  If Not Cont Then
+    B.Why := 'the offline mail settings of the user are not complete';
+  If Cont Then
+    Begin
+    Case UpCase(User.GetUserOffType) Of
+      'X': OffType := 2;
+      'Q': OffType := 1;
+      'B': OffType := 3;
+      'T': OffType := 4;
+      'P': OffType := 5;
+      Else
+        OffType := 0;
+      End;
+    If (OffType = 0) And User.GetUserQwkNode Then
+      OffType := 1;                    {a QWK node gets QWK packets, whatever types the system offers to callers}
+    If (OffType > 0) And (User.GetUserQwkNode Or Config^.GetOffTypeAvail(OffType)) Then
+      Case OffType Of
+        2: Offline := New(XRSOffPtr, Init);
+        1: Offline := New(QwkOffPtr, Init);
+        4: Offline := New(TxtOffPtr, Init);
+        3: Offline := New(BwvOffPtr, Init);
+        End;
+    If Offline = Nil Then
+      Begin
+      Cont := False;
+      B.Why := 'the packet type of the user is not available';
+      End;
+    End;
+  If Cont Then
+    Begin
+    Offline^.SetPath(WorkPath);
+    Offline^.SetBBSID(Config^.GetBBSID);
+    Offline^.SetQwke(Config^.GetOffQwke Or User.GetUserQwkNode);
+    Offline^.SetControlFiles((Not User.GetUserQwkNode) Or User.GetUserQwkControl);
+    If Offline^.StartPacket <> 0 Then
+      Begin
+      Cont := False;
+      B.Why := 'the packet could not be started';
+      End;
+    End;
+  If Cont Then
+    Begin
+    P.Sel := PktSel;
+    P.Ev := Nil;
+    P.MaxMsgs := User.GetUserOffMax;
+    If Config^.GetOffMax < P.MaxMsgs Then
+      P.MaxMsgs := Config^.GetOffMax;
+    If (MaxMsgs > 0) And (MaxMsgs < P.MaxMsgs) Then
+      P.MaxMsgs := MaxMsgs;
+    P.AreaMax := User.GetUserOffConfMax;
+    If Config^.GetOffConfMax < P.AreaMax Then
+      P.AreaMax := Config^.GetOffConfMax;
+    P.OwnMsgs := User.GetUserOffOwn;
+    P.CheckUser := False;
+    Cont := OffExport(Offline, P, B.R);
+    If Not Cont Then
+      B.Why := 'the messages could not be collected';
+    End;
+  If Cont Then
+    Begin
+    If Offline^.ClosePacket <> 0 Then
+      Begin
+      Cont := False;
+      B.Why := 'the packet could not be closed';
+      End;
+    End;
+  If Cont And (B.R.NumMsgs = 0) And (Not User.GetUserOffZero) Then
+    Begin
+    OfflineBuildPacket := 1;
+    Cont := False;
+    End;
+  If Cont Then
+    Begin
+    PackNum := GetUserPackerNum;
+    If PackNum = 0 Then
+      Begin
+      Cont := False;
+      B.Why := 'the user has no packer';
+      End
+    Else
+      Begin
+      ArcName := Offline^.GetArchiveName(PackNum);
+      Cont := OffRun(Config^.GetPackCmdLine(PackNum), StartUpPath, WorkPath, ArcName + ' *.*');
+      ChDir(StripTrail(StartUpPath, DirectorySeparator));
+      If IoResult <> 0 Then;
+      Found := OffFindNoCase(WorkPath, ArcName);
+      If (Not Cont) Or (Found = '') Then
+        Begin
+        Cont := False;
+        B.Why := 'the packer did not make ' + ArcName;
+        End
+      Else
+        Begin
+        B.ArcPath := Found;                {OffFindNoCase gives the whole path}
+        B.Messages := B.R.NumMsgs;
+        OfflineBuildPacket := 0;
+        End;
+      End;
+    End;
+  If Offline <> Nil Then
+    Dispose(Offline, Done);
+  OfflineQuiet := Quiet0;
   End;
 
 

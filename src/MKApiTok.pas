@@ -6,7 +6,7 @@ Unit MKApiTok;   {The token file of the JSON API: apitokens.json in the BBS dire
 // "expires": "2027-11-24", "from": ["127.0.0.1", "10.0.0.0/8"], "note": "the dashboard", "user": "" } ] }
 //
 // A token is mkapi_ and 43 random base64url characters (256 bits); only its SHA-256 is kept.  The file is mode 600 and is written whole (a new file replaces the old one).  Who uses a token last is
-// kept in apitokens.use (id, time, address), a separate file, so the token file is not rewritten for every request.  The scopes: status nodes events mailer stats calls areas files messages messages:private users, users:private
+// kept in apitokens.use (id, time, address), a separate file, so the token file is not rewritten for every request.  The scopes: status nodes events mailer stats calls areas files messages messages:private users, qwk and qwk:reply (QWK packets: they need a token that names a QWK node's user), users:private
 // (reserved), * (all) and, for tokens that name a user, self:... (reserved: version 1 gives such a token no endpoint).
 //
 
@@ -25,6 +25,9 @@ Type
 Const
   TokenPrefix = 'mkapi_';
 
+Var
+  QwkJson: String;                    {the "qwk" object of the token file (limits), kept when the file is written again}
+
 Function TokenFileName(Dir: String): String;
 Function LoadTokens(FN: String; Var T: TApiTokens; Var Err: String): Boolean;
 Function SaveTokens(FN: String; Const T: TApiTokens; Var Err: String): Boolean;
@@ -33,6 +36,7 @@ Function NewTokenText: String;
 Function HashToken(Const Tok: String): String;
 Function ScopeKnown(Const S: String): Boolean;
 Function ValidId(Const S: String): Boolean;
+Procedure QwkLimits(Var MaxPacket, MaxReply, KeepDays: Int64);      {from the "qwk" object: max_packet 10 MB, max_reply 5 MB, keep_days 7}
 Function AddrAllowed(Const Addr: String; L: TStringList): Boolean;
 Function FindByToken(Const T: TApiTokens; Const Tok: String): Integer;       {-1: none (the comparison takes the same time for every entry)}
 Function TokenExpired(Const Tk: TApiToken; Today: TDateTime): Boolean;
@@ -46,7 +50,7 @@ Uses BaseUnix, Unix, DateUtils, fpjson, jsonparser, MKPwd;
 
 Const
   B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  Known: Array[0..12] Of String = ('status', 'nodes', 'events', 'mailer', 'stats', 'calls', 'areas', 'files', 'messages', 'messages:private', 'users', 'users:private', '*');
+  Known: Array[0..14] Of String = ('status', 'nodes', 'events', 'mailer', 'stats', 'calls', 'areas', 'files', 'messages', 'messages:private', 'users', 'users:private', 'qwk', 'qwk:reply', '*');
 
 
 Function TokenFileName(Dir: String): String;
@@ -205,6 +209,37 @@ Function AddrAllowed(Const Addr: String; L: TStringList): Boolean;
   End;
 
 
+Procedure QwkLimits(Var MaxPacket, MaxReply, KeepDays: Int64);
+  Var
+    D: TJSONData;
+
+  Begin
+  MaxPacket := 10485760;
+  MaxReply := 5242880;
+  KeepDays := 7;
+  If QwkJson = '' Then
+    Exit;
+  Try
+    D := GetJSON(QwkJson);
+    Try
+      If D.JSONType = jtObject Then
+        Begin
+        MaxPacket := TJSONObject(D).Get('max_packet', MaxPacket);
+        MaxReply := TJSONObject(D).Get('max_reply', MaxReply);
+        KeepDays := TJSONObject(D).Get('keep_days', KeepDays);
+        End;
+    Finally
+      D.Free;
+    End;
+  Except
+    MaxPacket := 10485760;
+  End;
+  If MaxPacket < 1024 Then MaxPacket := 1024;
+  If MaxReply < 1024 Then MaxReply := 1024;
+  If KeepDays < 1 Then KeepDays := 1;
+  End;
+
+
 Procedure FreeTokens(Var T: TApiTokens);
   Var
     i: Integer;
@@ -235,6 +270,7 @@ Function StrList(O: TJSONObject; Const Key: String): TStringList;
 
 Function LoadTokens(FN: String; Var T: TApiTokens; Var Err: String): Boolean;
   Var
+    Q: TJSONData;
     Fs: TFileStream;
     D: TJSONData;
     Root, O: TJSONObject;
@@ -244,6 +280,7 @@ Function LoadTokens(FN: String; Var T: TApiTokens; Var Err: String): Boolean;
 
   Begin
   SetLength(T, 0);
+  QwkJson := '';
   Err := '';
   Result := True;
   If Not FileExists(FN) Then
@@ -270,6 +307,9 @@ Function LoadTokens(FN: String; Var T: TApiTokens; Var Err: String): Boolean;
       Exit;
       End;
     Root := TJSONObject(D);
+    Q := Root.Find('qwk');
+    If (Q <> Nil) And (Q.JSONType = jtObject) Then
+      QwkJson := Q.AsJSON;
     A := Root.Find('tokens');
     If (A = Nil) Or (A.JSONType <> jtArray) Then
       Begin
@@ -315,6 +355,8 @@ Function SaveTokens(FN: String; Const T: TApiTokens; Var Err: String): Boolean;
   Root := TJSONObject.Create;
   Arr := TJSONArray.Create;
   Root.Add('tokens', Arr);
+  If QwkJson <> '' Then
+    Root.Add('qwk', GetJSON(QwkJson));
   For i := 0 To High(T) Do
     Begin
     O := TJSONObject.Create;

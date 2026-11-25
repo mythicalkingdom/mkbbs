@@ -7,6 +7,7 @@ Program MKApiTokenTool;
 
        mkapitoken [-c config dir] add ID -s scope,scope [-e yyyy-mm-dd] [-f address,net] [-u "User Name"] [-n note] [-q]
        mkapitoken [-c config dir] list
+       mkapitoken [-c config dir] limits
        mkapitoken [-c config dir] revoke ID
        mkapitoken [-c config dir] rotate ID [-q]
 
@@ -120,6 +121,8 @@ Procedure DoAdd;
       Die('unknown scope ' + Tk.Scopes[i]);
     If (Copy(Tk.Scopes[i], 1, 5) = 'self:') And (User = '') Then
       Die('the scope ' + Tk.Scopes[i] + ' is for a token that names a user (-u)');
+    If (Copy(Tk.Scopes[i], 1, 3) = 'qwk') And (User = '') Then
+      Die('the scope ' + Tk.Scopes[i] + ' is for a token that names the user of a QWK node (-u "Name"); the user must have the QWK Node flag');
     End;
   If Expires <> '' Then
     Begin
@@ -184,6 +187,16 @@ Procedure DoList;
     Else
       WriteLn('    never used');
     End;
+  End;
+
+
+Procedure DoLimits;
+  Var
+    P, R, K: Int64;
+
+  Begin
+  QwkLimits(P, R, K);
+  WriteLn('QWK packets: max_packet ', P, ' bytes, max_reply ', R, ' bytes, keep_days ', K, ' (the "qwk" object of ', FN, '; these are the defaults when it is not there)');
   End;
 
 
@@ -283,8 +296,8 @@ If Rest.Count > 1 Then
   Id := Rest[1];
 If ((Cmd = 'add') Or (Cmd = 'revoke') Or (Cmd = 'rotate')) And (Id = '') Then
   Die(Cmd + ' needs the id of the token');
-If (Cmd <> 'add') And (Cmd <> 'list') And (Cmd <> 'revoke') And (Cmd <> 'rotate') Then
-  Die('unknown command ' + Cmd + ' (add, list, revoke, rotate)');
+If (Cmd <> 'add') And (Cmd <> 'list') And (Cmd <> 'revoke') And (Cmd <> 'rotate') And (Cmd <> 'limits') Then
+  Die('unknown command ' + Cmd + ' (add, list, revoke, rotate, limits)');
 If (ConfDir <> '') And (GetEnvironmentVariable('MK') <> ConfDir) Then
   Begin                                    {started again with MK set: the environment of this process is read once}
   SetLength(PArgv, ParamCount + 2);
@@ -342,6 +355,7 @@ If Not LoadTokens(FN, Tokens, Err) Then
   Die(Err);
 If Cmd = 'add' Then DoAdd
 Else If Cmd = 'list' Then DoList
+Else If Cmd = 'limits' Then DoLimits
 Else If Cmd = 'revoke' Then DoRevoke
 Else DoRotate;
 End.

@@ -5,7 +5,9 @@ Program MKApi;
 {
      mkapi: one request of the JSON API.  mklisten starts it for each connection of a port of the type "api" (the connection is on standard input and output, as for mk), with
        -A<address>   the caller's address       -H   a PROXY header comes first       -Y   TLS: the handshake is done first (MK_TLS_CERT, MK_TLS_KEY)
-     and MK = the BBS configuration directory.  HTTP/1.1, one request, then the connection is closed; JSON only; GET and HEAD only (version 1 is read only).
+     and MK = the BBS configuration directory.  HTTP/1.1, one request, then the connection is closed.  Every path says which methods it takes (GET and HEAD, or POST / PUT for the ones that change
+     something) and how big a body may be; the body is read to a spool file after the token has been checked (Content-Length only, no chunked requests; "Expect: 100-continue" is answered; 413 when it
+     is over the limit, 408 when it stops coming), the answers are JSON or a file that is streamed (a packet).  The paths that read are GET and HEAD only.
 
      The token (Authorization: Bearer mkapi_...) is looked up in apitokens.json in the BBS directory (mkapitoken makes them).  No token, a token that is not known, expired, not for this address:
      401 and the exit code 88, which mklisten counts as a failed log-on of the address (the login guard); a token without the scope of the endpoint: 403 and 88 too.  Every request is one line on
@@ -20,23 +22,29 @@ Program MKApi;
      The answers are built in MKApiData from the files and the socket the BBS has (node files, useron.bbs, events.info, the mailer's control socket, stats/*.tsv, the bases, the user file).
 }
 
-Uses SysUtils, Classes, BaseUnix, DateUtils, fpjson,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKComAbs, MKSess, MKApiTok, MKApiData;
+Uses SysUtils, Classes, BaseUnix, DateUtils, fpjson, MKPwd,
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKComAbs, MKSess, MKApiTok, MKApiData, MKQwkApi;
 
 Const
-  Paths: Array[0..12] Of String = ('/v1', '/v1/status', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/{area}', '/v1/messages/{area}', '/v1/messages/{area}/{number}', '/v1/users');
+  Paths: Array[0..15] Of String = ('/v1', '/v1/status', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/{area}', '/v1/messages/{area}', '/v1/messages/{area}/{number}', '/v1/qwk', '/v1/qwk/packet', '/v1/qwk/packet/{id}/ack', '/v1/users');
   MaxHead = 8192;
   MaxLine = 2048;
   ReadSecs = 10;
+  BodyTotalSecs = 600;                {the whole body}
 
 Var
   Com: AbsComPtr;
-  Addr, Method, Target, Path, Query, Auth, TokenId: String;
+  Addr, Method, Target, Path, Query, Auth, TokenId, Head_: String;
   Proxy: Boolean;
   Tokens: TApiTokens;
   TokIdx: Integer;
   TokFile, UseFile: String;
+  BodyIdleSecs: Integer;              {no byte of a body for this long: 408 (60; MKAPI_BODY_IDLE says another number, for the tests)}
   Sent: Boolean;
+  ContentLen: Int64;                  {Content-Length of the request, -1 when there is none}
+  BodyFile: String;                   {the spool file of the body ('' when there is none)}
+  ReqIn, RespOut: Int64;              {bytes of the body in, bytes of the answer out (the log line)}
+  TestPaths: Boolean;                 {MKAPI_TEST=1: the paths /v1/test/... of the tests of the machinery}
 
 
 Procedure Log(S: String);
@@ -67,17 +75,40 @@ Procedure SendAll(S: String);
 Function Reason(Code: Integer): String;
   Begin
   Case Code Of
+    100: Result := 'Continue';
     200: Result := 'OK';
+    204: Result := 'No Content';
     400: Result := 'Bad Request';
     401: Result := 'Unauthorized';
     403: Result := 'Forbidden';
     404: Result := 'Not Found';
     405: Result := 'Method Not Allowed';
+    408: Result := 'Request Timeout';
+    409: Result := 'Conflict';
+    410: Result := 'Gone';
+    411: Result := 'Length Required';
+    413: Result := 'Payload Too Large';
     414: Result := 'URI Too Long';
+    415: Result := 'Unsupported Media Type';
+    423: Result := 'Locked';
     431: Result := 'Request Header Fields Too Large';
     Else
       Result := 'Error';
     End;
+  End;
+
+
+Procedure LogRequest(Code: Integer);
+  {the one line of every request: who, from where, what, the answer, the bytes of the body that came and of the answer that went}
+  Var
+    S: String;
+
+  Begin
+  S := Copy('-' + TokenId, 1 + Ord(TokenId <> ''), 40) + ' ' + Addr + ' ' + Method + ' ' + Copy(Target, 1, 100) + ' ' + IntToStr(Code);
+  If ReqIn > 0 Then
+    S := S + ' in=' + IntToStr(ReqIn);
+  S := S + ' out=' + IntToStr(RespOut);
+  Log(S);
   End;
 
 
@@ -98,7 +129,8 @@ Procedure Answer(Code: Integer; Body: String; Extra: String = '');
     H := H + Body;
   SendAll(H);
   Com^.FlushOut;
-  Log(Copy('-' + TokenId, 1 + Ord(TokenId <> ''), 40) + ' ' + Addr + ' ' + Method + ' ' + Copy(Target, 1, 100) + ' ' + IntToStr(Code));
+  RespOut := Length(Body);
+  LogRequest(Code);
   End;
 
 
@@ -114,8 +146,17 @@ Procedure ErrorAnswer(Code: Integer; Msg: String; Extra: String = '');
   End;
 
 
+Procedure CleanupBody;
+  Begin
+  If BodyFile <> '' Then
+    DeleteFile(BodyFile);
+  BodyFile := '';
+  End;
+
+
 Procedure Finish(Code: Integer);
   Begin
+  CleanupBody;
   Com^.Hangup;
   Halt(Code);
   End;
@@ -236,12 +277,251 @@ Procedure Send(O: TJSONObject);
   End;
 
 
+
+Procedure NoContent(Extra: String = '');
+  {204: no body, no Content-Length}
+  Begin
+  Sent := True;
+  SendAll('HTTP/1.1 204 No Content'#13#10'Cache-Control: no-store'#13#10'X-Content-Type-Options: nosniff'#13#10'Connection: close'#13#10 + Extra + #13#10);
+  Com^.FlushOut;
+  RespOut := 0;
+  LogRequest(204);
+  End;
+
+
+Procedure AnswerFile(Code: Integer; ContentType, FN: String; Extra: String = '');
+  {a file as the body, streamed (HEAD: the headers and the length only)}
+  Var
+    Fs: TFileStream;
+    Buf: Array[0..7999] Of Byte;
+    N: LongInt;
+    Size: Int64;
+    H: String;
+
+  Begin
+  Fs := TFileStream.Create(FN, fmOpenRead Or fmShareDenyNone);
+  Try
+    Size := Fs.Size;
+    Sent := True;
+    H := 'HTTP/1.1 ' + IntToStr(Code) + ' ' + Reason(Code) + #13#10 +
+      'Content-Type: ' + ContentType + #13#10 +
+      'Content-Length: ' + IntToStr(Size) + #13#10 +
+      'Cache-Control: no-store'#13#10 +
+      'X-Content-Type-Options: nosniff'#13#10 +
+      'Connection: close'#13#10 + Extra + #13#10;
+    SendAll(H);
+    RespOut := 0;
+    If Method <> 'HEAD' Then
+      Repeat
+        N := Fs.Read(Buf, SizeOf(Buf));
+        If N > 0 Then
+          Begin
+          If Com^.SendBlock(Buf, N) = 0 Then
+            Break;
+          Inc(RespOut, N);
+          If Not Com^.GetCarrier Then
+            Break;
+          End;
+      Until N <= 0;
+    Com^.FlushOut;
+  Finally
+    Fs.Free;
+  End;
+  LogRequest(Code);
+  End;
+
+
+{------------------------------------------------------------ what a path takes}
+
+Type
+  TRule = Record
+    Methods: String;                  {GET HEAD POST PUT, separated by blanks}
+    MaxBody: Int64;                   {0: no body}
+    End;
+
+
+Function RuleFor(Const P: String; Var R: TRule): Boolean;
+  {the methods and the body limit of a path; False for a path that is not one (the route says 404)}
+  Begin
+  Result := True;
+  R.Methods := 'GET HEAD';
+  R.MaxBody := 0;
+  If (P = '/v1') Or (P = '/v1/status') Or (P = '/v1/nodes') Or (P = '/v1/events') Or (P = '/v1/mailer') Or (P = '/v1/stats') Or (P = '/v1/calls') Or (P = '/v1/areas/messages') Or (P = '/v1/areas/files') Or
+     (P = '/v1/users') Or (Copy(P, 1, 16) = '/v1/areas/files/') Or (Copy(P, 1, 13) = '/v1/messages/') Or (Copy(P, 1, 10) = '/v1/users/') Then
+    Exit;
+  If (P = '/v1/qwk') Or (P = '/v1/qwk/packet') Then
+    Exit;
+  If (Copy(P, 1, 15) = '/v1/qwk/packet/') And (Copy(P, Length(P) - 3, 4) = '/ack') Then
+    Begin
+    R.Methods := 'POST';
+    Exit;
+    End;
+  If TestPaths Then
+    Begin
+    If P = '/v1/test/echo' Then
+      Begin
+      R.Methods := 'POST PUT';
+      R.MaxBody := 100000;
+      Exit;
+      End;
+    If P = '/v1/test/blob' Then
+      Exit;
+    End;
+  Result := False;
+  End;
+
+
+Function AllowHeader(Const Methods: String): String;
+  Begin
+  Result := 'Allow: ' + StringReplace(Trim(Methods), ' ', ', ', [rfReplaceAll]) + #13#10;
+  End;
+
+
+Function SpoolName(Const Kind: String): String;
+  {a file in the temporary folder of the BBS (the folder of the configuration, else tmp/ in the BBS folder, else the system's)}
+  Var
+    D: String;
+
+  Begin
+  D := Config^.GetTempPath;
+  If (D = '') Or Not DirectoryExists(D) Then
+    D := Config^.GetBbsPath + 'tmp/';
+  If Not DirectoryExists(D) Then
+    D := GetTempDir;
+  Result := IncludeTrailingPathDelimiter(D) + 'api' + IntToStr(fpGetPid) + '.' + Kind;
+  End;
+
+
+Procedure ReadBody(Len: Int64);
+  {the body to a spool file: up to Len bytes, no byte for BodyIdleSecs or more than BodyTotalSecs altogether = 408; a caller who goes = the request is dropped without an answer}
+  Var
+    Fs: TFileStream;
+    Buf: Array[0..4095] Of Byte;
+    Got: Int64;
+    N: Word;
+    LastByte, Start: TDateTime;
+
+  Begin
+  BodyFile := SpoolName('body');
+  Fs := TFileStream.Create(BodyFile, fmCreate);
+  fpChmod(PChar(BodyFile), &600);
+  Got := 0;
+  Start := Now;
+  LastByte := Now;
+  Try
+    While Got < Len Do
+      Begin
+      If Not Com^.WaitForChar(1000) Then
+        Begin
+        If Not Com^.GetCarrier Then
+          Begin
+          ReqIn := Got;
+          Log(Copy('-' + TokenId, 1 + Ord(TokenId <> ''), 40) + ' ' + Addr + ' ' + Method + ' ' + Copy(Target, 1, 100) + ' the caller went after ' + IntToStr(Got) + ' of ' + IntToStr(Len) + ' bytes');
+          Fs.Free;
+          Fs := Nil;
+          CleanupBody;
+          Halt(0);
+          End;
+        If ((Now - LastByte) * 86400 > BodyIdleSecs) Or ((Now - Start) * 86400 > BodyTotalSecs) Then
+          Begin
+          Fs.Free;
+          Fs := Nil;
+          ReqIn := Got;
+          ErrorAnswer(408, 'the body did not come in time');
+          Finish(0);
+          End;
+        Continue;
+        End;
+      N := SizeOf(Buf);
+      If Len - Got < N Then
+        N := Len - Got;
+      N := Com^.GetBlock(Buf, N);
+      If N > 0 Then
+        Begin
+        Fs.WriteBuffer(Buf, N);
+        Inc(Got, N);
+        LastByte := Now;
+        If (Now - Start) * 86400 > BodyTotalSecs Then
+          Begin
+          Fs.Free;
+          Fs := Nil;
+          ReqIn := Got;
+          ErrorAnswer(408, 'the body did not come in time');
+          Finish(0);
+          End;
+        End;
+      End;
+  Finally
+    Fs.Free;
+  End;
+  ReqIn := Got;
+  End;
+
+
+Procedure PrepareBody(Const P: String);
+  {after the token: what the path takes (the method; a body or not), then the body is read to the spool file.  Nothing for a path that is not one: the route answers 404}
+  Var
+    R: TRule;
+    T: String;
+    Chunked: Boolean;
+
+  Begin
+  If Not RuleFor(P, R) Then
+    Exit;
+  If Pos(' ' + Method + ' ', ' ' + R.Methods + ' ') = 0 Then
+    Begin
+    ErrorAnswer(405, 'this path does not take ' + Method, AllowHeader(R.Methods));
+    Finish(0);
+    End;
+  T := HeaderValue(Head_, 'Transfer-Encoding');
+  Chunked := (T <> '') And (LowerCase(T) <> 'identity');
+  If Chunked Then
+    Begin
+    ErrorAnswer(400, 'a chunked body is not supported: send Content-Length');
+    Finish(0);
+    End;
+  If R.MaxBody = 0 Then
+    Begin
+    If (ContentLen > 0) Then
+      Begin
+      ErrorAnswer(400, 'this path has no body');
+      Finish(0);
+      End;
+    Exit;
+    End;
+  If ContentLen < 0 Then
+    Begin
+    ErrorAnswer(411, 'Content-Length is needed');
+    Finish(0);
+    End;
+  If ContentLen > R.MaxBody Then
+    Begin
+    ErrorAnswer(413, 'the body is over the limit of ' + IntToStr(R.MaxBody) + ' bytes');
+    Finish(0);
+    End;
+  If LowerCase(HeaderValue(Head_, 'Expect')) = '100-continue' Then
+    Begin
+    SendAll('HTTP/1.1 100 Continue'#13#10#13#10);
+    Com^.FlushOut;
+    End;
+  If ContentLen > 0 Then
+    ReadBody(ContentLen);
+  End;
+
+
 Procedure Route;
   Var
     O, N: TJSONObject;
     A: TJSONArray;
     i: Integer;
-    Err, RunDir, BbsDir, P, Name: String;
+    Err, RunDir, BbsDir, P, Name, BlobName: String;
+    Fs: TFileStream;
+    Blob: Int64;
+    Bt: Byte;
+    Node: String;
+    Code: Integer;
+    MaxP, MaxR, Keep: Int64;
+    QRes: TQwkRes;
 
   Begin
   RunDir := GetEnvironmentVariable('MKRUN');
@@ -346,6 +626,87 @@ Procedure Route;
       ErrorAnswer(404, Err)
     Else
       Send(O);
+    End
+  Else If TestPaths And (P = '/v1/test/echo') Then
+    Begin
+    Need('*');
+    O := TJSONObject.Create;
+    O.Add('bytes', ReqIn);
+    If (BodyFile <> '') And (ReqIn > 0) Then
+      Begin
+      Fs := TFileStream.Create(BodyFile, fmOpenRead);
+      SetLength(Name, Fs.Size);
+      Fs.ReadBuffer(Name[1], Fs.Size);
+      Fs.Free;
+      O.Add('sha256', HashToken(Name));
+      End
+    Else
+      O.Add('sha256', HashToken(''));
+    O.Add('content_type', HeaderValue(Head_, 'Content-Type'));
+    Send(O);
+    End
+  Else If TestPaths And (P = '/v1/test/blob') Then
+    Begin
+    Need('*');
+    Blob := StrToInt64Def(QueryParam(Query, 'size'), 1000);
+    If (Blob < 0) Or (Blob > 5000000) Then
+      ErrorAnswer(400, 'size is 0 to 5000000')
+    Else
+      Begin
+      BlobName := SpoolName('blob');
+      Fs := TFileStream.Create(BlobName, fmCreate);
+      For i := 0 To Blob - 1 Do
+        Begin
+        Bt := (i * 7 + 3) Mod 251;
+        Fs.WriteBuffer(Bt, 1);
+        End;
+      Fs.Free;
+      AnswerFile(200, 'application/octet-stream', BlobName);
+      DeleteFile(BlobName);
+      End;
+    End
+  Else If Copy(P, 1, 7) = '/v1/qwk' Then
+    Begin
+    Need('qwk');
+    Node := Tokens[TokIdx].User;
+    If Not QwkNodeLoad(Node, Code, Err) Then
+      Begin
+      ErrorAnswer(Code, Err);
+      Finish(88);
+      End;
+    QwkLimits(MaxP, MaxR, Keep);
+    If P = '/v1/qwk' Then
+      Send(QwkInfo(Node, MaxP, MaxR, Keep))
+    Else If P = '/v1/qwk/packet' Then
+      Begin
+      QwkPacket(Node, QueryParam(Query, 'rebuild') = '1', MaxP, Keep, QRes);
+      If QRes.Code = 200 Then
+        AnswerFile(200, 'application/zip', QRes.FilePath, 'X-QWK-Packet: ' + QRes.Id + #13#10 + 'X-QWK-Messages: ' + IntToStr(QRes.Messages) + #13#10 + 'X-QWK-SHA256: ' + QRes.Sha + #13#10 +
+          'Content-Disposition: attachment; filename="' + Config^.GetBBSID + '.QWK"'#13#10)
+      Else If QRes.Code = 204 Then
+        NoContent('X-QWK-Packet: none'#13#10)
+      Else
+        ErrorAnswer(QRes.Code, QRes.Err);
+      End
+    Else If (Copy(P, 1, 15) = '/v1/qwk/packet/') And (Copy(P, Length(P) - 3, 4) = '/ack') Then
+      Begin
+      Name := Copy(P, 16, Length(P) - 19);
+      QwkAck(Node, Name, Keep, QRes);
+      If QRes.Code = 200 Then
+        Begin
+        O := TJSONObject.Create;
+        O.Add('acknowledged', True);
+        O.Add('packet', QRes.Id);
+        O.Add('messages', QRes.Messages);
+        If QRes.Already Then
+          O.Add('already', True);
+        Send(O);
+        End
+      Else
+        ErrorAnswer(QRes.Code, QRes.Err);
+      End
+    Else
+      ErrorAnswer(404, 'not found');
     End
   Else If P = '/v1/users' Then
     Begin
@@ -458,6 +819,13 @@ Var
 
 Begin
 Sent := False;
+BodyFile := '';
+ReqIn := 0;
+RespOut := 0;
+ContentLen := -1;
+TestPaths := GetEnvironmentVariable('MKAPI_TEST') = '1';
+BodyIdleSecs := StrToIntDef(GetEnvironmentVariable('MKAPI_BODY_IDLE'), 60);
+AddExitProc(@CleanupBody);
 Method := '';
 Target := '';
 TokenId := '';
@@ -501,19 +869,29 @@ If p > 0 Then
   Path := Copy(Target, 1, p - 1);
   Query := Copy(Target, p + 1, 2000);
   End;
-If (Method <> 'GET') And (Method <> 'HEAD') Then
+If (Method <> 'GET') And (Method <> 'HEAD') And (Method <> 'POST') And (Method <> 'PUT') Then
   Begin
-  ErrorAnswer(405, 'this API is read only (GET)', 'Allow: GET, HEAD'#13#10);
+  ErrorAnswer(405, 'this API takes GET, HEAD, POST and PUT', 'Allow: GET, HEAD'#13#10);
   Finish(0);
   End;
+Head_ := Head;
 T := HeaderValue(Head, 'Content-Length');
-If (T <> '') And (T <> '0') Then
+ContentLen := -1;
+If T <> '' Then
   Begin
-  ErrorAnswer(400, 'a GET has no body');
-  Finish(0);
+  ContentLen := StrToInt64Def(T, -2);
+  If ContentLen < 0 Then
+    Begin
+    ErrorAnswer(400, 'Content-Length is not a number');
+    Finish(0);
+    End;
   End;
 Auth := HeaderValue(Head, 'Authorization');
 Authenticate;
+T := Path;
+If (Length(T) > 1) And (T[Length(T)] = '/') Then
+  Delete(T, Length(T), 1);
+PrepareBody(T);
 Route;
 Finish(0);
 End.
