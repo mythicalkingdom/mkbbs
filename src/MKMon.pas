@@ -255,14 +255,14 @@ Procedure LoadNodes;
 
 Function NodeLine(Const N: NodeRec): String;
   Begin
-  NodeLine := Pad(Long2Str(N.Node), 5) + Pad(N.UserName, 22) + Pad(ActivityStr(N.Status), 15) +
+  NodeLine := Pad(Long2Str(N.Node), 5) + Pad(N.UserName, 21) + Pad(ActivityStr(N.Status), 14) +
     Pad(N.Addr, 17) + Pad(N.Typ, 8) + Pad(ClockStr(N.Start), 7) + DurStr(fpTime - N.Start);
   End;
 
 
 Function HeadLine: String;
   Begin
-  HeadLine := Pad('Node', 5) + Pad('User', 22) + Pad('Activity', 15) + Pad('Address', 17) +
+  HeadLine := Pad('Node', 5) + Pad('User', 21) + Pad('Activity', 14) + Pad('Address', 17) +
     Pad('Type', 8) + Pad('Since', 7) + 'Online';
   End;
 
