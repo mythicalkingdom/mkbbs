@@ -76,6 +76,8 @@ caller --- mklisten --- mk (one process per caller) --- files on disk
 | `echocfg.mk` | Fido echo systems and echo areas |
 | `fileecho.mk` | file echoes (TIC): the echoes, the systems' TIC and FileFix passwords, the check command and the pass-through spool |
 | `mailer.mk` | mailer settings, links, routes |
+| `apitokens.json`, `apitokens.use`, `qwkapi/<user>/` | the JSON API: the tokens (hashes; mode 600) and when each was last used; the QWK packets that wait for an acknowledgement, the ledgers of acknowledged packets and of reply packets (`API.md`, `MAINT.md`) |
+| `<id>.ack` | next to a hub's map file: a packet was posted and the hub has not been told yet (`HUBS.md`, `transport https`) |
 | `bbsconfig.json` | the whole configuration in one JSON file (optional; every setting has a place in it) |
 | `users.bbs`, `extusers.bbs`, `lastread.bbs`, `useron.bbs` ... | users, their extended records (including a hashed password), last read pointers, who is online |
 | `*.mnu`, `*.lc`, screens | menus, language files, display files |

@@ -168,7 +168,7 @@ the node gets what `mk -Q` would give it: the areas of its **offline mail** (wha
   If the BBS stopped in the middle of an import the line stays `started` and the retry is **`409`** ("an earlier upload of this packet did not finish"): nothing is posted twice, the log says how far it got, and the
   sysop looks at the area and removes that line of `reply.ledger` to let the packet through again.  Other answers: `415` (not a ZIP, or another content type), `400` (not a reply packet for this BBS id, or it cannot
   be unpacked), `403` (the token has no `qwk:reply`), `423` (another request of the node is running).
-* **A script** (a node that fetches with `curl`):
+* **A script** (a node that fetches with `curl`; `contrib/qwk/qwk-http-fetch.sh` and `qwk-http-ack.sh` are the working version, installed in `share/mkbbs/qwk`; MK nodes use `transport https` of `mk -G`, `HUBS.md`):
 
   ```
   curl -sf -D h.txt -H "Authorization: Bearer $TOKEN" -o mail.qwk https://hub.example.org:2341/v1/qwk/packet   # 200: the file; 204: nothing new

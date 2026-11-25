@@ -70,6 +70,8 @@ install: build/.built
 	install -m 644 hubs/*.scr $(DESTDIR)$(PREFIX)/share/mkbbs/hubs/
 	install -d $(DESTDIR)$(PREFIX)/share/mkbbs/ssh
 	install -m 644 contrib/ssh/* $(DESTDIR)$(PREFIX)/share/mkbbs/ssh/
+	install -d $(DESTDIR)$(PREFIX)/share/mkbbs/qwk
+	install -m 755 contrib/qwk/*.sh $(DESTDIR)$(PREFIX)/share/mkbbs/qwk/
 	install -m 644 mklisten.example.json $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
 	@if [ -e $(DESTDIR)$(SYSCONFDIR)/mklisten.json ]; then \
 	  echo "keeping $(DESTDIR)$(SYSCONFDIR)/mklisten.json"; \

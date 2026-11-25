@@ -92,6 +92,21 @@ stay right); `mkusered` shows them as deleted and the sysop can take the mark of
 * **`-w DAYS` is the warning list:** only a list, nothing is changed: the users who would be purged within the next DAYS days, with the days to go.  Use it to write to them first.
 * `MKPURGE_TODAY=yyyy-mm-dd` takes another day for today (a test aid).  Exit codes: 0 done, 1 not usable.
 
+# The QWK state of the API: `qwkapi/`
+
+When a QWK node takes its packet through the JSON API (`API.md`) the BBS keeps, for each node, in `<BBS dir>/qwkapi/<user>/`:
+
+| file | what |
+|---|---|
+| `waiting.qwk`, `waiting.state` | the packet that has not been acknowledged yet, and how far the node's pointers go with it; **a packet that waits longer than `keep_days` (default 7) is dropped at the node's next request** (nothing else removes it; `mkmaint` does not touch this folder) |
+| `acked.log` | the ids of packets that were acknowledged, expired or dropped (a lost answer to an acknowledgement is harmless); lines older than `keep_days` + 1 days are removed whenever the file is written |
+| `reply.ledger` | the SHA-1 of every reply packet that was posted (`done`) or is being posted (`started`); lines older than `max(30, 4 * keep_days)` days are removed |
+| `.lock` | the lock of the node's requests |
+
+**A `started` line that stays** means the BBS stopped (a crash, a kill, a power cut) in the middle of posting a reply packet.  The node's retry of that packet is answered `409` and **nothing is posted again**: look at the
+area and the log (`api: <token> ... PUT /v1/qwk/reply`), and when you know what was posted, delete that line of `reply.ledger` to let the packet through (or let the node send it again as a new packet).  A node's
+state is **not** part of a backup of the user files alone: `mkbackup` holds the whole BBS folder, `qwkapi/` with it.  To forget a node completely, delete its folder (and revoke its token: `mkapitoken revoke`).
+
 # Packing users: `mkuserpack`
 
 ```

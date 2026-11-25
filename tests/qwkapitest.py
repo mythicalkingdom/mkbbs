@@ -235,6 +235,23 @@ try:
     check('the log has the acknowledgements and the packets with their bytes', re.search(r'api: node5 127\.0\.0\.1 POST /v1/qwk/packet/[0-9a-f]{12}/ack 200', log) and re.search(r'GET /v1/qwk/packet 200 out=\d+', log) and 'mkapi_' not in log, log[-500:])
     spool = [f for f in os.listdir(ra + '/tmp')]
     check('no temporary directory of a packet is left', spool == [] or all(not os.path.isdir(ra + '/tmp/' + f) for f in spool), spool)
+    # ---- the example scripts of contrib/qwk (curl): fetch, check, acknowledge
+    board_name = json.loads(req('GET', '/v1/qwk')[2])['bbs_id']
+    if shutil.which('curl') and shutil.which('sha256sum'):
+        fetch = repo + '/contrib/qwk/qwk-http-fetch.sh'
+        ackc = repo + '/contrib/qwk/qwk-http-ack.sh'
+        post('Script one', 'for the curl script')
+        out = work + '/curlout'
+        r = subprocess.run([fetch, 'http://127.0.0.1:24881', tok, out], capture_output=True, text=True)
+        pid_s = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ''
+        check('contrib/qwk/qwk-http-fetch.sh: the packet is in the directory under its name, the id on the last line, exit 0', r.returncode == 0 and re.fullmatch(r'[0-9a-f]{12}', pid_s) and os.path.exists(out + '/' + board_name + '.QWK') and zipfile.is_zipfile(out + '/' + board_name + '.QWK'), (r.returncode, r.stdout, r.stderr))
+        before_ack = lr()
+        r = subprocess.run([ackc, 'http://127.0.0.1:24881', tok, pid_s], capture_output=True, text=True)
+        check('qwk-http-ack.sh: the hub is told, the pointer moves', r.returncode == 0 and '"acknowledged"' in r.stdout and lr() > before_ack, (r.returncode, r.stdout, r.stderr))
+        r = subprocess.run([fetch, 'http://127.0.0.1:24881', tok, out], capture_output=True, text=True)
+        check('the script again: nothing new, exit 3', r.returncode == 3, (r.returncode, r.stderr))
+        r = subprocess.run([fetch, 'http://127.0.0.1:24881', 'mkapi_' + 'B' * 43, out], capture_output=True, text=True)
+        check('a wrong token: exit 1 with the hub\'s answer', r.returncode == 1 and '401' in r.stderr, (r.returncode, r.stderr))
     # ---- phase 3: the reply packet
     tokr = tool('add', 'nodereply', '-s', 'qwk,qwk:reply', '-u', NODE, '-q').stdout.strip()
     tokm = tool('add', 'msgs', '-s', 'messages', '-q').stdout.strip()
