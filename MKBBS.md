@@ -24,7 +24,7 @@ and in the tear line of the messages the BBS writes: `--- MK Bbs v0.2`); the Deb
   and upload replies.
 * **Doors.**  Menu command 7 runs a program with the caller's connection and writes the drop files (`DOOR.SYS`,
   `DORINFO1.DEF`, `CALLINFO.BBS`); on Linux a program can run on a pseudo terminal (with a terminal type and size that
-  match the caller) or get the connection directly.  Menu command 7 writes `DOOR32.SYS` too with `*3` in its data.  Command 172 runs a door described in `doors.cfg` (a DOS door in dosemu2, or a native one).  Commands 169 and 170 run a BASIC or a Pascal program inside the
+  match the caller) or get the connection directly.  Menu command 7 writes `DOOR32.SYS` too with `*3` in its data.  Command 172 runs a door described in `doors.cfg` (a DOS door in dosemu2, or a native one), by default in a bubblewrap sandbox (no network, a private `/tmp`, only its own directories).  Commands 169 and 170 run a BASIC or a Pascal program inside the
   BBS for the caller, locked to its own directory.
 * **Chat, paging, bulletins, questionnaires.**  As the menus are set up.
 * **Events.**  `mkconfig` > Events: a time, the days, and what it does (a command, a poll / hold / free of the mailer, a hub pass), what

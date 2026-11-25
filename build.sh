@@ -296,6 +296,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doortest.py build/work/door | grep -E "^(ok|FAIL|skip|failures)" | tee build/doorresult.txt
   if grep -q "^FAIL" build/doorresult.txt; then exit 1; fi
 fi
+# the door sandbox (bubblewrap; skipped when bwrap is not installed)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/sandboxtest.py build/work/sandbox | grep -E "^(ok|FAIL|skip|failures)" | tee build/sandboxresult.txt
+  if grep -q "^FAIL" build/sandboxresult.txt; then exit 1; fi
+fi
 # the same with the real dosemu2 (skipped when it is not installed)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/dosdoorcmdtest.py build/work/dosdoorcmd | grep -E "^(ok|FAIL|skip|failures)" | tee build/dosdoorcmdresult.txt

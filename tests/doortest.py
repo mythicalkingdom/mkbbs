@@ -76,6 +76,7 @@ dir = %s/lord
 command = LORD.EXE *N    # the node
 subdir = sub
 com = 2
+sandbox = off
 dropfiles = dorinfo1.def door.sys
 
 [natv]
@@ -83,17 +84,20 @@ type = native
 dir = %s/natv
 command = hello.sh
 dropfiles = door.sys
+sandbox = off
 [d32]
 type = native
 dir = %s/n32
 command = d32.sh
 dropfiles = door32.sys
+sandbox = off
 [d32raw]
 type = native
 dir = %s/n32
 command = d32.sh
 dropfiles = door32.sys
 raw = yes
+sandbox = off
 [nodir]
 type = dos
 dir = /nonexistent/dir

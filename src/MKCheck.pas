@@ -20,7 +20,7 @@ Program MKCheck;
 }
 
 Uses SysUtils, Classes, BaseUnix, Unix, Process,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg, MKSandbox;
 
 Var
   Quiet, Verbose: Boolean;
@@ -303,6 +303,19 @@ Procedure CheckDoorItem(MenuName: String; Item: Integer; Key, Data: String);
     If (W <> '') And (Pos('/', W) = 0) And (Pos('\', W) = 0) And (FindNoCase(IncludeTrailingPathDelimiter(Dir), W) = '') And
        ((Kind = 'dos') Or Not OnPath(W)) Then
       Warn(Prefix + 'the command ' + W + ' of the door ' + Name + ' is not in ' + Dir);
+    If Sandbox <> 'off' Then
+      Begin
+      If FindBwrap(DoorCfg.SbProgram) = '' Then
+        Warn(Prefix + 'the door ' + Name + ' runs in the sandbox (sandbox = ' + Sandbox + ') and bwrap (bubblewrap) is not installed: the door will not be run')
+      Else If Not SandboxWorks(FindBwrap(DoorCfg.SbProgram), Dos) Then
+        Warn(Prefix + 'the door ' + Name + ' runs in the sandbox and ' + Dos);
+      For j := 0 To Binds.Count - 1 Do
+        If Not (DirectoryExists(Binds[j]) Or FileExists(Binds[j])) Then
+          Warn(Prefix + 'the door ' + Name + ': bind = ' + Binds[j] + ' is not there');
+      For j := 0 To ROBinds.Count - 1 Do
+        If Not (DirectoryExists(ROBinds[j]) Or FileExists(ROBinds[j])) Then
+          Warn(Prefix + 'the door ' + Name + ': robind = ' + ROBinds[j] + ' is not there');
+      End;
     If Kind = 'dos' Then
       Begin
       Dos := DoorCfg.Dosemu;

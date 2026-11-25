@@ -18,7 +18,7 @@ Procedure RunDoor(DoorName: ShortString);
 Implementation
 
 Uses SysUtils, Classes, BaseUnix, Unix,
-  MKDoor, MKGlobT, MKCfgAbs, MKComAbs, MKLogEnt, MKShell, MKDoorCfg, MKFile, MKString, MKVCrt;
+  MKDoor, MKGlobT, MKCfgAbs, MKComAbs, MKLogEnt, MKShell, MKDoorCfg, MKSandbox, MKFile, MKString, MKVCrt;
 
 
 Procedure RemoveTree(Const Dir: String);
@@ -142,6 +142,116 @@ Function NodeCommand(Const Cmd: String; Node: Integer): String;
   End;
 
 
+Var
+  WrapActive: Boolean = False;         {a native door of doors.cfg is being started: its settings are used}
+  WrapDoor: TDoorDef;
+  WrapCfg: TDoorCfg = Nil;
+
+
+Procedure AddList(L: TStrings; Const Items: TStrings);
+  Var
+    i: Integer;
+
+  Begin
+  If Items <> Nil Then
+    For i := 0 To Items.Count - 1 Do
+      L.Add(Items[i]);
+  End;
+
+
+Function SandboxReady(Const Mode: String; Cfg: TDoorCfg; Out Bwrap, Why: String): Boolean;
+  {the sandbox is wanted (not off) and bwrap works}
+  Begin
+  Bwrap := FindBwrap(Cfg.SbProgram);
+  SandboxReady := SandboxWorks(Bwrap, Why);
+  End;
+
+
+Function WorkBase(Cfg: TDoorCfg): String;
+  {where the work directories and the sandbox scripts are made (private: mode 700)}
+  Begin
+  WorkBase := Cfg.Tmp;
+  If WorkBase = '' Then
+    WorkBase := GetEnvironmentVariable('MKDOS_TMP');
+  If WorkBase = '' Then
+    WorkBase := '/tmp/mkdosdoor-' + IntToStr(fpGetUid);
+  If ForceDirectories(WorkBase) Then
+    fpChmod(WorkBase, &700);
+  End;
+
+
+Function SandboxScript(Cfg: TDoorCfg; Node: Integer): String;
+  Begin
+  SandboxScript := IncludeTrailingPathDelimiter(WorkBase(Cfg)) + 'sandbox-node' + IntToStr(Node) + '.sh';
+  End;
+
+
+Function WrapHook(Var Cmd: ShortString; Const NodeDir: ShortString): Boolean;
+  {menu command 7 / a native door of doors.cfg: the program runs in the sandbox when its settings say so}
+  Var
+    Cfg: TDoorCfg;
+    Mode, Bwrap, Why, W: String;
+    RW, RO: TStringList;
+
+  Begin
+  WrapHook := True;
+  Cfg := WrapCfg;
+  If Not WrapActive Then
+    Begin
+    Cfg := TDoorCfg.Create;
+    Cfg.Load(IncludeTrailingPathDelimiter(Config^.GetBbsPath) + 'doors.cfg');
+    End;
+  Try
+    If WrapActive Then
+      Mode := WrapDoor.Sandbox
+    Else
+      Mode := Cfg.SbCommand7;
+    If Mode = 'off' Then
+      Exit;
+    If Not SandboxReady(Mode, Cfg, Bwrap, Why) Then
+      Begin
+      LogEntry.WriteEntry('Not run (sandbox): ' + Cmd + ': ' + Why);
+      WrapHook := False;
+      Exit;
+      End;
+    RW := TStringList.Create;
+    RO := TStringList.Create;
+    Try
+      RW.Add(NodeDir);
+      AddList(RW, Cfg.SbBinds);
+      AddList(RO, Cfg.SbROBinds);
+      If WrapActive Then
+        Begin
+        If WrapDoor.Dir <> '' Then
+          RW.Add(WrapDoor.Dir);
+        AddList(RW, WrapDoor.Binds);
+        AddList(RO, WrapDoor.ROBinds);
+        End
+      Else
+        Begin
+        W := Copy(Cmd, 1, Pos(' ', Cmd + ' ') - 1);
+        If Pos('/', W) > 0 Then
+          RW.Add(ExtractFilePath(W));
+        End;
+      W := SandboxScript(Cfg, User.GetUserLineNum);
+      If SandboxWrapper(W, Bwrap, Mode, NodeDir, RW, RO) Then
+        Cmd := W + ' ' + Cmd
+      Else
+        Begin
+        LogEntry.WriteEntry('Not run (sandbox): ' + Cmd + ': cannot write ' + W);
+        WrapHook := False;
+        End;
+    Finally
+      RW.Free;
+      RO.Free;
+    End;
+  Finally
+    If Not WrapActive Then
+      Cfg.Free;
+  End;
+  End;
+
+
 Procedure Unavailable(Const Name, Why: String);
   Begin
   User.DisplayNewLine;
@@ -151,11 +261,17 @@ Procedure Unavailable(Const Name, Why: String);
   End;
 
 
-Procedure RunNative(Const D: TDoorDef);
+Procedure RunNative(Const D: TDoorDef; Cfg: TDoorCfg);
   Var
-    Cmd, W: String;
+    Cmd, W, Bwrap, Why: String;
 
   Begin
+  If D.Sandbox <> 'off' Then
+    If Not SandboxReady(D.Sandbox, Cfg, Bwrap, Why) Then
+      Begin
+      Unavailable(D.Name, 'the sandbox: ' + Why);
+      Exit;
+      End;
   Cmd := Trim(D.Command);
   If (D.Dir <> '') And (Cmd <> '') Then
     Begin
@@ -173,13 +289,21 @@ Procedure RunNative(Const D: TDoorDef);
     Cmd := Cmd + ' *!';
   If D.Raw Then
     Cmd := Cmd + ' *S';
-  TypeSeven(Cmd);
+  WrapDoor := D;
+  WrapCfg := Cfg;
+  WrapActive := True;
+  Try
+    TypeSeven(Cmd);
+  Finally
+    WrapActive := False;
+  End;
   End;
 
 
 Procedure RunDos(Const D: TDoorDef; Cfg: TDoorCfg);
   Var
-    HomeDir, NodeDir, Base, Work, Dosemu, Bat, S: String;
+    HomeDir, NodeDir, Base, Work, Dosemu, Bat, S, Cmd, Bwrap, Why: String;
+    RW, RO: TStringList;
     Node: Integer;
     Error: Word;
     InNode, UsePty: Boolean;
@@ -212,6 +336,12 @@ Procedure RunDos(Const D: TDoorDef; Cfg: TDoorCfg);
     Unavailable(D.Name, 'no command');
     Exit;
     End;
+  If D.Sandbox <> 'off' Then
+    If Not SandboxReady(D.Sandbox, Cfg, Bwrap, Why) Then
+      Begin
+      Unavailable(D.Name, 'the sandbox: ' + Why);
+      Exit;
+      End;
   Base := Cfg.Tmp;
   If Base = '' Then
     Base := GetEnvironmentVariable('MKDOS_TMP');
@@ -301,8 +431,35 @@ Procedure RunDos(Const D: TDoorDef; Cfg: TDoorCfg);
     LogEntry.WriteEntry('Door : ' + D.Name);
     Tx := WhereX;
     Ty := WhereY;
-    DoShell(Dosemu + ' -dumb -quiet -K "' + Work + '" -I "serial { virtual com ' + IntToStr(D.Com) + ' }" -E mkdoor.bat', False, False);
-    Failed := ShellError;
+    Cmd := Dosemu + ' -dumb -quiet -K "' + Work + '" -I "serial { virtual com ' + IntToStr(D.Com) + ' }" -E mkdoor.bat';
+    If D.Sandbox <> 'off' Then
+      Begin
+      RW := TStringList.Create;
+      RO := TStringList.Create;
+      Try
+        RW.Add(Work);
+        RW.Add(NodeDir);
+        RW.Add(D.Dir);
+        AddList(RW, Cfg.SbBinds);
+        AddList(RW, D.Binds);
+        AddList(RO, Cfg.SbROBinds);
+        AddList(RO, D.ROBinds);
+        If Copy(Dosemu, 1, 5) <> '/usr/' Then
+          RO.Add(ExtractFilePath(Dosemu));
+        If SandboxWrapper(SandboxScript(Cfg, Node), Bwrap, D.Sandbox, NodeDir, RW, RO) Then
+          Cmd := SandboxScript(Cfg, Node) + ' ' + Cmd
+        Else
+          Failed := 8;
+      Finally
+        RW.Free;
+        RO.Free;
+      End;
+      End;
+    If Failed = 0 Then
+      Begin
+      DoShell(Cmd, False, False);
+      Failed := ShellError;
+      End;
     If D.Freeze Then
       User.AdjustTime(User.CurrentTime - DoorStart);
     GoToXY(1, 1);
@@ -347,7 +504,7 @@ Procedure RunDoor(DoorName: ShortString);
     If i < 0 Then
       Unavailable(Name, 'not in doors.cfg')
     Else If Cfg.Doors[i].Kind = 'native' Then
-      RunNative(Cfg.Doors[i])
+      RunNative(Cfg.Doors[i], Cfg)
     Else
       RunDos(Cfg.Doors[i], Cfg);
   Finally
@@ -355,5 +512,8 @@ Procedure RunDoor(DoorName: ShortString);
   End;
   End;
 
+
+Initialization
+  ShellWrapHook := @WrapHook;
 
 End.

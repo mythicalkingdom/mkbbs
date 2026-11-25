@@ -31,9 +31,15 @@ door  <-- COM1 (FOSSIL, INT 14h or the UART) -->  dosemu2  <-- standard input / 
    dropfiles = dorinfo1.def door.sys # which drop files: dorinfo1.def door.sys callinfo.bbs door32.sys (default: dorinfo1.def door.sys)
    freeze    = no                    # yes: the time of the caller does not run while the door does
    raw       = no                    # native: yes = the program gets the caller's connection itself as standard input / output, no pseudo terminal (*S of command 7)
-   sandbox   = default               # default | off | net: read, not used yet (DOORS-PLAN.md C)
-   bind      = /bbs/doors/scores     # more directories for the sandbox (any number of lines): read, not used yet
-   robind    = /bbs/files
+   sandbox   = default               # default (no network) | off | net (the network stays): see "The sandbox" below
+   bind      = /bbs/doors/scores     # more directories the door may write (any number of lines)
+   robind    = /bbs/files            # ... and read
+
+   [sandbox]                         # optional: for all sandboxed programs
+   program  = /usr/bin/bwrap         # default: bwrap on the PATH
+   command7 = off                    # what menu command 7 gets: off (default) | default | net
+   bind     = /bbs/doors/shared      # more directories, writable / read only, for every sandboxed program
+   robind   = /bbs/files
    ```
 
    A `#` after a space starts a comment.  A door that runs a Linux program has `type = native`: its `command` is looked for in `dir` first, then as command 7 does; `door.sys`, `callinfo.bbs`, `door32.sys`, `freeze` and `raw` in
@@ -42,6 +48,26 @@ door  <-- COM1 (FOSSIL, INT 14h or the UART) -->  dosemu2  <-- standard input / 
 5. `mkcheck` looks at every such item: the door is in `doors.cfg`, its directory and command are there (DOS names in any case), dosemu2 is installed, and lines of `doors.cfg` it does not understand are reported with their number.
 
 A door that cannot be started (not in `doors.cfg`, no directory, no dosemu2) is **not available**: the caller is told so, and the reason is in the log (`Door lord not run: ...`).
+
+## The sandbox
+
+A door is somebody else's program.  Every door of `doors.cfg` runs in **bubblewrap** (`bwrap`, package `bubblewrap`) unless its block says `sandbox = off`.  What the program sees:
+
+* **no network** (`sandbox = default`; with `sandbox = net` the network and the files to use it -- `/etc/resolv.conf`, `/etc/hosts`, `/etc/ssl` -- stay);
+* **`/usr` read only**, with `/bin`, `/lib`, `/lib64` and `/sbin` linked to it, `/etc/localtime` and the terminal data, `/proc` and `/dev` of its own;
+* **a `/tmp` of its own**, empty and gone when the door ends (not shared between nodes);
+* its **own process numbers, IPC and host name**, no capabilities, and it ends with `mk` (`--die-with-parent`);
+* of everything else **only what is named**: the node directory (where it runs and where the drop files are), the door's directory (`dir`), for a DOS door the work directory of the call, and the paths of `bind =` (writable) and
+  `robind =` (read only) lines, in the door's block and in `[sandbox]`.  A path that is not there is left out.
+
+The terminal is not changed: the pseudo terminal is the door's terminal as before (curses doors work).  For a DOS door dosemu2 runs inside the sandbox, so the door and dosemu2 are both closed in.  A door that must call out (IRC, an
+InterBBS link) has `sandbox = net`; one that must read the BBS has a `robind` for what it needs.  `MK_HUB_PASSWORD` is removed from the environment of a sandboxed program.
+
+**Menu command 7** programs are not sandboxed unless `[sandbox]` says `command7 = default` (or `net`): then the node directory and the directory of the program are bound, and a program that needs more (`mkqwk` and the BBS directory)
+gets it with `bind` / `robind` lines in `[sandbox]`.  Do not sandbox `mkdosdoor` (the old script: it needs dosemu2 and its work directory).
+
+**Without a working `bwrap`** a sandboxed door is **not run** (the caller is told "This door is not available" or that the program could not be run, the reason is in the log); `sandbox = off` runs it as before.  `mkcheck` says which doors are
+sandboxed and whether bwrap works.  The sandbox is a sandbox, not a prison: there are no limits on CPU time or memory, a door can fill the disk it may write to, and it is no defence against a flaw in the kernel.
 
 ## `DOOR32.SYS`
 
@@ -89,7 +115,7 @@ menu data as its limit.  It stays for this release and is removed after it; use 
 * **The directory of the node** (`node<N>`) is the current directory of the program, so a relative path in the arguments of the menu item (`games/data`) is no
   longer relative to the BBS directory; the program itself is found as before (BBS directory first, then the path) and made a full path.  `mkqwk`, run from a menu,
   finds its `config.mko` in the directory of the node, or in the directory `MK` names.  Another work directory of a call is a place for what the node's programs keep.
-* dosemu2 is **not a sandbox**: a door runs with the rights of the BBS user and can read what that user can.  Run the BBS as a user of its own.
+* Without `sandbox = off` a door runs in the sandbox below; **with it, or in menu command 7 (unless `command7` is set), a door runs with the rights of the BBS user and can read what that user can.**  Run the BBS as a user of its own in any case.
 * A door that wants **a real UART** (its own interrupt handler, not a FOSSIL or INT 14h) usually works on the emulated 16550 of dosemu2, but test each.
 * File names: DOS sees the names as they are in the door directory; keep them upper or lower case consistently (dosemu2 matches without case).
 * The first start of a call takes a second or two.

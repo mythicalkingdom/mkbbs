@@ -6,7 +6,7 @@ Priority: optional
 Maintainer: @MAINTAINER@
 Installed-Size: @SIZE@
 Depends: libc6 (>= 2.34), adduser
-Recommends: zip, unzip, libssl3t64 | libssl3, stunnel4
+Recommends: zip, unzip, libssl3t64 | libssl3, stunnel4, bubblewrap
 Suggests: openssh-server | dropbear-bin, dosemu2, curl
 Homepage: https://github.com/mythicalkingdom/mkbbs
 Description: MK BBS: a bulletin board system with FidoNet and QWK networking

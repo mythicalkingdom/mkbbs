@@ -156,6 +156,7 @@ try:
         if round_ == 1:
             check('the door runs in dosemu2: its answer comes through COM1 to the caller', b'HELLO FROM DOS' in t, t[-300:])
             check('the first line of DOOR.SYS as the door read it: COM1:', b'COM1:' in t, t[-300:])
+            check('the door runs in the sandbox (dosemu2 under bwrap: the wrapper script of the node is there)', os.path.exists(workbase + '/sandbox-node1.sh'), os.listdir(workbase))
             check('the work directory of the node is there while the door runs, the old one of a bad call is gone', os.path.isdir(workbase + '/node1') and not os.path.exists(old), os.listdir(workbase))
             c.sendall(b'x')
             t = until(c, b'GOT:x', 10)

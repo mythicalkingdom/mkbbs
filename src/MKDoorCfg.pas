@@ -20,9 +20,15 @@ Unit MKDoorCfg;   {doors.cfg: the doors of the BBS (DOORS-PLAN.md)}
        dropfiles = dorinfo1.def door.sys callinfo.bbs door32.sys     which drop files are written (default: dorinfo1.def door.sys)
        freeze    = no                    yes: the time of the caller does not run while the door does
        raw       = no                    native: yes = the program gets the caller's connection itself as standard input / output, no pseudo terminal (*S of command 7)
-       sandbox   = default               default | off | net (DOORS-PLAN.md C: not used yet)
+       sandbox   = default               default (no network) | off | net (the network stays): the door runs in bubblewrap, see MKSandbox.pas
        bind      = /bbs/doors/scores     more directories the sandbox shows, writable (any number of lines)
        robind    = /bbs/files            ... read only
+
+       [sandbox]                         settings for all sandboxed programs (optional)
+       program  = /usr/bin/bwrap         default: bwrap on the PATH
+       command7 = off                    what menu command 7 gets: off | default | net
+       bind     = /bbs/doors/shared      more directories, writable / read only, for every sandboxed program
+       robind   = /bbs/files
 }
 
 Interface
@@ -39,6 +45,8 @@ Type
 
   TDoorCfg = Class
     Dosemu, Tmp: String;
+    SbProgram, SbCommand7: String;     {[sandbox]: the bwrap program, and what command 7 gets: off (default) | default | net}
+    SbBinds, SbROBinds: TStringList;   {[sandbox]: directories for all sandboxed doors}
     Doors: Array Of TDoorDef;
     Problems: TStringList;             {what could not be understood, with the line number: mkcheck says it}
     Constructor Create;
@@ -60,6 +68,9 @@ Uses SysUtils;
 Constructor TDoorCfg.Create;
   Begin
   Problems := TStringList.Create;
+  SbBinds := TStringList.Create;
+  SbROBinds := TStringList.Create;
+  SbCommand7 := 'off';
   SetLength(Doors, 0);
   End;
 
@@ -75,6 +86,8 @@ Destructor TDoorCfg.Destroy;
     Doors[i].ROBinds.Free;
     End;
   Problems.Free;
+  SbBinds.Free;
+  SbROBinds.Free;
   Inherited Destroy;
   End;
 
@@ -107,7 +120,7 @@ Procedure TDoorCfg.Load(Const Path: String);
     L: TStringList;
     i, p, Cur: Integer;
     S, K, V: String;
-    InGlobal, Ok: Boolean;
+    InGlobal, InSandbox, Ok: Boolean;
 
   Procedure Bad(Const Why: String);
     Begin
@@ -124,6 +137,7 @@ Procedure TDoorCfg.Load(Const Path: String);
     End;
     Cur := -1;
     InGlobal := False;
+    InSandbox := False;
     For i := 0 To L.Count - 1 Do
       Begin
       S := Trim(L[i]);
@@ -140,9 +154,16 @@ Procedure TDoorCfg.Load(Const Path: String);
           Continue;
           End;
         S := Trim(Copy(S, 2, Length(S) - 2));
+        InSandbox := False;
         If LowerCase(S) = 'global' Then
           Begin
           InGlobal := True;
+          Cur := -1;
+          End
+        Else If LowerCase(S) = 'sandbox' Then
+          Begin
+          InGlobal := False;
+          InSandbox := True;
           Cur := -1;
           End
         Else
@@ -177,7 +198,23 @@ Procedure TDoorCfg.Load(Const Path: String);
         End;
       K := LowerCase(Trim(Copy(S, 1, p - 1)));
       V := Trim(Copy(S, p + 1, Length(S)));
-      If InGlobal Then
+      If InSandbox Then
+        Begin
+        If K = 'program' Then SbProgram := V
+        Else If K = 'command7' Then
+          Begin
+          SbCommand7 := LowerCase(V);
+          If (SbCommand7 <> 'off') And (SbCommand7 <> 'default') And (SbCommand7 <> 'net') Then
+            Begin
+            Bad('command7 is off, default or net');
+            SbCommand7 := 'off';
+            End;
+          End
+        Else If K = 'bind' Then SbBinds.Add(V)
+        Else If K = 'robind' Then SbROBinds.Add(V)
+        Else Bad('unknown setting ' + K + ' in [sandbox]');
+        End
+      Else If InGlobal Then
         Begin
         If K = 'dosemu' Then Dosemu := V
         Else If K = 'tmp' Then Tmp := V

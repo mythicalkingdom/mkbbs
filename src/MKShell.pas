@@ -3,6 +3,13 @@ Unit MKShell;
 
 Interface
 
+Type
+  TWrapHook = Function(Var Cmd: String; Const NodeDir: String): Boolean;
+    {set by MKDosDoor: gives the command line a sandbox (bubblewrap) when the settings say so; False = the program must not be run (the hook has logged why)}
+
+Var
+  ShellWrapHook: TWrapHook;
+
 Function WriteDorInfo: Word;
 Function WriteDoorSys: Word;
 Function WriteCallInfo: Word;
@@ -581,7 +588,7 @@ Procedure TypeSeven(Cmd: String);
     Failed: Word;
     RawDoor: Boolean;
     UsePty: Boolean;
-    HomeDir, NodeDir, Prog: String;
+    HomeDir, NodeDir, Prog, Wrapped: String;
     InNode: Boolean;
 
   Begin
@@ -691,8 +698,14 @@ Procedure TypeSeven(Cmd: String);
     LogEntry.WriteEntry('DOS shell : ' + Cmd);
     Tx := WhereX;
     Ty := WhereY;
-    DoShell(CmdStr, Swapping, False);
-    Failed := ShellError;
+    Wrapped := CmdStr;
+    If (@ShellWrapHook <> Nil) And (Not ShellWrapHook(Wrapped, NodeDir)) Then
+      Failed := 8
+    Else
+      Begin
+      DoShell(Wrapped, Swapping, False);
+      Failed := ShellError;
+      End;
     If FreezeTime Then
       User.AdjustTime(User.CurrentTime - DoorStart);
     End;
