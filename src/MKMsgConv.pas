@@ -5,7 +5,7 @@ Program MKMsgConv;
 {
      mkmsgconv: copies a message area into a new base of another kind (MSGCONV-PLAN.md).
 
-       mkmsgconv [-c config dir] -a <areas> | -k <type>  -t <type>  [-d file id] [-n] [-m] [-f] [-v] [-q]
+       mkmsgconv [-c config dir] -a <areas> | -k <type>  -t <type>  [-d file id] [-n] [-s] [-m] [-f] [-v] [-q]
 
          -a    the areas: numbers, separated by commas, and ranges (3,7,10-20)
          -k    every area of this kind (H S F J M Y) instead of -a
@@ -13,6 +13,7 @@ Program MKMsgConv;
          -d    the file id of the new base (default: the area's own file id, or area<N>); Squish, JAM, Merlin, Synchronet: a file name below the
                message path of the area, Fido: a directory name; Hudson uses the board number of the area and the message path
          -n    a dry run: the copy is made in a scratch directory (and removed), so what the new kind cannot hold is counted exactly; nothing is written to the BBS
+         -s    after the copy checked out: the area is of the new kind (and has the new file id) in the configuration: config.mk and bbsconfig.json both, when both are there; the old files stay
          -m    keep the number map (old new) in <BBS dir>/convmap/area<N>.map
          -f    go on although the new base already has messages (they stay, the copy is added), a caller is on line, a non-empty destination
          -v    each message
@@ -29,7 +30,7 @@ Program MKMsgConv;
 }
 
 Uses SysUtils, Classes, BaseUnix, Unix,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen, MKFile;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen, MKFile, MKCfgMK, MKCfgJs;
 
 Type
   TFlags = Record
@@ -37,7 +38,7 @@ Type
     End;
 
 Var
-  Dry, Verbose, Quiet, Force, KeepMap: Boolean;
+  Dry, Verbose, Quiet, Force, KeepMap, Switch: Boolean;
   DestType: Char = ' ';
   FileIdOpt: String = '';
   AreaList: TStringList;
@@ -247,6 +248,89 @@ Function DestId(A: Word; Const Dir: String): String;
       Id := UpCase(DestType) + Base + Fid;
     End;
   DestId := Id;
+  End;
+
+
+Function FileIdFor(A: Word): String;
+  {the file id the new base has in the configuration: -d, else the old one, else area<N> (Hudson has none: the board is the area number)}
+  Begin
+  If UpCase(DestType) = 'H' Then
+    Begin
+    FileIdFor := '';
+    Exit;
+    End;
+  FileIdFor := FileIdOpt;
+  If FileIdOpt = '' Then
+    FileIdFor := Config^.GetMsgFileId(A);
+  If FileIdFor = '' Then
+    FileIdFor := 'area' + IntToStr(A);
+  End;
+
+
+Function SwitchStore(Obj: CfgObjPtr; A: Word; Fid: String; Const What: String): String;
+  {sets the kind and the file id of the area in one store of the configuration and saves it; '' when it went, else why not}
+  Begin
+  SwitchStore := '';
+  Obj^.Load;
+  If Obj^.GetError <> 0 Then
+    Begin
+    SwitchStore := What + ' cannot be loaded (' + IntToStr(Obj^.GetError) + ')';
+    Exit;
+    End;
+  Obj^.SetMsgBaseType(A, UpCase(DestType));
+  Obj^.SetMsgFileId(A, Fid);
+  Obj^.Save;
+  End;
+
+
+Function SwitchArea(A: Word; Const Dst: String): String;
+  {-s: the area is of the new kind in the configuration: the store in use, and the other one too when both exist (config.mk and bbsconfig.json are kept in step).  Then the configuration is read again and must give
+   the new base for the area.  '' when it went, else why not}
+  Var
+    Obj: CfgObjPtr;
+    Fid, Dir, E, Chk: String;
+    Chk2: CfgObjPtr;
+    InUseJson: Boolean;
+
+  Begin
+  SwitchArea := '';
+  Fid := FileIdFor(A);
+  Dir := IncludeTrailingPathDelimiter(Config^.GetBbsPath);
+  InUseJson := JsonConfigWanted;
+  Obj := NewMKConfig(False);
+  E := SwitchStore(Obj, A, Fid, Copy('bbsconfig.json', 1, 14 * Ord(InUseJson)) + Copy('config.mk', 1, 9 * Ord(Not InUseJson)));
+  Dispose(Obj, Done);
+  If E <> '' Then
+    Begin
+    SwitchArea := E;
+    Exit;
+    End;
+  If InUseJson Then
+    Begin
+    If FileExists(Dir + 'config.mk') Then
+      Begin
+      Obj := New(MKCfgObjPtr, Init);
+      E := SwitchStore(Obj, A, Fid, 'config.mk');
+      Dispose(Obj, Done);
+      End;
+    End
+  Else If FileExists(JsonConfigFile(Dir)) Then
+    Begin
+    Obj := New(MKJsonCfgObjPtr, Init);
+    E := SwitchStore(Obj, A, Fid, 'bbsconfig.json');
+    Dispose(Obj, Done);
+    End;
+  If E <> '' Then
+    Begin
+    SwitchArea := E;
+    Exit;
+    End;
+  Chk2 := NewMKConfig(True);
+  Chk2^.Load;
+  Chk := Chk2^.GetMsgAreaId(A);
+  Dispose(Chk2, Done);
+  If Chk <> Dst Then
+    SwitchArea := 'the configuration gives ' + Chk + ' for the area, not ' + Dst;
   End;
 
 
@@ -659,6 +743,19 @@ Procedure DoArea(A: Word);
       Cut := Cut + ', ' + IntToStr(Lr) + ' last-read pointer(s) dropped (Synchronet keeps none)'
     Else
       Cut := Cut + ', ' + IntToStr(Lr) + ' last-read pointer(s) ' + Copy('would be ', 1, 9 * Ord(Dry)) + 'moved';
+  If Switch And (Not Dry) Then
+    Begin
+    Err := SwitchArea(A, Dst);
+    If Err <> '' Then
+      Begin
+      WriteLn('area ', A, ' ', Name, ': copied and checked, but NOT switched: ', Err);
+      Failed := True;
+      End
+    Else
+      Cut := Cut + ', the area is ' + KindName(DestType) + ' in the configuration now';
+    End;
+  If Quiet And (Err = '') Then
+    Exit;
   If Dry Then
     WriteLn('area ', A, ' ', Name, ': ', KindName(From), ' -> ', KindName(DestType), ', would copy ', N, ' message(s), the copy checked out', Cut)
   Else
@@ -710,6 +807,7 @@ While i <= ParamCount Do
   Else If A = '-q' Then Quiet := True
   Else If A = '-f' Then Force := True
   Else If A = '-m' Then KeepMap := True
+  Else If A = '-s' Then Switch := True
   Else If A = '-c' Then
     Begin
     Inc(i);
@@ -745,7 +843,7 @@ While i <= ParamCount Do
     End
   Else
     Begin
-    WriteLn('usage: mkmsgconv [-c config dir] -a <areas> | -k <kind>  -t <kind>  [-d file id] [-n] [-m] [-f] [-v] [-q]');
+    WriteLn('usage: mkmsgconv [-c config dir] -a <areas> | -k <kind>  -t <kind>  [-d file id] [-n] [-s] [-m] [-f] [-v] [-q]');
     Halt(1);
     End;
   Inc(i);
@@ -813,7 +911,7 @@ If TotalAreas = 0 Then
   Halt(1);
   End;
 WriteLn(TotalMsgs, ' message(s) in ', TotalOk, ' of ', TotalAreas, ' area(s) ', Copy('would be ', 1, 9 * Ord(Dry)), 'converted to ', KindName(DestType), Copy(' (a dry run: nothing was written)', 1, 34 * Ord(Dry)),
-  Copy('; the configuration is unchanged: set the kind and file id of the area in mkconfig to use the new base', 1, 100 * Ord(Not Dry)));
+  Copy('; the configuration is unchanged: set the kind and file id of the area in mkconfig to use the new base (or convert with -s)', 1, 120 * Ord(Not (Dry Or Switch))));
 If Failed Then
   Halt(2);
 End.

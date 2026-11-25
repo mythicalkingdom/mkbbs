@@ -167,5 +167,30 @@ check('... a dry run is allowed', r.returncode == 0, r.stdout + r.stderr)
 subprocess.run([build + '/lrtool', 'useron', '-'], env=env, check=True)
 r = conv('-a', '4', '-t', 'M', '-d', 'free', '-m')
 check('nobody on line: it goes (-m keeps the map)', r.returncode == 0 and os.path.exists(ra + '/convmap/area4.map'), (r.stdout, r.stderr, os.listdir(ra)))
+
+# phase 3: -s switches the area in the configuration (config.mk and bbsconfig.json together)
+shutil.copy(cj + '/bbsconfig.json', ra + '/bbsconfig.json')
+envj2 = dict(env, MKJSON=ra)
+
+
+def areaid(e, a):
+    return subprocess.run([build + '/lrtool', 'areaid', str(a)], env=e, capture_output=True, text=True).stdout.strip()
+
+
+r = conv('-a', '2', '-t', 'J', '-d', 'swj')
+check('without -s the configuration is unchanged', r.returncode == 0 and areaid(env, 2) == ident('S', 2, 'sq') and areaid(envj2, 2) == ident('S', 2, 'sq'), (areaid(env, 2), areaid(envj2, 2)))
+r = subprocess.run([build + '/mkmsgconv', '-a', '2', '-t', 'J', '-d', 'swj2', '-s'], env=env, capture_output=True, text=True, encoding='latin-1')
+check('-s: the area is JAM in config.mk', r.returncode == 0 and 'configuration now' in r.stdout and areaid(env, 2) == ident('J', 2, 'swj2'), (r.stdout, r.stderr, areaid(env, 2)))
+check('... and in bbsconfig.json (both kept in step)', areaid(envj2, 2) == ident('J', 2, 'swj2'), areaid(envj2, 2))
+check('... the old Squish base is still there and the new one holds the messages', len(dump(ident('S', 2, 'sq')) or []) == 6 and len(dump(ident('J', 2, 'swj2')) or []) == 6)
+# and the other way round, with the JSON file in use
+r = subprocess.run([build + '/mkmsgconv', '-a', '2', '-t', 'M', '-d', 'swm', '-s'], env=envj2, capture_output=True, text=True, encoding='latin-1')
+check('-s with MKJSON set: JSON and records both change', r.returncode == 0 and areaid(env, 2) == ident('M', 2, 'swm') and areaid(envj2, 2) == ident('M', 2, 'swm'), (r.stdout, r.stderr, areaid(env, 2), areaid(envj2, 2)))
+r = conv('-a', '2', '-t', 'H', '-s', '-n')
+check('-s with -n changes nothing', r.returncode == 0 and areaid(env, 2) == ident('M', 2, 'swm'), r.stdout)
+r = conv('-a', '1-3', '-t', 'Y', '-q')
+check('a range of areas (-q: the total only)', r.returncode == 0 and 'area 1' not in r.stdout and '18 message(s) in 3 of 3' in r.stdout, r.stdout)
+r = conv('-a', '1-3', '-t', 'Y', '-q')
+check('... again: each area is refused and named, exit 2, the total still comes', r.returncode == 2 and r.stdout.count('REFUSED') == 3 and '0 message(s) in 0 of 3' in r.stdout, r.stdout)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

@@ -131,7 +131,7 @@ lane C par_2
 # password limits: locking after wrong passwords, the expiry of a password; the login guard of mklisten (counts failed log-ons per address)
 par_pwlimits() {
   if [ -f bbs/bbsc/ra/config.mk ]; then
-    python3 tests/pwlimittest.py build/work/pwlimit | grep -E "^(ok|FAIL|skip)" | tee build/pwlimitresult.txt
+    python3 tests/pwlimittest.py build build/work/pwlimit | grep -E "^(ok|FAIL|skip)" | tee build/pwlimitresult.txt
     if grep -q FAIL build/pwlimitresult.txt; then exit 1; fi
     python3 tests/loginguardtest.py build/work/loginguard | grep -E "^(ok|FAIL|skip)" | tee build/loginguardresult.txt
     if grep -q FAIL build/loginguardresult.txt; then exit 1; fi

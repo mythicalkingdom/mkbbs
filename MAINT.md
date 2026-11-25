@@ -162,6 +162,32 @@ A door that keeps its own files by the user number it was given (`DOOR.SYS`, `DO
 * A door can check which pack it has converted by the first line of the map (`# usermap: ... of <date time>`).
 * Plain text on purpose: `awk -F'\t' '$2 != "-" {print $1, $2}' usermap.txt` is a conversion table.
 
+# Converting a message area to another kind: `mkmsgconv`
+
+An area's base kind (Hudson, Squish, Fido `*.MSG`, JAM, Merlin, Synchronet) is set in `mkconfig`; changing it there does not move the messages.  `mkmsgconv` writes a new base of the kind you want, checks it and, with `-s`, switches the area over.
+
+```
+mkmsgconv [-c config dir] -a <areas> | -k <kind>  -t <new kind>  [-d file id] [-n] [-s] [-m] [-f] [-v] [-q]
+```
+
+| | |
+|---|---|
+| `-a 3,7,10-20` / `-k H` | the areas: numbers and ranges, or every area of a kind (`H S F J M Y`) |
+| `-t J` | the new kind: `H` Hudson, `S` Squish, `F` Fido `*.msg`, `J` JAM, `M` Merlin, `Y` Synchronet |
+| `-d id` | the file id of the new base (default: the old one, else `area<N>`), below the message path of the area |
+| `-n` | a dry run: the copy is made in a scratch directory and compared, so what the new kind cannot hold is counted exactly; nothing is written |
+| `-s` | after the check, the area has the new kind and file id in the configuration: `config.mk` **and** `bbsconfig.json` when both are there; the configuration is read again to see that it names the new base |
+| `-m` | keep the number map `old new` in `<BBS dir>/convmap/area<N>.map` for doors and other tools |
+| `-f` | go on although the new base holds messages (the copy is added) or a caller is on line |
+| `-v` / `-q` | each message / the summary and the refusals only |
+
+* **The old base is never changed.**  It stays until you remove it (a Hudson area leaves its messages in the shared files until `mkmaint -p`).
+* **Copied:** from, to, subject, date, time, addresses, cost, flags, the text exactly as stored (kludge lines too) and the reply and see-also links.  Deleted messages stay out.  **Numbers start at 1** in the new base (Hudson: the numbers run through all its areas); the map is used for the links and for the pointers.
+* **Last-read pointers** of every user of `users.bbs` move through the map (the last message at or below the old pointer; JAM by the name's check sum).  Synchronet keeps no pointers: the report says how many were dropped.
+* **What a kind cannot hold** is counted in the report (a cut subject, a missing origin address, kludge lines Synchronet drops).
+* **Refused:** a caller on line (`useron.bbs`; run it in an exclusive event), an area with a message waiting to be sent (run `mktoss` first; the tosser then reads the new base once from the start), a destination that already holds messages, an area that is the new kind already.  One area failing does not stop the others; the exit code is 2 then (3: a caller on line, 1: not usable).
+* **Recipe:** `mkbackup`; `mkmsgconv -a 5 -t J -n`; in an exclusive event `mkmsgconv -k H -t J -s -m`; `mkcheck`; later `mkmaint -p` and remove the old files.
+
 # File areas: `mkfilecheck`
 
 ```

@@ -10,8 +10,13 @@ Var
   Fn: String;
   K: LongInt;
 Begin
-Config := NewMKConfig(True);
+Config := NewMKConfig(True);                  {MKJSON set: the JSON file, else the record files}
 Config^.Load;
+If ParamStr(1) = 'areaid' Then
+  Begin
+  WriteLn(Config^.GetMsgAreaId(StrToInt(ParamStr(2))));
+  Halt(0);
+  End;
 If ParamStr(1) = 'useron' Then
   Begin
   Fn := IncludeTrailingPathDelimiter(Config^.GetBbsPath) + 'useron.bbs';
