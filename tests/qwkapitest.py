@@ -48,7 +48,7 @@ subprocess.run([build + '/tosssetup', tmp + '/in', tmp + '/outb', tmp + '/un'], 
 subprocess.run([build + '/tossmake'], env=env, capture_output=True, text=True)
 NODE = 'Chuck Ebenschweiger'
 AREA = '6'
-r = subprocess.run([build + '/netsetup', NODE, AREA], env=env, capture_output=True, text=True)
+r = subprocess.run([build + '/netsetup', NODE, AREA], env=dict(env, NETSEC='110'), capture_output=True, text=True)       # level 110: it may post in the areas
 check('a QWK node is made (flag, ZIP, area 6 in its offline mail)', 'ok' in r.stdout, r.stdout + r.stderr)
 
 
@@ -235,6 +235,100 @@ try:
     check('the log has the acknowledgements and the packets with their bytes', re.search(r'api: node5 127\.0\.0\.1 POST /v1/qwk/packet/[0-9a-f]{12}/ack 200', log) and re.search(r'GET /v1/qwk/packet 200 out=\d+', log) and 'mkapi_' not in log, log[-500:])
     spool = [f for f in os.listdir(ra + '/tmp')]
     check('no temporary directory of a packet is left', spool == [] or all(not os.path.isdir(ra + '/tmp/' + f) for f in spool), spool)
+    # ---- phase 3: the reply packet
+    tokr = tool('add', 'nodereply', '-s', 'qwk,qwk:reply', '-u', NODE, '-q').stdout.strip()
+    tokm = tool('add', 'msgs', '-s', 'messages', '-q').stdout.strip()
+    tf = json.load(open(ra + '/apitokens.json'))
+    tf['qwk'] = {'max_packet': 10485760, 'max_reply': 4000}
+    json.dump(tf, open(ra + '/apitokens.json', 'w'))
+    board = json.loads(req('GET', '/v1/qwk')[2])['bbs_id']
+
+    def put(body, token=tokr, ctype='application/zip', port=24881):
+        for _ in range(50):
+            try:
+                sk = socket.create_connection(('127.0.0.1', port)); break
+            except OSError:
+                time.sleep(0.1)
+        h = 'PUT /v1/qwk/reply HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer %s\r\nContent-Length: %d\r\n' % (token, len(body))
+        if ctype:
+            h += 'Content-Type: %s\r\n' % ctype
+        sk.sendall((h + '\r\n').encode() + body)
+        sk.settimeout(30)
+        b = b''
+        try:
+            while True:
+                x = sk.recv(65536)
+                if not x:
+                    break
+                b += x
+        except (socket.timeout, ConnectionError):
+            pass
+        sk.close()
+        head, _, rb = b.partition(b'\r\n\r\n')
+        return (int(head.split()[1]) if head.startswith(b'HTTP/1.1') else 0), rb
+
+    def make_rep(tag, kind='reply', msgname=None, conf=AREA):
+        base = work + '/rep_' + tag
+        if kind == 'reply':
+            subprocess.run([build + '/qwkmsgtest', 'reply', base + '.msg', conf, board, tag], check=True, capture_output=True)
+        else:
+            subprocess.run([build + '/qwkmsgtest', 'control', base + '.msg', board] + kind.split('|'), check=True, capture_output=True)
+        bio = io.BytesIO()
+        with zipfile.ZipFile(bio, 'w') as z:
+            z.write(base + '.msg', msgname or (board.upper() + '.MSG'))
+        return bio.getvalue()
+
+    def count_replies():
+        j = json.loads(req('GET', '/v1/messages/%s?q=reply&limit=500' % AREA, tokm)[2])
+        return len(j.get('messages', []))
+
+    n0 = count_replies()
+    rep1 = make_rep('one')
+    st, rb = put(rep1)
+    j = json.loads(rb) if st == 200 else {}
+    a6 = [x for x in j.get('areas', []) if x['conference'] == int(AREA)]
+    a999 = [x for x in j.get('areas', []) if x['conference'] == 999]
+    check('PUT /v1/qwk/reply: 200 imported; two messages posted in conference 6 (the area), the one for a conference that is not there is refused with its reason', st == 200 and j['status'] == 'imported' and j['posted'] == 2 and a6 and a6[0]['posted'] == 2
+          and a6[0]['area'] and a999 and a999[0]['refused'] == 1 and 'may not post' in a999[0]['reason'] and j['refused'] == 1, (st, rb[:600]))
+    check('the two messages are in the area (read through the API)', count_replies() == n0 + 2, (count_replies(), n0))
+    st, rb = put(rep1)
+    j = json.loads(rb) if st == 200 else {}
+    check('the same packet again: 200 duplicate, nothing posted twice', st == 200 and j['status'] == 'duplicate' and j['posted'] == 2 and count_replies() == n0 + 2, (st, rb, count_replies()))
+    st, rb = put(b'x' * 4001)
+    check('a body over max_reply (4000): 413', st == 413, (st, rb))
+    st, rb = put(b'this is not a zip file at all')
+    check('something that is not a ZIP: 415', st == 415 and b'ZIP' in rb, (st, rb))
+    st, rb = put(rep1, ctype='text/plain')
+    check('another Content-Type: 415', st == 415, (st, rb))
+    st, rb = put(make_rep('other', msgname='OTHERID.MSG'))
+    check('a packet for another BBS id: 400, nothing posted', st == 400 and b'not a reply packet' in rb and count_replies() == n0 + 2, (st, rb))
+    st, rb = put(make_rep('noscope'), token=tok)
+    check('a token with qwk but without qwk:reply: 403', st == 403, (st, rb))
+    # the control messages of a node
+    st, rb = put(make_rep('ctl', kind='%s:DROP %s' % (AREA, AREA)))
+    j = json.loads(rb) if st == 200 else {}
+    st2, _, ib = req('GET', '/v1/qwk')
+    check('a control message (DROP): carried out and reported in "commands"; the node no longer has the conference', st == 200 and any('DROP' in c and 'done' in c for c in j['commands']) and not any(c['conference'] == int(AREA) for c in json.loads(ib)['conferences']), (st, rb[:400], ib[:300]))
+    st, rb = put(make_rep('ctl2', kind='%s:ADD %s' % (AREA, AREA)))
+    st2, _, ib = req('GET', '/v1/qwk')
+    check('ADD gives it back', st == 200 and any(c['conference'] == int(AREA) for c in json.loads(ib)['conferences']), (st, rb[:300]))
+    check('no work folder of a reply is left', all(not os.path.isdir(ra + '/tmp/' + f) for f in os.listdir(ra + '/tmp')) and not [f for f in os.listdir(ra + '/tmp') if f.startswith('api')], os.listdir(ra + '/tmp'))
+    # a crash between the ledger line and the end: the retry is refused, nothing is posted twice
+    cfg2 = dict(cfg, ports=[{'port': 24882, 'type': 'api', 'config': ra, 'env': {'MKAPI_TEST': '1', 'MKAPI_TEST_CRASH': '1'}}], logfile=work + '/listen2.log')
+    json.dump(cfg2, open(work + '/listen2.json', 'w'))
+    lst2 = subprocess.Popen([build + '/mklisten', '-c', work + '/listen2.json'], stdout=subprocess.DEVNULL)
+    time.sleep(2)
+    before = count_replies()
+    rep3 = make_rep('crash')
+    st, rb = put(rep3, port=24882)
+    check('a crash after the ledger line (test hook): no answer', st == 0, (st, rb))
+    lst2.terminate(); lst2.wait()
+    st, rb = put(rep3)
+    check('the retry of that packet: 409 (an earlier upload did not finish), nothing was posted by the crash and nothing is posted now', st == 409 and b'did not finish' in rb and count_replies() == before, (st, rb, count_replies(), before))
+    led = open(os.path.dirname(sf) + '/reply.ledger').read()
+    check('reply.ledger has a line for each packet: done for the ones that went through, started for the one that crashed', led.count(' done ') >= 3 and led.count(' started ') == 1, led)
+    log = open(work + '/listen.log').read()
+    check('the log line of an upload: token, PUT, the answer, the bytes in', re.search(r'api: nodereply 127\.0\.0\.1 PUT /v1/qwk/reply 200 in=\d+', log) and re.search(r'PUT /v1/qwk/reply 409', log), log[-500:])
 finally:
     lst.terminate()
     lst.wait()

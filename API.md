@@ -62,7 +62,7 @@ mkapitoken [-c config dir] list | revoke ID | rotate ID [-q]
 | `users` | `/v1/users`, `/v1/users/<name>` |
 | `users:private` | reserved: nothing in version 1 gives phone numbers or addresses |
 | `qwk` | the QWK packet of a node and its acknowledgement (below); the token must name the user of a QWK node (`-u "User"`) |
-| `qwk:reply` | uploading a reply packet (`QWK-API-PLAN.md`, phase 3: not built yet) |
+| `qwk:reply` | uploading a reply packet (`PUT /v1/qwk/reply`, below); the token must name the user of a QWK node |
 
 A request with no token, a token that is not known, expired or used from the wrong address gets **401**, a token without the scope **403**.  The answer never says which check failed.  Both count for the **login guard**
 of `mklisten` (`MKLISTEN.md`): five of them from one address within ten minutes block the address for an hour (the machine itself, `127.0.0.1`, is never blocked unless you change `allow`).
@@ -153,6 +153,21 @@ the node gets what `mk -Q` would give it: the areas of its **offline mail** (wha
   the `"qwk"` object of `apitokens.json` (`{"qwk": {"max_packet": 5000000, "keep_days": 14}}`); `mkapitoken limits` shows what is in effect.
 * **Expiry.**  A packet that is not acknowledged within `keep_days` is dropped at the next request of the node; its acknowledgement is then `410`.
 * **One request at a time for a node** (`423` while another one is running).  The state is in `qwkapi/<user>/` in the BBS folder (the waiting packet, its state file, `acked.log`).
+* **The reply packet.**  `PUT /v1/qwk/reply` (scope **`qwk:reply`**): the body is the reply packet, `<BBSID>.REP`, a ZIP (`Content-Type: application/zip` or `application/octet-stream`; at most `max_reply`,
+  5 MB by default: `413` over it).  It is posted **as the node**: its write access decides where, a conference it may not post in is refused (and said so), and its **control messages** (`ADD`, `DROP`,
+  `RESET`, `RESETALL`, `CONTROL ON/OFF` to `MK` or `SBBS`: `NETWORKING.md`) are carried out.  The answer:
+
+  ```json
+  { "status": "imported", "posted": 2, "refused": 1,
+    "areas": [ { "conference": 6, "area": "FIDO-MK", "posted": 2, "duplicates": 0, "moved_to_bad_area": 0, "skipped": 0, "refused": 0, "failed": 0, "reason": "" },
+               { "conference": 999, "area": null, "posted": 0, "duplicates": 0, "moved_to_bad_area": 0, "skipped": 0, "refused": 1, "failed": 0, "reason": "the node may not post in this conference (no such area, or no write access)" } ],
+    "commands": ["DROP 6: done"] }
+  ```
+
+  **Once only:** the SHA-1 of every reply packet goes into `qwkapi/<user>/reply.ledger` (`started`, then `done`).  The same packet again is `{"status": "duplicate"}` and posts nothing, so a node can retry after a lost answer.
+  If the BBS stopped in the middle of an import the line stays `started` and the retry is **`409`** ("an earlier upload of this packet did not finish"): nothing is posted twice, the log says how far it got, and the
+  sysop looks at the area and removes that line of `reply.ledger` to let the packet through again.  Other answers: `415` (not a ZIP, or another content type), `400` (not a reply packet for this BBS id, or it cannot
+  be unpacked), `403` (the token has no `qwk:reply`), `423` (another request of the node is running).
 * **A script** (a node that fetches with `curl`):
 
   ```

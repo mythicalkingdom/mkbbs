@@ -26,7 +26,7 @@ Uses SysUtils, Classes, BaseUnix, DateUtils, fpjson, MKPwd,
   MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKComAbs, MKSess, MKApiTok, MKApiData, MKQwkApi;
 
 Const
-  Paths: Array[0..15] Of String = ('/v1', '/v1/status', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/{area}', '/v1/messages/{area}', '/v1/messages/{area}/{number}', '/v1/qwk', '/v1/qwk/packet', '/v1/qwk/packet/{id}/ack', '/v1/users');
+  Paths: Array[0..16] Of String = ('/v1', '/v1/status', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/{area}', '/v1/messages/{area}', '/v1/messages/{area}/{number}', '/v1/qwk', '/v1/qwk/packet', '/v1/qwk/packet/{id}/ack', '/v1/qwk/reply', '/v1/users');
   MaxHead = 8192;
   MaxLine = 2048;
   ReadSecs = 10;
@@ -342,6 +342,9 @@ Type
 
 Function RuleFor(Const P: String; Var R: TRule): Boolean;
   {the methods and the body limit of a path; False for a path that is not one (the route says 404)}
+  Var
+    MaxP, MaxR, Keep: Int64;
+
   Begin
   Result := True;
   R.Methods := 'GET HEAD';
@@ -351,6 +354,13 @@ Function RuleFor(Const P: String; Var R: TRule): Boolean;
     Exit;
   If (P = '/v1/qwk') Or (P = '/v1/qwk/packet') Then
     Exit;
+  If P = '/v1/qwk/reply' Then
+    Begin
+    QwkLimits(MaxP, MaxR, Keep);
+    R.Methods := 'PUT';
+    R.MaxBody := MaxR;
+    Exit;
+    End;
   If (Copy(P, 1, 15) = '/v1/qwk/packet/') And (Copy(P, Length(P) - 3, 4) = '/ack') Then
     Begin
     R.Methods := 'POST';
@@ -522,6 +532,7 @@ Procedure Route;
     Code: Integer;
     MaxP, MaxR, Keep: Int64;
     QRes: TQwkRes;
+    Ans: TJSONObject;
 
   Begin
   RunDir := GetEnvironmentVariable('MKRUN');
@@ -667,7 +678,10 @@ Procedure Route;
     End
   Else If Copy(P, 1, 7) = '/v1/qwk' Then
     Begin
-    Need('qwk');
+    If P = '/v1/qwk/reply' Then
+      Need('qwk:reply')
+    Else
+      Need('qwk');
     Node := Tokens[TokIdx].User;
     If Not QwkNodeLoad(Node, Code, Err) Then
       Begin
@@ -685,6 +699,18 @@ Procedure Route;
           'Content-Disposition: attachment; filename="' + Config^.GetBBSID + '.QWK"'#13#10)
       Else If QRes.Code = 204 Then
         NoContent('X-QWK-Packet: none'#13#10)
+      Else
+        ErrorAnswer(QRes.Code, QRes.Err);
+      End
+    Else If P = '/v1/qwk/reply' Then
+      Begin
+      Name := LowerCase(HeaderValue(Head_, 'Content-Type'));
+      If (Name <> '') And (Pos('zip', Name) = 0) And (Pos('octet-stream', Name) = 0) Then
+        ErrorAnswer(415, 'send the reply packet as application/zip (or application/octet-stream)')
+      Else If (BodyFile = '') Or (ReqIn = 0) Then
+        ErrorAnswer(400, 'the body is empty: send the reply packet (<BBSID>.REP)')
+      Else If QwkReply(Node, BodyFile, Keep, TestPaths And (GetEnvironmentVariable('MKAPI_TEST_CRASH') = '1'), QRes, Ans) Then
+        Send(Ans)
       Else
         ErrorAnswer(QRes.Code, QRes.Err);
       End

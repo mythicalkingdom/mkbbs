@@ -91,6 +91,8 @@ call a hub, such as a Synchronet BBS), or both with different systems.
 
    Other Synchronet commands (FREQ, FILES, ATTACH, CTRL-A, TZ, VIA, MSGID, NDX) are accepted and ignored.  `DOOR.ID`
    in the packet says `CONTROLNAME = MK` and lists what is supported.
+8. **Or by HTTPS** (instead of the `qwk` port): a token for the node's user with the scopes `qwk` and `qwk:reply` gives it `GET /v1/qwk/packet`, its acknowledgement and `PUT /v1/qwk/reply` through the JSON
+   API (`API.md`: QWK packets for a node): the same packet and the same control messages, one request each, with TLS and a token that can be revoked.
 
 ### B. Be a node: call a hub
 

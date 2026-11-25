@@ -29,10 +29,12 @@ Function QwkNodeLoad(Const UserName: String; Var Code: Integer; Var Err: String)
 Function QwkInfo(Const UserName: String; MaxPacket, MaxReply, KeepDays: Int64): TJSONObject;
 Procedure QwkPacket(Const UserName: String; Rebuild: Boolean; MaxPacket, KeepDays: Int64; Var Res: TQwkRes);
 Procedure QwkAck(Const UserName, Id: String; KeepDays: Int64; Var Res: TQwkRes);
+Function QwkReply(Const UserName, BodyFile: String; KeepDays: Int64; CrashTest: Boolean; Var Res: TQwkRes; Var Answer: TJSONObject): Boolean;
+  {the reply packet in BodyFile: posted as the node.  Res.Code 200 (Answer says what happened), 400, 409, 415, 423 ...}
 
 Implementation
 
-Uses BaseUnix, Unix, DateUtils, MKGlobT, MKString, MKCfgAbs, MKDoor, MKFile, MKOffDL, MKOfflin, MKApiTok, MKApiData;
+Uses BaseUnix, Unix, DateUtils, sha1, MKGlobT, MKString, MKCfgAbs, MKDoor, MKFile, MKStr, MKMsgAbs, MKOffAbs, MKOffQwk, MKOffXfer, MKQwkImp, MKOffDL, MKOfflin, MKApiTok, MKApiData;
 
 Var
   LockFd: LongInt = -1;
@@ -88,6 +90,9 @@ Function QwkNodeLoad(Const UserName: String; Var Code: Integer; Var Err: String)
     Exit;
   If Not User.GetUserQwkNode Then
     Exit;
+  Prompts.Init;                       {the library calls ask for prompt texts (a screen of the caller would show them): the language file, so that a missing string is empty}
+  Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.lc') + Config^.GetLangFile(1) + '.lc');
+  StartUpPath := GetCurrentDir;
   Code := 200;
   Err := '';
   Result := True;
@@ -532,6 +537,283 @@ Procedure QwkAck(Const UserName, Id: String; KeepDays: Int64; Var Res: TQwkRes);
   Finally
     P.Free;
     L.Free;
+    DropLock;
+  End;
+  End;
+
+{------------------------------------------------------------ the reply packet}
+
+Const
+  MaxConf = 2000;
+
+Type
+  TConfCount = Record
+    Posted, Dupes, Grunged, Moved, Refused, Failed: LongInt;
+    Seen: Boolean;
+    End;
+
+Var
+  ConfStats: Array[0..MaxConf] Of TConfCount;
+  CmdLines: TStringList;
+
+
+Procedure ReplyNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
+  Begin
+  If (Conf < 0) Or (Conf > MaxConf) Then
+    Exit;
+  ConfStats[Conf].Seen := True;
+  Case Code Of
+    qiPosted: Inc(ConfStats[Conf].Posted);
+    qiDupe: Inc(ConfStats[Conf].Dupes);
+    qiGrunged: Inc(ConfStats[Conf].Grunged);
+    qiMoved: Inc(ConfStats[Conf].Moved);
+    qiRefused: Inc(ConfStats[Conf].Refused);
+    qiFailed: Inc(ConfStats[Conf].Failed);
+    End;
+  End;
+
+
+Procedure ReplySink(S: ShortString);
+  {the text the import would show the caller: the control messages say what they did ("ADD 12: done")}
+  Begin
+  S := Trim(S);
+  If (S <> '') And ((Pos(': done', S) > 0) Or (Pos(': not done', S) > 0) Or (Pos(': ignored', S) > 0)) Then
+    CmdLines.Add(S);
+  End;
+
+
+Function ReplyHash(Const FN: String): String;
+  Begin
+  Result := LowerCase(SHA1Print(SHA1File(FN)));
+  End;
+
+
+Function ReplyLedgerStatus(Const Dir, Hash: String; Var Posted: LongInt): String;
+  Var
+    L, P: TStringList;
+    i: Integer;
+
+  Begin
+  Result := '';
+  Posted := 0;
+  If Not FileExists(Dir + 'reply.ledger') Then
+    Exit;
+  L := TStringList.Create;
+  P := TStringList.Create;
+  Try
+    L.LoadFromFile(Dir + 'reply.ledger');
+    P.Delimiter := ' ';
+    P.StrictDelimiter := True;
+    For i := 0 To L.Count - 1 Do
+      Begin
+      P.DelimitedText := L[i];
+      If (P.Count >= 4) And (P[0] = Hash) Then
+        Begin
+        Result := P[1];
+        Posted := StrToIntDef(P[3], 0);
+        End;
+      End;
+  Finally
+    P.Free;
+    L.Free;
+  End;
+  End;
+
+
+Procedure ReplyLedgerSet(Const Dir, Hash, Status: String; Posted: LongInt; KeepDays: Int64);
+  {one line for each packet: hash, started or done, time, messages posted; the lines of the last max(30, 4 * keep_days) days stay}
+  Var
+    L, P: TStringList;
+    i: Integer;
+    T, Keep: Int64;
+
+  Begin
+  L := TStringList.Create;
+  P := TStringList.Create;
+  P.Delimiter := ' ';
+  P.StrictDelimiter := True;
+  Try
+    If FileExists(Dir + 'reply.ledger') Then
+      L.LoadFromFile(Dir + 'reply.ledger');
+    Keep := KeepDays * 4;
+    If Keep < 30 Then
+      Keep := 30;
+    For i := L.Count - 1 DownTo 0 Do
+      Begin
+      P.DelimitedText := L[i];
+      T := 0;
+      If P.Count >= 3 Then
+        T := StrToInt64Def(P[2], 0);
+      If (P.Count >= 1) And ((P[0] = Hash) Or ((T > 0) And (NowUnix - T > Keep * 86400))) Then
+        L.Delete(i);
+      End;
+    L.Add(Hash + ' ' + Status + ' ' + IntToStr(NowUnix) + ' ' + IntToStr(Posted));
+    L.SaveToFile(Dir + 'reply.ledger');
+  Finally
+    P.Free;
+    L.Free;
+  End;
+  End;
+
+
+Function QwkReply(Const UserName, BodyFile: String; KeepDays: Int64; CrashTest: Boolean; Var Res: TQwkRes; Var Answer: TJSONObject): Boolean;
+  Var
+    Dir, Work, Hash, St: String;
+    Posted: LongInt;
+    Offline: QwkOffPtr;
+    Cmds: OffCmdList;
+    NumCmds, k, i: Word;
+    ci: Integer;
+    ImpO: OffImportOpts;
+    Magic: Array[0..1] Of Char;
+    Fs: TFileStream;
+    Areas, Cmd: TJSONArray;
+    A: TJSONObject;
+    Total: LongInt;
+
+  Begin
+  Result := False;
+  FillChar(Res, SizeOf(Res), 0);
+  Answer := Nil;
+  Res.Code := 500;
+  Dir := NodeDir(UserName);
+  If Not TakeLock(Dir) Then
+    Begin
+    Res.Code := 423;
+    Res.Err := 'another request of this node is running';
+    Exit;
+    End;
+  Try
+    { a ZIP, and the same packet only once }
+    Magic[0] := #0;
+    Magic[1] := #0;
+    Fs := TFileStream.Create(BodyFile, fmOpenRead);
+    Try
+      If Fs.Size >= 2 Then
+        Fs.ReadBuffer(Magic, 2);
+    Finally
+      Fs.Free;
+    End;
+    If (Magic[0] <> 'P') Or (Magic[1] <> 'K') Then
+      Begin
+      Res.Code := 415;
+      Res.Err := 'the body is not a ZIP file (a reply packet is <BBSID>.REP, a ZIP)';
+      Exit;
+      End;
+    Hash := ReplyHash(BodyFile);
+    St := ReplyLedgerStatus(Dir, Hash, Posted);
+    If St = 'done' Then
+      Begin
+      Answer := TJSONObject.Create;
+      Answer.Add('status', 'duplicate');
+      Answer.Add('posted', Posted);
+      Answer.Add('note', 'this reply packet was imported before: nothing was posted again');
+      Res.Code := 200;
+      Result := True;
+      Exit;
+      End;
+    If St = 'started' Then
+      Begin
+      Res.Code := 409;
+      Res.Err := 'an earlier upload of this packet did not finish: nothing is posted again; the sysop must look at the log and at ' + Dir + 'reply.ledger';
+      Exit;
+      End;
+    { unpack it in a work folder of its own }
+    Work := CreateTempDir(Config^.GetTempPath);
+    If Work = '' Then
+      Begin
+      Res.Err := 'no temporary folder';
+      Exit;
+      End;
+    Try
+      Offline := New(QwkOffPtr, Init);
+      Offline^.SetBBSId(Config^.GetBBSID);
+      Offline^.SetPath(Work);
+      CopyFileTo(BodyFile, WithBackSlash(Work) + 'upload.1');
+      OffRenameUploads(Work);
+      NumCmds := 0;
+      k := GetUserPackerNum;
+      FillChar(Cmds, SizeOf(Cmds), 0);
+      If k > 0 Then
+        Begin
+        Inc(NumCmds);
+        Cmds[NumCmds] := Config^.GetUnPackCmdLine(k);
+        End;
+      For i := 1 To 10 Do
+        If (i <> k) And Config^.GetPackAvail(i) And (NumCmds < 11) Then
+          Begin
+          Inc(NumCmds);
+          Cmds[NumCmds] := Config^.GetUnPackCmdLine(i);
+          End;
+      If Not OffUnpackReply(Offline, Work, StartUpPath, Cmds, NumCmds) Then
+        Begin
+        Dispose(Offline, Done);
+        Res.Code := 400;
+        Res.Err := 'this is not a reply packet for ' + Config^.GetBBSID + ' (no ' + Config^.GetBBSID + '.MSG in it, or it cannot be unpacked)';
+        Exit;
+        End;
+      { the import: the ledger says it was started before anything is posted }
+      ReplyLedgerSet(Dir, Hash, 'started', 0, KeepDays);
+      If CrashTest Then
+        Halt(3);
+      FillChar(ConfStats, SizeOf(ConfStats), 0);
+      CmdLines := TStringList.Create;
+      OffImpHook := @ReplyNote;
+      OffImpSink := @ReplySink;
+      ImpO.BadArea := Config^.GetBadMsgArea;
+      ImpO.ForceName := Not User.GetUserQwkNode;
+      ImpO.ReDate := Config^.GetOffReDate;
+      ImpO.DupeFile := WithBackSlash(Config^.GetMsgPath(1)) + 'qwkdupe.dat';
+      Offline^.SetImportOpts(ImpO);
+      Offline^.ImportPacket;
+      User.WriteUser;                    {the control messages changed the user's offline areas and the counts: the record is saved as mk does when a call ends}
+      OffImpHook := Nil;
+      OffImpSink := Nil;
+      Posted := Offline^.GetImported;
+      Dispose(Offline, Done);
+      ReplyLedgerSet(Dir, Hash, 'done', Posted, KeepDays);
+      Answer := TJSONObject.Create;
+      Answer.Add('status', 'imported');
+      Answer.Add('posted', Posted);
+      Areas := TJSONArray.Create;
+      Total := 0;
+      For i := 0 To MaxConf Do
+        If ConfStats[i].Seen And (ConfStats[i].Posted + ConfStats[i].Dupes + ConfStats[i].Grunged + ConfStats[i].Moved + ConfStats[i].Refused + ConfStats[i].Failed > 0) Then
+          Begin
+          A := TJSONObject.Create;
+          A.Add('conference', i);
+          If (i >= 1) And (i <= Config^.GetMaxMsgAreas) And (Config^.GetMsgName(i) <> '') Then
+            A.Add('area', Cp437Str(Config^.GetMsgName(i)))
+          Else
+            A.Add('area', TJSONNull.Create);
+          A.Add('posted', ConfStats[i].Posted);
+          A.Add('duplicates', ConfStats[i].Dupes);
+          A.Add('moved_to_bad_area', ConfStats[i].Moved);
+          A.Add('skipped', ConfStats[i].Grunged);
+          A.Add('refused', ConfStats[i].Refused);
+          A.Add('failed', ConfStats[i].Failed);
+          If ConfStats[i].Refused > 0 Then
+            A.Add('reason', 'the node may not post in this conference (no such area, or no write access)')
+          Else
+            A.Add('reason', '');
+          Inc(Total, ConfStats[i].Refused);
+          Areas.Add(A);
+          End;
+      Answer.Add('areas', Areas);
+      Answer.Add('refused', Total);
+      Cmd := TJSONArray.Create;
+      For ci := 0 To CmdLines.Count - 1 Do
+        Cmd.Add(CmdLines[ci]);
+      Answer.Add('commands', Cmd);
+      CmdLines.Free;
+      Res.Code := 200;
+      Result := True;
+    Finally
+      CleanDir(WithBackSlash(Work));
+      RmDir(ExcludeTrailingPathDelimiter(Work));
+      If IOResult <> 0 Then;
+    End;
+  Finally
     DropLock;
   End;
   End;

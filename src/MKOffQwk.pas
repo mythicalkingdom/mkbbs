@@ -62,6 +62,13 @@ Const
   QwkImportLedger: String = '';        {when set: the area and number of every message posted from a packet is added to this file
                                         (a QWK network pass keeps it so that these messages are not sent back)}
 
+Type OffImpNoteProc = Procedure(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);   {as QwkImpNoteProc (MKQwkImp)}
+Type OffImpSinkProc = Procedure(S: String);
+
+Const
+  OffImpHook: OffImpNoteProc = Nil;    {ImportPacket tells what happened to each message (the qi... codes of MKQwkImp), conference by conference (the JSON API)}
+  OffImpSink: OffImpSinkProc = Nil;    {when set: the text ImportPacket and the control messages would show the caller (ADD 12: done ...) goes here and not to the caller's screen}
+
 Type QwkConfFunc = Function(N: LongInt): LongInt;   {the conference of a message area at the other end (-1 = none)}
 
 
@@ -946,6 +953,15 @@ Function CtlArea(Area: LongInt): Boolean;
   End;
 
 
+Procedure ImpSay(S: String);
+  Begin
+  If @OffImpSink <> Nil Then
+    OffImpSink(S)
+  Else
+    ImpUser^.DisplayStrLn(S);
+  End;
+
+
 Function ImpControl(Conf: LongInt; Subj: String): Boolean;
   Var
     Cmd, Arg: String;
@@ -1013,7 +1029,7 @@ Function ImpControl(Conf: LongInt; Subj: String): Boolean;
   Else If (Cmd = 'FREQ') Or (Cmd = 'FILES') Or (Cmd = 'ATTACH') Or (Cmd = 'CTRL-A') Or (Cmd = 'TZ') Or
           (Cmd = 'VIA') Or (Cmd = 'MSGID') Or (Cmd = 'NDX') Then
     Begin
-    ImpUser^.DisplayStrLn(Cmd + ': ignored');
+    ImpSay(Cmd + ': ignored');
     Exit;
     End;
   If Conf > 0 Then
@@ -1021,9 +1037,9 @@ Function ImpControl(Conf: LongInt; Subj: String): Boolean;
   Else
     Msg := '';
   If Ok Then
-    ImpUser^.DisplayStrLn(Cmd + Msg + ': done')
+    ImpSay(Cmd + Msg + ': done')
   Else
-    ImpUser^.DisplayStrLn(Cmd + Msg + ': not done');
+    ImpSay(Cmd + Msg + ': not done');
   ImpControl := Ok;
   End;
 
@@ -1100,7 +1116,7 @@ Procedure ImpTodoor(FN: String);
         Else
           Ok := True;                      {only w, k, f: nothing to keep}
         End;
-      ImpUser^.DisplayStrLn('AREA ' + Long2Str(Area) + ': ' + DoneStr(Ok));
+      ImpSay('AREA ' + Long2Str(Area) + ': ' + DoneStr(Ok));
       End
     Else If Cmd = 'RESET' Then
       Begin
@@ -1113,10 +1129,10 @@ Procedure ImpTodoor(FN: String);
         OffSetUserLR(Area, Ptr);
         Ok := True;
         End;
-      ImpUser^.DisplayStrLn('RESET ' + Long2Str(Area) + ': ' + DoneStr(Ok));
+      ImpSay('RESET ' + Long2Str(Area) + ': ' + DoneStr(Ok));
       End
     Else If (Cmd = 'KEYWORD') Or (Cmd = 'FILTER') Or (Cmd = 'TWIT') Or (Cmd = 'ATTACH') Or (Cmd = 'FILE') Or (Cmd = 'REQUEST') Then
-      ImpUser^.DisplayStrLn(Cmd + ': ignored');
+      ImpSay(Cmd + ': ignored');
     End;
   Close(T);
   If IoResult <> 0 Then;
@@ -1149,6 +1165,8 @@ Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
     A: LongInt;
 
   Begin
+  If @OffImpHook <> Nil Then
+    OffImpHook(Code, Conf, Msg);
   Case Code Of
     qiPosted: Begin
               ImpUser^.UpdateForMsg;
@@ -1167,11 +1185,11 @@ Procedure ImpNote(Code: Word; Conf: LongInt; Msg: AbsMsgPtr);
                   End;
                 End;
               End;
-    qiDupe: ImpUser^.DisplayStrLn(Prompts.GetString(181));
-    qiGrunged: ImpUser^.DisplayStrLn(Prompts.GetString(182));
-    qiMoved: ImpUser^.DisplayStrLn(Prompts.GetString(180));
-    qiRefused: ImpUser^.DisplayStrLn(Prompts.GetString(136) + ' ' + Long2Str(Conf));
-    qiFailed: ImpUser^.DisplayStrLn(Prompts.GetString(260) + ' ' + Long2Str(Conf));
+    qiDupe: ImpSay(Prompts.GetString(181));
+    qiGrunged: ImpSay(Prompts.GetString(182));
+    qiMoved: ImpSay(Prompts.GetString(180));
+    qiRefused: ImpSay(Prompts.GetString(136) + ' ' + Long2Str(Conf));
+    qiFailed: ImpSay(Prompts.GetString(260) + ' ' + Long2Str(Conf));
     End;
   End;
 
@@ -1214,7 +1232,7 @@ Procedure QwkOffObj.ImportPacket;
   If FN <> '' Then
     ImpTodoor(FN);                          {QWKE: the caller's changes of areas and pointers}
   If E <> 0 Then
-    ImpUser^.DisplayStrLn(Prompts.GetString(182))
+    ImpSay(Prompts.GetString(182))
   Else
     Begin
     QI^.Imported := R.Posted;
