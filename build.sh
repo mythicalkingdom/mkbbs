@@ -286,6 +286,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/missingtest.py build/work/missing | grep -E "^(ok|FAIL|skip|failures)" | tee build/missingresult.txt
   if grep -q FAIL build/missingresult.txt; then exit 1; fi
 fi
+# mk -G with transport https against a real hub (two BBSs): the packet, the reply, the acknowledgement after the posting, TLS (QWK-API-PLAN.md phase 4)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/qwkhttptest.py build/work/qwkhttp | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkhttpresult.txt
+  if grep -q "^FAIL" build/qwkhttpresult.txt; then exit 1; fi
+fi
 # QWK packets over the JSON API: the packet, the acknowledgement, the pointers, the expiry (QWK-API-PLAN.md phase 2)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwkapitest.py build/work/qwkapi | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkapiresult.txt

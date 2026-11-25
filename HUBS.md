@@ -9,7 +9,8 @@ reference and the status.  (The work was planned in `QWK-HUB-PLAN.md`.)
 |---|---|---|---|
 | *(none)*, with `hub host:port` | a Telnet call and a **script** (a profile) that logs in and runs the hub's QWK menu; Zmodem, Ymodem or Xmodem is done by MK | the hub is a BBS with a QWK menu (Synchronet, another MK ...) | `profile NAME` or `script FILE`, `login`, `password`, `protocol` |
 | `ftp` / `ftps` | FTP or explicit-TLS FTP, by MK itself | the hub keeps `<id>.qwk` and takes `<id>.rep` by FTP | `get` / `put` remote names, `login`, `password` |
-| `exec` | **programs of yours** (`get`, `put`) run without a shell | anything else: SFTP, HTTP, rsync, a mail gate ... | `get` / `put` command lines |
+| `http` / `https` | the **JSON API** of an MK system (`API.md`: QWK packets for a node), by MK itself | the hub is an MK system with an `api` port and a token for the node | `hub https://host:port`, `token` |
+| `exec` | **programs of yours** (`get`, `put`) run without a shell | anything else: SFTP, rsync, a mail gate ... | `get` / `put` command lines |
 | *(no `hub`)* | something else moves the files | cron, a script or `mkbink` puts `<id>.QWK` in `inbound` and takes `<id>.REP` from `outbound` | `inbound`, `outbound` |
 
 All of them share the rest: the reply packet is made from the new messages of the areas the hub user is subscribed to, the packet of the hub is posted (duplicates are
@@ -26,8 +27,9 @@ private (`chmod 600`): it has the password.
 | `outbound` | directory | the same | where `<id>.REP` is made |
 | `user` | name | the id | the user record that is the bookkeeping for the hub (QWK Node flag) |
 | `conf` | `<hub number> <area>` | | conference *n* of the hub is message area *a* here; an area with no line is not sent, a conference with none is not posted |
-| `hub` | `host[:port]` | port 23 (21 for `ftp` / `ftps`) | the hub to call |
-| `transport` | `ftp`, `ftps`, `exec` | Telnet | how the files move (see above) |
+| `hub` | `host[:port]`, or a URL `http://host:port` / `https://host:port[/prefix]` | port 23 (21 for `ftp` / `ftps`, 80 / 443 for `http` / `https`) | the hub to call; a URL says `transport http` or `https` (and a `/prefix` is for a front end that puts the API under a path) |
+| `transport` | `ftp`, `ftps`, `http`, `https`, `exec` | Telnet | how the files move (see above) |
+| `token`, `token-env` | the token of the node at the hub / the name of an environment variable that holds it | | http / https: the token that `mkapitoken` made at the hub for this node's user (scopes `qwk` and `qwk:reply`); it is never written to a transcript or on a command line, and the map file is private |
 | `profile` | name | | Telnet: the script `NAME.scr` (the directories are listed under *Profiles*), else a built-in one: `synchronet`, `mk` |
 | `script` | file | | Telnet: a script of your own (relative to the map file) instead of a profile |
 | `login`, `password` | text | | the account at the hub (the password is never written to a transcript or on a command line) |
@@ -37,13 +39,33 @@ private (`chmod 600`): it has the password.
 | `nothing` | number | 3 | exec: the exit status of `get` that means "nothing new" |
 | `exec-timeout` | seconds | 600 | exec: a program that runs longer is killed |
 | `ftp-delete` | `yes` / `no` | no | ftp: delete the packet at the hub after it was fetched |
-| `ftp-timeout` | seconds | 60 | ftp: seconds without a byte before giving up |
-| `tls-ca` | file | the system's CAs | ftps: the CA (or the certificate itself) that is trusted |
-| `tls-verify` | `yes` / `no` | yes | ftps: no turns the checking of the certificate (and of its name) off |
+| `ftp-timeout` | seconds | 60 | ftp / http: seconds without a byte before giving up |
+| `tls-ca` | file | the system's CAs | ftps / https: the CA (or the certificate itself) that is trusted |
+| `tls-verify` | `yes` / `no` | yes | ftps / https: no turns the checking of the certificate (and of its name) off |
 | `reply-error`, `reply-ok` | text | from the profile header | what the hub says after the reply packet; up to 8 of each |
 | `strip-ctrla` | `yes` / `no` | no | take Synchronet's Ctrl-A codes out of the messages |
 | `control-to` | name | `SBBS` | whom the control messages (ADD, DROP ...) are for |
 | `retries`, `retry`, `retry-max`, `onfail` | | 3, 300, 3600, none | what `mklisten` does when a scheduled pass fails with 5, 6 or 7 |
+
+## `transport http` / `https`: the JSON API of an MK system
+
+```
+hub https://hub.example.org:2341
+token-env HUB_TOKEN             ; or: token mkapi_...   (the map file is mode 600)
+tls-ca /etc/ssl/hub-ca.pem      ; if the hub's certificate is not one the system trusts
+conf 6 6
+```
+
+At the hub: `mkapitoken add node5 -s qwk,qwk:reply -u "<the user of this node>"` and an `api` port with TLS in `mklisten.json` (`API.md`, "QWK packets for a node").  A pass is:
+
+1. **If an earlier pass could not tell the hub** that its packet is posted (`<id>.ack` next to the map file), the hub is told now, **before** a packet is asked for, so it does not send the same one again.
+2. `GET /v1/qwk/packet`: `200` the packet (its SHA-256 is checked: a damaged one is thrown away, exit 5, and the hub keeps it), `204` nothing new.
+3. `PUT /v1/qwk/reply` with the reply packet if one is waiting: `200` (`imported`, or `duplicate` when the hub had it already) and the reply packet is deleted; the answer says how many messages were posted and refused;
+   `400` / `409` / `413` / `415` the hub did not accept the packet (exit 7, it stays in the outbound directory); `401` / `403` / `423` / `5xx` or no connection: exit 5, it stays.
+4. The packet is **posted and the pointers are saved** (as for every transport), **then** `POST .../ack` tells the hub it may let the packet go.  If that fails the note `<id>.ack` is kept and the next pass
+   sends it first; if the hub dropped the packet meanwhile (`404`, `410`) or the pointers at the hub changed (`409`) there is nothing more to do.
+
+`-D` names the requests and sends none.  The transcript (`<id>.hub.log`) has the requests and the status of the answers, never the token.
 
 ## Profiles
 

@@ -129,7 +129,7 @@ Implementation
 
 Uses BaseUnix, termio, MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
   MKOffAbs, MKOffQwk, MKQwkImp, MKOffDL, MKOffXfer, MKOfflin,
-  MKComAbs, MKComClient, MKFtp, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
+  MKComAbs, MKComClient, MKFtp, MKHttp, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
   Dos;
 
 
@@ -153,6 +153,9 @@ Var
   HubFtpDel, HubTlsVerify, HubPortGiven: Boolean;
   HubTlsCa: String;
   HubFtpSecs: LongInt;
+  HubHttp: Byte;                         {the hub is reached by HTTP (1) or HTTPS (2): the JSON API of an MK system (QWK-API-PLAN.md)}
+  HubToken, HubTokenEnv, HubPrefix: String;  {token / token-env: the token of the node at the hub; hub https://host:port/prefix}
+  HubAckId: String;                      {the id of the packet that came by HTTP and has not been acknowledged yet}
   HubNothing: LongInt;                   {the exit status of get that means "nothing new" (default 3)}
   HubExecSecs: LongInt;                  {exec-timeout}
   SelIdx: Word;
@@ -219,6 +222,11 @@ Function LoadMap(Id: String): Boolean;
   HubTlsVerify := True;
   HubTlsCa := '';
   HubFtpSecs := 60;
+  HubHttp := 0;
+  HubToken := '';
+  HubTokenEnv := '';
+  HubPrefix := '';
+  HubAckId := '';
   HubPortGiven := False;
   HubGet := '';
   HubPut := '';
@@ -258,6 +266,22 @@ Function LoadMap(Id: String): Boolean;
         UserName := Rest
       Else If Key = 'hub' Then
         Begin
+        If Lower(Copy(Rest, 1, 8)) = 'https://' Then
+          Begin
+          HubHttp := 2;
+          Rest := Copy(Rest, 9, 200);
+          End
+        Else If Lower(Copy(Rest, 1, 7)) = 'http://' Then
+          Begin
+          HubHttp := 1;
+          Rest := Copy(Rest, 8, 200);
+          End;
+        P := Pos('/', Rest);
+        If P > 0 Then
+          Begin
+          HubPrefix := StripTrail(Copy(Rest, P, 200), '/');       {the API is behind a path of a front end}
+          Rest := Copy(Rest, 1, P - 1);
+          End;
         P := Pos(':', Rest);
         If P > 0 Then
           Begin
@@ -284,7 +308,13 @@ Function LoadMap(Id: String): Boolean;
         Begin
         HubExec := Lower(ExtractWord(Rest, 1)) = 'exec';
         HubFtp := Ord(Lower(ExtractWord(Rest, 1)) = 'ftp') + 2 * Ord(Lower(ExtractWord(Rest, 1)) = 'ftps');
+        If Lower(ExtractWord(Rest, 1)) = 'http' Then HubHttp := 1;
+        If Lower(ExtractWord(Rest, 1)) = 'https' Then HubHttp := 2;
         End
+      Else If Key = 'token' Then
+        HubToken := Rest
+      Else If Key = 'token-env' Then
+        HubTokenEnv := ExtractWord(Rest, 1)
       Else If Key = 'ftp-delete' Then
         HubFtpDel := Lower(ExtractWord(Rest, 1)) = 'yes'
       Else If Key = 'tls-verify' Then
@@ -341,6 +371,10 @@ Function LoadMap(Id: String): Boolean;
   If IoResult <> 0 Then;
   If (HubFtp > 0) And Not HubPortGiven Then
     HubPort := 21;
+  If (HubHttp > 0) And Not HubPortGiven Then
+    HubPort := 80 + 363 * Ord(HubHttp = 2);
+  If (HubHttp > 0) And (HubToken = '') And (HubTokenEnv <> '') Then
+    HubToken := GetEnv(HubTokenEnv);
   LoadMap := True;
   End;
 
@@ -926,6 +960,11 @@ Function DryRun(Id: String): Integer;
     WriteLn(StdErr, 'Hub by ', Copy('FTPS', 1, 3 + Ord(HubFtp = 2)), ' at ', HubHost, ':', HubPort);
     WriteLn(StdErr, '  get: ', FtpName(HubGet, '%id%.qwk', Id), '   put: ', FtpName(HubPut, '%id%.rep', Id));
     End
+  Else If HubHttp > 0 Then
+    Begin
+    WriteLn(StdErr, 'Hub by ', Copy('HTTPS', 1, 4 + Ord(HubHttp = 2)), ' at ', HubHost, ':', HubPort, HubPrefix, ' (the JSON API of an MK system)');
+    WriteLn(StdErr, '  GET ', HubPrefix, '/v1/qwk/packet   PUT ', HubPrefix, '/v1/qwk/reply   POST ', HubPrefix, '/v1/qwk/packet/<id>/ack (after the packet is posted)');
+    End
   Else If HubHost <> '' Then
     WriteLn(StdErr, 'Hub ', HubHost, ':', HubPort, ', profile ', HubProfile, ' ', HubScript)
   Else
@@ -1339,6 +1378,15 @@ Function Redact(S: AnsiString): AnsiString;
     P: LongInt;
 
   Begin
+  If HubToken <> '' Then
+    Begin
+    P := Pos(HubToken, S);
+    While P > 0 Do
+      Begin
+      S := Copy(S, 1, P - 1) + '********' + Copy(S, P + Length(HubToken), Length(S));
+      P := Pos(HubToken, S);
+      End;
+    End;
   If HubPass <> '' Then
     Begin
     P := Pos(HubPass, S);
@@ -1574,6 +1622,201 @@ Function FtpPass(Id, Rep: String): Integer;
   End;
 
 
+Function JsonError(Const Body: AnsiString): String;
+  Begin
+  JsonError := JsonValue(Body, 'error');
+  End;
+
+
+Function HttpSay(Const What: String; Var R: THttpResult): String;
+  Begin
+  HttpSay := What + ' ' + Long2Str(R.Status) + Copy(': ' + JsonError(R.Body), 1, 200 * Ord(JsonError(R.Body) <> ''));
+  End;
+
+
+Function AckFile(Id: String): String;
+  Begin
+  AckFile := MapDir + Id + '.ack';
+  End;
+
+
+Function HttpAck(Id, PacketId: String): Integer;
+  {POST .../ack: 0 the hub has been told (or had been told), 1 the hub no longer has that packet or its pointers changed (nothing to do), 2 it could not be done (try again at the next pass)}
+  Var
+    R: THttpResult;
+    Ok: Boolean;
+
+  Begin
+  HttpAck := 2;
+  Ok := HttpDo(HubHost, HubPort, HubHttp = 2, HubTlsCa, HubTlsVerify, HubFtpSecs, 'POST', HubPrefix + '/v1/qwk/packet/' + PacketId + '/ack', HubToken, '', '', '', R);
+  If Not Ok Then
+    Say('The hub could not be told that packet ' + PacketId + ' is posted: ' + R.Err + '; the next pass tells it')
+  Else If R.Status = 200 Then
+    Begin
+    HttpAck := 0;
+    Say('The hub was told that packet ' + PacketId + ' is posted');
+    End
+  Else If (R.Status = 404) Or (R.Status = 410) Then
+    Begin
+    HttpAck := 1;
+    Say('The hub no longer has packet ' + PacketId + ' (' + HttpSay('answer', R) + ')');
+    End
+  Else If R.Status = 409 Then
+    Begin
+    HttpAck := 1;
+    Say('The hub dropped packet ' + PacketId + ': ' + JsonError(R.Body));
+    End
+  Else
+    Say('The hub did not take the acknowledgement of ' + PacketId + ': ' + HttpSay('answer', R) + '; the next pass tells it');
+  HttpFree(R);
+  End;
+
+
+Procedure SendPendingAck(Id: String);
+  {an earlier pass posted a packet and could not tell the hub: tell it now, before a new packet is asked for (the hub would send the same one again)}
+  Var
+    F: Text;
+    PId: String;
+
+  Begin
+  If (HubHttp = 0) Or Not FileExist(AckFile(Id)) Then
+    Exit;
+  PId := '';
+  Assign(F, AckFile(Id));
+  Reset(F);
+  If IoResult = 0 Then
+    Begin
+    ReadLn(F, PId);
+    Close(F);
+    End;
+  If IoResult <> 0 Then;
+  PId := StripBoth(PId, ' ');
+  If PId = '' Then
+    Begin
+    EraseFile(AckFile(Id));
+    Exit;
+    End;
+  If HttpAck(Id, PId) < 2 Then
+    EraseFile(AckFile(Id));
+  End;
+
+
+Function HttpPass(Id, Rep: String): Integer;
+  {transport http / https (the JSON API of an MK system): GET the packet, PUT the reply packet; the acknowledgement of the packet is sent after it has been posted (QwkNetPass).
+   0 done, 5 the hub could not be reached or said no for another reason, 6 the packet could not be kept, 7 the hub did not accept the reply packet}
+  Var
+    R: THttpResult;
+    Ok2, Ok, Failed, Refused, LogOk, NoLink: Boolean;
+    Qwk, Why, Sum, Posted: String;
+    LogF: Text;
+    Err: String;
+
+  Procedure Trace(Const T: String);
+    Begin
+    If LogOk Then
+      Write(LogF, Redact(T));
+    End;
+
+  Begin
+  HttpPass := 0;
+  Failed := False;
+  Refused := False;
+  NoLink := False;
+  Ok := True;
+  HubSent := False;
+  HubAckId := '';
+  Qwk := WithBackSlash(HubRcvDir) + Id + '.QWK';
+  Assign(LogF, HubLogPath(Id));
+  Rewrite(LogF);
+  LogOk := IoResult = 0;
+  Say('Hub by ' + Copy('HTTPS', 1, 4 + Ord(HubHttp = 2)) + ' at ' + HubHost + ':' + Long2Str(HubPort) + HubPrefix);
+  If HubToken = '' Then
+    Begin
+    Failed := True;
+    Say('The map file has no "token" (or "token-env" whose variable is set): the hub cannot be asked');
+    End;
+  If Not Failed Then
+    Begin
+    Ok2 := HttpDo(HubHost, HubPort, HubHttp = 2, HubTlsCa, HubTlsVerify, HubFtpSecs, 'GET', HubPrefix + '/v1/qwk/packet', HubToken, '', '', Qwk, R);
+    Trace(R.Trace);
+    If Not Ok2 Then
+      Begin
+      Failed := True;
+      NoLink := True;
+      Say('HTTP with ' + HubHost + ' failed: ' + R.Err);
+      End
+    Else If R.Status = 200 Then
+      Begin
+      Sum := HttpHeader(R, 'x-qwk-sha256');
+      If (Sum <> '') And (HttpFileSha256(Qwk) <> Sum) Then
+        Begin
+        Failed := True;
+        EraseFile(Qwk);
+        Say('The packet that came is damaged (its SHA-256 is not the one the hub gave): it was thrown away');
+        End
+      Else
+        Begin
+        HubAckId := HttpHeader(R, 'x-qwk-packet');
+        Say('Packet fetched from the hub (' + HttpHeader(R, 'x-qwk-messages') + ' message(s), packet ' + HubAckId + ')');
+        End;
+      End
+    Else If R.Status = 204 Then
+      Say('Nothing new at the hub')
+    Else
+      Begin
+      Failed := True;
+      Say('The hub did not give the packet: ' + HttpSay('answer', R));
+      End;
+    HttpFree(R);
+    End;
+  If (Rep <> '') And (HubToken <> '') And Not NoLink Then
+    Begin
+    Ok2 := HttpDo(HubHost, HubPort, HubHttp = 2, HubTlsCa, HubTlsVerify, HubFtpSecs, 'PUT', HubPrefix + '/v1/qwk/reply', HubToken, Rep, 'application/zip', '', R);
+    Trace(R.Trace);
+    If Not Ok2 Then
+      Begin
+      Failed := True;
+      Say('Sending the reply packet failed: ' + R.Err + '; it stays in the outbound directory');
+      End
+    Else If R.Status = 200 Then
+      Begin
+      HubSent := True;
+      Posted := JsonValue(R.Body, 'status');
+      Say('The hub says the reply packet was ' + Copy(Posted + '?', 1, Length(Posted) + Ord(Posted = '')) + ' (' + JsonValue(R.Body, 'posted') + ' message(s) posted, ' + JsonValue(R.Body, 'refused') + ' refused)');
+      If (NumErr > 0) Or (NumOk > 0) Then
+        If ReplyRefused(R.Body, Why) Then
+          Begin
+          Refused := True;
+          HubSent := False;
+          Say('The hub did not accept the reply packet: ' + Why + '; it stays in the outbound directory');
+          End;
+      End
+    Else If (R.Status = 400) Or (R.Status = 409) Or (R.Status = 413) Or (R.Status = 415) Then
+      Begin
+      Refused := True;
+      Say('The hub did not accept the reply packet: ' + HttpSay('answer', R) + '; it stays in the outbound directory');
+      End
+    Else
+      Begin
+      Failed := True;
+      Say('The hub did not take the reply packet: ' + HttpSay('answer', R) + '; it stays in the outbound directory');
+      End;
+    HttpFree(R);
+    End;
+  If LogOk Then
+    Close(LogF);
+  If IoResult <> 0 Then;
+  HubFinish(Id, Rep, HubRcvDir, Ok);
+  If Failed Then
+    HttpPass := 5
+  Else If Not Ok Then
+    HttpPass := 6
+  Else If Refused Then
+    HttpPass := 7;
+  Err := '';
+  End;
+
+
 Function DoHub(Id: String): Integer;
   {0 done, 5 not reached, 6 the script failed, 7 the hub did not accept the reply packet}
   Var
@@ -1596,7 +1839,7 @@ Function DoHub(Id: String): Integer;
     Say(Id + '.qwk is still in the inbound directory: no call before it is posted');
     Exit;
     End;
-  If HubExec Or (HubFtp > 0) Then
+  If HubExec Or (HubFtp > 0) Or (HubHttp > 0) Then
     Text := ''
   Else If Not LoadHubScript(Text) Then
     Begin
@@ -1611,7 +1854,7 @@ Function DoHub(Id: String): Integer;
     Exit;
     End;
   Rep := OffFindNoCase(Outbound, Id + '.rep');
-  If HubExec Or (HubFtp > 0) Then
+  If HubExec Or (HubFtp > 0) Or (HubHttp > 0) Then
     S := Nil
   Else
     S := ConnectTcp(HubHost, HubPort, 20000, True, Err);
@@ -1621,6 +1864,8 @@ Function DoHub(Id: String): Integer;
       DoHub := ExecPass(Id, Rep)
     Else If HubFtp > 0 Then
       DoHub := FtpPass(Id, Rep)
+    Else If HubHttp > 0 Then
+      DoHub := HttpPass(Id, Rep)
     Else
       Begin
       Say('Hub ' + HubHost + ': ' + Err);
@@ -2159,6 +2404,8 @@ Function ReplayPass(Id, TFile: String): Integer;
 Function QwkNetPass(RemoteId: String): Integer;
   Var
     Res, N: Integer;
+    PacketOk: Boolean;
+    AckF: Text;
     i: Word;
     CtlErr: String;
 
@@ -2211,15 +2458,31 @@ Function QwkNetPass(RemoteId: String): Integer;
     Res := 3;
   If HubConfigured Then
     Begin
+    SendPendingAck(RemoteId);
     N := DoHub(RemoteId);
     If N <> 0 Then
       Res := N;
     End;
-  If Not DoPacket(RemoteId) Then
+  PacketOk := DoPacket(RemoteId);
+  If Not PacketOk Then
     Res := 4;
   If QwkNetCtlBad And (Res = 0) Then
     Res := 8;
   User.WriteUser;
+  If PacketOk And (HubHttp > 0) And (HubAckId <> '') Then
+    Begin
+    {the packet is posted and the pointers are saved: now the hub may let it go.  A note is kept first, so that a pass that cannot reach the hub now tells it at the next one}
+    Assign(AckF, AckFile(RemoteId));
+    Rewrite(AckF);
+    If IoResult = 0 Then
+      Begin
+      WriteLn(AckF, HubAckId);
+      Close(AckF);
+      End;
+    If IoResult <> 0 Then;
+    If HttpAck(RemoteId, HubAckId) < 2 Then
+      EraseFile(AckFile(RemoteId));
+    End;
   QwkNetPass := Res;
   End;
 
