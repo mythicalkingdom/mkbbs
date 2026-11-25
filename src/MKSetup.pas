@@ -6,25 +6,28 @@ Program MKSetup;
      mksetup: makes a new BBS that mk can run: the folder, a default configuration, the language file, two message areas, a file area with an example file, a sample door, the menu and the text screens
      mk looks for.  The sysop then changes what he wants with mkconfig, mkmenu, mkdraw and mkusered.  It only makes: a folder that has a configuration is never touched.
 
-       mksetup [-d dir] [-n "BBS name"] [-s "Sysop name"] [-l american|english] [-L language dir] [-y]
+       mksetup [-d dir] [-n "BBS name"] [-s "Sysop name"] [-l american|english] [-L language dir] [-u] [-p password] [-N] [-y]
 
          -d DIR    the BBS folder (default /opt/bbs); made when it is not there
          -n NAME   the name of the BBS (default "My BBS")
          -s NAME   the name of the sysop (default "Sysop")
          -l LANG   the language: american (default) or english
          -L DIR    where the compiled language files (AMERICAN.lc ...) and games/ are looked for (default: next to the programs, /usr/local/share/mkbbs, /usr/share/mkbbs)
-         -y        no questions: what is not given by an option is the default
+         -u        also make the account of the sysop (the sysop name, security level 110, no need to be the first to register); -p gives its password, else one is made up and shown once
+         -p PW     the password of that account (4 to 15 characters; implies -u)
+         -N        do not make mklisten.json (the listener configuration: a telnet port 2323 and the sysop monitor on 127.0.0.1:2330 with a made-up password, shown once)
+         -y        no questions: what is not given by an option is the default (no account, mklisten.json made)
 
-     Without -y a question is asked for each of the first four that was not given.  The exit code: 0 done, 1 not usable (a bad option, no language file, a folder that cannot be made), 2 the folder
+     Without -y a question is asked for each of the first four that was not given, and whether to make the sysop account and mklisten.json.  The exit code: 0 done, 1 not usable (a bad option, no language file, a folder that cannot be made), 2 the folder
      has a configuration already.
 }
 
 Uses SysUtils, Classes, BaseUnix,
-  MKGlobT, MKCfgAbs, MKCfgMK, MKCfgNew, Default, MKOpen, MKMsgAbs, MKMsgMer;
+  MKGlobT, MKCfgAbs, MKCfgMK, MKCfgNew, Default, MKOpen, MKMsgAbs, MKMsgMer, MKDoor, MKPwd, sha1;
 
 Var
-  Dir, BbsName, SysopName, Lang, ShareDir: String;
-  Yes: Boolean;
+  Dir, BbsName, SysopName, Lang, ShareDir, SysopPwd, MonPwd: String;
+  Yes, MakeUser, MakeListen, GivenUser: Boolean;
   ExeDir: String;
 
 
@@ -217,6 +220,110 @@ Procedure WriteTopMenu(MenuDir: String);
   End;
 
 
+{------------------------------------------------------------ passwords, the account, the listener}
+
+Function MadeUpPassword(N: Integer): String;
+  {letters and digits without the ones that look alike}
+  Const
+    Chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+  Var
+    Fs: TFileStream;
+    B: Array[0..31] Of Byte;
+    i: Integer;
+
+  Begin
+  Fs := TFileStream.Create('/dev/urandom', fmOpenRead);
+  Try
+    Fs.ReadBuffer(B, SizeOf(B));
+  Finally
+    Fs.Free;
+  End;
+  Result := '';
+  For i := 0 To N - 1 Do
+    Result := Result + Chars[(B[i] Mod Length(Chars)) + 1];
+  End;
+
+
+Procedure MakeSysopUser(Cfg: MKCfgObjPtr);
+  {the account of the sysop, written the way mk writes a new caller (users.bbs, extusers.bbs, usersidx.bbs; the password hashed when the configuration says so)}
+  Var
+    Sec: SecType;
+    D: String;
+
+  Begin
+  Config := Cfg;
+  PwdModeFromConfig;
+  User.Init;
+  User.SetUserBbsType(1);
+  User.SetUserName(SysopName);
+  User.SetUserCity('');
+  User.SetUserPwd(SysopPwd);
+  Sec.Level := 110;
+  Sec.Flags := -1;
+  User.SetUserSec(Sec);
+  User.SetUserLastDate('00-00-00');
+  User.SetUserCredit(0);
+  User.SetUserScrLength(23);
+  User.SetUserPageTune(1);
+  D := FormatDateTime('mm-dd-yy', Now);
+  User.SetUserFirstDate(D);
+  User.SetUserMore(True);
+  User.SetUserScrnClr(True);
+  User.SetUserMsgTemplate(1);
+  User.SetUserFileTemplate(1);
+  User.AddUser;
+  User.Done;
+  End;
+
+
+Function JsonStr(S: String): String;
+  Begin
+  Result := StringReplace(StringReplace(S, '\', '\\', [rfReplaceAll]), '"', '\"', [rfReplaceAll]);
+  End;
+
+
+Procedure MakeListenFile(Dir: String);
+  Var
+    MkPath, P: String;
+    T: TStringList;
+
+  Begin
+  MkPath := ExeDir + 'mk';
+  If Not FileExists(MkPath) Then
+    Begin
+    MkPath := ExeSearch('mk', GetEnvironmentVariable('PATH'));
+    If MkPath = '' Then
+      MkPath := '/usr/bin/mk';
+    End;
+  MakeDir(Dir + 'logs/');
+  MakeDir(Dir + 'run/');
+  MonPwd := MadeUpPassword(12);
+  T := TStringList.Create;
+  Try
+    T.Add('{');
+    T.Add('  "_note": "made by mksetup: check it with   mklisten -c ' + Dir + 'mklisten.json -t   start it with   mklisten -c ' + Dir + 'mklisten.json   (MKLISTEN.md)",');
+    T.Add('  "mk": "' + JsonStr(MkPath) + '",');
+    T.Add('  "logfile": "' + JsonStr(Dir + 'logs/mklisten.log') + '",');
+    T.Add('  "rundir": "' + JsonStr(Dir + 'run') + '",');
+    T.Add('  "workdir": "' + JsonStr(ExcludeTrailingPathDelimiter(Dir)) + '",');
+    T.Add('  "nodes": "1-4",');
+    T.Add('  "localnode": 9,');
+    T.Add('  "ports": [');
+    T.Add('    { "port": 2323, "type": "telnet", "baud": 38400, "charset": "auto", "config": "' + JsonStr(ExcludeTrailingPathDelimiter(Dir)) + '" },');
+    T.Add('    { "_note": "the sysop monitor: telnet to 127.0.0.1:2330 (from elsewhere through ssh -L 2330:127.0.0.1:2330); the password is kept as a sha1 hash",');
+    T.Add('      "port": 2330, "type": "sysop", "bind": "127.0.0.1", "password": "sha1:' + LowerCase(SHA1Print(SHA1String(MonPwd))) + '", "config": "' + JsonStr(ExcludeTrailingPathDelimiter(Dir)) + '" }');
+    T.Add('  ]');
+    T.Add('}');
+    P := Dir + 'mklisten.json';
+    T.SaveToFile(P);
+  Finally
+    T.Free;
+  End;
+  fpChmod(PChar(P), &600);
+  End;
+
+
 {------------------------------------------------------------ the main work}
 
 Const
@@ -241,6 +348,11 @@ SysopName := '';
 Lang := '';
 ShareDir := '';
 Yes := False;
+MakeUser := False;
+GivenUser := False;
+MakeListen := True;
+SysopPwd := '';
+MonPwd := '';
 ExeDir := ExtractFilePath(ExpandFileName(ParamStr(0)));
 i := 1;
 While i <= ParamCount Do
@@ -248,7 +360,14 @@ While i <= ParamCount Do
   A := ParamStr(i);
   If A = '-y' Then
     Yes := True
-  Else If (A = '-d') Or (A = '-n') Or (A = '-s') Or (A = '-l') Or (A = '-L') Then
+  Else If A = '-u' Then
+    Begin
+    MakeUser := True;
+    GivenUser := True;
+    End
+  Else If A = '-N' Then
+    MakeListen := False
+  Else If (A = '-d') Or (A = '-n') Or (A = '-s') Or (A = '-l') Or (A = '-L') Or (A = '-p') Then
     Begin
     Inc(i);
     If i > ParamCount Then
@@ -257,11 +376,17 @@ While i <= ParamCount Do
     Else If A = '-n' Then BbsName := ParamStr(i)
     Else If A = '-s' Then SysopName := ParamStr(i)
     Else If A = '-l' Then Lang := LowerCase(ParamStr(i))
+    Else If A = '-p' Then
+      Begin
+      SysopPwd := ParamStr(i);
+      MakeUser := True;
+      GivenUser := True;
+      End
     Else ShareDir := ParamStr(i);
     End
   Else
     Begin
-    WriteLn('usage: mksetup [-d dir] [-n "BBS name"] [-s "Sysop name"] [-l american|english] [-L language dir] [-y]');
+    WriteLn('usage: mksetup [-d dir] [-n "BBS name"] [-s "Sysop name"] [-l american|english] [-L language dir] [-u] [-p password] [-N] [-y]');
     Halt(1);
     End;
   Inc(i);
@@ -274,7 +399,20 @@ If Not Yes Then
   If BbsName = '' Then BbsName := Ask('Name of the BBS', 'My BBS');
   If SysopName = '' Then SysopName := Ask('Name of the sysop', 'Sysop');
   If Lang = '' Then Lang := Ask('Language (american or english)', 'american');
+  If Not GivenUser Then
+    MakeUser := UpperCase(Copy(Ask('Make the account of the sysop now (y/n)', 'n'), 1, 1)) = 'Y';
+  If MakeUser And (SysopPwd = '') Then
+    SysopPwd := Ask('Password of the sysop (Enter = make one up)', '');
+  If MakeListen Then
+    MakeListen := UpperCase(Copy(Ask('Make mklisten.json, the listener configuration (y/n)', 'y'), 1, 1)) = 'Y';
   End;
+If MakeUser And (SysopPwd = '') Then
+  Begin
+  SysopPwd := MadeUpPassword(10);
+  Say('(no password given: one is made up)');
+  End;
+If MakeUser And ((Length(SysopPwd) < 4) Or (Length(SysopPwd) > 15)) Then
+  Die(1, 'the password of the sysop is 4 to 15 characters');
 If Dir = '' Then Dir := '/opt/bbs';
 If BbsName = '' Then BbsName := 'My BBS';
 If SysopName = '' Then SysopName := 'Sysop';
@@ -429,8 +567,26 @@ For i := 0 To 6 Do
 PutText(Dir + 'newuser.q-a', 'Display "|Thank you for registering.||"');
 PutText(Dir + 'limits.ctl', '; security level, minutes a day, download limit in K (for every speed)' + LineEnding + '5 30 0' + LineEnding + '10 60 5000' + LineEnding + '50 120 20000' + LineEnding + '100 240 99999');
 Say('  newuser.q-a (the questionnaire of a new caller) and limits.ctl (time and download limits for the levels)');
+If MakeUser Then
+  Begin
+  MakeSysopUser(Cfg);
+  Say('  account of the sysop: ' + SysopName + ' (security level 110)');
+  End;
+If MakeListen Then
+  Begin
+  MakeListenFile(Dir);
+  Say('  listener configuration: ' + Dir + 'mklisten.json (telnet 2323, sysop monitor 127.0.0.1:2330)');
+  End;
 Cfg^.Done;
 WriteLn;
+If MakeUser Then
+  Say('Sysop account:  ' + SysopName + '  password  ' + SysopPwd + '   (shown only now)');
+If MakeListen Then
+  Say('Sysop monitor:  telnet 127.0.0.1 2330   password  ' + MonPwd + '   (shown only now; mklisten.json holds a hash)');
+If MakeUser Or MakeListen Then
+  WriteLn;
 Say('Done.  Try it:   MK=' + ExcludeTrailingPathDelimiter(Dir) + ' mk -L');
 Say('Change it:       MK=' + ExcludeTrailingPathDelimiter(Dir) + ' mkconfig | mkmenu | mkdraw | mkusered');
+If MakeListen Then
+  Say('Let callers in:  mklisten -c ' + Dir + 'mklisten.json -t   then without -t');
 End.

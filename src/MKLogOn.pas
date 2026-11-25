@@ -138,7 +138,7 @@ Procedure LogOffSysInfo;
     For i := 0 to 23 Do
       TL.BusyPerHour[i] := 0;
     TL.StartDate := DateStr(GetDosDate);
-    If SaveFile('timelog.bbs', TL, SizeOf(TL)) = 0 Then;
+    If SaveFile(SysPath, TL, SizeOf(TL)) = 0 Then;
     End;
   If LoadFile(SysPath, TL, SizeOf(TL)) = 0 Then
     Begin

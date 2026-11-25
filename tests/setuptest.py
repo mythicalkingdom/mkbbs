@@ -118,6 +118,9 @@ class Term:
         return re.sub(rb'\x1b\[[0-9;?]*[A-Za-z]', b'', self.buf).decode('latin-1')
 
 
+# the data files are not there yet: mk makes them in the BBS folder, not in the directory it was started from
+for n_ in ('users.bbs', 'extusers.bbs', 'usersidx.bbs', 'useron.bbs', 'timelog.bbs', 'lastread.bbs'):
+    os.remove(B + '/' + n_)
 t = Term(B, cwd)
 t.drain(3)
 for k in ('Test User\r', 'Y\r', 'Dayton OH\r', 'N\r', 'N\r', '\r', '\r', '\r', '513-555-1234\r', '513-555-1234\r', '01/01/80\r', 'M\r', 'secret1\r', 'secret1\r', 'Y\r', '\r', '\r', '\r'):
@@ -144,5 +147,31 @@ except OSError:
     pass
 check('nothing was written in the directory mk was started from but the exitinfo of the node (the data files are in the BBS folder)', set(os.listdir(cwd)) <= {'exitinfo.bbs'}, os.listdir(cwd))
 check('the user file in the BBS folder has the one caller', os.path.getsize(B + '/users.bbs') == 158 and os.path.getsize(B + '/extusers.bbs') == 614, (os.path.getsize(B + '/users.bbs'), os.path.getsize(B + '/extusers.bbs')))
+# the account of the sysop and the listener configuration
+S = tmp + '/sys'
+r = setup('-d', S, '-n', 'Sys BBS', '-s', 'Boss Man', '-p', 'sysop1', '-y')
+check('-p: the account of the sysop is made, the passwords are shown once', r.returncode == 0 and 'Boss Man' in r.stdout and 'password  sysop1' in r.stdout and 'Sysop monitor:' in r.stdout, r.stdout + r.stderr)
+u = open(S + '/users.bbs', 'rb').read()
+check('the account: the name, the password, security level 110, one record in users.bbs, extusers.bbs and usersidx.bbs', len(u) == 158 and u[1:1 + u[0]] == b'Boss Man' and u[63:63 + u[62]] == b'sysop1' and int.from_bytes(u[132:134], 'little') == 110
+      and os.path.getsize(S + '/extusers.bbs') == 614 and os.path.getsize(S + '/usersidx.bbs') == 8, (len(u), u[:12], int.from_bytes(u[132:134], 'little')))
+lj = json.load(open(S + '/mklisten.json'))
+mon = [p_ for p_ in lj['ports'] if p_['type'] == 'sysop'][0]
+mp = re.search(r'Sysop monitor:.*password\s+(\S+)', r.stdout).group(1)
+check('mklisten.json: mode 600, a telnet port and the sysop monitor on 127.0.0.1 with the sha1 of the password that was shown', oct(os.stat(S + '/mklisten.json').st_mode & 0o777) == '0o600' and lj['workdir'] == S
+      and mon['bind'] == '127.0.0.1' and mon['password'] == 'sha1:' + hashlib.sha1(mp.encode()).hexdigest() and any(p_['type'] == 'telnet' for p_ in lj['ports']), lj)
+r2 = subprocess.run([build + '/mklisten', '-c', S + '/mklisten.json', '-t'], capture_output=True, text=True)
+check('mklisten -t accepts it', r2.returncode == 0, r2.stdout + r2.stderr)
+r = setup('-d', tmp + '/nolisten', '-N', '-y')
+check('-N: no mklisten.json, no account without -u', r.returncode == 0 and not os.path.exists(tmp + '/nolisten/mklisten.json') and os.path.getsize(tmp + '/nolisten/users.bbs') == 0, r.stdout + r.stderr)
+r = setup('-d', tmp + '/shortpw', '-u', '-p', 'ab', '-y')
+check('a password that is too short is refused (exit 1)', r.returncode == 1 and 'password' in r.stderr and not os.path.exists(tmp + '/shortpw/config.mk'), r.stderr)
+r = setup('-d', tmp + '/made', '-u', '-y')
+check('-u without -p: a password is made up and shown', r.returncode == 0 and re.search(r'Sysop account:.*password\s+\S{10}', r.stdout), r.stdout)
+t = Term(S, tmp)
+t.drain(3)
+for k in ('Boss Man\r', 'sysop1\r', '\r', '\r', '\r'):
+    t.send(k)
+s_ = t.text()
+check('the sysop logs on with the password and gets the menu (no registration)', 'Command >' in s_ and 'Main menu' in s_ and 'not found in the user records' not in s_, s_[-500:])
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

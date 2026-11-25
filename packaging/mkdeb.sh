@@ -79,8 +79,9 @@ cat > "$doc/README.Debian" <<'RD'
 mkbbs for Debian
 ================
 
-* Nothing is started by the package.  Edit /etc/mkbbs/mklisten.json (the paths, the ports, the sysop password), make a BBS directory with mkconfig
-  (GETTING-STARTED.md), then:   systemctl enable --now mklisten
+* Nothing is started by the package.  The quick start: make a first BBS with   sudo -u mkbbs mksetup -d /opt/bbs -u   (SETUP.md; it also writes /opt/bbs/mklisten.json, which
+  you can use instead of /etc/mkbbs/mklisten.json), then   mklisten -c /opt/bbs/mklisten.json   or point the service at it.  By hand: edit /etc/mkbbs/mklisten.json (the paths, the ports,
+  the sysop password), make a BBS directory with mkconfig (GETTING-STARTED.md), then:   systemctl enable --now mklisten
 * The listener runs as the user mkbbs (made by the package); that user must be able to read and write the BBS directory.
 * Language files: /usr/share/mkbbs/lang (the text, and the compiled .lc files); copy them into the BBS directory.
 * Hub profiles: /usr/share/mkbbs/hubs.  SSH front end templates: /usr/share/mkbbs/ssh (SSH.md).

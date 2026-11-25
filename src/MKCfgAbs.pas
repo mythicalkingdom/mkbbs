@@ -543,7 +543,7 @@ Function CfgObj.FindBbsFile(FileName: String):String;
       If FileExist(GetMsgPath(1) + FileName) Then
         TempStr := GetMsgPath(1)
       Else
-        TempStr := '';
+        TempStr := CfgInfo^.BbsPath;      {a file that is not there yet is made in the BBS folder, not in the directory the program was started from}
       End;
     End;
   AddBackSlash(TempStr);
