@@ -296,6 +296,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doortest.py build/work/door | grep -E "^(ok|FAIL|skip|failures)" | tee build/doorresult.txt
   if grep -q "^FAIL" build/doorresult.txt; then exit 1; fi
 fi
+# the same with the real dosemu2 (skipped when it is not installed)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/dosdoorcmdtest.py build/work/dosdoorcmd | grep -E "^(ok|FAIL|skip|failures)" | tee build/dosdoorcmdresult.txt
+  if grep -q "^FAIL" build/dosdoorcmdresult.txt; then exit 1; fi
+fi
 # statistics display codes ^T (screens and menu prompts)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/statcodestest.py build/work/statcodes | grep -E "^(ok|FAIL|skip|failures)" | tee build/statcodesresult.txt
