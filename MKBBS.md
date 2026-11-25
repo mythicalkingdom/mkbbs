@@ -102,6 +102,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
 | `mkbinkcfg`, `mktoss` | the Fido mailer settings and the tosser (`NETWORKING.md`, `TOSSER.md`) |
 | `mkuserpurge` | marks users deleted who have not called for a long time (keep file, security level, a warning list) (`MAINT.md`) |
+| `mkcheck` | looks at a BBS and says what would stop `mk` from running it (or running it well): folders, language, menus, areas, users, listener configuration; changes nothing (`SETUP.md`) |
 | `mksetup` | makes a new BBS that `mk` can run: folder, configuration, two message areas, a file area, a sample door, the menu and screens (`SETUP.md`) |
 | `mkapi`, `mkapitoken` | the read only JSON API (a port of the type `api` in `mklisten`) and its tokens (`API-PLAN.md`) |
 | `mkuserpack` | takes deleted users out of the user files (exclusive event), writes `usermap.txt` old→new numbers (`MAINT.md`) |

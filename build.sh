@@ -50,6 +50,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpack src/MKUserPack.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapi src/MKApi.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapitoken src/MKApiTokTool.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omksetup src/MKSetup.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcheck src/MKCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
@@ -287,24 +288,29 @@ fi
 # the JSON API: tokens, mkapi over HTTP and TLS, the login guard
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/apitest.py build/work/api | grep -E "^(ok|FAIL|skip|failures)" | tee build/apiresult.txt
-  if grep -q FAIL build/apiresult.txt; then exit 1; fi
+  if grep -q "^FAIL" build/apiresult.txt; then exit 1; fi
+fi
+# mkcheck: a BBS that mksetup made is fine, and each thing broken in a copy is reported
+if [ -f lang/AMERICAN.lc ]; then
+  python3 tests/checktest.py build build/work/check | grep -E "^(ok|FAIL|skip|failures)" | tee build/checkresult.txt
+  if grep -q "^FAIL" build/checkresult.txt; then exit 1; fi
 fi
 # mksetup: a new BBS that mk runs (a new caller registers, reads, lists files, says goodbye)
 if [ -f lang/AMERICAN.lc ]; then
   python3 tests/setuptest.py build build/work/setup | grep -E "^(ok|FAIL|skip|failures)" | tee build/setupresult.txt
-  if grep -q FAIL build/setupresult.txt; then exit 1; fi
+  if grep -q "^FAIL" build/setupresult.txt; then exit 1; fi
 fi
 # backslash codes in menu prompts (the real mk over telnet)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/promptesctest.py build/work/promptesc | grep -E "^(ok|FAIL|skip|failures)" | tee build/promptescresult.txt
-  if grep -q FAIL build/promptescresult.txt; then exit 1; fi
+  if grep -q "^FAIL" build/promptescresult.txt; then exit 1; fi
 fi
 # housekeeping of users (mkuserpurge) and of the file areas (mkfilecheck), on private copies
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/userpurgetest.py build build/work/userpurge | grep -E "^(ok|FAIL|skip|failures)" | tee build/userpurgeresult.txt
   python3 tests/filechecktest.py build build/work/filecheck | grep -E "^(ok|FAIL|skip|failures)" | tee build/filecheckresult.txt
   python3 tests/userpacktest.py build build/work/userpack | grep -E "^(ok|FAIL|skip|failures)" | tee build/userpackresult.txt
-  if grep -q FAIL build/userpurgeresult.txt build/filecheckresult.txt build/userpackresult.txt; then exit 1; fi
+  if grep -q "^FAIL" build/userpurgeresult.txt build/filecheckresult.txt build/userpackresult.txt; then exit 1; fi
 fi
 # the statistics screen of the sysop monitor (S)
 if [ -f bbs/bbsc/ra/config.mk ]; then

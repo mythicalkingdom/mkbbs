@@ -96,4 +96,7 @@ mkstats [-d day | -m month | -y year] [-by node|port|user|hour|day] [-top N] [-c
   files, menus and screens named but not there, message bases that cannot be opened, areas with no `conf` line for a network, a mailer link without a password, ports that are already
   in use, a TLS certificate that is unreadable or about to expire, an expired or missing sysop password, a login guard that would block the sysop's own address.  The checker is the smaller piece
   and is useful alone (it can run from an event and from the package's `postinst`); the wizard can then use it for its last step.
-* A JSON API (read-only first), native packaging for other systems, Windows, ban lists (see the roadmap notes).
+  **Built (2026-11-24):** `mksetup` (`SETUP.md`, `SETUP-PLAN.md`) and a first `mkcheck` (`SETUP.md`: folders, language, menus item by item, the files a new caller needs, message bases opened, file area
+  folders, user files in step, the sysop account, the listener with `mklisten -t`).  **Not yet in `mkcheck`:** network areas without a link, a mailer link without a password, ports already in use, a TLS
+  certificate that cannot be read or is about to expire, the listener user's write access, the login guard against the sysop's own address, an event that runs a command that is not there.
+* The JSON API is built (`API.md`).  Native packaging for other systems, Windows, ban lists remain (see the roadmap notes).

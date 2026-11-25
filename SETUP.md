@@ -28,6 +28,19 @@ Without `-y` it asks for the folder (default `/opt/bbs`), the name of the BBS, t
 
 Everything is an ordinary file of the BBS: change the settings with `mkconfig`, the menus with `mkmenu`, the screens with `mkdraw` (`.asc` text or `.ans` art), the users with `mkusered`.
 
+## Checking a BBS: `mkcheck`
+
+```
+mkcheck [-c config dir] [-l mklisten.json] [-q] [-v]
+```
+
+`mkcheck` looks at a BBS and changes nothing.  Each line is `ok` (fine, with `-v`), `info` (good to know), `WARN` (it works, but probably not as you want) or `FAIL` (`mk` will not work, or not for a new caller).
+It looks at: the configuration and the folders it names; the language file; **the menus** (every item of every menu reachable from `top`: the menus it goes to, the screens it shows, the programs and games it runs, the
+questionnaires, keys used twice, and a way to log off); the files a new caller needs (`newuser.q-a`, `limits.ctl` with a line for the level of a new caller) and the screens `mk` shows; **the message areas** (each
+base is opened) and the file area folders; the **user files** (record sizes, `extusers.bbs` and `usersidx.bbs` in step with `users.bbs`, the account of the sysop); the new caller's level against the areas; and the
+listener configuration (`mklisten -t`).  The exit code is 0 when there is no FAIL (WARN is possible), 1 when there is no configuration to look at, 2 when something is FAIL.  Run it after `mksetup`, after
+editing a menu, and before you put a restored backup into use: `mkcheck -c /opt/bbs`.  On a BBS from DOS days it shows what its menus lead to that was never there.
+
 ## Then
 
 ```
