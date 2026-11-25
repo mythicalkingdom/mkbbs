@@ -14,19 +14,22 @@ Program MKMsgConv;
                message path of the area, Fido: a directory name; Hudson uses the board number of the area and the message path
          -n    a dry run: the copy is made in a scratch directory (and removed), so what the new kind cannot hold is counted exactly; nothing is written to the BBS
          -m    keep the number map (old new) in <BBS dir>/convmap/area<N>.map
-         -f    go on although the new base already has messages (they stay, the copy is added), callers are on line ...
+         -f    go on although the new base already has messages (they stay, the copy is added), a caller is on line, a non-empty destination
          -v    each message
          -q    only the summary
 
      The old base is never changed.  The new base is written beside it, read again and compared with the old one, message by message; the report says
      what the new kind could not hold (a cut subject ...).  The configuration is not changed (the report says what to set in mkconfig).
+     The last-read pointer of every user (users.bbs) is moved through the map to the new base: the new number of the last message at or below the old pointer (JAM by the check sum of the name).
+     A caller on line (useron.bbs) stops it (exit 3; -f: anyway): run it in an exclusive event.  The scan mark of the tosser is not touched: the next scan reads the new base once from the
+     start (everything converted is sent already, so nothing goes out twice).
      A message waiting to be sent (an echomail message of this system that the tosser has not scanned, a netmail not sent) stops the area: run mktoss first.
 
      The exit code: 0 done, 1 not usable (options, no configuration), 2 an area was refused or failed.
 }
 
 Uses SysUtils, Classes, BaseUnix, Unix,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen, MKFile;
 
 Type
   TFlags = Record
@@ -491,10 +494,116 @@ Procedure WriteMap(A: Word);
   End;
 
 
+Function MapAtOrBelow(Old: LongInt): LongInt;
+  {the new number of the last message that was at or below the old number (0 when there is none): where a caller who had read up to Old stands in the new base}
+  Var
+    Lo, Hi, Mid: LongInt;
+
+  Begin
+  MapAtOrBelow := 0;
+  Lo := 0;
+  Hi := NMap - 1;
+  While Lo <= Hi Do
+    Begin
+    Mid := (Lo + Hi) Div 2;
+    If OldNum[Mid] <= Old Then
+      Begin
+      MapAtOrBelow := NewNum[Mid];
+      Lo := Mid + 1;
+      End
+    Else
+      Hi := Mid - 1;
+    End;
+  End;
+
+
+Function CallersOnLine: String;
+  {the names of the callers on line (useron.bbs), '' when nobody is}
+  Var
+    UO: UserOnType;
+    Fn: String;
+    k, N: LongInt;
+
+  Begin
+  CallersOnLine := '';
+  Fn := IncludeTrailingPathDelimiter(Config^.GetBbsPath) + 'useron.bbs';
+  If Not FileExists(Fn) Then
+    Exit;
+  N := SizeFile(Fn) Div SizeOf(UserOnType);
+  For k := 0 To N - 1 Do
+    If LoadFilePos(Fn, UO, SizeOf(UO), k * SizeOf(UO)) = 0 Then
+      If (UO.Name <> '') And (UO.Status <> uoNotAvail) And (UO.Status <> uoWait) Then
+        Begin
+        CallersOnLine := UO.Name + ' (node ' + IntToStr(UO.Node) + ')';
+        Exit;
+        End;
+  End;
+
+
+Function CopyLastRead(Src, Dst: String; Write: Boolean): LongInt;
+  {the last-read pointer of every user of users.bbs, through the map: the new base gets the new number of the last message at or below the old pointer.  JAM keeps its pointers by the
+   check sum of the user's name, the others by the record number in users.bbs.  The number of pointers set (or, with Write False, that would be set); -1 when a base cannot be opened}
+  Var
+    S, D: AbsMsgPtr;
+    Fn: String;
+    U: UsersType;
+    N, k, Old, New, Cnt: LongInt;
+    SJ, DJ: Boolean;
+
+  Begin
+  CopyLastRead := 0;
+  Fn := Config^.FindBbsFile('users.bbs') + 'users.bbs';
+  If Not FileExists(Fn) Then
+    Exit;
+  If Not OpenMsgArea(S, Src) Then
+    Begin
+    CopyLastRead := -1;
+    Exit;
+    End;
+  D := Nil;
+  If Write And (UpCase(Dst[1]) <> 'Y') Then
+    If Not OpenMsgArea(D, Dst) Then
+      Begin
+      If CloseMsgArea(S) Then;
+      CopyLastRead := -1;
+      Exit;
+      End;
+  SJ := UpCase(Src[1]) = 'J';
+  DJ := UpCase(Dst[1]) = 'J';
+  N := SizeFile(Fn) Div SizeOf(UsersType);
+  Cnt := 0;
+  For k := 0 To N - 1 Do
+    If LoadFilePos(Fn, U, SizeOf(U), k * SizeOf(U)) = 0 Then
+      Begin
+      If SJ Then
+        Old := S^.GetLastRead(JamStrCrc(U.Name))
+      Else
+        Old := S^.GetLastRead(k);
+      If Old > 0 Then
+        Begin
+        New := MapAtOrBelow(Old);
+        If New > 0 Then
+          Begin
+          If Write And (D <> Nil) Then
+            If DJ Then
+              D^.SetLastRead(JamStrCrc(U.Name), New)
+            Else
+              D^.SetLastRead(k, New);
+          Inc(Cnt);
+          End;
+        End;
+      End;
+  If CloseMsgArea(S) Then;
+  If D <> Nil Then
+    If CloseMsgArea(D) Then;
+  CopyLastRead := Cnt;
+  End;
+
+
 Procedure DoArea(A: Word);
   Var
     Name, Src, Dst, Cut, Err, Tmp: String;
-    N: LongInt;
+    N, Lr: LongInt;
     From: Char;
 
   Begin
@@ -544,6 +653,12 @@ Procedure DoArea(A: Word);
   Inc(TotalMsgs, N);
   If KeepMap And (Not Dry) Then
     WriteMap(A);
+  Lr := CopyLastRead(Src, Dst, Not Dry);
+  If Lr > 0 Then
+    If UpCase(DestType) = 'Y' Then
+      Cut := Cut + ', ' + IntToStr(Lr) + ' last-read pointer(s) dropped (Synchronet keeps none)'
+    Else
+      Cut := Cut + ', ' + IntToStr(Lr) + ' last-read pointer(s) ' + Copy('would be ', 1, 9 * Ord(Dry)) + 'moved';
   If Dry Then
     WriteLn('area ', A, ' ', Name, ': ', KindName(From), ' -> ', KindName(DestType), ', would copy ', N, ' message(s), the copy checked out', Cut)
   Else
@@ -686,6 +801,8 @@ If Config = Nil Then
 Config^.Load;
 If Config^.GetError <> 0 Then
   Die(1, IntToStr(Config^.GetError) + ': Error loading config files');
+If (Not Dry) And (Not Force) And (CallersOnLine <> '') Then
+  Die(3, 'a caller is on line: ' + CallersOnLine + '.  The last-read pointers would be moved under the caller: run it in an exclusive event (-f: anyway)');
 For i := 1 To Config^.GetMaxMsgAreas Do
   If Config^.GetMsgName(i) <> '' Then
     If ((KindFilter <> ' ') And (UpCase(Config^.GetMsgBaseType(i)) = KindFilter)) Or ((KindFilter = ' ') And InAreaList(i)) Then

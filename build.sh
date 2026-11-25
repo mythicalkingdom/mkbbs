@@ -53,7 +53,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omsgput tests/msgput.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omksetup src/MKSetup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcheck src/MKCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmsgconv src/MKMsgConv.pas
-for t in convfill convdump convtext; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
+for t in convfill convdump convtext lrtool; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas

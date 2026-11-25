@@ -36,6 +36,8 @@ areas of different names (merging two areas into one base) is a copy with `-f` i
 
 **Status:** phase 1 is built (`src/MKMsgConv.pas`, `tests/msgconvtest.py`: all 30 pairs of kinds).  Found while testing: Hudson message numbers run through all its areas (a Hudson target does not start at 1; the map has the real numbers); Synchronet keeps no kludge lines in the text (the report counts them); Merlin and Synchronet refuse an empty text (a single line end is written).
 
+**Phase 2 is built:** the last-read pointer of every user of `users.bbs` goes through the map (the new number of the last message at or below the old pointer; JAM by the check sum of the name); a caller on line (`useron.bbs`) stops the conversion (exit 3, `-f` goes on, a dry run is allowed); Synchronet keeps no last-read pointers (the report says how many were dropped; `AbsMsgObj.GetLastRead` now returns 0 instead of an undefined value).  The tosser's scan mark is not written: the next scan reads the converted base once from the start, which is safe because everything converted was sent already (messages waiting to be sent refuse the area).  An exclusive event is not detected from here: run it inside one.  Test: `lrtool`, `msgconvtest.py`.
+
 ## Phases
 
 1. **The engine** (`MKMsgConv.pas`) and `mkmsgconv -a <area> -t <type> [-d id] [-n] [-v]`: the destination id by the rules of the configuration, copy of all fields and text, the number map, reply links, the second read and compare, the report of what a kind cannot hold; tests: a base of each kind made with `msgput`, converted to

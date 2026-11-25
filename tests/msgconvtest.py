@@ -122,5 +122,50 @@ r = conv('-a', '999', '-t', 'J')
 check('an area that is not there: nothing to do (exit 1)', r.returncode == 1, r.stdout + r.stderr)
 r = conv('-a', '2', '-t', 'Q')
 check('a kind that does not exist: refused with a usage message', r.returncode == 1, r.stdout + r.stderr)
+
+# phase 2: the last-read pointers of the users go through the map; callers on line stop it
+def lr(op, aid, user, val=None):
+    r = subprocess.run([build + '/lrtool', op, aid, str(user)] + ([str(val)] if val is not None else []), env=env, capture_output=True, text=True)
+    return int(r.stdout.strip()) if op == 'get' and r.returncode == 0 and r.stdout.strip() else (None if op == 'get' else r.returncode)
+
+
+def expect(live, dst, p):
+    """the new number of the last live message at or below the old number p"""
+    c = len([x for x in live if int(x[0]) <= p])
+    return int(dst[c - 1][0]) if c else 0
+
+
+for sk, tk in (('H', 'J'), ('J', 'S'), ('M', 'H'), ('Y', 'F'), ('S', 'M'), ('F', 'Y'), ('J', 'F'), ('S', 'H')):
+    aid = ident(sk, AREA[sk], FIDS[sk])
+    live = dump(aid)
+    olds = [int(x[0]) for x in live]
+    ptr = {10: olds[3], 11: olds[1], 12: olds[-1] + 50, 13: olds[2] - 1, 14: 0}
+    for u, p in ptr.items():
+        lr('set', aid, u, p)
+    fid = 'lr%s%s' % (tk.lower(), sk.lower())
+    r = conv('-a', str(AREA[sk]), '-t', tk, '-d', fid, '-v', '-f')           # -f: a Hudson board of the area is shared by every conversion into Hudson
+    did = ident(tk, AREA[sk], fid)
+    dst = dump(did)[-6:]
+    got = {u: lr('get', did, u) for u in ptr}
+    want = {u: expect(live, dst, p) for u, p in ptr.items()}
+    if sk == 'Y':
+        want = {u: 0 for u in ptr}                                           # Synchronet keeps no pointers
+    if tk == 'Y':
+        check('%s -> Y: the pointers are dropped and the report says so' % sk, 'dropped' in r.stdout and r.returncode == 0, r.stdout[-300:])
+        continue
+    check('%s -> %s: the last-read pointers of 5 users went through the map (%s)' % (sk, tk, want), r.returncode == 0 and got == want and (sk == 'Y' or 'last-read pointer(s) moved' in r.stdout), (got, want, r.stdout[-300:]))
+
+r = conv('-n', '-a', '4', '-t', 'S', '-d', 'drylr')
+check('the dry run counts the pointers and writes none', r.returncode == 0 and 'would be moved' in r.stdout and not os.path.exists(mb + 'drylr.sqd'), r.stdout)
+subprocess.run([build + '/lrtool', 'useron', 'Test Caller', '1'], env=env, check=True)
+r = conv('-a', '4', '-t', 'S', '-d', 'busy')
+check('a caller on line stops the conversion (exit 3, -f goes on)', r.returncode == 3 and 'on line' in r.stderr and not os.path.exists(mb + 'busy.sqd'), (r.returncode, r.stdout, r.stderr))
+r = conv('-a', '4', '-t', 'S', '-d', 'busy', '-f')
+check('... -f goes on', r.returncode == 0 and 'copied 6' in r.stdout, r.stdout + r.stderr)
+r = conv('-n', '-a', '4', '-t', 'M', '-d', 'busy2')
+check('... a dry run is allowed', r.returncode == 0, r.stdout + r.stderr)
+subprocess.run([build + '/lrtool', 'useron', '-'], env=env, check=True)
+r = conv('-a', '4', '-t', 'M', '-d', 'free', '-m')
+check('nobody on line: it goes (-m keeps the map)', r.returncode == 0 and os.path.exists(ra + '/convmap/area4.map'), (r.stdout, r.stderr, os.listdir(ra)))
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

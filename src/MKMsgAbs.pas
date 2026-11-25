@@ -641,6 +641,7 @@ Function AbsMsgObj.NumberOfMsgs: LongInt;
 
 Function AbsMsgObj.GetLastRead(UNum: LongInt): LongInt;
   Begin
+  GetLastRead := 0;                {a kind that keeps no pointers (Synchronet) has none}
   End;
 
 Procedure AbsMsgObj.SetLastRead(UNum: LongInt; LR: LongInt);
