@@ -212,11 +212,47 @@ Function FindNoCase(Dir, Name: String): String;
   End;
 
 
+Function WordCountOf(S: String): Integer;
+  Var
+    L: TStringList;
+
+  Begin
+  L := TStringList.Create;
+  Try
+    L.Delimiter := ' ';
+    L.StrictDelimiter := True;
+    L.DelimitedText := Trim(S);
+    WordCountOf := L.Count;
+    If Trim(S) = '' Then
+      WordCountOf := 0;
+  Finally
+    L.Free;
+  End;
+  End;
+
+
+Function NthWord(S: String; n: Integer): String;
+  Var
+    L: TStringList;
+
+  Begin
+  L := TStringList.Create;
+  Try
+    L.Delimiter := ' ';
+    L.StrictDelimiter := True;
+    L.DelimitedText := Trim(S);
+    NthWord := L[n - 1];
+  Finally
+    L.Free;
+  End;
+  End;
+
+
 Procedure CheckDoorItem(MenuName: String; Item: Integer; Key, Data: String);
   {menu command 172: the door is in doors.cfg, and what it needs is there}
   Var
     Name, Prefix, W, Dos: String;
-    i: Integer;
+    i, j: Integer;
 
   Begin
   Name := Trim(Data);
@@ -251,6 +287,11 @@ Procedure CheckDoorItem(MenuName: String; Item: Integer; Key, Data: String);
     Begin
     If Command = '' Then
       Warn(Prefix + 'the door ' + Name + ' has no command in doors.cfg');
+    For j := 1 To WordCountOf(DropFiles) Do
+      If Pos(' ' + NthWord(DropFiles, j) + ' ', ' dorinfo1.def door.sys callinfo.bbs door32.sys ') = 0 Then
+        Warn(Prefix + 'the door ' + Name + ' names the drop file ' + NthWord(DropFiles, j) + ', which MK does not write (dorinfo1.def door.sys callinfo.bbs door32.sys)');
+    If (Kind = 'dos') And DropFilesWanted(DoorCfg.Doors[i], 'door32.sys') Then
+      Warn(Prefix + 'door32.sys is for native doors: a DOS door in dosemu2 does not get it');
     If (Dir = '') Or Not DirectoryExists(Dir) Then
       Begin
       Warn(Prefix + 'the directory of the door ' + Name + ' is not there: ' + Dir);

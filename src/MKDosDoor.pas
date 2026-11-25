@@ -167,8 +167,12 @@ Procedure RunNative(Const D: TDoorDef);
     Cmd := Cmd + ' *D';
   If DropFilesWanted(D, 'callinfo.bbs') Then
     Cmd := Cmd + ' *W';
+  If DropFilesWanted(D, 'door32.sys') Then
+    Cmd := Cmd + ' *3';
   If D.Freeze Then
     Cmd := Cmd + ' *!';
+  If D.Raw Then
+    Cmd := Cmd + ' *S';
   TypeSeven(Cmd);
   End;
 

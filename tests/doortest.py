@@ -58,6 +58,9 @@ open(doors + '/lord/LORD.EXE', 'w').write('x')
 open(doors + '/lord/sub/DATA.DAT', 'w').write('d')
 open(doors + '/natv/hello.sh', 'w').write('#!/bin/sh\necho "NATIVE:$(basename $PWD) $(ls door.sys callinfo.bbs 2>&1 | tr "\\n" " ")"\n')
 os.chmod(doors + '/natv/hello.sh', 0o755)
+os.makedirs(doors + '/n32')
+open(doors + '/n32/d32.sh', 'w').write('#!/bin/sh\necho "D32-BEGIN"\ncat -v door32.sys\necho "D32-END"\n')
+os.chmod(doors + '/n32/d32.sh', 0o755)
 workbase = tmp + '/dw'
 
 
@@ -80,11 +83,22 @@ type = native
 dir = %s/natv
 command = hello.sh
 dropfiles = door.sys
+[d32]
+type = native
+dir = %s/n32
+command = d32.sh
+dropfiles = door32.sys
+[d32raw]
+type = native
+dir = %s/n32
+command = d32.sh
+dropfiles = door32.sys
+raw = yes
 [nodir]
 type = dos
 dir = /nonexistent/dir
 command = X.EXE
-""" % (dosemu, workbase, doors, doors))
+""" % (dosemu, workbase, doors, doors, doors, doors))
 
 
 write_cfg()
@@ -119,6 +133,8 @@ add_item(172, '5', 'DOOR-LORD', 'lord')
 add_item(172, '6', 'DOOR-NONE', 'nosuchdoor')
 add_item(172, '7', 'DOOR-NATV', 'natv')
 add_item(172, '8', 'DOOR-NODIR', 'nodir')
+add_item(172, '9', 'DOOR-D32', 'd32')
+add_item(172, 'A', 'DOOR-D32RAW', 'd32raw')
 open(path, 'wb').write(d)
 cfg = {'mk': repo + '/build/mk', 'rundir': os.path.join(work, 'run'), 'logfile': os.path.join(work, 'listen.log'),
        'workdir': ra, 'nodes': '1-2',
@@ -226,6 +242,21 @@ try:
     t = until(c, b'NATIVE:', 8)
     t += until(c, b'Command >', 6)
     check('a native door runs as command 7 does: in the node directory, with DOOR.SYS (and no CALLINFO.BBS)', b'NATIVE:node1' in t and b'door.sys' in t and b'No such file' in t, t[-300:])
+
+    # DOOR32.SYS
+    def d32(key):
+        c.sendall(key)
+        t = until(c, b'D32-END', 8)
+        until(c, b'Command >', 6)
+        m = re.search(rb'D32-BEGIN\r?\n(.*?)D32-END', t, re.S)
+        d32.raw = m.group(1) if m else b''
+        return [l.rstrip(b'^M').decode('latin-1') for l in m.group(1).replace(b'\r', b'').split(b'\n') if l] if m else None
+    L = d32(b'9')
+    check('DOOR32.SYS: 11 lines, CR LF, in the node directory (pseudo terminal: comm type 0, handle 0)', L is not None and len(L) == 11 and L[0] == '0' and L[1] == '0', L)
+    check('... baud, software, user record, name, handle, level, minutes left, ANSI, node', L is not None and L[3].startswith('Mythical Kingdom Bbs') and L[5] == 'Mark May' and L[6] and L[7].isdigit() and L[8].isdigit() and L[9] in ('0', '1') and L[10] == '1', L)
+    check('... the line ends are CR LF', d32.raw.count(b'^M') == 11, d32.raw)
+    L = d32(b'A')
+    check('DOOR32.SYS of a raw door (*S) over telnet: comm type 2 (a socket), handle 0', L is not None and len(L) == 11 and L[0] == '2' and L[1] == '0', L)
 
     # dosemu not installed
     write_cfg('/nonexistent/dosemu')

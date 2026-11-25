@@ -17,8 +17,9 @@ Unit MKDoorCfg;   {doors.cfg: the doors of the BBS (DOORS-PLAN.md)}
        command   = START.BAT             what is run there; *N is the node (native: the other * codes of command 7 too)
        subdir    =                       DOS: run in this directory below dir
        com       = 1                     DOS: the COM port number the door is told
-       dropfiles = dorinfo1.def door.sys callinfo.bbs     which drop files are written (default: dorinfo1.def door.sys)
+       dropfiles = dorinfo1.def door.sys callinfo.bbs door32.sys     which drop files are written (default: dorinfo1.def door.sys)
        freeze    = no                    yes: the time of the caller does not run while the door does
+       raw       = no                    native: yes = the program gets the caller's connection itself as standard input / output, no pseudo terminal (*S of command 7)
        sandbox   = default               default | off | net (DOORS-PLAN.md C: not used yet)
        bind      = /bbs/doors/scores     more directories the sandbox shows, writable (any number of lines)
        robind    = /bbs/files            ... read only
@@ -32,7 +33,7 @@ Type
   TDoorDef = Record
     Name, Kind, Dir, Command, SubDir, DropFiles, Sandbox: String;
     Com: Integer;
-    Freeze: Boolean;
+    Freeze, Raw: Boolean;
     Binds, ROBinds: TStringList;
   End;
 
@@ -211,6 +212,12 @@ Procedure TDoorCfg.Load(Const Path: String);
             Freeze := YesNo(LowerCase(V), Ok);
             If Not Ok Then
               Bad('freeze is yes or no');
+            End
+          Else If K = 'raw' Then
+            Begin
+            Raw := YesNo(LowerCase(V), Ok);
+            If Not Ok Then
+              Bad('raw is yes or no');
             End
           Else If K = 'sandbox' Then
             Begin

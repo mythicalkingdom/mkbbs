@@ -28,19 +28,36 @@ door  <-- COM1 (FOSSIL, INT 14h or the UART) -->  dosemu2  <-- standard input / 
    command   = START.BAT             # what is run there, DOS style; *N is the node, ** a star
    subdir    =                       # dos: run in this directory below dir
    com       = 1                     # dos: the COM port number the door is told (1 to 9)
-   dropfiles = dorinfo1.def door.sys # which drop files: dorinfo1.def door.sys callinfo.bbs (default: dorinfo1.def door.sys)
+   dropfiles = dorinfo1.def door.sys # which drop files: dorinfo1.def door.sys callinfo.bbs door32.sys (default: dorinfo1.def door.sys)
    freeze    = no                    # yes: the time of the caller does not run while the door does
+   raw       = no                    # native: yes = the program gets the caller's connection itself as standard input / output, no pseudo terminal (*S of command 7)
    sandbox   = default               # default | off | net: read, not used yet (DOORS-PLAN.md C)
    bind      = /bbs/doors/scores     # more directories for the sandbox (any number of lines): read, not used yet
    robind    = /bbs/files
    ```
 
-   A `#` after a space starts a comment.  A door that runs a Linux program has `type = native`: its `command` is looked for in `dir` first, then as command 7 does; `door.sys`, `callinfo.bbs` and `freeze` in
-   its block become `*D`, `*W` and `*!` of command 7.
+   A `#` after a space starts a comment.  A door that runs a Linux program has `type = native`: its `command` is looked for in `dir` first, then as command 7 does; `door.sys`, `callinfo.bbs`, `door32.sys`, `freeze` and `raw` in
+   its block become `*D`, `*W`, `*3`, `*!` and `*S` of command 7.
 4. A menu item (`mkmenu`) of **type 172, "Run a door (doors.cfg)"** (in the group External & Misc); its data is the name of the door: `lord`.
 5. `mkcheck` looks at every such item: the door is in `doors.cfg`, its directory and command are there (DOS names in any case), dosemu2 is installed, and lines of `doors.cfg` it does not understand are reported with their number.
 
 A door that cannot be started (not in `doors.cfg`, no directory, no dosemu2) is **not available**: the caller is told so, and the reason is in the log (`Door lord not run: ...`).
+
+## `DOOR32.SYS`
+
+Native doors that are written for `DOOR32.SYS` get it with `door32.sys` in `dropfiles` (command 7: `*3` in the data), in the directory of the node like the other drop files.  Eleven lines, CR LF:
+
+| line | |
+|---|---|
+| 1 | comm type: **2** when the program has the caller's connection as its standard input and output *and that is a socket* (`raw = yes` / `*S`, behind `mklisten`'s telnet, raw and web socket ports), else **0** (local: a pseudo terminal, or a pipe behind SSH or a front end) |
+| 2 | the handle: **0**, the descriptor of standard input / output (a Linux door has no Windows socket handle; a door that wants one reads and writes descriptor 0) |
+| 3, 4 | the baud rate of the caller, the BBS software (`Mythical Kingdom Bbs - Version 0.2 Alpha`) |
+| 5, 6, 7 | the user's record number, real name, handle (the name when there is none) |
+| 8, 9 | security level, minutes left |
+| 10, 11 | emulation (0 ASCII, 1 ANSI), the node |
+
+A door that needs a real socket (`getpeername`, `send` on it) therefore runs with `raw = yes` on a port where the connection is a socket; behind SSH it gets comm type 0 and has to use its terminal.  A DOS door in dosemu2 is not given `DOOR32.SYS`
+(`mkcheck` says so); it uses `DOOR.SYS` or `DORINFO1.DEF` and its COM port.
 
 ## What command 172 does for a DOS door
 

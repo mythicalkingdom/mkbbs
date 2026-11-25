@@ -6,10 +6,14 @@ Interface
 Function WriteDorInfo: Word;
 Function WriteDoorSys: Word;
 Function WriteCallInfo: Word;
+Function WriteDoor32(Raw: Boolean): Word;
+  {DOOR32.SYS: comm type (2 = the connection is a socket and the program has it as its standard input / output: Raw, with *S;
+   0 = local: a pseudo terminal, a pipe), the handle (0: the descriptor of standard input / output), the baud rate, the BBS software, the user's record number,
+   real name, handle, security level, minutes left, emulation (1 ANSI), node}
 Procedure TypeSeven(Cmd: String);
   {Menu command 007, run a program: the command line, with these parameters (from the DOS original, a * and a letter):
      *B baud  *C comspec  *D door.sys  *F first name  *L last name  *G ansi 1/0  *M (swap, ignored)  *N node  *P baud
-     *R user record  *T minutes left  *W callinfo.bbs  *! time stops while the program runs  *0 *1 templates  ** a star
+     *R user record  *T minutes left  *W callinfo.bbs  *3 door32.sys  *! time stops while the program runs  *0 *1 templates  ** a star
      *S  Linux: the program gets the caller's connection itself as standard input / output (no terminal); without it the
          program runs on a pseudo terminal (MKPty: echo, CR LF, TERM / COLUMNS / LINES from the caller's terminal, raw mode
          for curses; MK_NOPTY in the environment turns the terminal off for all)
@@ -24,6 +28,7 @@ Implementation
 
 Uses MKFile, MKString, MKCfgAbs, MKDoor, MKGlobT, MKComAbs, MKDos, MKLogEnt,
   MKRCfgMK,
+  BaseUnix,
   MKScrn,
     MKVCrt,
   Dos;
@@ -517,6 +522,48 @@ Function WriteCallInfo: Word;
   End;
 
 
+Function WriteDoor32(Raw: Boolean): Word;
+  Var
+    F: Text;
+    Error: Word;
+    Sec: SecType;
+    St: Stat;
+    CommType: Byte;
+    Ansi: Byte;
+    Nm, Hd: String;
+
+  Begin
+  CommType := 0;
+  If Raw And CommActive Then
+    Begin
+    {a socket as standard input: the program can use it as it is; behind SSH or a front end it is a pipe or a terminal: local}
+    If (fpFStat(0, St) = 0) And fpS_ISSOCK(St.st_mode) Then
+      CommType := 2;
+    End;
+  User.GetUserSec(Sec);
+  Nm := User.GetUserName;
+  Hd := User.GetUserHandle;
+  If Hd = '' Then
+    Hd := Nm;
+  Ansi := 0;
+  If User.GetUserAnsi Then
+    Ansi := 1;
+  Assign(F, 'door32.sys');
+  ReWrite(F);
+  Error := IoResult;
+  If Error = 0 Then
+    Begin
+    Write(F, Long2Str(CommType), #13#10, '0', #13#10, Long2Str(User.GetUserBaud), #13#10, BbsVersion, #13#10,
+      Long2Str(User.GetUserRecNum), #13#10, Nm, #13#10, Hd, #13#10, Long2Str(Sec.Level), #13#10,
+      Long2Str(User.TimeRemain Div 60), #13#10, Long2Str(Ansi), #13#10, Long2Str(User.GetUserLineNum), #13#10);
+    Error := IoResult;
+    Close(F);
+    If IoResult <> 0 Then;
+    End;
+  WriteDoor32 := Error;
+  End;
+
+
 Procedure TypeSeven(Cmd: String);
   Var
     LastStar: Boolean;
@@ -528,6 +575,7 @@ Procedure TypeSeven(Cmd: String);
     FossilHot: Boolean;
     FreezeTime: Boolean;
     CallInfo: Boolean;
+    Door32: Boolean;
     DoorStart: LongInt;
     Tx, Ty: Byte;
     Failed: Word;
@@ -543,6 +591,7 @@ Procedure TypeSeven(Cmd: String);
   FreezeTime := False;
   FossilHot := False;
   CallInfo := False;
+  Door32 := False;
   CmdCtr := 1;
   DoorSys := False;
   LastStar := False;
@@ -578,6 +627,7 @@ Procedure TypeSeven(Cmd: String);
         'S': RawDoor := True;           {the program gets the caller's connection itself, no pseudo terminal}
         'T': CmdStr := CmdStr + Long2Str(User.TimeRemain Div 60);
         'W': CallInfo := True;
+        '3': Door32 := True;
         '!': FreezeTime := True;
         '#':; {turn off want chat}
         '0': CmdStr := CmdStr + Config^.GetFileAreaPath(User.GetUserFileTemplate);
@@ -623,6 +673,8 @@ Procedure TypeSeven(Cmd: String);
     Error := WriteDoorSys;
   If ((Error = 0) And (CallInfo)) Then
     Error := WriteCallInfo;
+  If (Error = 0) And (Door32) Then
+    Error := WriteDoor32(RawDoor);
   If Error = 0 Then
     User.WriteExit('');
   DoorRaw := RawDoor;
