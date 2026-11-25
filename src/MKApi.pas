@@ -14,6 +14,7 @@ Program MKApi;
        GET /v1                  the paths and the scopes of the token
        GET /v1/status           scope status      GET /v1/nodes     scope nodes     GET /v1/events   scope events     GET /v1/mailer  scope mailer
        GET /v1/stats?from=&to=&by=   scope stats  GET /v1/calls?limit=&since=   scope calls
+       GET /v1/messages/<area>?q=&limit=&after=, /v1/messages/<area>/<number>   scope messages (headers; one message with its text; private ones need messages:private)
        GET /v1/areas/messages, /v1/areas/files   scope areas      GET /v1/areas/files/<area>?q=&limit=&after=   scope files (name, description, size, date)
        GET /v1/users?q=&limit=&after=&deleted=1, /v1/users/<name>   scope users
      The answers are built in MKApiData from the files and the socket the BBS has (node files, useron.bbs, events.info, the mailer's control socket, stats/*.tsv, the bases, the user file).
@@ -23,7 +24,7 @@ Uses SysUtils, Classes, BaseUnix, DateUtils, fpjson,
   MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKComAbs, MKSess, MKApiTok, MKApiData;
 
 Const
-  Paths: Array[0..10] Of String = ('/v1', '/v1/status', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/{area}', '/v1/users');
+  Paths: Array[0..12] Of String = ('/v1', '/v1/status', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/{area}', '/v1/messages/{area}', '/v1/messages/{area}/{number}', '/v1/users');
   MaxHead = 8192;
   MaxLine = 2048;
   ReadSecs = 10;
@@ -329,6 +330,20 @@ Procedure Route;
     O := ApiFileList(StrToIntDef(Copy(P, 17, 10), 0), Query);
     If O = Nil Then
       ErrorAnswer(404, 'no such file area')
+    Else
+      Send(O);
+    End
+  Else If Copy(P, 1, 13) = '/v1/messages/' Then
+    Begin
+    Need('messages');
+    Name := Copy(P, 14, 40);                {<area> or <area>/<number>}
+    i := Pos('/', Name);
+    If i = 0 Then
+      O := ApiMsgList(StrToIntDef(Name, 0), Query, HasScope(Tokens[TokIdx], 'messages:private'), Err)
+    Else
+      O := ApiMsg(StrToIntDef(Copy(Name, 1, i - 1), 0), StrToIntDef(Copy(Name, i + 1, 12), 0), HasScope(Tokens[TokIdx], 'messages:private'), Err);
+    If O = Nil Then
+      ErrorAnswer(404, Err)
     Else
       Send(O);
     End

@@ -19,6 +19,8 @@ Function ApiCalls(Const StatDir, Query: String; Var Err: String): TJSONObject;
 Function ApiMsgAreas: TJSONObject;
 Function ApiFileAreas: TJSONObject;
 Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;     {Nil: no such file area}
+Function ApiMsgList(Area: Integer; Const Query: String; Private_: Boolean; Var Err: String): TJSONObject;   {Nil: Err says why}
+Function ApiMsg(Area, Num: Integer; Private_: Boolean; Var Err: String): TJSONObject;                   {Nil: Err says why}
 Function ApiUsers(Const Query: String): TJSONObject;
 Function ApiUser(Const Name, Query: String): TJSONObject;                 {Nil: there is no such user}
 
@@ -1078,6 +1080,194 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
     Result.Add('next', TJSONNull.Create);
   Desc.Free;
   Names.Free;
+  End;
+
+
+{------------------------------------------------------------ messages}
+
+Function AddrStr(Var A: AddrType): String;
+  Begin
+  Result := IntToStr(A.Zone) + ':' + IntToStr(A.Net) + '/' + IntToStr(A.Node);
+  If A.Point <> 0 Then
+    Result := Result + '.' + IntToStr(A.Point);
+  End;
+
+
+Function OpenArea(Area: Integer; Var M: AbsMsgPtr; Var Err: String): Boolean;
+  Var
+    Id: String;
+
+  Begin
+  Result := False;
+  M := Nil;
+  If (Area < 1) Or (Area > Config^.GetMaxMsgAreas) Or (Config^.GetMsgName(Area) = '') Then
+    Begin
+    Err := 'no such message area';
+    Exit;
+    End;
+  Id := Config^.GetMsgAreaId(Area);
+  If (Id = '') Or Not OpenMsgArea(M, Id) Then
+    Begin
+    Err := 'the message base cannot be opened';
+    Exit;
+    End;
+  Result := True;
+  End;
+
+
+Function HeaderJson(M: AbsMsgPtr): TJSONObject;
+  {the header of the current message; MsgStartUp has been done}
+  Var
+    D: String;
+
+  Begin
+  Result := TJSONObject.Create;
+  Result.Add('number', M^.GetMsgNum);
+  Result.Add('from', Cp437Str(M^.GetFrom));
+  Result.Add('to', Cp437Str(M^.GetTo));
+  Result.Add('subject', Cp437Str(M^.GetSubj));
+  D := IsoDate(M^.GetDate);
+  If D <> '' Then
+    Result.Add('date', D)
+  Else
+    Result.Add('date', TJSONNull.Create);
+  Result.Add('time', M^.GetTime);
+  Result.Add('private', M^.IsPriv);
+  Result.Add('received', M^.IsRcvd);
+  Result.Add('local', M^.IsLocal);
+  If M^.GetRefer > 0 Then
+    Result.Add('reply_to', M^.GetRefer)
+  Else
+    Result.Add('reply_to', TJSONNull.Create);
+  End;
+
+
+Function ApiMsgList(Area: Integer; Const Query: String; Private_: Boolean; Var Err: String): TJSONObject;
+  {the headers of an area: public messages, not deleted (private ones with the scope messages:private), from the number after "after", at most "limit"}
+  Var
+    M: AbsMsgPtr;
+    Arr: TJSONArray;
+    After, Limit, Got, Last: Int64;
+    Q: String;
+    More: Boolean;
+
+  Begin
+  Result := Nil;
+  If Not OpenArea(Area, M, Err) Then
+    Exit;
+  Limit := IntParam(Query, 'limit', 100, 1, 500);
+  After := IntParam(Query, 'after', 0, 0, 2147483646);
+  Q := LowerCase(QueryParam(Query, 'q'));
+  Result := TJSONObject.Create;
+  Result.Add('area', Area);
+  Result.Add('name', Cp437Str(Config^.GetMsgName(Area)));
+  Arr := TJSONArray.Create;
+  Result.Add('messages', Arr);
+  Got := 0;
+  Last := 0;
+  More := False;
+  M^.SeekFirst(After + 1);
+  While M^.SeekFound Do
+    Begin
+    M^.MsgStartUp;
+    If (Not M^.IsDeleted) And (Private_ Or Not M^.IsPriv) Then
+      Begin
+      If (Q = '') Or (Pos(Q, LowerCase(Cp437Str(M^.GetSubj))) > 0) Or (Pos(Q, LowerCase(Cp437Str(M^.GetFrom))) > 0) Or (Pos(Q, LowerCase(Cp437Str(M^.GetTo))) > 0) Then
+        Begin
+        If Got >= Limit Then
+          Begin
+          More := True;
+          Break;
+          End;
+        Arr.Add(HeaderJson(M));
+        Last := M^.GetMsgNum;
+        Inc(Got);
+        End;
+      End;
+    M^.SeekNext;
+    End;
+  Result.Add('count', Got);
+  If More Then
+    Result.Add('next', Last)
+  Else
+    Result.Add('next', TJSONNull.Create);
+  If CloseMsgArea(M) Then;
+  End;
+
+
+Function ApiMsg(Area, Num: Integer; Private_: Boolean; Var Err: String): TJSONObject;
+  {one message: the header, the addresses, the kludge lines and the text (CP437 as UTF-8, lines joined with a line feed, at most 200000 characters)}
+  Const
+    MaxText = 200000;
+
+  Var
+    M: AbsMsgPtr;
+    O: TJSONObject;
+    A: AddrType;
+    Kl: TJSONArray;
+    Text, S, Line: String;
+    Wrapped, Cut: Boolean;
+
+  Begin
+  Result := Nil;
+  If Not OpenArea(Area, M, Err) Then
+    Exit;
+  M^.SeekFirst(Num);
+  If (Not M^.SeekFound) Or (M^.GetMsgNum <> Num) Then
+    Begin
+    Err := 'no such message';
+    If CloseMsgArea(M) Then;
+    Exit;
+    End;
+  M^.MsgStartUp;
+  If M^.IsDeleted Or (M^.IsPriv And Not Private_) Then
+    Begin
+    Err := 'no such message';
+    If CloseMsgArea(M) Then;
+    Exit;
+    End;
+  O := HeaderJson(M);
+  O.Add('area', Area);
+  If M^.GetSeeAlso > 0 Then
+    O.Add('see_also', M^.GetSeeAlso)
+  Else
+    O.Add('see_also', TJSONNull.Create);
+  M^.GetOrig(A);
+  If (A.Zone <> 0) Or (A.Net <> 0) Or (A.Node <> 0) Then
+    O.Add('origin_address', AddrStr(A))
+  Else
+    O.Add('origin_address', TJSONNull.Create);
+  M^.GetDest(A);
+  If (A.Zone <> 0) Or (A.Net <> 0) Or (A.Node <> 0) Then
+    O.Add('destination_address', AddrStr(A))
+  Else
+    O.Add('destination_address', TJSONNull.Create);
+  Kl := TJSONArray.Create;
+  Text := '';
+  Cut := False;
+  Wrapped := False;
+  M^.MsgTxtStartUp;
+  While (Not M^.EOM) And (Not Cut) Do
+    Begin
+    S := M^.GetString(250);
+    If (S <> '') And (S[1] = #1) Then
+      Begin
+      Kl.Add(Cp437Str(Copy(S, 2, 250)));
+      Continue;
+      End;
+    Line := Cp437Str(S);
+    If (Text <> '') And Not Wrapped Then
+      Text := Text + #10;
+    Text := Text + Line;
+    Wrapped := M^.WasWrap;
+    If Length(Text) > MaxText Then
+      Cut := True;
+    End;
+  O.Add('kludges', Kl);
+  O.Add('text', Text);
+  O.Add('truncated', Cut);
+  If CloseMsgArea(M) Then;
+  Result := O;
   End;
 
 

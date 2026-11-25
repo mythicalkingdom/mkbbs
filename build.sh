@@ -49,6 +49,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfilecheck src/MKFileCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpack src/MKUserPack.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapi src/MKApi.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapitoken src/MKApiTokTool.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omsgput tests/msgput.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omksetup src/MKSetup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcheck src/MKCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas

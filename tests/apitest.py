@@ -41,8 +41,20 @@ FA = int(sorted(cd['files'], key=int)[0])
 fdir = tmp + '/f1/'
 os.makedirs(fdir)
 cd['files'][str(FA)]['FilePath'] = fdir
+MA = int(sorted([k for k in cd['messages'] if cd['messages'][k]['Name']], key=int)[0])
+cd['messages'][str(MA)]['MsgBaseType'] = 'M'
+cd['messages'][str(MA)]['FileId'] = 'api.mer'
+cd['messages'][str(MA)]['MsgPathNum'] = 1
 json.dump(cd, open(cj + '/bbsconfig.json', 'w', encoding='utf-8'), ensure_ascii=False)
 subprocess.run([build + '/mkcfgcvt', '-y', '5', '1'], env=envj, check=True, capture_output=True)
+MID = 'M' + ra + '/api.mer'
+def put(*a):
+    subprocess.run([build + '/msgput'] + [x if isinstance(x, bytes) else x.encode() for x in a], check=True)
+put('add', MID, 'Alice', 'All', 'Hello world', '0', b'line one|second line with \x82cole|', '0', 'MSGID: 1:110/100 abcd1234')
+put('add', MID, 'Bob', 'Carol', 'A secret', '1', 'for your eyes only')
+put('add', MID, 'Carol', 'Alice', 'Re: Hello world', '0', 'a reply', '1')
+put('add', MID, 'Dave', 'All', 'Deleted one', '0', 'gone')
+put('del', MID, '4')
 for n_, sz in (('alpha.zip', 100), ('Beta.TXT', 2000), ('gamma.lzh', 5), ('unlisted.dat', 7)):
     open(fdir + n_, 'wb').write(b'x' * sz)
 open(fdir + 'files.bbs', 'w', encoding='latin-1').write('alpha.zip     The first file\n              with a second line\nBeta.TXT      Beta notes\ngamma.lzh     A \x82cole archive\nGONE.ZIP      listed, not there\n')
@@ -274,6 +286,29 @@ try:
     check('an area that is not there: 404', get('/v1/areas/files/9999', allq)[0] == 404 and get('/v1/areas/files/x', allq)[0] == 404)
     tf = tool('add', 'areasonly', '-s', 'areas', '-q').stdout.strip()
     check('the files need their own scope: "areas" lists the areas, not the files (403)', get('/v1/areas/files', tf)[0] == 200 and get('/v1/areas/files/%d' % FA, tf)[0] == 403)
+    # messages
+    tm = tool('add', 'msgs', '-s', 'messages', '-q').stdout.strip()
+    tp = tool('add', 'msgspriv', '-s', 'messages,messages:private', '-q').stdout.strip()
+    st, _, body = get('/v1/messages/%d' % MA, tm)
+    j = json.loads(body)
+    nums = [m_['number'] for m_ in j.get('messages', [])]
+    check('/v1/messages/<area>: the headers of the public messages, not the private one, not the deleted one', st == 200 and nums == [1, 3] and j['name'] and j['next'] is None and j['messages'][0]['subject'] == 'Hello world'
+          and j['messages'][0]['from'] == 'Alice' and j['messages'][0]['to'] == 'All' and j['messages'][0]['date'] == '2026-11-20' and j['messages'][0]['time'] == '10:15' and j['messages'][1]['reply_to'] == 1, (st, body[:600]))
+    st, _, body = get('/v1/messages/%d' % MA, tp)
+    check('with messages:private the private message is listed too', st == 200 and [m_['number'] for m_ in json.loads(body)['messages']] == [1, 2, 3], body[:500])
+    st, _, body = get('/v1/messages/%d/1' % MA, tm)
+    j = json.loads(body)
+    check('/v1/messages/<area>/<number>: the header, the addresses, the kludge lines and the text (CP437 as UTF-8, lines separated by a line feed)', st == 200 and j['text'].split('\n')[:2] == ['line one', 'second line with \u00e9cole'] and j['origin_address'] == '1:110/100'
+          and j['kludges'] == ['MSGID: 1:110/100 abcd1234'] and j['subject'] == 'Hello world' and j['area'] == MA and j['private'] is False and j['truncated'] is False, (st, body[:600]))
+    st, _, body = get('/v1/messages/%d/3' % MA, tm)
+    check('a reply: reply_to is the number of the message it answers', st == 200 and json.loads(body)['reply_to'] == 1 and json.loads(body)['text'].startswith('a reply'), body[:400])
+    check('a private message is 404 without messages:private, and readable with it', get('/v1/messages/%d/2' % MA, tm)[0] == 404 and json.loads(get('/v1/messages/%d/2' % MA, tp)[2])['text'].startswith('for your eyes only'))
+    check('a deleted message, a number that is not there, an area that is not there: 404', get('/v1/messages/%d/4' % MA, tp)[0] == 404 and get('/v1/messages/%d/99' % MA, tp)[0] == 404 and get('/v1/messages/9999', tp)[0] == 404 and get('/v1/messages/9999/1', tp)[0] == 404)
+    j = json.loads(get('/v1/messages/%d?limit=1' % MA, tm)[2])
+    j2 = json.loads(get('/v1/messages/%d?limit=1&after=%d' % (MA, j['next']), tm)[2])
+    check('paging by message number: limit 1 gives next, after= continues', j['count'] == 1 and j['next'] == 1 and [m_['number'] for m_ in j2['messages']] == [3] and j2['next'] is None, (j, j2))
+    check('q searches subject, from and to', [m_['number'] for m_ in json.loads(get('/v1/messages/%d?q=carol' % MA, tm)[2])['messages']] == [3])
+    check('the messages need their own scope: "areas" is not enough (403)', get('/v1/messages/%d' % MA, tf)[0] == 403)
     # users
     st, _, body = get('/v1/users?limit=5', allq)
     j = json.loads(body)
@@ -291,7 +326,7 @@ try:
     alln = json.loads(get('/v1/users?limit=1000', allq)[2])
     withdel = json.loads(get('/v1/users?limit=1000&deleted=1', allq)[2])
     check('deleted users are hidden unless asked for (?deleted=1)', all(not u['deleted'] for u in alln['users']) and withdel['count'] >= alln['count'], (alln['count'], withdel['count']))
-    check('every data endpoint needs its scope: a token with only "status" gets 403 on all of them', all(get(pth, tool('add', 'st' + str(i), '-s', 'status', '-q').stdout.strip())[0] == 403 for i, pth in enumerate(['/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/1', '/v1/users', '/v1/users/x'])))
+    check('every data endpoint needs its scope: a token with only "status" gets 403 on all of them', all(get(pth, tool('add', 'st' + str(i), '-s', 'status', '-q').stdout.strip())[0] == 403 for i, pth in enumerate(['/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/1', '/v1/messages/1', '/v1/messages/1/1', '/v1/users', '/v1/users/x'])))
     # TLS
     st, head, body = get('/v1/status', tok, port=24862, tls=True)
     check('TLS: the same answer over HTTPS (certificate and name checked)', st == 200 and 'bbs' in json.loads(body), (st, head, body))

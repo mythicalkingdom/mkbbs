@@ -57,6 +57,8 @@ mkapitoken [-c config dir] list | revoke ID | rotate ID [-q]
 | `calls` | `/v1/calls` |
 | `areas` | `/v1/areas/messages`, `/v1/areas/files` (the areas with their counts) |
 | `files` | `/v1/areas/files/<area>` (the files themselves: names and descriptions) |
+| `messages` | `/v1/messages/<area>`, `/v1/messages/<area>/<number>` (the public messages: headers and text) |
+| `messages:private` | with `messages`: private messages too (netmail, mail between users) |
 | `users` | `/v1/users`, `/v1/users/<name>` |
 | `users:private` | reserved: nothing in version 1 gives phone numbers or addresses |
 
@@ -117,6 +119,16 @@ Every file area: `number`, `name`, `available` (false when its directory is not 
 The files of one area, sorted by name without regard to case: `name`, `description` (from `files.bbs`; continuation lines are joined with a line feed; `null` for a file the list does not name), `size`, `date`.
 A file the list names that is not on the disk is left out.  `q` searches names and descriptions; `after` is the name the page before ended with (`next`).  An area that is not there: 404.
 
+### `GET /v1/messages/<area>?q=&limit=&after=`  (`messages`)
+The headers of the messages of an area, by number: `messages` (each: `number`, `from`, `to`, `subject`, `date` (`yyyy-mm-dd`), `time` (`HH:MM`), `private`, `received`, `local`, `reply_to` (the number of the message it
+answers, or null)), `count` and `next` (the number to give as `after` for the following page, null on the last).  `limit` default 100, at most 500; `q` searches subject, sender and recipient (any case).
+**Deleted messages are never shown; private ones only to a token with `messages:private`** (with the plain scope the list leaves them out and a request for one is a 404).  A message base that cannot be opened: 404.
+
+### `GET /v1/messages/<area>/<number>`  (`messages`)
+One message: the header of the list, and `area`, `see_also`, `origin_address` and `destination_address` (`zone:net/node.point`, or null), `kludges` (the control lines of a Fido message without their ^A),
+`text` (the message text; the BBS's CP437 is converted to UTF-8, lines are separated by a line feed, a line that was wrapped by the base is joined again) and `truncated` (true when the text was cut at 200000
+characters).  Reading a message through the API does **not** mark it as read or change anything.
+
 ### `GET /v1/users?q=&limit=&after=&deleted=1`  (`users`)
 `users`, `count`, `next`.  Each: `number` (the position in the user file: it changes when `mkuserpack` packs the file, see `MAINT.md`), `name`, `handle`, `city`, `level`, `calls`, `first_call`, `last_call`, `upload_files`, `download_files`,
 `upload_k`, `download_k`, `messages`, `deleted`, `qwk_node`.  No passwords, no phone numbers, no street addresses.  **Deleted users are hidden** unless you ask with `deleted=1`.  `q` searches names and handles.
@@ -147,5 +159,5 @@ One user by name (any case, URL encoded: `/v1/users/Mark%20May`); 404 when there
 
 ## Not in version 1
 
-Any write (running an event, polling a link, disconnecting a node), message text, the `self:` calls of a caller who acts as himself, and BBS-to-BBS calls.  The token file already has the `user` field for the callers
+Any write (running an event, polling a link, disconnecting a node), the `self:` calls of a caller who acts as himself, and BBS-to-BBS calls.  The token file already has the `user` field for the callers
 who come later, and the plan is in `API-PLAN.md`.
