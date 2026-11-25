@@ -1,15 +1,13 @@
 # MK BBS
 
-**Mythical Kingdom Tech BBS** by Mark May, brought from DOS and Turbo Pascal to **Linux and Free Pascal**.  A complete bulletin board system: callers connect over the network (Telnet, SSH, raw TCP, web socket, TLS),
-read and post messages, move files, play doors, and take their mail away as QWK packets; the sysop runs it with full-screen editors and a live monitor, and ties it into Fido and QWK networks.
-
-The DOS versions were numbered 0.01; **0.2 is the first version of the Free Pascal / Linux port.**  This is alpha software: the board runs, the tests pass (`./build.sh`), and the pieces below are built, but it has had little time on the open internet.
+**Mythical Kingdom BBS** by Mark May, brought from DOS and Turbo Pascal to **Linux and Free Pascal**.  A complete bulletin board system: callers connect over the network (Telnet, SSH, raw TCP, web socket, TLS),
+read and post messages, upload and download files, play doors, and take their mail away as QWK packets; the sysop runs it with full-screen editors and a live monitor, and ties it into Fido and QWK networks.
 
 | | |
 |---|---|
 | ![the logon of a caller](docs/screenshots/mk-logon.png) | ![the main menu](docs/screenshots/mk-menu.png) |
 
-*A caller's view over Telnet: language choice and logon, then the main menu (the screens are ordinary ANSI files; the sample BBS in this repository is the original DOS-era board).*
+*A caller's view over Telnet: language choice and logon, then the main menu (the screens are ordinary ANSI files; the sample BBS in this repository is the original DOS-era Mythical Kingdom Tech BBS, the board that ran on this software).*
 
 ## What you get
 
@@ -48,13 +46,9 @@ The DOS versions were numbered 0.01; **0.2 is the first version of the Free Pasc
 
 ## Quick start
 
-You need Free Pascal 3.2.2 (`fpc`), `make`, and for TLS a system OpenSSL.  Doors in dosemu2 and the sandbox need `dosemu` and `bubblewrap`; none of this is needed for the BBS itself.
+Install the Debian package (`sudo apt install ./mkbbs_*.deb`; it puts the programs in `/usr/bin`, makes the `mkbbs` user and the systemd unit, and starts nothing).  Doors that run in dosemu2 need `dosemu`; the door sandbox needs `bubblewrap` (the package recommends it).  To build from source instead, see the postscript.
 
 ```sh
-make && sudo make install          # programs in /usr/local/bin, the mkbbs user, a systemd unit
-# or, on Debian and relatives:
-make deb && sudo apt install ./build/mkbbs_*.deb
-
 sudo -u mkbbs mksetup -d /opt/bbs -u      # a first BBS: folders, configuration, areas, menus, screens, mklisten.json
 mkcheck -c /opt/bbs                        # what would stop it from running (or running well)?
 mklisten -c /opt/bbs/mklisten.json         # or: systemctl enable --now mklisten
@@ -77,13 +71,30 @@ telnet localhost 2323                      # a caller
 | [`SSH.md`](SSH.md), [`PASSWORDS.md`](PASSWORDS.md) | SSH access, hashed passwords |
 | [`MAINT.md`](MAINT.md), [`BACKUP.md`](BACKUP.md), [`STATS.md`](STATS.md) | housekeeping, backups, statistics |
 
-The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (IPv6, upload handling, metrics, a message base converter, multi-node chat).
+## License
 
-## Building and testing
+GPL-3.0-or-later, see [`LICENSE`](LICENSE).  Original MK BBS © 1992, 1993 Mark May.
+
+---
+
+## Postscript: version, status and development
+
+The DOS versions were numbered 0.01; **0.2 is the first version of the Free Pascal / Linux port.**  This is alpha software: the board runs, the tests pass (`./build.sh`), and the features described above are built, but it has had little time on the open internet.
+
+### Building from source
+
+You need Free Pascal 3.2.2 (`fpc`), `make`, and for TLS a system OpenSSL.
+
+```sh
+make && sudo make install          # programs in /usr/local/bin, the mkbbs user, a systemd unit
+make deb                           # or a Debian package: build/mkbbs_<version>_<arch>.deb
+```
+
+### Building and testing
 
 `./build.sh` builds every program into `build/` and runs the whole test suite (several hundred checks over real Telnet sessions, pseudo terminals and fake network peers); a full run takes about ten minutes.  `./build.sh --build-only` just builds.
 The screenshots above are made by `tools/screenshots.py` from the real programs running on the sample BBS (it needs `pip install pyte pillow`).
 
-## License
+### Design notes and to-do list
 
-GPL-3.0-or-later, see [`LICENSE`](LICENSE).  Original MK BBS © 1992, 1993 Mark May.
+The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (IPv6, upload handling, metrics, a message base converter, multi-node chat).
