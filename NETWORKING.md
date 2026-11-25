@@ -290,7 +290,7 @@ tls-ca     /etc/mkbbs/hub-ca.pem       # ftps: the CA (or the certificate itself
 tls-verify yes                         # ftps: no turns the checking of the certificate off (default yes)
 ```
 
-* Passive mode only (EPSV, then PASV), binary, IPv4.  `get` / `put` are the remote **names** here (with `%id%`); with `transport exec` they are programs.
+* Passive mode only (EPSV, then PASV), binary, IPv4 and IPv6 (PASV is IPv4 only; the data connection goes to the machine of the control connection).  `get` / `put` are the remote **names** here (with `%id%`); with `transport exec` they are programs.
 * A packet that is not at the hub (550) is "nothing new", not an error.  A hub that keeps the packet until somebody deletes it needs `ftp-delete yes` (or a hub that
   makes a new one each time), or the same packet is fetched again by each pass.  The messages that came before are not posted twice (the duplicate ledger), but it is
   wasted time.

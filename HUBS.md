@@ -27,7 +27,7 @@ private (`chmod 600`): it has the password.
 | `outbound` | directory | the same | where `<id>.REP` is made |
 | `user` | name | the id | the user record that is the bookkeeping for the hub (QWK Node flag) |
 | `conf` | `<hub number> <area>` | | conference *n* of the hub is message area *a* here; an area with no line is not sent, a conference with none is not posted |
-| `hub` | `host[:port]`, or a URL `http://host:port` / `https://host:port[/prefix]` | port 23 (21 for `ftp` / `ftps`, 80 / 443 for `http` / `https`) | the hub to call; a URL says `transport http` or `https` (and a `/prefix` is for a front end that puts the API under a path) |
+| `hub` | `host[:port]`, or a URL `http://host:port` / `https://host:port[/prefix]`; an IPv6 address goes in brackets when there is a port (`[2001:db8::1]:2341`, `https://[2001:db8::1]:2341`) | port 23 (21 for `ftp` / `ftps`, 80 / 443 for `http` / `https`) | the hub to call; a URL says `transport http` or `https` (and a `/prefix` is for a front end that puts the API under a path) |
 | `transport` | `ftp`, `ftps`, `http`, `https`, `exec` | Telnet | how the files move (see above) |
 | `token`, `token-env` | the token of the node at the hub / the name of an environment variable that holds it | | http / https: the token that `mkapitoken` made at the hub for this node's user (scopes `qwk` and `qwk:reply`); it is never written to a transcript or on a command line, and the map file is private |
 | `profile` | name | | Telnet: the script `NAME.scr` (the directories are listed under *Profiles*), else a built-in one: `synchronet`, `mk` |
@@ -131,6 +131,7 @@ All of them are `mk -G<id>` and some switch; nobody is on line.
 * **Exit 6:** Telnet: the script stopped; the last `<<` lines of `<id>.hub.log` show what the hub said instead of what the script waited for.  Record the call with `-K` and replay it
   with `-F` while you change the profile.
 * **Exit 7:** the reply packet was sent but the hub's answer matched `reply-error` (or lacked `reply-ok`).  Look at the end of the transcript.  The packet stays.
+* **IPv6:** a name with both an IPv4 and an IPv6 address is tried address by address (the system's order) until one answers; an IPv6 literal in the `hub` line is written `[addr]:port`, or bare without a port.
 * **FTPS: "not for <name>":** the certificate names another host.  Use the name in the certificate in the `hub` line (an address is not a name), or `tls-verify no` for a hub you trust by
   other means.  **"not accepted":** give the CA with `tls-ca`.
 * **The same packet is posted again and again by FTP:** the hub keeps it; use `ftp-delete yes`, or a hub that replaces it.

@@ -58,6 +58,7 @@ r = run('-q')
 check('-q: only the summary when everything is fine (the info lines are left out too)', r.stdout.strip().startswith('mkcheck: nothing FAIL') and r.stdout.count('\n') <= 2, r.stdout)
 r = run('-v')
 check('-v: the fine things too', r.stdout.count('ok  ') > 10 and 'language 1 (American)' in r.stdout, r.stdout)
+check('-v: what each port of the listener binds (IPv4 and IPv6 by default)', 'listener port 2323: IPv4 and IPv6' in r.stdout, r.stdout)
 
 r = broken(lambda d: os.remove(d + '/newuser.q-a'))
 check('no newuser.q-a: FAIL with the error a caller would get', r.returncode == 2 and 'FAIL newuser.q-a is not there' in r.stdout and 'Error in Questionaire' in r.stdout, r.stdout)

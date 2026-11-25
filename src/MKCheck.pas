@@ -702,7 +702,19 @@ Procedure CheckListener;
     End;
   Rc := RunCapture(Prog, ['-c', ListenFile, '-t'], Out);
   If Rc = 0 Then
-    Ok('mklisten accepts ' + ListenFile)
+    Begin
+    Ok('mklisten accepts ' + ListenFile);
+    L := TStringList.Create;
+    L.Text := Out;
+    For i := 0 To L.Count - 1 Do
+      Begin
+      If Copy(Trim(L[i]), 1, 5) = 'port ' Then
+        Ok('listener ' + Trim(L[i]));
+      If Copy(Trim(L[i]), 1, 8) = 'WARNING:' Then
+        Warn('listener: ' + Trim(Copy(Trim(L[i]), 9, 250)));
+      End;
+    L.Free;
+    End
   Else
     Begin
     L := TStringList.Create;

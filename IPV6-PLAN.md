@@ -31,7 +31,7 @@ Function NetIsLoopback(Addr: String): Boolean;
 Function NetSplitHostPort(S: String; Out Host: String; Out Port: Integer): Boolean;   {host:port, [v6]:port, a URL's authority}
 ```
 
-**Status:** phases 1, 2 and 3 are built (`src/MKNet.pas`, `tests/nettest.pas`; the listener, the guard, the PROXY addresses, `mkmon`, `mklisten -t`, `tests/iplistentest.py`; both in `build.sh`), and the clients (`MKComClient`, `MKFtp`, `MKHttp` on `NetConnect`, hub host parsing with `[v6]:port`; `clienttest`, `hubftptest`, `qwkhttptest` have IPv6 cases).  Checks and documents (phase 4) and `mkbink` (phase 5) are left.
+**Status:** phases 1 to 4 are built (`src/MKNet.pas`, `tests/nettest.pas`; the listener, the guard, the PROXY addresses, `mkmon`, `mklisten -t`, `tests/iplistentest.py`; both in `build.sh`), and the clients (`MKComClient`, `MKFtp`, `MKHttp` on `NetConnect`, hub host parsing with `[v6]:port`; `clienttest`, `hubftptest`, `qwkhttptest` have IPv6 cases).  `mkcheck` says what each port binds and warns about an IPv6 address on a system without IPv6; `MKLISTEN.md`, `HUBS.md`, `SSH.md`, `API.md`, `NETWORKING.md` and the README say it.  `mkbink` and the nodelist lookup (phase 5) are left.
 
 ## Phases
 

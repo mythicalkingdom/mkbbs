@@ -3259,7 +3259,11 @@ Begin
       If Ports[i].Bind = '::' Then
         WriteLn('  port ', Ports[i].Port, ': IPv4 and IPv6', Copy(' (this system has no IPv6: IPv4 only)', 1, 36 * Ord(Not NetHasIPv6)))
       Else
+        Begin
         WriteLn('  port ', Ports[i].Port, ': ', Ports[i].Bind, ' only (IPv', NetFamily(Ports[i].Bind), ')');
+        If (NetFamily(Ports[i].Bind) = 6) And (Not NetHasIPv6) Then
+          WriteLn('  WARNING: port ', Ports[i].Port, ' is bound to the IPv6 address ', Ports[i].Bind, ' and this system has no IPv6: the port cannot be opened');
+        End;
     For i := 0 To High(Ports) Do
       If Ports[i].Api Then
         Begin

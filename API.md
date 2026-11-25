@@ -16,7 +16,7 @@ Version 1 **only reads**: `GET` and `HEAD`; nothing can be changed through it.  
    { "port": 2340, "type": "api", "config": "/bbs/ra" }
    ```
 
-   It listens on `127.0.0.1` unless you say `"bind"`.  Any other address **needs TLS** (below), or `"insecure": true` if you really want tokens to travel in the clear (the log warns).  The port stays open while
+   It listens on `127.0.0.1` unless you say `"bind"` (`"::1"` is loopback too; an IPv6 address needs TLS like any other).  Any other address **needs TLS** (below), or `"insecure": true` if you really want tokens to travel in the clear (the log warns).  The port stays open while
    an exclusive event runs.  `"maxperip"` defaults to 10.  `mkapi` is started from the directory of `mk` (or named with `"mkapi": "/path"` at the top level).
 
 2. **A token** for each program that will call:

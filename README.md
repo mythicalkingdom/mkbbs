@@ -12,7 +12,7 @@ read and post messages, upload and download files, play doors, and take their ma
 ## What you get
 
 **For callers**
-* **Connections:** Telnet (terminal type, size and character set negotiated), plain TCP, web socket, TLS (built in or `stunnel`), and SSH through OpenSSH (Dropbear is supported, less tested).  Output is CP437 for BBS terminals and UTF-8 for modern ones.
+* **Connections:** over **IPv4 and IPv6**: Telnet (terminal type, size and character set negotiated), plain TCP, web socket, TLS (built in or `stunnel`), and SSH through OpenSSH (Dropbear is supported, less tested).  Output is CP437 for BBS terminals and UTF-8 for modern ones.
 * **Logon:** name and password (plain as in the old days, or PBKDF2 hashes), new-user questionnaire, security levels and flags, time limits, account lock and password expiry, a login guard that blocks addresses after repeated failures.
 * **Menus and screens:** every menu is a file of commands with keys and security levels; screens are ANSI, AVATAR or ASCII; all prompt text comes from language files, so a board can speak several languages.  Display codes put the caller's name, the system's numbers, and **live statistics** (`^T`: calls today, minutes this month, busiest hour ...) into screens and prompts.
 * **Messages:** read, scan, reply, post and search in public and private areas, netmail, echomail and QWK conferences.  Many message base formats side by side: **Hudson, Squish, JAM, Fido `*.MSG`, Merlin, Ezycom, PCBoard, Synchronet (SMB)** and QWK.

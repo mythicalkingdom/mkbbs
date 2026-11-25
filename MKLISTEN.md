@@ -94,7 +94,9 @@ Rules:
 * `config` is the same as `"env": {"MK": "..."}`; `env` adds other variables; `args` adds words to the `mk` command line
   (for example `["-L", "-X"]`).
 * `label` names what a port is for in the statistics (`STATS.md`): `"label": "ssh"` on the port that `mkbbsssh` connects to; without it the label is the type of the port (`telnet-tls` for a TLS port).
-* `bind` limits a port to an address (default all IPv4 addresses).  Keep the `sysop` port on `127.0.0.1`.
+* `bind` limits a port to an address.  The default (`"::"`, also when `bind` is left out) listens on **IPv4 and IPv6** on one socket (an IPv4 caller is shown as `192.0.2.7`, not `::ffff:192.0.2.7`;
+  on a system with no IPv6 the port is IPv4 only and the log says so); `"0.0.0.0"` is IPv4 only; one address (`"127.0.0.1"`, `"::1"`, `"2001:db8::7"`) binds just that one, and only that family.  Keep the `sysop` port on `127.0.0.1` or `::1`.
+  Callers are written in the usual form (`2001:db8::7`, shortest form, lower case) in the log, `maxperip`, the login guard, `mkmon` (a long IPv6 address is shortened there: `2a02:8071:5..:6789`) and the statistics.  `mklisten -t` says what each port would listen on.
 * `localnode` must not be one of the nodes of any port (the listener refuses to start otherwise).
 * A `sysop` `password` is the text itself, or `sha1:` followed by the lower case hex digest.  To make one:
   `printf %s 'secret' | sha1sum`.
@@ -165,7 +167,7 @@ stunnel:   [mkbbs-wss]  accept = 443  connect = 127.0.0.1:2325
 mklisten:  { "port": 2325, "type": "ws", "bind": "127.0.0.1", "proxy": true, "config": "/bbs/ra" }
 ```
 
-`"proxy": true` needs `"bind": "127.0.0.1"`.  Choose this one when you already run stunnel (or nginx / haproxy with the PROXY protocol) for other services, want one place for all
+`"proxy": true` needs `"bind": "127.0.0.1"` (or `"::1"`).  Choose this one when you already run stunnel (or nginx / haproxy with the PROXY protocol) for other services, want one place for all
 the certificates and cipher settings, or do not want the OpenSSL libraries used by the BBS programs.  `mklisten.example.json` has an example of each.
 
 ### Sysop monitor from elsewhere
@@ -209,7 +211,7 @@ normal ports are not affected.
 
 ### Behind a front end (TLS, SSH)
 
-A port with `"proxy": true` (and `"bind": "127.0.0.1"`) is for a front end that puts a PROXY header first on the connection (stunnel with `protocol = proxy`, `mkbbsssh`).
+A port with `"proxy": true` (and `"bind": "127.0.0.1"` or `"::1"`) is for a front end that puts a PROXY header first on the connection (stunnel with `protocol = proxy`, `mkbbsssh`).
 `mklisten` looks at that header before it uses a node, so `maxperip`, the login guard, the log and `mkmon` have the caller's **real address**.  SSH: `SSH.md`.
 
 ### The login guard
@@ -226,7 +228,7 @@ The guard is **on by default**: 5 failed log-ons from one address within 10 minu
                 "message": "Too many failed log-ons from this address. Please try again later." }
 ```
 
-`"allow"` takes single addresses and IPv4 nets (`"10.0.0.0/8"`); naming it **replaces** the default list, so keep `127.0.0.1` in it when you want the machine itself exempt.  Put your own
+`"allow"` takes single addresses and nets, IPv4 (`"10.0.0.0/8"`) and IPv6 (`"2001:db8::/32"`); naming it **replaces** the default list (`127.0.0.1` and `::1`), so keep those in it when you want the machine itself exempt.  Put your own
 network (the address you log on from) in it, or you can lock yourself out for an hour; a restart of `mklisten` also clears the blocks.  `mklisten -t` says what is in force.
 
 A caller who did not get in (wrong passwords, too many tries at the name; **not** one who has gone away: a port scan or a dropped connection) makes `mk` end with the errorlevel **88**; `mklisten` counts that
