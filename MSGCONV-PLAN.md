@@ -34,6 +34,8 @@ mkmsgconv [-c config dir] -a <area>[,<area>|<from>-<to>] | -k <type>   which are
 Squish and JAM index details such as JAM's per-message `Replies` chains are rebuilt by the writer; **message ids** (`MSGID`) and reply kludges stay in the text as they are, so echomail threading by id still works.  Conversion between
 areas of different names (merging two areas into one base) is a copy with `-f` into an existing base, which the tool allows but does not try to be clever about.  Ezycom and PCBoard bases can be read as a source (`-k E`, `-k B`) but are not written.
 
+**Status:** phase 1 is built (`src/MKMsgConv.pas`, `tests/msgconvtest.py`: all 30 pairs of kinds).  Found while testing: Hudson message numbers run through all its areas (a Hudson target does not start at 1; the map has the real numbers); Synchronet keeps no kludge lines in the text (the report counts them); Merlin and Synchronet refuse an empty text (a single line end is written).
+
 ## Phases
 
 1. **The engine** (`MKMsgConv.pas`) and `mkmsgconv -a <area> -t <type> [-d id] [-n] [-v]`: the destination id by the rules of the configuration, copy of all fields and text, the number map, reply links, the second read and compare, the report of what a kind cannot hold; tests: a base of each kind made with `msgput`, converted to

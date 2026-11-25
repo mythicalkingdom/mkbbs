@@ -52,6 +52,8 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapitoken src/MKApiTokTool.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omsgput tests/msgput.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omksetup src/MKSetup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcheck src/MKCheck.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmsgconv src/MKMsgConv.pas
+for t in convfill convdump convtext; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklistmsgarea src/MKListMsgArea.pas
@@ -295,6 +297,11 @@ fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/doortest.py build/work/door | grep -E "^(ok|FAIL|skip|failures)" | tee build/doorresult.txt
   if grep -q "^FAIL" build/doorresult.txt; then exit 1; fi
+fi
+# mkmsgconv: an area of each kind converted into every other kind and compared (MSGCONV-PLAN.md)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/msgconvtest.py build build/work/msgconv | grep -E "^(ok|FAIL|skip|failures)" | tee build/msgconvresult.txt
+  if grep -q "^FAIL" build/msgconvresult.txt; then exit 1; fi
 fi
 # MKNet: addresses, connect and listen over IPv4 and IPv6 on the loopback (IPV6-PLAN.md)
 build/nettest | grep -E "^(ok|FAIL|skip|failures)" | tee build/netresult.txt
