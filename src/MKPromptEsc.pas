@@ -9,6 +9,7 @@ Unit MKPromptEsc;   {Backslash codes in a menu prompt: \n a line break, \f<c> an
          \f<c>     the user code ^F<c>   (\fA the caller's name, \fO the security level ...)
          \k<c>     the system code ^K<c> (\kO the minutes left, \kZ the current file area ...)
          \\        a backslash
+         \t<p><c>  the statistics code ^T<p><c>: a period letter (T W M Y A) and an item letter (MKStatsRead: \tMC the calls of this month)
 
      Any other backslash is kept as it is (together with the character after it), and so is a \f or \k at the end of the text.  The expanded text goes through the ordinary display (MKCodes), which
      does the rest.
@@ -43,6 +44,11 @@ Function ExpandPromptEscapes(S: String): String;
         Begin
         R := R + '\';
         Inc(i, 2);
+        End
+      Else If ((C = 't') Or (C = 'T')) And (i + 3 <= Length(S)) Then
+        Begin
+        R := R + #20 + S[i + 2] + S[i + 3];
+        Inc(i, 4);
         End
       Else If ((C = 'f') Or (C = 'F') Or (C = 'k') Or (C = 'K')) And (i + 2 <= Length(S)) Then
         Begin

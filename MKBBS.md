@@ -175,6 +175,7 @@ the prompt's own and the **highlight** colour that `^` switches to.  Each item h
 * a **`;` at the end** keeps the cursor on the line, so the next prompt follows on the same line (without it every prompt ends its line);
 * `@` is replaced by the name of the caller's current **file area**, `` ` `` (a backtick) by the name of the current **message area**;
 * `~` is replaced by the number of **minutes left** in this call;
+* `\t<p><i>` is a **statistics** code (`STATS.md`): `\tMC` the calls of this month, `\tMc` the caller's own calls this month (period `T W M Y A`, item `C M A D K P Q G U H`; lower case = the caller);
 * **backslash codes**, because the prompt field of `mkmenu` takes no control characters: `\n` is a **line break**, `\\` is a backslash, `\f<c>` is the user display code **^F**`<c>` and `\k<c>` the system code
   **^K**`<c>` (the same codes a screen made with `mkdraw` can hold; they work in a prompt too).  Any other backslash is kept as it is.  The codes that are worth having in a menu:
 

@@ -106,7 +106,7 @@ Procedure LoadExtChars;
 
 Const
   MaxCust = 100;
-  MaxBbsCodes = 64;
+  MaxBbsCodes = 80;
 
 Type
   BCodeRec = Record
@@ -243,6 +243,22 @@ Function BbsPrompt(Item: Word): String;
     62: S := 'Curr file area   [^KZ]';
     63: S := 'Num msg area     [^K1]';
     64: S := 'Num file area    [^K2]';
+    65: S := 'Calls today      [^TTC]';
+    66: S := 'Calls this week  [^TWC]';
+    67: S := 'Calls this month [^TMC]';
+    68: S := 'Calls this year  [^TYC]';
+    69: S := 'Calls on record  [^TAC]';
+    70: S := 'Callers today    [^TTU]';
+    71: S := 'Callers this month[^TMU]';
+    72: S := 'Mins on, month   [^TMM]';
+    73: S := 'Avg call mins    [^TMA]';
+    74: S := 'Downloads, month [^TMD]';
+    75: S := 'Kb down, month   [^TMK]';
+    76: S := 'Uploads, month   [^TMP]';
+    77: S := 'Msgs posted, month[^TMG]';
+    78: S := 'Busiest hour, mon[^TMH]';
+    79: S := 'Your calls, month[^TMc]';
+    80: S := 'Your mins, month [^TMm]';
     Else
       S := '';
     End;
@@ -253,7 +269,7 @@ Function BbsPrompt(Item: Word): String;
 
 
 Function BbsCode(Item: Word): String;
-  {the built-in codes: ^A ^B ^C ^D ^E ^G ^L ^W, then ^F x (user), ^K x (system) with the letters of the prompt list}
+  {the built-in codes: ^A ^B ^C ^D ^E ^G ^L ^W, then ^F x (user), ^K x (system) with the letters of the prompt list, then ^T p i (statistics: a period and an item letter)}
   Begin
   BbsCode := '';
   If NumCust > 0 Then
@@ -277,6 +293,22 @@ Function BbsCode(Item: Word): String;
     37..62: BbsCode := #11 + Chr(65 + Item - 37);        {^K A .. ^K Z}
     63: BbsCode := #11#49;                                {^K 1}
     64: BbsCode := #11#50;                                {^K 2}
+    65: BbsCode := #20'TC';
+    66: BbsCode := #20'WC';
+    67: BbsCode := #20'MC';
+    68: BbsCode := #20'YC';
+    69: BbsCode := #20'AC';
+    70: BbsCode := #20'TU';
+    71: BbsCode := #20'MU';
+    72: BbsCode := #20'MM';
+    73: BbsCode := #20'MA';
+    74: BbsCode := #20'MD';
+    75: BbsCode := #20'MK';
+    76: BbsCode := #20'MP';
+    77: BbsCode := #20'MG';
+    78: BbsCode := #20'MH';
+    79: BbsCode := #20'Mc';
+    80: BbsCode := #20'Mm';
     End;
   End;
 

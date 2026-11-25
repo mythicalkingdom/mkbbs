@@ -119,6 +119,19 @@ Function CvtMenuStr(MStr:String; MenuItem: Byte; IsPrompt: Boolean): String;
            End;
       '@': TStr := TStr + Config^.GetFileAreaName(User.GetUserFileTemplate);
       '`': TStr := TStr + Config^.GetMsgName(User.GetUserMsgTemplate);
+      #20: Begin                            {a statistics code ^T: its period letter and its item letter go with it}
+           TStr := TStr + MStr[i];
+           If i < Length(MStr) Then
+             Begin
+             Inc(i);
+             TStr := TStr + MStr[i];
+             End;
+           If i < Length(MStr) Then
+             Begin
+             Inc(i);
+             TStr := TStr + MStr[i];
+             End;
+           End;
       #6, #11: Begin                        {a display code ^F or ^K: its letter goes with it, whatever the letter is}
            TStr := TStr + MStr[i];
            If i < Length(MStr) Then

@@ -291,6 +291,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwkhttptest.py build/work/qwkhttp | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkhttpresult.txt
   if grep -q "^FAIL" build/qwkhttpresult.txt; then exit 1; fi
 fi
+# statistics display codes ^T (screens and menu prompts)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/statcodestest.py build/work/statcodes | grep -E "^(ok|FAIL|skip|failures)" | tee build/statcodesresult.txt
+  if grep -q "^FAIL" build/statcodesresult.txt; then exit 1; fi
+fi
 # QWK packets over the JSON API: the packet, the acknowledgement, the pointers, the expiry (QWK-API-PLAN.md phase 2)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwkapitest.py build/work/qwkapi | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkapiresult.txt

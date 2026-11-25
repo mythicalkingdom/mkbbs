@@ -17,7 +17,8 @@ Type DisplayInfoType = Record
   TChar: Char;
   FileName: String;
   DisplayError: Word;
-  State: Word;         {0=normal 1=^F 2=^K}
+  State: Word;         {0=normal 1=^F 2=^K 3=^T, the period letter comes 4=^T<period>, the item letter comes}
+  StatPeriod: Char;    {the period letter of a ^T code}
   Sec: SecType;
   End;
 
@@ -43,7 +44,7 @@ Implementation
 
 Uses
       MKVCrt,
-  MKDoor, MKCfgAbs, MKString, MKSys, MKDos, MKAvatar, MKOfflin, MKLogHook;
+  MKDoor, MKCfgAbs, MKString, MKSys, MKDos, MKAvatar, MKOfflin, MKLogHook, MKStatsRead;
 
 
 
@@ -106,6 +107,7 @@ Procedure BbsDisplayObj.DisplayStr(Var DStr: String);
            '': User.SetMore(True);
            '': User.SetMore(False);
            '': DInfo^.State := 1;
+           #20: DInfo^.State := 3;                {^T: statistics, a period letter and an item letter follow (MKStatsRead)}
            #9 : User.DisplayStr('        ');
            #10: Begin
                 User.DisplayChr(#10);
@@ -273,6 +275,14 @@ Procedure BbsDisplayObj.DisplayStr(Var DStr: String);
                 Else
                   User.DisplayStr(Prompts.GetString(19));
            End;
+         End;
+      3: Begin                {^T<period>: a wrong period letter is taken with its item letter, nothing is shown}
+         DInfo^.StatPeriod := UpCase(DStr[i]);
+         DInfo^.State := 4;
+         End;
+      4: Begin                {^T<period><item>}
+         DInfo^.State := 0;
+         User.DisplayStr(StatCodeText(DInfo^.StatPeriod, DStr[i], User.GetUserName, WithBackSlash(Config^.GetBbsPath) + 'stats'));
          End;
       End; {End Case}
     Dec(HotCount);
