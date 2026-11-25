@@ -37,88 +37,22 @@ Function JsonValue(Const Text, Key: String): String;                {the value o
 
 Implementation
 
-Uses BaseUnix, Sockets, NetDB, ctypes, openssl, MKTlsLib, MKPwd;
+Uses BaseUnix, Sockets, ctypes, openssl, MKTlsLib, MKPwd, MKNet;
 
 Const
   MaxText = 2 * 1024 * 1024;
 
 
-Function Resolve(Const H: String; Var Addr: TInAddr): Boolean;
-  Var
-    HE: THostEntry;
-
-  Begin
-  Result := True;
-  Addr := StrToNetAddr(H);
-  If Addr.s_addr <> 0 Then
-    Exit;
-  If ResolveHostByName(H, HE) Then
-    Begin
-    Addr := HE.Addr;
-    Exit;
-    End;
-  Result := False;
-  End;
-
-
 Function TcpConnect(Const H: String; Port: Word; Secs: LongInt; Var Err: String): LongInt;
   Var
-    Fd, Flags, Res, SoErr, L: LongInt;
-    A: TInetSockAddr;
-    Addr: TInAddr;
-    FS: TFDSet;
+    Fd: LongInt;
     TV: TTimeVal;
 
   Begin
   Result := -1;
-  If Not Resolve(H, Addr) Then
-    Begin
-    Err := 'Unknown host ' + H;
+  If Not NetConnect(H, Port, Secs * 1000, Fd, Err) Then       {IPv4 and IPv6: every address of the name in turn}
     Exit;
-    End;
-  Fd := fpSocket(AF_INET, SOCK_STREAM, 0);
-  If Fd < 0 Then
-    Begin
-    Err := 'No socket';
-    Exit;
-    End;
-  Flags := fpFcntl(Fd, F_GETFL);
-  fpFcntl(Fd, F_SETFL, Flags Or O_NONBLOCK);
-  FillChar(A, SizeOf(A), 0);
-  A.sin_family := AF_INET;
-  A.sin_port := htons(Port);
-  A.sin_addr := Addr;
-  Res := fpConnect(Fd, @A, SizeOf(A));
-  If (Res < 0) And (fpGetErrno = ESysEINPROGRESS) Then
-    Begin
-    fpFD_ZERO(FS);
-    fpFD_SET(Fd, FS);
-    TV.tv_sec := Secs;
-    TV.tv_usec := 0;
-    If fpSelect(Fd + 1, Nil, @FS, Nil, @TV) <= 0 Then
-      Begin
-      Err := 'No answer from ' + H + ':' + IntToStr(Port);
-      fpClose(Fd);
-      Exit;
-      End;
-    SoErr := 0;
-    L := SizeOf(SoErr);
-    fpGetSockOpt(Fd, SOL_SOCKET, SO_ERROR, @SoErr, @L);
-    If SoErr <> 0 Then
-      Begin
-      Err := 'Cannot connect to ' + H + ':' + IntToStr(Port) + ' (error ' + IntToStr(SoErr) + ')';
-      fpClose(Fd);
-      Exit;
-      End;
-    End
-  Else If Res < 0 Then
-    Begin
-    Err := 'Cannot connect to ' + H + ':' + IntToStr(Port);
-    fpClose(Fd);
-    Exit;
-    End;
-  fpFcntl(Fd, F_SETFL, Flags);
-  TV.tv_sec := Secs;
+  TV.tv_sec := Secs;                      {a read or a write that waits longer than this fails: also for the TLS reads}
   TV.tv_usec := 0;
   fpSetSockOpt(Fd, SOL_SOCKET, SO_RCVTIMEO, @TV, SizeOf(TV));
   fpSetSockOpt(Fd, SOL_SOCKET, SO_SNDTIMEO, @TV, SizeOf(TV));
@@ -385,7 +319,7 @@ Function HttpDo(Const Host: String; Port: Word; Tls: Boolean; Const Ca: String; 
       Fs := TFileStream.Create(ReqFile, fmOpenRead Or fmShareDenyNone);
       ReqLen := Fs.Size;
       End;
-    Hd := Method + ' ' + Path + ' HTTP/1.1'#13#10 + 'Host: ' + Host + ':' + IntToStr(Port) + #13#10 + 'User-Agent: mk (MK BBS)'#13#10 + 'Accept: */*'#13#10 + 'Connection: close'#13#10;
+    Hd := Method + ' ' + Path + ' HTTP/1.1'#13#10 + 'Host: ' + NetJoinHostPort(Host, Port) + #13#10 + 'User-Agent: mk (MK BBS)'#13#10 + 'Accept: */*'#13#10 + 'Connection: close'#13#10;
     If Token <> '' Then
       Hd := Hd + 'Authorization: Bearer ' + Token + #13#10;
     If ReqLen >= 0 Then

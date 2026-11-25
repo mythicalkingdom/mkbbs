@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """mk -G<id> with "transport ftp" / "ftps" in the map file (MKFtp, MKQwkNet FtpPass) against a fake FTP server (tests/fakeftp.py): plain and explicit TLS,
 the TLS session reused for the data connection, the certificate checked (CA file, name).   usage: hubftptest.py <build dir> <work dir>"""
-import json, os, re, shutil, subprocess, sys, time, zipfile
+import json, os, re, shutil, socket, subprocess, sys, time, zipfile
 
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, here)
@@ -60,8 +60,8 @@ def make_packet(path):
         z.writestr('MESSAGES.DAT', b'Produced by Qmail...Copyright (c) 1987 by Sparkware.  All Rights Reserved' + b' ' * (128 - 73))
 
 
-def write_map(extra='', transport='ftp', host='127.0.0.1', pw=PW):
-    open(mapf, 'w').write('inbound %s/in\noutbound %s/out\nuser Chuck Ebenschweiger\nhub %s:%d\ntransport %s\nlogin lion\npassword %s\nconf 6 6\n%s' % (ra, ra, host, port, transport, pw, extra))
+def write_map(extra='', transport='ftp', host='127.0.0.1', pw=PW, hubport=None):
+    open(mapf, 'w').write('inbound %s/in\noutbound %s/out\nuser Chuck Ebenschweiger\nhub %s:%d\ntransport %s\nlogin lion\npassword %s\nconf 6 6\n%s' % (ra, ra, host, hubport or port, transport, pw, extra))
 
 
 def post():
@@ -116,6 +116,21 @@ p = run('-D')
 check('dry run: says FTP, the remote names, connects to nothing', p.returncode == 0 and 'Hub by FTP' in p.stderr and HUB + '.qwk' in p.stderr, p.stderr[-400:])
 srv.close()
 srv2 = None
+# ---- plain FTP over IPv6 (EPSV: the data connection goes to the machine of the control connection)
+try:
+    t6 = socket.socket(socket.AF_INET6); t6.bind(('::1', 0)); t6.close()
+    v6 = True
+except OSError:
+    v6 = False
+    print('skip: no IPv6 on this system')
+if v6:
+    srv6 = FakeFtp(root, port + 7, password=PW, host='::1')
+    for hostform in ('[::1]', '::1'):
+        clean(); write_map(host=hostform, hubport=port + 7) if hostform == '[::1]' else open(mapf, 'w').write('inbound %s/in\noutbound %s/out\nuser Chuck Ebenschweiger\nhub [::1]:%d\ntransport ftp\nlogin lion\npassword %s\nconf 6 6\n' % (ra, ra, port + 7, PW))
+        post(); make_packet(root + '/' + HUB + '.qwk')
+        p = run()
+        check('FTP to %s (IPv6): packet fetched, reply packet stored, EPSV used' % hostform, p.returncode == 0 and 'Packet received: ' + HUB + '.qwk' in p.stderr and os.path.exists(root + '/' + HUB + '.rep') and 'EPSV' in ' '.join(srv6.log), (p.returncode, p.stderr[-400:], srv6.log[-6:]))
+    srv6.close()
 # a server that is not there
 write_map('ftp-timeout 5\n'); post()
 p = run()

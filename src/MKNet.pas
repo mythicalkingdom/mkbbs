@@ -340,7 +340,8 @@ Function NetLocal(Fd: LongInt): String;
   End;
 
 
-Function TryConnect(Ai: PAddrInfo; TimeoutMs: Integer; Out Fd: LongInt; Out Err: String): Boolean;
+Function TryConnect(Ai: PAddrInfo; TimeoutMs: Integer; Out Fd: LongInt; Out Code: Integer): Boolean;
+  {Code when it fails: 0 = no answer in time, -1 = no socket for that family, else the errno of the connect}
   Var
     Flags, Res, SoErr: LongInt;
     L: TSockLen;
@@ -348,11 +349,11 @@ Function TryConnect(Ai: PAddrInfo; TimeoutMs: Integer; Out Fd: LongInt; Out Err:
 
   Begin
   TryConnect := False;
-  Err := '';
+  Code := 0;
   Fd := fpSocket(Ai^.ai_family, SOCK_STREAM, 0);
   If Fd < 0 Then
     Begin
-    Err := 'no socket for the address family ' + IntToStr(Ai^.ai_family);
+    Code := -1;
     Exit;
     End;
   Flags := fpFcntl(Fd, F_GETFL);
@@ -360,7 +361,7 @@ Function TryConnect(Ai: PAddrInfo; TimeoutMs: Integer; Out Fd: LongInt; Out Err:
   Res := fpConnect(Fd, Ai^.ai_addr, Ai^.ai_addrlen);
   If (Res < 0) And (fpGetErrno <> ESysEINPROGRESS) Then
     Begin
-    Err := 'connect error ' + IntToStr(fpGetErrno);
+    Code := fpGetErrno;
     fpClose(Fd);
     Fd := -1;
     Exit;
@@ -372,7 +373,7 @@ Function TryConnect(Ai: PAddrInfo; TimeoutMs: Integer; Out Fd: LongInt; Out Err:
     P.revents := 0;
     If fpPoll(@P, 1, TimeoutMs) <= 0 Then
       Begin
-      Err := 'timeout';
+      Code := 0;
       fpClose(Fd);
       Fd := -1;
       Exit;
@@ -382,7 +383,7 @@ Function TryConnect(Ai: PAddrInfo; TimeoutMs: Integer; Out Fd: LongInt; Out Err:
     fpGetSockOpt(Fd, SOL_SOCKET, SO_ERROR, @SoErr, @L);
     If SoErr <> 0 Then
       Begin
-      Err := 'connect error ' + IntToStr(SoErr);
+      Code := SoErr;
       fpClose(Fd);
       Fd := -1;
       Exit;
@@ -398,7 +399,8 @@ Function NetConnect(Const Host: String; Port: Word; TimeoutMs: Integer; Out Fd: 
     Hints: TAddrInfo;
     Res, Ai: PAddrInfo;
     Rc: cint;
-    H, E, Tried: String;
+    H, Where: String;
+    Code: Integer;
 
   Begin
   NetConnect := False;
@@ -418,19 +420,24 @@ Function NetConnect(Const Host: String; Port: Word; TimeoutMs: Integer; Out Fd: 
     Exit;
     End;
   Try
-    Tried := '';
+    Code := -1;
     Ai := Res;
     While Ai <> Nil Do
       Begin
-      If TryConnect(Ai, TimeoutMs, Fd, E) Then
+      If TryConnect(Ai, TimeoutMs, Fd, Code) Then
         Begin
         NetConnect := True;
         Exit;
         End;
-      Tried := Tried + ' ' + AddrText(Ai^.ai_addr, Ai^.ai_addrlen) + ' (' + E + ')';
       Ai := Ai^.ai_next;
       End;
-    Err := 'Cannot connect to ' + NetJoinHostPort(H, Port) + ':' + Tried;
+    Where := NetJoinHostPort(H, Port);
+    If Code = 0 Then
+      Err := 'No answer from ' + Where
+    Else If Code = ESysECONNREFUSED Then
+      Err := 'Connection refused by ' + Where
+    Else
+      Err := 'Cannot connect to ' + Where + ' (error ' + IntToStr(Code) + ')';       {of the last address tried}
   Finally
     freeaddrinfo(Res);
   End;

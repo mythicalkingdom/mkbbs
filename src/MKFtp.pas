@@ -4,7 +4,7 @@ Unit MKFtp;          {a small FTP client: plain or FTPS (explicit TLS), passive 
 
 {
      For a QWK hub that is reached by FTP (map file: transport ftp / ftps).  It does what the exchange needs and no more: log in, fetch one file,
-     send one file, delete one file.  Passive mode only (EPSV, then PASV), binary type, IPv4.  The data connection always goes to the address of the control
+     send one file, delete one file.  Passive mode only (EPSV, then PASV), binary type, IPv4 and IPv6 (PASV is IPv4 only).  The data connection always goes to the address of the control
      connection (a server behind NAT names its own, private address).
 
      FTPS is explicit TLS (AUTH TLS, PBSZ 0, PROT P) with the OpenSSL libraries of the system, loaded when it is wanted (nothing is linked: without libssl
@@ -56,86 +56,20 @@ function FtpOpen(const AHost: String; Port: Word; Tls: Boolean; const ACa: Strin
 
 Implementation
 
-Uses SysUtils, Classes, BaseUnix, Sockets, NetDB, DynLibs, ctypes, openssl, MKTlsLib;
+Uses SysUtils, Classes, BaseUnix, Sockets, DynLibs, ctypes, openssl, MKTlsLib, MKNet;
 
 Const
   CrLf = #13#10;
 
-function Resolve(const H: String; var Addr: TInAddr): Boolean;
-  Var
-    HE: THostEntry;
-
-  Begin
-  Resolve := True;
-  Addr := StrToNetAddr(H);
-  If Addr.s_addr <> 0 Then
-    Exit;
-  If ResolveHostByName(H, HE) Then
-    Begin
-    Addr := HE.Addr;                     {network byte order already}
-    Exit;
-    End;
-  Resolve := False;
-  End;
-
-
 function Connect(const H: String; Port: Word; Secs: LongInt; var Err: String): LongInt;
   Var
-    Fd, Flags, Res, SoErr, L: LongInt;
-    A: TInetSockAddr;
-    Addr: TInAddr;
-    FS: TFDSet;
+    Fd: LongInt;
     TV: TTimeVal;
 
   Begin
   Connect := -1;
-  If Not Resolve(H, Addr) Then
-    Begin
-    Err := 'Unknown host ' + H;
+  If Not NetConnect(H, Port, Secs * 1000, Fd, Err) Then       {IPv4 and IPv6: every address of the name in turn}
     Exit;
-    End;
-  Fd := fpSocket(AF_INET, SOCK_STREAM, 0);
-  If Fd < 0 Then
-    Begin
-    Err := 'No socket';
-    Exit;
-    End;
-  Flags := fpFcntl(Fd, F_GETFL);
-  fpFcntl(Fd, F_SETFL, Flags Or O_NONBLOCK);
-  FillChar(A, SizeOf(A), 0);
-  A.sin_family := AF_INET;
-  A.sin_port := htons(Port);
-  A.sin_addr := Addr;
-  Res := fpConnect(Fd, @A, SizeOf(A));
-  If (Res < 0) And (fpGetErrno = ESysEINPROGRESS) Then
-    Begin
-    fpFD_ZERO(FS);
-    fpFD_SET(Fd, FS);
-    TV.tv_sec := Secs;
-    TV.tv_usec := 0;
-    If fpSelect(Fd + 1, nil, @FS, nil, @TV) <= 0 Then
-      Begin
-      Err := 'No answer from ' + H + ':' + IntToStr(Port);
-      fpClose(Fd);
-      Exit;
-      End;
-    SoErr := 0;
-    L := SizeOf(SoErr);
-    fpGetSockOpt(Fd, SOL_SOCKET, SO_ERROR, @SoErr, @L);
-    If SoErr <> 0 Then
-      Begin
-      Err := 'Cannot connect to ' + H + ':' + IntToStr(Port) + ' (error ' + IntToStr(SoErr) + ')';
-      fpClose(Fd);
-      Exit;
-      End;
-    End
-  Else If Res < 0 Then
-    Begin
-    Err := 'Cannot connect to ' + H + ':' + IntToStr(Port);
-    fpClose(Fd);
-    Exit;
-    End;
-  fpFcntl(Fd, F_SETFL, Flags);
   TV.tv_sec := Secs;                      {a read or a write that waits longer than this fails: also for the TLS reads}
   TV.tv_usec := 0;
   fpSetSockOpt(Fd, SOL_SOCKET, SO_RCVTIMEO, @TV, SizeOf(TV));
@@ -326,6 +260,7 @@ function TFtp.DataOpen(var DFd: LongInt; var DSsl: Pointer): Boolean;
     S, T: String;
     E: String;
 
+    DH: String;
   Begin
   DataOpen := False;
   DSsl := Nil;
@@ -372,7 +307,10 @@ function TFtp.DataOpen(var DFd: LongInt; var DSsl: Pointer): Boolean;
       End;
     Port := Nums[5] * 256 + Nums[6];
     End;
-  DFd := Connect(Host, Port, Secs, E);
+  DH := NetPeer(Fd);                      {the machine the control connection reached (not another address of the same name)}
+  If DH = '' Then
+    DH := Host;
+  DFd := Connect(DH, Port, Secs, E);
   If DFd < 0 Then
     Begin
     Err := 'Data connection: ' + E;

@@ -5,12 +5,13 @@ import os, socket, ssl, threading
 
 
 class FakeFtp:
-    def __init__(self, root, port, user='lion', password='pw', certfile=None, keyfile=None, require_reuse=False):
+    def __init__(self, root, port, user='lion', password='pw', certfile=None, keyfile=None, require_reuse=False, host='127.0.0.1'):
         self.root, self.port, self.user, self.password = root, port, user, password
         self.cert, self.key, self.require_reuse = certfile, keyfile, require_reuse
         self.log, self.resumed = [], []
-        self.srv = socket.socket(); self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.srv.bind(('127.0.0.1', port)); self.srv.listen(5)
+        self.host = host
+        self.srv = socket.socket(socket.AF_INET6 if ':' in host else socket.AF_INET); self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.srv.bind((host, port)); self.srv.listen(5)
         self.ctx = None
         if certfile:
             self.ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -78,7 +79,7 @@ class FakeFtp:
                 elif cmd in ('EPSV', 'PASV'):
                     if pasv:
                         pasv.close()
-                    pasv = socket.socket(); pasv.bind(('127.0.0.1', 0)); pasv.listen(1)
+                    pasv = socket.socket(socket.AF_INET6 if ':' in self.host else socket.AF_INET); pasv.bind((self.host, 0)); pasv.listen(1)
                     p = pasv.getsockname()[1]
                     if cmd == 'EPSV':
                         reply('229 Entering Extended Passive Mode (|||%d|)' % p)

@@ -36,15 +36,15 @@ def serve(listener, script, result):
     c.close()
 
 
-def run(script, *args):
-    l = socket.socket()
+def run(script, *args, listen='127.0.0.1', host=None):
+    l = socket.socket(socket.AF_INET6 if ':' in listen else socket.AF_INET)
     l.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    l.bind(('127.0.0.1', 0))
+    l.bind((listen, 0))
     l.listen(1)
     res = []
     t = threading.Thread(target=serve, args=(l, script, res))
     t.start()
-    p = subprocess.run([build + '/clienttest', '127.0.0.1', str(l.getsockname()[1])] + list(args), capture_output=True, text=True, timeout=30)
+    p = subprocess.run([build + '/clienttest', host or listen, str(l.getsockname()[1])] + list(args), capture_output=True, text=True, timeout=30)
     t.join()
     l.close()
     return p.stdout, (res[0] if res else b'')
@@ -83,5 +83,24 @@ p = subprocess.run([build + '/clienttest', '127.0.0.1', str(port)], capture_outp
 check('a closed port: an error at once', p.returncode == 1 and 'refused' in p.stdout and time.time() - t0 < 3, p.stdout)
 p = subprocess.run([build + '/clienttest', 'no-such-host.invalid', '23'], capture_output=True, text=True, timeout=30)
 check('an unknown host: an error', p.returncode == 1 and 'Unknown host' in p.stdout, p.stdout)
+# IPv6 (skipped on a system without it)
+try:
+    t6 = socket.socket(socket.AF_INET6); t6.bind(('::1', 0)); t6.close()
+    v6 = True
+except OSError:
+    v6 = False
+    print('skip: no IPv6 on this system')
+if v6:
+    out, got = run(script, listen='::1')
+    check('IPv6: it connects to ::1 and the session is the same (Telnet answers, banner, typed bytes)', 'connected' in out and bytes([IAC, WILL, SGA]) in got and got.endswith(b'ping\r' + bytes([IAC, IAC])) and ('got ' + want.hex()) in out, (out, got))
+    out, got = run([b'hello\r\n'], 'raw', listen='::1', host='[::1]')
+    check('IPv6: [::1] with brackets as the host, raw', 'connected' in out and got == b'ping\r' + bytes([255]), (out, got))
+    out, got = run([b'hello\r\n'], 'raw', listen='::1', host='localhost')
+    check('a name with an IPv4 and an IPv6 address reaches the IPv6 listener (the addresses are tried in turn)', 'connected' in out and got == b'ping\r' + bytes([255]), (out, got))
+    out, got = run([b'hello\r\n'], 'raw', listen='127.0.0.1', host='localhost')
+    check('... and the IPv4 listener', 'connected' in out and got == b'ping\r' + bytes([255]), (out, got))
+    l = socket.socket(socket.AF_INET6); l.bind(('::1', 0)); port = l.getsockname()[1]; l.close()
+    p = subprocess.run([build + '/clienttest', '::1', str(port)], capture_output=True, text=True, timeout=30)
+    check('a closed IPv6 port: refused, the address in brackets in the message', p.returncode == 1 and 'refused by [::1]:%d' % port in p.stdout, p.stdout)
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

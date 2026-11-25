@@ -3,7 +3,7 @@ Unit MKComClient;    {a session that is a connection to another system: a TCP cl
 {$I MKB.Def}
 
 {
-     ConnectTcp makes this program the caller: it connects to Host:Port (a name or a dotted IPv4 address; no IPv6)
+     ConnectTcp makes this program the caller: it connects to Host:Port (a name, an IPv4 or an IPv6 address; the addresses of a name are tried in turn)
      and returns a session (MKComAbs) that is ready to use: with Telnet = True a Telnet filter in client mode (see
      MKComTelnet: SGA and binary offered, the server's options answered, terminal type and window size told), else the
      bytes as they are.  The session is the owner of the connection: Hangup / Dispose close it.  Nil is returned with
@@ -35,96 +35,26 @@ Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolea
 Implementation
 
 
-Uses BaseUnix, Sockets, NetDB, SysUtils, MKComFd, MKComTelnet;
-
-
-Function Resolve(Host: String; Var Addr: TInAddr): Boolean;
-  Var
-    H: THostEntry;
-
-  Begin
-  Resolve := True;
-  Addr := StrToNetAddr(Host);
-  If Addr.s_addr <> 0 Then
-    Exit;
-  If (Host = '0.0.0.0') Then
-    Exit;
-  If ResolveHostByName(Host, H) Then
-    Begin
-    Addr := H.Addr;                      {ResolveHostByName gives the address in network byte order}
-    Exit;
-    End;
-  Resolve := False;
-  End;
+Uses BaseUnix, SysUtils, MKComFd, MKComTelnet, MKNet;
 
 
 Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolean; Var Err: String): AbsComPtr;
   Var
-    Fd, Flags, Res: LongInt;
-    A: TInetSockAddr;
-    Addr: TInAddr;
-    FS: TFDSet;
-    TV: TTimeVal;
-    SoErr, L: LongInt;
+    Fd: LongInt;
     Raw: FdComPtr;
     Tel: TelnetComPtr;
+    E: AnsiString;
 
   Begin
   ConnectTcp := Nil;
   Err := '';
-  If Not Resolve(Host, Addr) Then
+  If Not NetConnect(Host, Port, TimeoutMs, Fd, E) Then       {IPv4 and IPv6: every address of the name in turn}
     Begin
-    Err := 'Unknown host ' + Host;
+    Err := E;
     Exit;
     End;
-  Fd := fpSocket(AF_INET, SOCK_STREAM, 0);
-  If Fd < 0 Then
-    Begin
-    Err := 'Cannot make a socket';
-    Exit;
-    End;
-  Flags := fpFcntl(Fd, F_GETFL);
-  fpFcntl(Fd, F_SETFL, Flags Or O_NONBLOCK);
-  FillChar(A, SizeOf(A), 0);
-  A.sin_family := AF_INET;
-  A.sin_port := htons(Port);
-  A.sin_addr := Addr;
-  Res := fpConnect(Fd, @A, SizeOf(A));
-  If (Res < 0) And (fpGetErrno <> ESysEINPROGRESS) Then
-    Begin
-    Err := 'Cannot connect to ' + Host + ':' + IntToStr(Port);
-    fpClose(Fd);
-    Exit;
-    End;
-  If Res < 0 Then
-    Begin
-    fpFD_ZERO(FS);
-    fpFD_SET(Fd, FS);
-    TV.tv_sec := TimeoutMs Div 1000;
-    TV.tv_usec := (TimeoutMs Mod 1000) * 1000;
-    Res := fpSelect(Fd + 1, Nil, @FS, Nil, @TV);
-    If Res <= 0 Then
-      Begin
-      Err := 'No answer from ' + Host + ':' + IntToStr(Port);
-      fpClose(Fd);
-      Exit;
-      End;
-    SoErr := 0;
-    L := SizeOf(SoErr);
-    fpGetSockOpt(Fd, SOL_SOCKET, SO_ERROR, @SoErr, @L);
-    If SoErr <> 0 Then
-      Begin
-      If SoErr = ESysECONNREFUSED Then
-        Err := 'Connection refused by ' + Host + ':' + IntToStr(Port)
-      Else
-        Err := 'Cannot connect to ' + Host + ':' + IntToStr(Port) + ' (error ' + IntToStr(SoErr) + ')';
-      fpClose(Fd);
-      Exit;
-      End;
-    End;
-  fpFcntl(Fd, F_SETFL, Flags);                  {blocking again: the session waits with select}
   New(Raw, InitFd(Fd, Fd));
-  Raw^.SetRemoteAddr(Host + ':' + IntToStr(Port));
+  Raw^.SetRemoteAddr(NetJoinHostPort(Host, Port));
   If ClientPreamble <> '' Then
     Begin
     Raw^.OpenSession;

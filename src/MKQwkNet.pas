@@ -129,7 +129,7 @@ Implementation
 
 Uses BaseUnix, termio, MKString, MKFile, MKGlobT, MKCfgAbs, MKDoor, MKOpen, MKMsgAbs,
   MKOffAbs, MKOffQwk, MKQwkImp, MKOffDL, MKOffXfer, MKOfflin,
-  MKComAbs, MKComClient, MKFtp, MKHttp, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
+  MKNet, MKComAbs, MKComClient, MKFtp, MKHttp, MKHubScr, MKHubExec, MKHubReplay, MKHubTalk, MKProt, MKVideo, MKPlat,
   Dos;
 
 
@@ -196,6 +196,8 @@ Function LoadMap(Id: String): Boolean;
   Var
     F: Text;
     Line, Key, Rest: String;
+    SplitHost: AnsiString;
+    SplitPort: LongInt;
     P: Word;
     Conf, Area: LongInt;
     FileName: String;
@@ -282,12 +284,14 @@ Function LoadMap(Id: String): Boolean;
           HubPrefix := StripTrail(Copy(Rest, P, 200), '/');       {the API is behind a path of a front end}
           Rest := Copy(Rest, 1, P - 1);
           End;
-        P := Pos(':', Rest);
-        If P > 0 Then
+        If NetSplitHostPort(Rest, SplitHost, SplitPort) Then      {host, host:port, [2001:db8::1]:port, a bare IPv6 address}
           Begin
-          HubPortGiven := True;
-          HubPort := Str2Long(Copy(Rest, P + 1, 6));
-          HubHost := Copy(Rest, 1, P - 1);
+          HubHost := SplitHost;
+          If SplitPort >= 0 Then
+            Begin
+            HubPortGiven := True;
+            HubPort := SplitPort;
+            End;
           End
         Else
           HubHost := Rest;

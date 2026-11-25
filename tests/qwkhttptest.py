@@ -88,11 +88,11 @@ lst = subprocess.Popen([build + '/mklisten', '-c', work + '/hub.json'], stdout=s
 
 # a front between the node and the hub that can drop the acknowledgement or damage the packet
 class Front(threading.Thread):
-    def __init__(self, port, up):
+    def __init__(self, port, up, host='127.0.0.1'):
         super().__init__(daemon=True)
         self.port, self.up, self.mode = port, up, ''
-        self.srv = socket.socket(); self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.srv.bind(('127.0.0.1', port)); self.srv.listen(5)
+        self.srv = socket.socket(socket.AF_INET6 if ':' in host else socket.AF_INET); self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.srv.bind((host, port)); self.srv.listen(5)
 
     def run(self):
         while True:
@@ -195,6 +195,20 @@ try:
     p = run()
     check('the next pass: nothing new (204), exit 0', p.returncode == 0 and 'Nothing new at the hub' in p.stderr, (p.returncode, p.stderr[-300:]))
     check('the posts of the hub are in the node base once (the second pass did not bring them again)', dump(nenv).count('Message from the hub') == 1, dump(nenv)[-400:])
+    # the same over IPv6: the hub URL has the address in brackets (the front listens on ::1 and passes it on to the API port)
+    try:
+        t6 = socket.socket(socket.AF_INET6); t6.bind(('::1', 0)); t6.close()
+        front6 = Front(24897, 24891, host='::1'); front6.start()
+    except OSError:
+        front6 = None
+        print('skip: no IPv6 on this system')
+    if front6:
+        post(henv, 'Over IPv6', 'fetched through [::1]')
+        write_map(hub='http://[::1]:24897')
+        p = run()
+        check('a pass by http to a hub URL with an IPv6 address (http://[::1]:port): the packet is fetched and acknowledged, exit 0',
+              p.returncode == 0 and 'Packet fetched from the hub' in p.stderr and 'The hub was told that packet' in p.stderr and 'Over IPv6' in dump(nenv), (p.returncode, p.stderr[-500:]))
+        write_map()
     # the acknowledgement is lost
     post(henv, 'Second from the hub', 'another one')
     front.mode = 'dropack'
