@@ -45,7 +45,7 @@ Function StatsScreen(RunDir: String): String;
 Implementation
 
 Uses
-  BaseUnix, Sockets, Dos, MKString, MKGlobT, MKComAbs, MKSess, MKCp437, MKNodeHost;
+  BaseUnix, Sockets, Dos, MKString, MKGlobT, MKComAbs, MKSess, MKCp437, MKNodeHost, MKNet;
 
 
 Const
@@ -1121,7 +1121,7 @@ Function ResolveHost(Const AddrS: String; Var Host: String): Boolean;
     Begin
     Host := H;
     If Port <> 0 Then
-      Host := Host + ':' + Num(Port);
+      Host := NetJoinHostPort(Host, Port);
     Msg := 'Calling ' + Host + ' (from the nodelist)';
     MsgUntil := fpTime + 5;
     End

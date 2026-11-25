@@ -22,6 +22,7 @@ Function NetListen(Const Bind: String; Port: Word; Out Fd: LongInt; Out What: St
 
 Function NetPeer(Fd: LongInt): String;        {the address of the other end, normalised; '' when it is not known}
 Function NetLocal(Fd: LongInt): String;       {the address of this end}
+Function NetPeerPort(Fd: LongInt): Word;      {the port of the other end, 0 when it is not known}
 Function NetNormalise(Const Addr: String): String;
 Function NetFamily(Const Addr: String): Integer;       {4, 6, or 0 when it is no address}
 Function NetMatch(Const Addr, Entry: String): Boolean;
@@ -322,6 +323,21 @@ Function NetPeer(Fd: LongInt): String;
     NetPeer := AddrText(@S, L)
   Else
     NetPeer := '';
+  End;
+
+
+Function NetPeerPort(Fd: LongInt): Word;
+  Var
+    S: TStorage;
+    L: TSockLen;
+
+  Begin
+  L := SizeOf(S);
+  FillChar(S, SizeOf(S), 0);
+  If (fpGetPeerName(Fd, @S, @L) = 0) And (L >= 4) Then
+    NetPeerPort := (S[2] Shl 8) Or S[3]
+  Else
+    NetPeerPort := 0;
   End;
 
 

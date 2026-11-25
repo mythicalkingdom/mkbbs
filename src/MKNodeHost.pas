@@ -16,7 +16,7 @@ Function NodelistHost(Var A: AddrType; Var Host: String; Var Port: Word; Var Why
 Implementation
 
 Uses
-  MKString, MKCfgAbs, MKNSrch;
+  MKString, MKCfgAbs, MKNSrch, MKNet;
 
 Var
   Nodes: NodeListObj;
@@ -27,7 +27,9 @@ Function NodelistHost(Var A: AddrType; Var Host: String; Var Port: Word; Var Why
   {The internet address of a node from its nodelist line: the flags IBN (binkp), IBN:port, IBN:host, IBN:host:port
    and INA:host.  False when the nodelist has no index, no such node or no host name for it; Why says which.}
   Var
-    Line, Flag, Up, P1, P2, P3, INA: String;
+    Line, Flag, Up, P1, P2, INA: String;
+    SplitHost: AnsiString;
+    SplitPort: LongInt;
     k, p: Word;
     HasIbn, Good: Boolean;
     V: LongInt;
@@ -77,28 +79,23 @@ Function NodelistHost(Var A: AddrType; Var Host: String; Var Port: Word; Var Why
       Continue;
       End;
     P1 := Copy(Up, 1, p - 1);
-    P2 := Copy(Flag, p + 1, 255);
-    P3 := '';
-    p := Pos(':', P2);
-    If p > 0 Then
-      Begin
-      P3 := Copy(P2, p + 1, 255);
-      P2 := Copy(P2, 1, p - 1);
-      End;
+    P2 := Copy(Flag, p + 1, 255);                  {what follows the first colon: port, host, host:port, [v6], [v6]:port, a bare IPv6 address}
     If P1 = 'INA' Then
-      INA := P2
+      Begin
+      If NetSplitHostPort(P2, SplitHost, SplitPort) Then
+        INA := SplitHost;
+      End
     Else If P1 = 'IBN' Then
       Begin
       HasIbn := True;
       Val(P2, V, p);
       If (p = 0) And (V > 0) And (V < 65536) Then
         Port := V
-      Else If P2 <> '' Then
+      Else If NetSplitHostPort(P2, SplitHost, SplitPort) Then
         Begin
-        Host := P2;
-        Val(P3, V, p);
-        If (p = 0) And (V > 0) And (V < 65536) Then
-          Port := V;
+        Host := SplitHost;
+        If (SplitPort > 0) And (SplitPort < 65536) Then
+          Port := SplitPort;
         End;
       End;
   Until (Flag = '') Or (k > 60);

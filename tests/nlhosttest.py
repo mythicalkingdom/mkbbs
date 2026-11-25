@@ -37,6 +37,10 @@ open(os.path.join(nl, 'nodelist.999'), 'w').write('\r\n'.join([
     ',600,Mine,Town,Op,-Unpublished-,300,CM,IBN,INA:e.example.org',
     ',700,Answers,Town,Op,-Unpublished-,300,CM,IBN,INA:f.example.org',
     ',800,Gone,Town,Op,-Unpublished-,300,CM,IBN,INA:g.example.org',
+    ',1001,V6a,Town,Op,-Unpublished-,300,CM,IBN:[2001:db8::1]:24560',
+    ',1002,V6b,Town,Op,-Unpublished-,300,CM,IBN,INA:2001:db8::2',
+    ',1003,V6c,Town,Op,-Unpublished-,300,CM,IBN:2001:db8::3',
+    ',1004,V6d,Town,Op,-Unpublished-,300,CM,INA:[2001:db8::4],IBN:24570',
     '']))
 env = {'PATH': os.environ['PATH'], 'MK': cfg}
 fails = 0
@@ -83,6 +87,8 @@ link(5, 600, host='mine.example.com')         # set by hand: wins
 link(6, 700, flags=1)                         # answer only: not looked up
 link(7, 800, port=24999)                      # port set by hand: wins
 link(8, 900)                                  # not in the nodelist
+for i, n in enumerate((1001, 1002, 1003, 1004)):
+    link(9 + i, n)                            # IPv6 hosts
 open(os.path.join(cfg, 'mailer.mk'), 'wb').write(d)
 e = bytearray(open(os.path.join(srcra, [f for f in os.listdir(srcra) if f.lower() == 'echocfg.mk'][0]), 'rb').read()) if any(f.lower() == 'echocfg.mk' for f in os.listdir(srcra)) else bytearray(2000)
 put(e, 0, 'files/in', 51)
@@ -118,6 +124,12 @@ check('answer-only links are not looked up', 'host' not in block(out, '1:110/700
 b = block(out, '1:110/800')
 check('a port set in the link wins over the nodelist\'s', 'host g.example.org' in b and 'port 24999' in b)
 check('a node that is not in the nodelist: no host, no error', 'host' not in block(out, '1:110/900') and 'link 1:110/900' in out)
+b = block(out, '1:110/1001')
+check('IPv6: IBN:[addr]:port', 'host 2001:db8::1' in b and 'port 24560' in b)
+check('IPv6: INA:addr (bare) with IBN', 'host 2001:db8::2' in block(out, '1:110/1002') and 'port' not in block(out, '1:110/1002'))
+check('IPv6: IBN:addr (bare, no port)', 'host 2001:db8::3' in block(out, '1:110/1003') and 'port' not in block(out, '1:110/1003'))
+b = block(out, '1:110/1004')
+check('IPv6: INA:[addr] with IBN:port', 'host 2001:db8::4' in b and 'port 24570' in b)
 sys.stdout.flush()
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

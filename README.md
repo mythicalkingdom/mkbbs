@@ -97,4 +97,4 @@ The screenshots above are made by `tools/screenshots.py` from the real programs 
 
 ### Design notes and to-do list
 
-The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (IPv6, upload handling, metrics, a message base converter, multi-node chat).
+The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (upload handling, metrics, a message base converter, multi-node chat).
