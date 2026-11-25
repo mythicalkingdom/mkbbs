@@ -132,7 +132,7 @@ check('the messages of conference 6 are in area 6 now',
       'subj=Reply via REP' in after and 'subj=Second reply' in after and 'reply line one|reply line two' in after and 'subj=Reply via REP' not in before)
 check('... from the user (the sample forces the log-in name), to All / Sysop, echo and local flags like the BBS editor sets them',
       'from=Mark May to=All subj=Reply via REP' in after and 'from=Mark May to=Sysop subj=Second reply' in after and after.count('echo=TRUE') >= 3)
-check('... with the tear and origin lines of the area', 'reply line two|--- MK Bbs v0.01| * Origin:' in after)
+check('... with the tear and origin lines of the area', 'reply line two|--- MK Bbs v0.2| * Origin:' in after)
 check('... the message of conference 999 (no such area, no area for bad messages) was not posted', 'Lost one' not in after)
 check('the duplicate file is in the user directory', os.path.exists(udir + '/qwkdupe.dat'))
 # the same packet again: duplicates, nothing new

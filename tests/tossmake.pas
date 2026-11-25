@@ -82,7 +82,7 @@ begin
   P^.SetDate('11-16-26'); P^.SetTime('14:15');
   P^.SetLocal(True); P^.SetEcho(True);
   P^.DoStringLn('written by the BBS');
-  P^.DoStringLn('--- MK Bbs v0.01');
+  P^.DoStringLn('--- MK Bbs v0.2');
   P^.DoStringLn(Config^.GetDefaultOrigStr(6));
   if P^.WriteMsg <> 0 then begin writeln('write failed'); Halt(1); end;
   { a second one that is not marked for export (already sent) }

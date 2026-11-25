@@ -798,7 +798,7 @@ Function ImpMap(Conf: LongInt; Var T: QwkImpTarget; Var Moved: Boolean): Boolean
   T.ReDate := ImpO.ReDate;
   If (T.Kind <> mmtNormal) And Config^.MsgAddFido(Area) Then
     Begin
-    T.TearLine := '--- MK Bbs v0.01';
+    T.TearLine := '--- MK Bbs v0.2';
     T.OriginLine := Config^.GetDefaultOrigStr(Area);
     End;
   ImpMap := True;

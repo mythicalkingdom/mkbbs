@@ -19,14 +19,14 @@ def check(name, ok, info=''):
 
 for f in glob.glob(repo + '/build/mkbbs_*.deb'):
     os.remove(f)
-r = subprocess.run([repo + '/packaging/mkdeb.sh'], capture_output=True, text=True, cwd=repo, env=dict(os.environ, VERSION='0.1+test'))
-debs = glob.glob(repo + '/build/mkbbs_0.1+test_*.deb')
+r = subprocess.run([repo + '/packaging/mkdeb.sh'], capture_output=True, text=True, cwd=repo, env=dict(os.environ, VERSION='0.2+test'))
+debs = glob.glob(repo + '/build/mkbbs_0.2+test_*.deb')
 check('packaging/mkdeb.sh builds the package', r.returncode == 0 and len(debs) == 1, r.stdout + r.stderr)
 if not debs:
     print('failures: %d' % fails); sys.exit(1)
 deb = debs[0]
 info = subprocess.run(['dpkg-deb', '-f', deb], capture_output=True, text=True).stdout
-check('control: name, version, architecture, depends on libc6 and adduser, recommends libssl and stunnel', 'Package: mkbbs' in info and 'Version: 0.1+test' in info and 'Architecture: ' in info
+check('control: name, version, architecture, depends on libc6 and adduser, recommends libssl and stunnel', 'Package: mkbbs' in info and 'Version: 0.2+test' in info and 'Architecture: ' in info
       and 'libc6' in info and 'adduser' in info and 'libssl3' in info and 'stunnel4' in info, info)
 check('the maintainer line has no private mail address', '@users.noreply.github.com' in info or os.environ.get('DEB_MAINTAINER'), info)
 lst = subprocess.run(['dpkg-deb', '-c', deb], capture_output=True, text=True).stdout

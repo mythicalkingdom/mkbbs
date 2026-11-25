@@ -5,6 +5,9 @@ Linux, built with Free Pascal.  This document describes the BBS itself: what a c
 the files it uses, the programs of the toolkit, and how to run it.  For setting up networking see `NETWORKING.md`, for
 the listener `MKLISTEN.md`, and for the Fido tosser `TOSSER.md`.  `GETTING-STARTED.md` shows how the pieces fit.
 
+**Versions.**  The DOS / Turbo Pascal versions were numbered 0.01.  **0.2 is the first version of the Free Pascal / Linux port** (`BbsVersion` in `src/MKGlobT.pas`, shown by menu command 8, by `GET /v1/status` of the API
+and in the tear line of the messages the BBS writes: `--- MK Bbs v0.2`); the Debian package takes its version from it (`packaging/mkdeb.sh`, `0.2+git<date>.<commit>`).
+
 ## What a caller gets
 
 * **Logon and users.**  Login by name and password (kept plain, as in the DOS days, or as a hash: `PASSWORDS.md`), new user

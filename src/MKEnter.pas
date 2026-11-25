@@ -648,7 +648,7 @@ Procedure MsgEntObj.GetText;
                If ((Config^.GetMsgType(ME^.Area) <> Normal) And
                (Config^.MsgAddFido(ME^.Area))) Then
                  Begin
-                 TMsg^.DoStringLn('--- MK Bbs v0.01');
+                 TMsg^.DoStringLn('--- MK Bbs v0.2');
                  TMsg^.DoStringLn(Config^.GetDefaultOrigStr(ME^.Area));
                  End;
                MsgWriteError := TMsg^.WriteMsg;

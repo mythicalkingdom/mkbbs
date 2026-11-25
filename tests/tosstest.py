@@ -181,7 +181,7 @@ if have_mkbink:
     ec = [m for m in h1 if 'local echo message' in m[0]][0]
     check('the scanned echomail: area MK, from us (1:110/290), SEEN-BY 110/100 200 290, PATH 110/290, a MSGID of ours, the BBS tear and origin lines',
           'area=MK' in ec[0] and 'orig=1:110/290.0' in ec[0] and '^SEEN-BY: 110/100 200 290|' in ec[1] and '^PATH: 110/290|' in ec[1]
-          and '^MSGID: 1:110/290 ' in ec[1] and '--- MK Bbs v0.01|' in ec[1] and ' * Origin: ' in ec[1] and 'written by the BBS|' in ec[1])
+          and '^MSGID: 1:110/290 ' in ec[1] and '--- MK Bbs v0.2|' in ec[1] and ' * Origin: ' in ec[1] and 'written by the BBS|' in ec[1])
     tr = [m for m in h1 if 'netmail for 2:250/1' in m[0]][0]
     check('the transit netmail: a Via line, INTL for 2:250/1, FMPT 5 (the point that sent it), private',
           '^Via 87:1001/11 @' in tr[1] and '^INTL 2:250/1 1:110/100|' in tr[1] and '^FMPT 5|' in tr[1] and 'attr=1 ' in tr[0])

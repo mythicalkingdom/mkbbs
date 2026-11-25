@@ -48,7 +48,7 @@ Type MKDateTime = Record
   End;
 
 Const
-  BbsVersion = 'Mythical Kingdom Bbs - Version 0.01 Alpha';
+  BbsVersion = 'Mythical Kingdom Bbs - Version 0.2 Alpha';
   Copyright  = 'Copyright 1992, 1993 by Mark May';
   Contact    = 'Contact 1:110/290  (513)237-7737 v34/vFC/v32';
 

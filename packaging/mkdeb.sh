@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds build/mkbbs_<version>_<arch>.deb from the programs in build/ (make deb builds them first).
 #
-#   packaging/mkdeb.sh                      version 0.1+git<date>.<commit>, maintainer from git
+#   packaging/mkdeb.sh                      version 0.2+git<date>.<commit>, maintainer from git
 #   VERSION=1.0 packaging/mkdeb.sh          another version
 #   DEB_MAINTAINER="Name <mail>" ...        another maintainer line
 #   MKBINK=../mkbink                        the binkp mailer project: its program goes in the package when it is built there
@@ -16,7 +16,7 @@ cd "$here"
 MKBINK=${MKBINK:-../mkbink}
 ARCH=$(dpkg --print-architecture)
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
-VERSION=${VERSION:-0.1+git$(date +%Y%m%d).$COMMIT}
+VERSION=${VERSION:-0.2+git$(date +%Y%m%d).$COMMIT}
 NAME=$(git config user.name 2>/dev/null || echo "MK BBS")
 MAINTAINER=${DEB_MAINTAINER:-"$NAME <$NAME@users.noreply.github.com>"}
 STAGE=build/deb/stage

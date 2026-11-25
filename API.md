@@ -81,7 +81,7 @@ The token's id and scopes, the name of the BBS and the list of paths.  Needs any
 
 ### `GET /v1/status`  (`status`)
 ```json
-{ "bbs": "Mythical Kingdom", "software": "Mythical Kingdom Bbs - Version 0.01 Alpha", "time": "2026-11-24T10:15:00-05:00", "nodes": { "in_use": 2 } }
+{ "bbs": "Mythical Kingdom", "software": "Mythical Kingdom Bbs - Version 0.2 Alpha", "time": "2026-11-24T10:15:00-05:00", "nodes": { "in_use": 2 } }
 ```
 
 ### `GET /v1/nodes`  (`nodes`)
