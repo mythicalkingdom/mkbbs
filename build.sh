@@ -291,6 +291,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/qwkhttptest.py build/work/qwkhttp | grep -E "^(ok|FAIL|skip|failures)" | tee build/qwkhttpresult.txt
   if grep -q "^FAIL" build/qwkhttpresult.txt; then exit 1; fi
 fi
+# menu command 172, a door of doors.cfg (DOORS-PLAN.md A): a fake dosemu, a native door, the drop files, the work directory
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/doortest.py build/work/door | grep -E "^(ok|FAIL|skip|failures)" | tee build/doorresult.txt
+  if grep -q "^FAIL" build/doorresult.txt; then exit 1; fi
+fi
 # statistics display codes ^T (screens and menu prompts)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/statcodestest.py build/work/statcodes | grep -E "^(ok|FAIL|skip|failures)" | tee build/statcodesresult.txt

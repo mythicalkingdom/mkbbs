@@ -5,6 +5,8 @@ native doors, **C** a sandbox for every door.  Today (`DOS-DOORS.md`, `src/MKShe
 `DORINFO1.DEF`, `DOOR.SYS` (`*D`) and `CALLINFO.BBS` (`*W`); a DOS door goes through the shell script `tools/mkdosdoor` (dosemu2, a work directory of links, drop files copied with the COM port
 line changed, `mkdoor.bat`), and the whole call has to fit the 75 characters of the menu data field.
 
+**Status (2026-11-25):** your answers: all six as proposed.  **A phase 1 is built** (command 172, `doors.cfg` reader `MKDoorCfg.pas`, `MKDosDoor.pas`, `mkcheck` rules, `tests/doortest.py` with a fake dosemu, `checktest` additions); not yet: A phase 2 (real dosemu2 test), docs, B, C.
+
 ## A. The DOS door command
 
 **A new menu command** (the next free number; `mkmenu` and `mkcheck` learn it): the data field is a **door name**, e.g. `lord`.  Everything else comes from a door file.

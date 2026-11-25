@@ -93,6 +93,41 @@ def bad_screen(d):
 
 r = broken(bad_screen)
 check('an item that shows a screen that is not there: WARN', r.returncode == 0 and has(r, 'WARN') and 'shows the screen noscree' in r.stdout, r.stdout)
+
+# menu command 172 (a door of doors.cfg)
+os.makedirs(tmp + '/dd', exist_ok=True)
+open(tmp + '/dd/Lord.Exe', 'w').write('x')
+open(tmp + '/fakedos', 'w').write('x')
+
+
+def door_item(name, cfgtext=None):
+    def f(d):
+        m = bytearray(open(d + '/menus/top.mnu', 'rb').read())
+        i = len(m) // 167 - 2
+        m[i * 167] = 172
+        nb = name.encode()
+        m[i * 167 + 84] = len(nb); m[i * 167 + 85:i * 167 + 85 + len(nb)] = nb
+        open(d + '/menus/top.mnu', 'wb').write(m)
+        if cfgtext is not None:
+            open(d + '/doors.cfg', 'w').write(cfgtext)
+    return f
+
+
+good = '[global]\ndosemu = %s/fakedos\n[lord]\ntype = dos\ndir = %s/dd\ncommand = LORD.EXE *N\n' % (tmp, tmp)
+r = broken(door_item('lord', good))
+check('a door that is all there (the command in the other case: DOS names): nothing to say', r.returncode == 0 and not has(r, 'WARN') and not has(r, 'FAIL'), r.stdout)
+r = broken(door_item('lord'))
+check('a door command and no doors.cfg: WARN', 'WARN menu top' in r.stdout and 'there is no doors.cfg' in r.stdout and r.returncode == 0, r.stdout)
+r = broken(door_item('other', good))
+check('a door that is not in doors.cfg: WARN', 'the door other, which is not in doors.cfg' in r.stdout, r.stdout)
+r = broken(door_item('lord', good.replace('/dd', '/nodir')))
+check('the door directory is not there: WARN', 'the directory of the door lord is not there' in r.stdout, r.stdout)
+r = broken(door_item('lord', good.replace('LORD.EXE', 'GONE.EXE')))
+check('the command is not in the door directory: WARN', 'the command GONE.EXE of the door lord is not in' in r.stdout, r.stdout)
+r = broken(door_item('lord', good.replace('/fakedos', '/nodosemu')))
+check('dosemu2 is not there: WARN', 'needs dosemu2, but' in r.stdout and 'is not there' in r.stdout, r.stdout)
+r = broken(door_item('lord', good + 'bogus = 1\ncom = 12\n'))
+check('doors.cfg lines that are not understood: WARN with the line number', 'WARN doors.cfg line 7: unknown setting bogus' in r.stdout and 'line 8: com is a number' in r.stdout, r.stdout)
 r = broken(lambda d: os.remove(d + '/games/cowsandbulls.pas'))
 check('the sample door is gone: WARN, the BBS still runs (exit 0)', r.returncode == 0 and 'WARN menu top' in r.stdout and 'cowsandbulls.pas, which is not there' in r.stdout, r.stdout)
 r = broken(lambda d: os.remove(d + '/msgs/gen.mer'))

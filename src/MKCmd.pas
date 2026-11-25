@@ -26,7 +26,7 @@ Implementation
 Uses MKFile, MKString, MKCodes, MKPromptEsc, MKDoor, MKMenus, MKCfgAbs, MKComAbs,
   MKCFile, MKMRead, MKEnter, MKName, MKMisc, MKDos, MKShell, MKPage,
   MKQuest, MKMsgSel, MKProt, MKLogEnt, MKMiscB, MKCD, MKRCfgMK, MKLogOn,
-  MKOfflin, MKBasicRun, MKPascalRun,
+  MKOfflin, MKBasicRun, MKPascalRun, MKDosDoor,
     MKVCrt,
   Dos;
 
@@ -815,6 +815,7 @@ Procedure ProcessCmd(Item: Word);
     169: RunBasicProgram(Menu.GetData(Item)); {Run a BASIC program (mkbasic)}
     170: RunPascalProgram(Menu.GetData(Item)); {Run a Pascal program (mkpascal)}
     171: ToggleCharset;                     {Toggle UTF-8 / CP437 text}
+    172: RunDoor(Menu.GetData(Item));       {Run a door of doors.cfg (DOS door in dosemu2, or native)}
     End;
   End;
 

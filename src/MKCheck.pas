@@ -20,12 +20,14 @@ Program MKCheck;
 }
 
 Uses SysUtils, Classes, BaseUnix, Unix, Process,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg;
 
 Var
   Quiet, Verbose: Boolean;
   NFail, NWarn, NInfo: Integer;
   BbsDir, ConfDir, ListenFile: String;
+  DoorCfg: TDoorCfg;                 {doors.cfg, loaded when the first menu item that runs a door is seen}
+  DoorCfgOk: Boolean;
 
 
 Procedure Out_(Tag, S: String);
@@ -192,6 +194,90 @@ Var
   KnownMenus: TStringList;
 
 
+Function FindNoCase(Dir, Name: String): String;
+  {a file of Dir whose name is Name in upper or lower case (DOS names): its real name, '' when there is none}
+  Var
+    SR: TSearchRec;
+
+  Begin
+  FindNoCase := '';
+  If FindFirst(Dir + '*', faAnyFile, SR) = 0 Then
+    Begin
+    Repeat
+      If LowerCase(SR.Name) = LowerCase(Name) Then
+        FindNoCase := SR.Name;
+    Until FindNext(SR) <> 0;
+    FindClose(SR);
+    End;
+  End;
+
+
+Procedure CheckDoorItem(MenuName: String; Item: Integer; Key, Data: String);
+  {menu command 172: the door is in doors.cfg, and what it needs is there}
+  Var
+    Name, Prefix, W, Dos: String;
+    i: Integer;
+
+  Begin
+  Name := Trim(Data);
+  If Pos(' ', Name) > 0 Then
+    Name := Copy(Name, 1, Pos(' ', Name) - 1);
+  Prefix := 'menu ' + MenuName + ' item ' + IntToStr(Item) + ' (' + Key + '): ';
+  If DoorCfg = Nil Then
+    Begin
+    DoorCfg := TDoorCfg.Create;
+    DoorCfg.Load(BbsDir + 'doors.cfg');
+    DoorCfgOk := FileExists(BbsDir + 'doors.cfg');
+    For i := 0 To DoorCfg.Problems.Count - 1 Do
+      Warn('doors.cfg ' + DoorCfg.Problems[i]);
+    End;
+  If Name = '' Then
+    Begin
+    Warn(Prefix + 'runs a door but names none (the data is the name of a door in doors.cfg)');
+    Exit;
+    End;
+  If Not DoorCfgOk Then
+    Begin
+    Warn(Prefix + 'runs the door ' + Name + ', and there is no doors.cfg in ' + BbsDir);
+    Exit;
+    End;
+  i := DoorCfg.Find(Name);
+  If i < 0 Then
+    Begin
+    Warn(Prefix + 'runs the door ' + Name + ', which is not in doors.cfg');
+    Exit;
+    End;
+  With DoorCfg.Doors[i] Do
+    Begin
+    If Command = '' Then
+      Warn(Prefix + 'the door ' + Name + ' has no command in doors.cfg');
+    If (Dir = '') Or Not DirectoryExists(Dir) Then
+      Begin
+      Warn(Prefix + 'the directory of the door ' + Name + ' is not there: ' + Dir);
+      Exit;
+      End;
+    W := Trim(Command);
+    If Pos(' ', W) > 0 Then
+      W := Copy(W, 1, Pos(' ', W) - 1);
+    If (W <> '') And (Pos('/', W) = 0) And (Pos('\', W) = 0) And (FindNoCase(IncludeTrailingPathDelimiter(Dir), W) = '') And
+       ((Kind = 'dos') Or Not OnPath(W)) Then
+      Warn(Prefix + 'the command ' + W + ' of the door ' + Name + ' is not in ' + Dir);
+    If Kind = 'dos' Then
+      Begin
+      Dos := DoorCfg.Dosemu;
+      If Dos = '' Then
+        Dos := GetEnvironmentVariable('MKDOS_DOSEMU');
+      If Dos = '' Then
+        Dos := 'dosemu';
+      If (Pos('/', Dos) = 0) And Not OnPath(Dos) Then
+        Warn(Prefix + 'the door ' + Name + ' needs dosemu2, which is not on the PATH (doors.cfg: dosemu = ...)')
+      Else If (Pos('/', Dos) > 0) And Not FileExists(Dos) Then
+        Warn(Prefix + 'the door ' + Name + ' needs dosemu2, but ' + Dos + ' is not there');
+      End;
+    End;
+  End;
+
+
 Procedure CheckMenuFile(Name: String; Var HasLogoff: Boolean);
   Var
     FN: String;
@@ -272,6 +358,7 @@ Procedure CheckMenuFile(Name: String; Var HasLogoff: Boolean);
             If Not (FileExists(Rel(W)) Or OnPath(W) Or FileExists(BbsDir + W)) Then
               Warn('menu ' + Name + ' item ' + IntToStr(i) + ' (' + R.Key + '): runs ' + W + ', which is not in the BBS folder or on the PATH');
           End;
+        172: CheckDoorItem(Name, i, R.Key, Data);
         169, 170:
           Begin
           W := FirstWord(Data);
