@@ -253,17 +253,27 @@ Procedure LoadNodes;
   End;
 
 
+Function ShortAddr(Const A: String): String;
+  {an IPv6 address can be 39 characters: the middle is left out of a long one (2a02:8071:5..:6789)}
+  Begin
+  If Length(A) <= 21 Then
+    ShortAddr := A
+  Else
+    ShortAddr := Copy(A, 1, 9) + '..' + Copy(A, Length(A) - 9, 10);
+  End;
+
+
 Function NodeLine(Const N: NodeRec): String;
   Begin
-  NodeLine := Pad(Long2Str(N.Node), 5) + Pad(N.UserName, 21) + Pad(ActivityStr(N.Status), 14) +
-    Pad(N.Addr, 17) + Pad(N.Typ, 8) + Pad(ClockStr(N.Start), 7) + DurStr(fpTime - N.Start);
+  NodeLine := Pad(Long2Str(N.Node), 5) + Pad(N.UserName, 17) + Pad(ActivityStr(N.Status), 14) +
+    Pad(ShortAddr(N.Addr), 22) + Pad(N.Typ, 7) + Pad(ClockStr(N.Start), 7) + DurStr(fpTime - N.Start);
   End;
 
 
 Function HeadLine: String;
   Begin
-  HeadLine := Pad('Node', 5) + Pad('User', 21) + Pad('Activity', 14) + Pad('Address', 17) +
-    Pad('Type', 8) + Pad('Since', 7) + 'Online';
+  HeadLine := Pad('Node', 5) + Pad('User', 17) + Pad('Activity', 14) + Pad('Address', 22) +
+    Pad('Type', 7) + Pad('Since', 7) + 'Online';
   End;
 
 

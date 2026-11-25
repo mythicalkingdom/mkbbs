@@ -33,7 +33,7 @@ Function ProxyAddrFromBuf(Var Buf; N: LongInt; Var Addr: String): Integer;
 
 Implementation
 
-Uses MKPlat;
+Uses MKPlat, MKNet;
 
 Const
   Sig2: String[12] = #13#10#13#10#0#13#10'QUIT'#10;
@@ -71,7 +71,7 @@ Function ParseProxyV1(Line: String; Var Addr: String): Boolean;
   For p := 1 To Length(Src) Do
     If Not (Src[p] In ['0'..'9', 'a'..'f', 'A'..'F', '.', ':']) Then
       Exit;
-  Addr := Src;
+  Addr := NetNormalise(Src);               {2001:DB8:0::7 is 2001:db8::7, ::ffff:192.0.2.7 is 192.0.2.7}
   ParseProxyV1 := True;
   End;
 
@@ -140,6 +140,7 @@ Function ProxyV2Addr(Fam: Byte; Var Body; Len: Word; Var Addr: String): Boolean;
         Addr := Addr + ':';
       Addr := Addr + HexWord(B[i * 2] * 256 + B[i * 2 + 1]);
       End;
+    Addr := NetNormalise(Addr);
     ProxyV2Addr := True;
     End;
   End;

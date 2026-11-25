@@ -31,7 +31,7 @@ Function NetIsLoopback(Addr: String): Boolean;
 Function NetSplitHostPort(S: String; Out Host: String; Out Port: Integer): Boolean;   {host:port, [v6]:port, a URL's authority}
 ```
 
-**Status:** phase 1 is built (`src/MKNet.pas`, `tests/nettest.pas` in `build.sh`).
+**Status:** phases 1 and 2 are built (`src/MKNet.pas`, `tests/nettest.pas`; the listener, the guard, the PROXY addresses, `mkmon`, `mklisten -t`, `tests/iplistentest.py`; both in `build.sh`).  The documents are phase 4.
 
 ## Phases
 

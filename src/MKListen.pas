@@ -45,7 +45,8 @@ Program MKListen;
               "type": "telnet",                "telnet" | "raw" | "ws" | "qwk" (telnet, mk -Q)
               "qwk": true,                     any type: the callers get the QWK login (mk -Q)
               "baud": 2400,                    emulated speed, 0 = full speed
-              "bind": "0.0.0.0",               address to listen on (IPv4)
+              "bind": "::",                    address to listen on: "::" (default) = IPv4 and IPv6 on one socket (IPv4 only when the system has no IPv6),
+                                               "0.0.0.0" = IPv4 only, or one address: "127.0.0.1", "::1", "2001:db8::7"
               "nodes": "1-4",                  nodes for this port
               "maxperip": 2,
               "config": "/bbs/mk",             same as "env": {"MK": "/bbs/mk"}
@@ -147,7 +148,7 @@ Program MKListen;
 *)
 
 Uses
-  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy, MKTls;
+  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy, MKTls, MKNet;
 
 
 Type
@@ -390,7 +391,7 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
   P.Port := 0;
   P.SType := 'telnet';
   P.Baud := 0;
-  P.Bind := '0.0.0.0';
+  P.Bind := '::';
   P.First := GFirst;
   P.Last := GLast;
   P.MaxPerIp := GMaxPerIp;
@@ -439,7 +440,12 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
       P.Baud := JInt(V, Where + '.baud', 0, 1000000)
     Else If Key = 'bind' Then
       Begin
-      P.Bind := JStr(V, Where + '.bind');
+      P.Bind := Trim(JStr(V, Where + '.bind'));
+      If (P.Bind = '') Or (P.Bind = '*') Then
+        P.Bind := '::';
+      If (P.Bind <> '::') And (NetFamily(P.Bind) = 0) Then
+        Die(Where + '.bind: "' + P.Bind + '" is not an address (use "::" for IPv4 and IPv6, "0.0.0.0" for IPv4 only, or one address)');
+      P.Bind := NetNormalise(P.Bind);
       BindGiven := True;
       End
     Else If Key = 'insecure' Then
@@ -494,9 +500,9 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     P.Args := P.Args + ' -Q';
   If P.Port = 0 Then
     Die(Where + ' has no "port"');
-  If P.Proxy And (P.Bind <> '127.0.0.1') Then
+  If P.Proxy And (Not NetIsLoopback(P.Bind)) Then
     Die('port ' + IntToStr(P.Port) +
-      ': "proxy": true needs "bind": "127.0.0.1" (anyone able to connect could fake an address)');
+      ': "proxy": true needs "bind": "127.0.0.1" or "::1" (anyone able to connect could fake an address)');
   If P.Tls And ((TlsCert = '') Or (TlsKey = '')) Then
     Die('port ' + IntToStr(P.Port) + ': "tls": true needs a "tls" section with "cert" and "key"');
   If P.Tls And P.Proxy Then
@@ -507,18 +513,18 @@ Procedure LoadPort(O: TJSONObject; Idx: Integer);
     Begin
     If P.MaxPerIp = 0 Then
       P.MaxPerIp := 10;
-    If (P.Bind <> '127.0.0.1') And (Not P.Tls) And (Not P.Insecure) Then
-      Die('port ' + IntToStr(P.Port) + ': an api port that is not on 127.0.0.1 needs "tls": true (or a TLS front end on loopback with "proxy": true); "insecure": true says you know that tokens then travel in the clear');
-    If P.Insecure And (P.Bind <> '127.0.0.1') Then
+    If (Not NetIsLoopback(P.Bind)) And (Not P.Tls) And (Not P.Insecure) Then
+      Die('port ' + IntToStr(P.Port) + ': an api port that is not on 127.0.0.1 or ::1 needs "tls": true (or a TLS front end on loopback with "proxy": true); "insecure": true says you know that tokens then travel in the clear');
+    If P.Insecure And (Not NetIsLoopback(P.Bind)) Then
       Log('port ' + IntToStr(P.Port) + ': api without TLS on ' + P.Bind + ' (insecure)');
     End;
   If P.Tls And P.Sysop Then
     Die('port ' + IntToStr(P.Port) + ': a sysop port is not for TLS (it is on 127.0.0.1: reach it with ssh port forwarding)');
   If P.Sysop Then
     Begin
-    If P.Bind <> '127.0.0.1' Then
+    If Not NetIsLoopback(P.Bind) Then
       Die('port ' + IntToStr(P.Port) +
-        ': a sysop port must have "bind": "127.0.0.1" (reach it with ssh port forwarding)');
+        ': a sysop port must have "bind": "127.0.0.1" or "::1" (reach it with ssh port forwarding)');
     If P.Password = '' Then
       Die('port ' + IntToStr(P.Port) + ': a sysop port needs a "password"');
     If P.Password = 'change-me' Then
@@ -667,10 +673,16 @@ Procedure ParseGuard(V: TJSONData);
     Else If K = 'allow' Then
       Begin
       If O.Items[j].JSONType <> jtArray Then
-        Die('loginguard.allow must be a list of addresses: ["127.0.0.1", "10.0.0.0/8"]');
+        Die('loginguard.allow must be a list of addresses: ["127.0.0.1", "10.0.0.0/8", "2001:db8::/32"]');
       GuardAllow.Clear;
       For n := 0 To O.Items[j].Count - 1 Do
+        Begin
         GuardAllow.Add(Trim(JStr(O.Items[j].Items[n], 'loginguard.allow')));
+        With GuardAllow Do
+          If (NetFamily(Copy(Strings[Count - 1], 1, Pos('/', Strings[Count - 1] + '/') - 1)) = 0) Or
+             ((Pos('/', Strings[Count - 1]) > 0) And Not NetMatch(Copy(Strings[Count - 1], 1, Pos('/', Strings[Count - 1]) - 1), Strings[Count - 1])) Then
+            Die('loginguard.allow: "' + Strings[Count - 1] + '" is not an address or a net (10.0.0.1, 10.0.0.0/8, 2001:db8::/32)');
+        End;
       End
     Else If Copy(K, 1, 1) <> '_' Then Die('loginguard: unknown key "' + O.Names[j] + '"');
     End;
@@ -808,37 +820,22 @@ Procedure OpenListeners;
   Var
     i: Integer;
     S: LongInt;
-    A: TInetSockAddr;
-    One: LongInt;
+    What, Kind: String;
 
   Begin
   For i := 0 To High(Ports) Do
     Begin
-    S := fpSocket(AF_INET, SOCK_STREAM, 0);
-    If S < 0 Then
-      Die('socket: error ' + IntToStr(fpGetErrno));
-    One := 1;
-    fpSetSockOpt(S, SOL_SOCKET, SO_REUSEADDR, @One, SizeOf(One));
-    FillChar(A, SizeOf(A), 0);
-    A.sin_family := AF_INET;
-    A.sin_port := htons(Ports[i].Port);
-    A.sin_addr := StrToNetAddr(Ports[i].Bind);
-    If (A.sin_addr.s_addr = 0) And (Ports[i].Bind <> '0.0.0.0') Then
-      Die('bad bind address ' + Ports[i].Bind);
-    If fpBind(S, @A, SizeOf(A)) <> 0 Then
-      Die('cannot bind ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' (error ' +
-        IntToStr(fpGetErrno) + ')');
-    If fpListen(S, 16) <> 0 Then
-      Die('listen: error ' + IntToStr(fpGetErrno));
+    If Not NetListen(Ports[i].Bind, Ports[i].Port, S, What) Then
+      Die(What);
     Ports[i].Fd := S;
     If Ports[i].Sysop Then
-      Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' sysop monitor')
+      Kind := 'sysop monitor'
     Else If Ports[i].Api Then
-      Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' api' + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls)))
+      Kind := 'api' + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls))
     Else
-      Log('listening on ' + Ports[i].Bind + ':' + IntToStr(Ports[i].Port) + ' ' +
-        Ports[i].SType + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls)) + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
-        IntToStr(Ports[i].First) + '-' + IntToStr(Ports[i].Last));
+      Kind := Ports[i].SType + Copy(' TLS', 1, 4 * Ord(Ports[i].Tls)) + ' baud ' + IntToStr(Ports[i].Baud) + ' nodes ' +
+        IntToStr(Ports[i].First) + '-' + IntToStr(Ports[i].Last);
+    Log('listening on ' + What + ' ' + Kind);
     End;
   End;
 
@@ -2984,66 +2981,16 @@ Procedure Refuse(Client: LongInt; Const Why: String; Const Addr: String; Const M
   End;
 
 
-Function AddrNum(Const A: String; Var V: LongWord): Boolean;
-  {a dotted IPv4 address as a number}
-  Var
-    P: Integer;
-    S, T: String;
-    N, i: Integer;
-
-  Begin
-  AddrNum := False;
-  V := 0;
-  S := A + '.';
-  For i := 1 To 4 Do
-    Begin
-    P := Pos('.', S);
-    If P = 0 Then
-      Exit;
-    T := Copy(S, 1, P - 1);
-    Delete(S, 1, P);
-    N := StrToIntDef(T, -1);
-    If (N < 0) Or (N > 255) Then
-      Exit;
-    V := (V Shl 8) Or LongWord(N);
-    End;
-  AddrNum := S = '';
-  End;
-
-
 Function GuardAllowed(Const Addr: String): Boolean;
-  {the address is one that is never counted: listed in "allow", exactly or as a net a.b.c.d/n}
+  {the address is one that is never counted: listed in "allow", exactly or as a net (a.b.c.d/n, an IPv6 address and /n)}
   Var
-    i, P, Bits: Integer;
-    E, Net: String;
-    A, B, Mask: LongWord;
+    i: Integer;
 
   Begin
   GuardAllowed := False;
   For i := 0 To GuardAllow.Count - 1 Do
-    Begin
-    E := GuardAllow[i];
-    P := Pos('/', E);
-    If P = 0 Then
-      Begin
-      If E = Addr Then
-        Exit(True);
-      End
-    Else
-      Begin
-      Net := Copy(E, 1, P - 1);
-      Bits := StrToIntDef(Copy(E, P + 1, 3), -1);
-      If (Bits >= 0) And (Bits <= 32) And AddrNum(Net, B) And AddrNum(Addr, A) Then
-        Begin
-        If Bits = 0 Then
-          Mask := 0
-        Else
-          Mask := LongWord($FFFFFFFF) Shl (32 - Bits);
-        If (A And Mask) = (B And Mask) Then
-          Exit(True);
-        End;
-      End;
-    End;
+    If NetMatch(Addr, GuardAllow[i]) Then
+      Exit(True);
   End;
 
 
@@ -3177,20 +3124,20 @@ Procedure PeekProxy(C: LongInt; Var Addr: String);
 
 Procedure Accept(PortNo: Integer);
   Var
-    A: TInetSockAddr;
-    L: TSockLen;
     C: LongInt;
     Addr: String;
     Node: Integer;
 
   Begin
-  L := SizeOf(A);
-  C := fpAccept(Ports[PortNo].Fd, @A, @L);
+  C := fpAccept(Ports[PortNo].Fd, Nil, Nil);
   If C < 0 Then
     Exit;
-  Addr := NetAddrToStr(A.sin_addr);
+  Addr := NetPeer(C);
   If Ports[PortNo].Proxy Then
+    Begin
     PeekProxy(C, Addr);
+    Addr := NetNormalise(Addr);
+    End;
   If (Ports[PortNo].MaxPerIp > 0) And (CountFrom(PortNo, Addr) >= Ports[PortNo].MaxPerIp) Then
     Begin
     Refuse(C, 'too many callers from this address', Addr);
@@ -3308,6 +3255,11 @@ Begin
     Begin
     WriteLn('mklisten: ', CfgFile, ' ok, ', Length(Ports), ' port(s)');
     WriteLn('  mk:    ', MkPath, ' ', Copy('(NOT FOUND)', 1 + 11 * Ord(FileExists(MkPath)), 11));
+    For i := 0 To High(Ports) Do
+      If Ports[i].Bind = '::' Then
+        WriteLn('  port ', Ports[i].Port, ': IPv4 and IPv6', Copy(' (this system has no IPv6: IPv4 only)', 1, 36 * Ord(Not NetHasIPv6)))
+      Else
+        WriteLn('  port ', Ports[i].Port, ': ', Ports[i].Bind, ' only (IPv', NetFamily(Ports[i].Bind), ')');
     For i := 0 To High(Ports) Do
       If Ports[i].Api Then
         Begin

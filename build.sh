@@ -299,6 +299,11 @@ fi
 # MKNet: addresses, connect and listen over IPv4 and IPv6 on the loopback (IPV6-PLAN.md)
 build/nettest | grep -E "^(ok|FAIL|skip|failures)" | tee build/netresult.txt
 if grep -q "^FAIL" build/netresult.txt; then exit 1; fi
+# IPv6 in mklisten: dual stack, bind, caller addresses, PROXY, loopback rules, the guard (skipped without IPv6)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/iplistentest.py build/work/iplisten | grep -E "^(ok|FAIL|skip|failures)" | tee build/iplistenresult.txt
+  if grep -q "^FAIL" build/iplistenresult.txt; then exit 1; fi
+fi
 # the door sandbox (bubblewrap; skipped when bwrap is not installed)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/sandboxtest.py build/work/sandbox | grep -E "^(ok|FAIL|skip|failures)" | tee build/sandboxresult.txt
