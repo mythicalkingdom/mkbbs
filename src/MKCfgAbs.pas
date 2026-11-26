@@ -279,6 +279,9 @@ Type CfgObj = Object
   Procedure GetEventExt(Var E: EventsCfgType); Virtual; {Defaults if none}
   Procedure SetEventExt(Var E: EventsCfgType); Virtual;
   Function  HasFileEcho: Boolean; Virtual; {FileEcho.Mk: the file echoes (TIC) (MK configurations only)}
+  Function  HasChat: Boolean; Virtual; {Chat.Mk: multi-node chat settings (MK configurations only)}
+  Procedure GetChat(Var C: ChatCfgType); Virtual; {Defaults (chat off) if none}
+  Procedure SetChat(Var C: ChatCfgType); Virtual;
   Procedure GetFileEcho(Var F: FileEchoCfgType); Virtual; {Defaults if none}
   Procedure SetFileEcho(Var F: FileEchoCfgType); Virtual;
   Function  GetEchoInPath: String; Virtual; {Get inbound files path}
@@ -1549,6 +1552,20 @@ Procedure CfgObj.GetMailer(Var M: MailerCfgType);
   End;
 
 Procedure CfgObj.SetMailer(Var M: MailerCfgType);
+  Begin
+  End;
+
+Function CfgObj.HasChat: Boolean;
+  Begin
+  HasChat := False;
+  End;
+
+Procedure CfgObj.GetChat(Var C: ChatCfgType);
+  Begin
+  ChatDefaults(C);
+  End;
+
+Procedure CfgObj.SetChat(Var C: ChatCfgType);
   Begin
   End;
 

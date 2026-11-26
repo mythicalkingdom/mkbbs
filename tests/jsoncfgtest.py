@@ -53,8 +53,9 @@ check('MK to JSON (MKJSON is a directory) completed', r.returncode == 0 and 'Con
 jf = os.path.join(jdir, 'bbsconfig.json')
 check('bbsconfig.json is there', os.path.exists(jf))
 d = json.load(open(jf, encoding='utf-8'))
-check('sections: version, config, messages, files, echo, mailer, events, fileecho', all(k in d for k in ('version', 'config', 'messages', 'files', 'echo', 'mailer', 'events', 'fileecho')) and d['version'] == 1)
+check('sections: version, config, messages, files, echo, mailer, events, fileecho', all(k in d for k in ('version', 'config', 'messages', 'files', 'echo', 'mailer', 'events', 'fileecho', 'chat')) and d['version'] == 1)
 check('fileecho has the defaults of a BBS with no file echoes (a 60 second check, 14 days of spool)', d['fileecho'].get('CheckTimeout') == 60 and d['fileecho'].get('PassDays') == 14 and not d['fileecho'].get('Area'))
+check('chat is OFF in a BBS that never had it (room name Chat, flood 5 in 10 s, 10 lines of history, log on)', d['chat'].get('Enabled') is False and d['chat'].get('RoomName') == 'Chat' and d['chat'].get('FloodLines') == 5 and d['chat'].get('History') == 10 and d['chat'].get('LogChat') is True and d['chat'].get('MaxLine') == 160)
 check('config has the field names and the sysop', d['config'].get('SysopName') == 'Mark May' and 'ExitEL' in d['config'])
 check('only message and file areas in use are written, named by number',
       0 < len(d['messages']) < 500 and all(k.isdigit() and v['Name'] for k, v in d['messages'].items()) and all(v['Name'] for v in d['files'].values()))
@@ -73,6 +74,7 @@ d['config']['BadMsgArea'] = 6                 # offline replies that cannot go w
 d['config']['BbsLocation'] = 'Zürich €'        # the euro sign has no CP437 code: a ?
 d['fileecho']['CheckCmd'] = '/usr/bin/scan %F %T'
 d['fileecho']['PassMaxMB'] = 300
+d['chat'].update({'Enabled': True, 'RoomName': 'Café', 'MinLevel': 30, 'FloodLines': 3, 'WordFile': '/etc/mkbbs/badwords.txt', 'WordAction': 1, 'MaxMinutes': 45, 'PrivateMsg': False})
 d['fileecho']['Area'] = {'1': {'Tag': 'FSX_GEN', 'Desc': 'General files', 'FileArea': 3, 'EchoTo': 5, 'Hub': 1, 'Groups': 3, 'Attr': 1},
                          '300': {'Tag': 'PASS_ONLY', 'FileArea': 0, 'EchoTo': 2}}
 d['fileecho']['Sys'] = {'1': {'TicPwd': 'tic1', 'FixPwd': 'fixpw', 'Groups': 7}, '32': {'TicPwd': 'last'}}
@@ -83,7 +85,7 @@ check('JSON to MK (MKJSON is the file) completed', r.returncode == 0 and 'Conver
 cfgmk = open(os.path.join(mk2, 'config.mk'), 'rb').read()
 check('the .mk file has the text in CP437', b'Caf\x82 \xb0 \xa4' in cfgmk and b'Z\x81rich ?' in cfgmk)
 check('config.mk has the size of the sample (BadMsgArea took bytes of AddOn)', len(cfgmk) == os.path.getsize(os.path.join(sample, 'config.mk')))
-check('all seven record files are written', sorted(os.listdir(mk2)) == ['config.mk', 'echocfg.mk', 'events.mk', 'fileecho.mk', 'files.mk', 'mailer.mk', 'messages.mk'])
+check('all eight record files are written', sorted(os.listdir(mk2)) == ['chat.mk', 'config.mk', 'echocfg.mk', 'events.mk', 'fileecho.mk', 'files.mk', 'mailer.mk', 'messages.mk'])
 r = run('mkcfgcvt', '-y', '1', '5', MK=mk2, MKJSON=j2dir)
 d2 = json.load(open(os.path.join(j2dir, 'bbsconfig.json'), encoding='utf-8'))
 fe = d2['fileecho']
@@ -92,6 +94,7 @@ check('the file echoes went through fileecho.mk and back: tag, area, mask, hub, 
       and fe['Sys']['1']['FixPwd'] == 'fixpw' and fe['Sys']['32']['TicPwd'] == 'last' and fe['Area']['300']['FileArea'] == 0)
 fs = os.path.getsize(os.path.join(mk2, 'fileecho.mk'))
 check('fileecho.mk is one record of fixed size (%d bytes)' % fs, fs > 30000)
+check('the chat settings went through chat.mk and back (on, name with CP437 text, level, flood, word file and action, minutes, /msg off)', d2['chat'] == d['chat'] and d2['chat']['Enabled'] is True and d2['chat']['RoomName'] == 'Café' and os.path.getsize(os.path.join(mk2, 'chat.mk')) > 100)
 check('BadMsgArea went through .mk and back', d2['config'].get('BadMsgArea') == 6 and 'BadMsgArea' in d['config'])
 check('MK back to JSON: the UTF-8 text is back', d2['config']['SystemName'] == 'Café ░ ñ' and d2['config']['BbsLocation'] == 'Zürich ?')
 d['config']['BbsLocation'] = 'Zürich ?'

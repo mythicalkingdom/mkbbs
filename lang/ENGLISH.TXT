@@ -478,3 +478,24 @@
 555 the scanner found something:
 556 it could not be checked, try again later.
 557 There is not enough free disk space for an upload now.
+558 Multi-node chat is not available.
+559 Your security level is too low for chat.
+560 You may not use chat.
+566 You are muted for
+567 more second(s).
+568 You are muted.
+569 Too many lines too fast: you are muted for
+570 minute(s).
+571 That line was not sent: it has a word that is not allowed here.
+572 Private lines are not allowed here.
+573 Nobody by that node number or name is in the room.
+574 /who  who is here    /msg N text  a private line to node N or a name    /me text  an action
+575 /ignore N|name  do not show that node or name    /help  this list    /quit  leave
+576 In the room:
+577 Use /msg N text
+578 private to
+579 Use /ignore N or /ignore name
+580 Not showing lines from
+581 Not a command: type /help
+582 type /help for the commands, /quit to leave
+583 Your chat time for this call is used up.

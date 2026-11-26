@@ -21,6 +21,7 @@ Function JsonTo_EventsCfgType(Var R: EventsCfgType): TJSONObject; Forward;
 Function JsonTo_FileEchoSysType(Var R: FileEchoSysType): TJSONObject; Forward;
 Function JsonTo_FileEchoAreaType(Var R: FileEchoAreaType): TJSONObject; Forward;
 Function JsonTo_FileEchoCfgType(Var R: FileEchoCfgType): TJSONObject; Forward;
+Function JsonTo_ChatCfgType(Var R: ChatCfgType): TJSONObject; Forward;
 
 Var
   ZeroJson_SecType: String;
@@ -64,6 +65,8 @@ Var
   ZeroJson_FileEchoAreaType: String;
 Var
   ZeroJson_FileEchoCfgType: String;
+Var
+  ZeroJson_ChatCfgType: String;
 
 
 Function JsonTo_SecType(Var R: SecType): TJSONObject;
@@ -677,6 +680,30 @@ Function JsonTo_FileEchoCfgType(Var R: FileEchoCfgType): TJSONObject;
     End;
   O.Add('Area', S);
   JsonTo_FileEchoCfgType := O;
+  End;
+
+Function JsonTo_ChatCfgType(Var R: ChatCfgType): TJSONObject;
+  Var
+    O: TJSONObject;
+
+  Begin
+  O := TJSONObject.Create;
+  O.Add('Version', TJSONInt64Number.Create(R.Version));
+  O.Add('Enabled', TJSONBoolean.Create(R.Enabled));
+  O.Add('MinLevel', TJSONInt64Number.Create(R.MinLevel));
+  O.Add('RoomName', TJSONString.Create(PasToJson(ShortOk(R.RoomName, 20))));
+  O.Add('MaxLine', TJSONInt64Number.Create(R.MaxLine));
+  O.Add('FloodLines', TJSONInt64Number.Create(R.FloodLines));
+  O.Add('FloodSecs', TJSONInt64Number.Create(R.FloodSecs));
+  O.Add('MuteMinutes', TJSONInt64Number.Create(R.MuteMinutes));
+  O.Add('History', TJSONInt64Number.Create(R.History));
+  O.Add('PrivateMsg', TJSONBoolean.Create(R.PrivateMsg));
+  O.Add('ShowHandle', TJSONBoolean.Create(R.ShowHandle));
+  O.Add('LogChat', TJSONBoolean.Create(R.LogChat));
+  O.Add('WordFile', TJSONString.Create(PasToJson(ShortOk(R.WordFile, 60))));
+  O.Add('WordAction', TJSONInt64Number.Create(R.WordAction));
+  O.Add('MaxMinutes', TJSONInt64Number.Create(R.MaxMinutes));
+  JsonTo_ChatCfgType := O;
   End;
 
 Procedure JsonFrom_SecType(O: TJSONObject; Var R: SecType);
@@ -1668,6 +1695,58 @@ Procedure JsonFrom_FileEchoCfgType(O: TJSONObject; Var R: FileEchoCfgType);
       End;
   End;
 
+Procedure JsonFrom_ChatCfgType(O: TJSONObject; Var R: ChatCfgType);
+  Var
+    D: TJSONData;
+
+  Begin
+  D := O.Find('Version');
+  If D <> Nil Then
+    R.Version := JsonNum(D, R.Version, 0, 65535);
+  D := O.Find('Enabled');
+  If D <> Nil Then
+    R.Enabled := JsonBool(D, R.Enabled);
+  D := O.Find('MinLevel');
+  If D <> Nil Then
+    R.MinLevel := JsonNum(D, R.MinLevel, 0, 65535);
+  D := O.Find('RoomName');
+  If D <> Nil Then
+    R.RoomName := Copy(JsonStr(D, R.RoomName), 1, 20);
+  D := O.Find('MaxLine');
+  If D <> Nil Then
+    R.MaxLine := JsonNum(D, R.MaxLine, 0, 65535);
+  D := O.Find('FloodLines');
+  If D <> Nil Then
+    R.FloodLines := JsonNum(D, R.FloodLines, 0, 255);
+  D := O.Find('FloodSecs');
+  If D <> Nil Then
+    R.FloodSecs := JsonNum(D, R.FloodSecs, 0, 255);
+  D := O.Find('MuteMinutes');
+  If D <> Nil Then
+    R.MuteMinutes := JsonNum(D, R.MuteMinutes, 0, 255);
+  D := O.Find('History');
+  If D <> Nil Then
+    R.History := JsonNum(D, R.History, 0, 255);
+  D := O.Find('PrivateMsg');
+  If D <> Nil Then
+    R.PrivateMsg := JsonBool(D, R.PrivateMsg);
+  D := O.Find('ShowHandle');
+  If D <> Nil Then
+    R.ShowHandle := JsonBool(D, R.ShowHandle);
+  D := O.Find('LogChat');
+  If D <> Nil Then
+    R.LogChat := JsonBool(D, R.LogChat);
+  D := O.Find('WordFile');
+  If D <> Nil Then
+    R.WordFile := Copy(JsonStr(D, R.WordFile), 1, 60);
+  D := O.Find('WordAction');
+  If D <> Nil Then
+    R.WordAction := JsonNum(D, R.WordAction, 0, 255);
+  D := O.Find('MaxMinutes');
+  If D <> Nil Then
+    R.MaxMinutes := JsonNum(D, R.MaxMinutes, 0, 65535);
+  End;
+
 Function ZeroOf_SecType: String;
   Var
     R: SecType;
@@ -1920,6 +1999,18 @@ Function ZeroOf_FileEchoCfgType: String;
   J.Free;
   End;
 
+Function ZeroOf_ChatCfgType: String;
+  Var
+    R: ChatCfgType;
+    J: TJSONObject;
+
+  Begin
+  FillChar(R, SizeOf(R), 0);
+  J := JsonTo_ChatCfgType(R);
+  ZeroOf_ChatCfgType := J.AsJSON;
+  J.Free;
+  End;
+
 Procedure JsonInitZero;
   Begin
   ZeroJson_SecType := ZeroOf_SecType;
@@ -1943,4 +2034,5 @@ Procedure JsonInitZero;
   ZeroJson_FileEchoSysType := ZeroOf_FileEchoSysType;
   ZeroJson_FileEchoAreaType := ZeroOf_FileEchoAreaType;
   ZeroJson_FileEchoCfgType := ZeroOf_FileEchoCfgType;
+  ZeroJson_ChatCfgType := ZeroOf_ChatCfgType;
   End;

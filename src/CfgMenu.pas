@@ -17,7 +17,7 @@ Implementation
 
 Uses Objects, Drivers, Views, Menus, App, MsgBox, MKString, MKGlobT, MKCfgAbs,
   CfgPal, CfgPath, CfgGen, CfgNuser, CfgSec, CfgSec2, CfgPage, CfgResp, CfgEl,
-  CfgXfer, CfgProt, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail, CfgFEcho;
+  CfgXfer, CfgProt, CfgEopt, CfgPLan, CfgPAddr, CfgPPack, CfgFArea, CfgOff, CfgFast, CfgOrig, CfgPSys, CfgDoor, CfgOffp, CfgEvent, CfgMArea, CfgMail, CfgFEcho, CfgChat;
 
 Const
   cmGeneral = 1000;
@@ -70,6 +70,7 @@ Const
   cmFileEchoes = 1047;
   cmFileEchoOpts = 1048;
   cmFileEchoSys = 1049;
+  cmChat = 1050;
   cmQuitCfg = 1042;
   cmQuitDlg = 2000;
 
@@ -161,6 +162,7 @@ Function CfgStatus.Hint(AHelpCtx: Word): String;
     cmFileEchoes: Hint := 'File Echoes (TIC): the echoes, the file area of each and the systems they go to';
     cmFileEchoOpts: Hint := 'File Echo Options: the check command and the pass-through spool';
     cmFileEchoSys: Hint := 'File Echo Systems: TIC and FileFix passwords and groups';
+    cmChat: Hint := 'Multi-node Chat: the switch (off by default) and the abuse controls';
     cmQuitCfg: Hint := 'Quit and Save Changes';
     End;
   End;
@@ -237,6 +239,7 @@ Procedure CfgApp.InitMenuBar;
             NewItem('~O~ptions', '', kbNoKey, cmFileOptions, cmFileOptions,
             Nil))),
         NewItem('~E~vents', '', kbNoKey, cmEvents, cmEvents,
+        NewItem('C~h~at', '', kbNoKey, cmChat, cmChat,
         NewSubMenu('E~c~hoMail', hcNoContext,
         NewMenu(
           NewItem('~S~ystems', '', kbNoKey, cmEchoSys, cmEchoSys,
@@ -250,7 +253,7 @@ Procedure CfgApp.InitMenuBar;
             NewItem('File Echo S~y~stems', '', kbNoKey, cmFileEchoSys, cmFileEchoSys,
             Nil)))))))))),
         NewItem('~Q~uit', '', kbNoKey, cmQuitCfg, cmQuitCfg,
-        Nil))))))
+        Nil)))))))
     )));
   End;
 
@@ -339,6 +342,7 @@ Procedure CfgApp.HandleEvent(Var Event: TEvent);
       cmFileEchoes: DoCfgFileEchoes;
       cmFileEchoOpts: DoCfgFileEchoOpts;
       cmFileEchoSys: DoCfgFileEchoSys;
+      cmChat: DoCfgChat;
       Else Exit;
       End;
     ClearEvent(Event);

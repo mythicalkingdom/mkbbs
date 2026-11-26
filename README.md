@@ -20,6 +20,7 @@ read and post messages, upload and download files, play doors, and take their ma
 * **Offline mail:** QWK, QWKE, Bluewave and text packets, with screens, bulletins and a new-files list; replies come back as REP packets.
 * **Doors:** menu command 7 runs any program with `DORINFO1.DEF`, `DOOR.SYS`, `CALLINFO.BBS` and **`DOOR32.SYS`**; command 172 runs doors described in `doors.cfg`, **DOS doors in dosemu2** (no helper script) or native programs, **each in a bubblewrap sandbox** (no network, a private `/tmp`, only its own directories).  A BASIC and a Pascal interpreter run programs inside the BBS.
 * Paging, chat, bulletins and questionnaires, as the menus are set up.
+* **Multi-node chat** (off unless the sysop turns it on): one room for callers on different nodes, logged, with a flood limit, a word filter and a ban list; the sysop watches and moderates it from `mkmon` or `mkchatctl` and can send a message to every node (`CHAT.md`).
 
 **For the sysop**
 * **`mklisten`** is the front door: it accepts connections on any number of ports, starts one `mk` per caller, runs scheduled **events** (polls, hub passes, purges, backups, your own commands, with exclusive maintenance windows), the **binkp mailer**, and the login guard.  It runs as a systemd service.
@@ -98,4 +99,4 @@ The screenshots above are made by `tools/screenshots.py` from the real programs 
 
 ### Design notes and to-do list
 
-The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (metrics, multi-node chat).
+The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list.

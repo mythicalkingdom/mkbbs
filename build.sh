@@ -53,6 +53,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omsgput tests/msgput.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omksetup src/MKSetup.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcheck src/MKCheck.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmsgconv src/MKMsgConv.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkchatctl src/MKChatCtl.pas
 for t in convfill convdump convtext lrtool; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omerlr tests/merlr.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklc src/MKLC.pas
@@ -315,6 +316,11 @@ if grep -q "^FAIL" build/netresult.txt; then exit 1; fi
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/iplistentest.py build/work/iplisten | grep -E "^(ok|FAIL|skip|failures)" | tee build/iplistenresult.txt
   if grep -q "^FAIL" build/iplistenresult.txt; then exit 1; fi
+fi
+# multi-node chat (menu command 174): two nodes in one room, off by default
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/mchattest.py build build/work/mchat | grep -E "^(ok|FAIL|skip|failures)" | tee build/mchatresult.txt
+  if grep -q "^FAIL" build/mchatresult.txt; then exit 1; fi
 fi
 # mklisten and systemd's sd_notify: READY, WATCHDOG heartbeats, STATUS, STOPPING
 python3 tests/sdnotifytest.py build/mklisten build/fakemk build/work/sdnotify | grep -E "^(ok|FAIL|skip|failures)" | tee build/sdnotifyresult.txt

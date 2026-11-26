@@ -28,6 +28,7 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     Mail: ^MailerCfgType;
     Ev: ^EventsCfgType;
     FE: ^FileEchoCfgType;
+    Ch: ^ChatCfgType;
 
   Begin
   If IConfig.HasMailer And OConfig.HasMailer Then
@@ -43,6 +44,13 @@ Procedure CvtEcho(Var IConfig: CfgObj; Var OConfig: CfgObj);
     IConfig.GetFileEcho(FE^);
     OConfig.SetFileEcho(FE^);
     Dispose(FE);
+    End;
+  If IConfig.HasChat And OConfig.HasChat Then
+    Begin                              {the chat settings, when both formats keep them}
+    New(Ch);
+    IConfig.GetChat(Ch^);
+    OConfig.SetChat(Ch^);
+    Dispose(Ch);
     End;
   If IConfig.HasEventExt And OConfig.HasEventExt Then
     Begin                              {what the events do, when both formats keep it}

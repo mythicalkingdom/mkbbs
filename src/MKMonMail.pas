@@ -38,6 +38,8 @@ Function MailerScreen(RunDir: String): String;
 
 Function EventsScreen(RunDir: String): String;
   {The events mklisten runs (events.info of the run directory); R runs one now.  The result is a message for the node list}
+Function ChatScreen(RunDir: String): String;
+  {The multi-node chat room, live: what is said (private lines too), who is in; mute, remove, ban, say a line, tell a node's callers at once.  The result is a message for the node list}
 Function StatsScreen(RunDir: String): String;
   {The statistics: the calls of today, the week, the month or the year from <MK>/stats/*.tsv (what mk writes for each call): totals, calls by hour, the last calls}
 
@@ -45,7 +47,7 @@ Function StatsScreen(RunDir: String): String;
 Implementation
 
 Uses
-  BaseUnix, Sockets, Dos, MKString, MKGlobT, MKComAbs, MKSess, MKCp437, MKNodeHost, MKNet;
+  BaseUnix, Sockets, Dos, MKString, MKGlobT, MKComAbs, MKSess, MKCp437, MKNodeHost, MKNet, MKChatCore, Classes;
 
 
 Const
@@ -1530,6 +1532,240 @@ Function EventsScreen(RunDir: String): String;
         End;
       End;
   Until False;
+  ComSession^.SendStr(Esc + '[0;37;40m' + Esc + '[2J' + Esc + '[H');
+  End;
+
+
+Function ChatScreen(RunDir: String): String;
+  Type
+    Person = Record
+      Node: Integer;
+      Name: String[40];
+      Real: String[40];
+      End;
+
+  Var
+    C: Char;
+    Idle: Word;
+    Cols_, Rows_: Word;
+    LastLoad: Int64;
+    Sel, Count, Vis: Integer;
+    People: Array[1..32] Of Person;
+    Room: TChatRoom;
+    Lines, Who: TStringList;
+    Cfg: ChatCfgType;
+    Msg2, BanFile: String;
+    MsgU: LongInt;
+    Ask: Char;
+
+  Function ReadLine_(Const Prompt: String): String;
+    {a line typed on the bottom row; Esc gives up (empty)}
+    Var
+      T: String;
+      K: Char;
+
+    Begin
+    T := '';
+    Repeat
+      FillAt(Rows - 1, 1, Cols, aNorm, ' ');
+      PutAt(Rows - 1, 2, aLabel, Prompt);
+      PutAt(Rows - 1, 3 + Length(Prompt), aNorm, Copy(T, Length(T) - 50 + 1 + Ord(Length(T) < 50) * 0, 50));
+      Flush;
+      K := GetKey(500);
+      Case K Of
+        #0: ;
+        #27: Begin
+             T := '';
+             Break;
+             End;
+        #13, #10: Break;
+        #8, #127: If T <> '' Then Delete(T, Length(T), 1);
+        Else
+          If (K >= ' ') And (K <> #127) And (Length(T) < 200) Then
+            T := T + K;
+        End;
+    Until False;
+    ReadLine_ := T;
+    End;
+
+  Procedure Load;
+    Var
+      i, p: Integer;
+      Shown, Real: String;
+
+    Begin
+    Who.Clear;
+    Room.Who(Who);
+    Count := 0;
+    For i := 0 To Who.Count - 1 Do
+      If Count < 32 Then
+        Begin
+        p := Pos(':', Who[i]);
+        Inc(Count);
+        People[Count].Node := Str2Long(Copy(Who[i], 6, p - 6));
+        If ChatPresence(RunDir, People[Count].Node, Shown, Real) Then
+          Begin
+          People[Count].Name := Shown;
+          People[Count].Real := Real;
+          End;
+        End;
+    If Sel > Count Then
+      Sel := Count;
+    If Sel < 1 Then
+      Sel := 1;
+    Lines.Clear;
+    Room.Tail(Lines, Vis);
+    End;
+
+  Procedure DrawChat;
+    Var
+      i: Integer;
+      S: String;
+      At: Byte;
+
+    Begin
+    Clear;
+    FillAt(1, 1, Cols, aTitle, ' ');
+    PutAt(1, 2, aTitle, 'multi-node chat');
+    PutAt(1, 60, aTitle, 'in the room ' + Num(Count));
+    Box(2, 1, Rows - 9, Cols, 'Room (private lines are shown to you only)');
+    For i := 0 To Lines.Count - 1 Do
+      PutAt(3 + i, 3, aNorm, Copy(Lines[i], 1, Cols - 4));
+    If Lines.Count = 0 Then
+      PutAt(3, 3, aDim, 'Nothing has been said (chat is off, or nobody has used it).');
+    Box(Rows - 8, 1, Rows - 2, Cols, 'In the room');
+    For i := 1 To Count Do
+      If i <= 5 Then
+        Begin
+        S := Pad('node ' + Num(People[i].Node), 9) + Pad(People[i].Name, 24);
+        If People[i].Real <> People[i].Name Then
+          S := S + '(' + People[i].Real + ')';
+        If i = Sel Then
+          Begin
+          FillAt(Rows - 8 + i, 2, Cols - 1, aSel, ' ');
+          PutAt(Rows - 8 + i, 3, aSel, S);
+          End
+        Else
+          PutAt(Rows - 8 + i, 3, aNorm, S);
+        End;
+    If Count = 0 Then
+      PutAt(Rows - 7, 3, aDim, 'Nobody is in the room.');
+    FillAt(Rows, 1, Cols, aKey, ' ');
+    If (Msg2 <> '') And (fpTime < MsgU) Then
+      PutAt(Rows, 2, aKey, Pad(Msg2, 76))
+    Else
+      Begin
+      Msg2 := '';
+      PutAt(Rows, 2, aKey, 'Up/Down choose  M mute 5 min  U unmute  K remove  B ban  T say  N notice  A announce to all nodes  Q quit');
+      End;
+    End;
+
+  Begin
+  ChatScreen := '';
+  Rows := 25;
+  If ComSession^.GetWindowSize(Cols_, Rows_) Then
+    If (Rows_ > 25) And (Rows_ <= MaxRows) Then
+      Rows := Rows_;
+  Utf8 := TermWantsUtf8(ComSession^.GetTermType);
+  ForceAll := True;
+  BanFile := GetEnv('MK');
+  If (BanFile <> '') And (BanFile[Length(BanFile)] <> '/') Then
+    BanFile := BanFile + '/';
+  BanFile := BanFile + 'chatban.lst';
+  ChatDefaults(Cfg);
+  Room := TChatRoom.Create(RunDir, '', BanFile, Cfg, 0);
+  Lines := TStringList.Create;
+  Who := TStringList.Create;
+  Vis := Rows - 12;
+  Sel := 1;
+  Msg2 := '';
+  MsgU := 0;
+  Idle := 0;
+  LastLoad := 0;
+  Count := 0;
+  Repeat
+    If NowMs - LastLoad >= 1000 Then
+      Begin
+      Load;
+      LastLoad := NowMs;
+      End;
+    DrawChat;
+    Flush;
+    C := GetKey(200);
+    If C = #0 Then
+      Begin
+      Inc(Idle);
+      If Idle > 3000 Then
+        Break;
+      End
+    Else
+      Begin
+      Idle := 0;
+      Case UpCase(C) Of
+        'Q', #27, #24, #3: Break;
+        #1: If Sel > 1 Then Dec(Sel);
+        #2: If Sel < Count Then Inc(Sel);
+        'M', 'U': If Count > 0 Then
+               Begin
+               ChatCtl(RunDir, 'mute', People[Sel].Node, 5 * Ord(UpCase(C) = 'M'));
+               If UpCase(C) = 'M' Then
+                 ChatSysopLine(RunDir, 'N', People[Sel].Name + ' was muted by the sysop for 5 minute(s)')
+               Else
+                 ChatSysopLine(RunDir, 'N', People[Sel].Name + ' may speak again');
+               Msg2 := 'node ' + Num(People[Sel].Node) + Copy(' muted for 5 minutes', 1, 20 * Ord(UpCase(C) = 'M')) + Copy(' may speak again', 1, 16 * Ord(UpCase(C) = 'U'));
+               MsgU := fpTime + 4;
+               End;
+        'K', 'B': If Count > 0 Then
+               Begin
+               Msg2 := Copy('Remove', 1, 6 * Ord(UpCase(C) = 'K')) + Copy('Ban (remove, and never again)', 1, 29 * Ord(UpCase(C) = 'B')) + ' node ' + Num(People[Sel].Node) + ' (' + People[Sel].Real + ')?  Y / N';
+               MsgU := fpTime + 30;
+               DrawChat;
+               Flush;
+               Ask := UpCase(GetKey(30000));
+               If Ask = 'Y' Then
+                 Begin
+                 If UpCase(C) = 'B' Then
+                   Begin
+                   ChatBan(BanFile, People[Sel].Real);
+                   If People[Sel].Name <> People[Sel].Real Then
+                     ChatBan(BanFile, People[Sel].Name);
+                   End;
+                 ChatCtl(RunDir, 'kick', People[Sel].Node, 0);
+                 ChatSysopLine(RunDir, 'N', People[Sel].Name + ' was removed from the room by the sysop' + Copy(' and may not come back', 1, 22 * Ord(UpCase(C) = 'B')));
+                 Msg2 := 'node ' + Num(People[Sel].Node) + ' removed' + Copy(', and banned', 1, 12 * Ord(UpCase(C) = 'B'));
+                 End
+               Else
+                 Msg2 := 'Nothing done';
+               MsgU := fpTime + 4;
+               End;
+        'T', 'N', 'A': Begin
+               Case UpCase(C) Of
+                 'T': Msg2 := ReadLine_('Say in the room: ');
+                 'N': Msg2 := ReadLine_('Notice in the room: ');
+                 Else
+                   Msg2 := ReadLine_('To every node: ');
+                 End;
+               If Msg2 <> '' Then
+                 Begin
+                 Case UpCase(C) Of
+                   'T': ChatSysopLine(RunDir, 'X', Msg2);
+                   'N': ChatSysopLine(RunDir, 'N', Msg2);
+                   Else
+                     SysMsgSend(RunDir, Msg2);
+                   End;
+                 Msg2 := 'Sent';
+                 End
+               Else
+                 Msg2 := 'Nothing sent';
+               MsgU := fpTime + 3;
+               LastLoad := 0;
+               End;
+        End;
+      End;
+  Until False;
+  Lines.Free;
+  Who.Free;
+  Room.Free;
   ComSession^.SendStr(Esc + '[0;37;40m' + Esc + '[2J' + Esc + '[H');
   End;
 

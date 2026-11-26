@@ -107,5 +107,5 @@ mkstats [-d day | -m month | -y year] [-by node|port|user|hour|day] [-top N] [-c
   4. **`/v1/metrics`** (built: `src/MKApiMetrics.pas`, scope `metrics`, `API.md`; `sd_notify` and the watchdog for `mklisten`: `src/MKSdNotify.pas`, `Type=notify`, `tests/sdnotifytest.py`) in the JSON API (Prometheus text: calls, nodes in use, failed log-ons, the mailer, events) and a systemd watchdog / `sd_notify` for `mklisten`.
   5. **Message base converter** (`mkmsgconv`, built: `MSGCONV-PLAN.md`): Hudson, JAM, Merlin, Squish and `*.msg` into one another (the DOS-era Hudson bases of the sample are the reason), numbers and dates kept, a dry run.
   6. **Door sandbox**: run command 7 programs (and `mkdosdoor`) in a restricted environment (for example `bubblewrap`: no network, a private `/tmp`, the node directory and the door directory only).
-  7. **Optional multi-node chat**: a chat room across nodes and a message from the sysop to every node (`mkmon`), switched on per BBS.
+  7. **Optional multi-node chat** (built: `MCHAT-PLAN.md`, `CHAT.md`; off by default): a chat room across nodes and a message from the sysop to every node (`mkmon`), switched on per BBS.
   Still open from before: ban lists, the remaining `mkcheck` checks, the API's writes (run an event, poll a link, disconnect a node), the `self:` calls of callers, logrotate and a JSON-lines log.

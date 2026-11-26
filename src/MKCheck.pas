@@ -426,6 +426,54 @@ Procedure CheckUploads;
   End;
 
 
+Procedure CheckChat;
+  {Chat.Mk (menu command 174): off, or on with what it needs}
+  Var
+    C: ChatCfgType;
+    D, W: String;
+
+  Begin
+  If Not Config^.HasChat Then
+    Exit;
+  Config^.GetChat(C);
+  If Not C.Enabled Then
+    Begin
+    Info('multi-node chat is off (mkconfig: Chat)');
+    Exit;
+    End;
+  Info('multi-node chat is ON: room "' + C.RoomName + '", level ' + IntToStr(C.MinLevel) + ' and up, flood limit ' + IntToStr(C.FloodLines) + ' lines in ' + IntToStr(C.FloodSecs) + ' s' +
+    Copy(', no flood limit', 1, 16 * Ord(C.FloodLines = 0)) + Copy(', every line logged', 1, 19 * Ord(C.LogChat)) + Copy(', NOT logged', 1, 12 * Ord(Not C.LogChat)));
+  If C.LogChat Then
+    Begin
+    D := ExtractFilePath(ExpandFileName(Config^.GetLogFileName));
+    If (D = '') Or (Not DirectoryExists(D)) Or (fpAccess(D, W_OK) <> 0) Then
+      Warn('chat: the log folder ' + D + ' cannot be written, so chat.log cannot be kept');
+    End
+  Else
+    Warn('chat: lines are not logged: nothing shows later who said what (mkconfig: Chat > Log every line)');
+  W := Trim(C.WordFile);
+  If (W <> '') And Not FileExists(W) Then
+    Warn('chat: the word file ' + W + ' is not there (no words are filtered)');
+  If C.MinLevel = 0 Then
+    Warn('chat: the lowest level is 0, so every caller, new users too, may join; raise it to keep them out until you have looked at them');
+  End;
+
+
+Procedure CheckChatItem(MenuName: String; Item: Integer; Key: String);
+  {menu command 174: chat is on, or the callers are told it is not there}
+  Var
+    C: ChatCfgType;
+
+  Begin
+  If Config^.HasChat Then
+    Config^.GetChat(C)
+  Else
+    ChatDefaults(C);
+  If Not C.Enabled Then
+    Warn('menu ' + MenuName + ' item ' + IntToStr(Item) + ' (' + Key + '): the multi-node chat command, and chat is off: callers are told it is not available (mkconfig: Chat, or take the item out)');
+  End;
+
+
 Procedure CheckUploadItem(MenuName: String; Item: Integer; Key, Data: String);
   {menu command 173: the area (when named) allows uploads}
   Var
@@ -529,6 +577,7 @@ Procedure CheckMenuFile(Name: String; Var HasLogoff: Boolean);
           End;
         172: CheckDoorItem(Name, i, R.Key, Data);
         173: CheckUploadItem(Name, i, R.Key, Data);
+        174: CheckChatItem(Name, i, R.Key);
         169, 170:
           Begin
           W := FirstWord(Data);
@@ -552,6 +601,7 @@ Procedure CheckMenus;
     n: Integer;
 
   Begin
+  CheckChat;
   KnownMenus := TStringList.Create;
   Logoff := False;
   If Not FileExists(Config^.GetMnuPath(1) + 'top.mnu') Then

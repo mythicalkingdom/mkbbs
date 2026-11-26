@@ -110,6 +110,7 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkcheck` | looks at a BBS and says what would stop `mk` from running it (or running it well): folders, language, menus, areas, users, listener configuration; changes nothing (`SETUP.md`) |
 | `mksetup` | makes a new BBS that `mk` can run: folder, configuration, two message areas, a file area, a sample door, the menu and screens (`SETUP.md`) |
 | `mkapi`, `mkapitoken` | the read only JSON API (a port of the type `api` in `mklisten`) and its tokens (`API-PLAN.md`) |
+| `mkchatctl` | the sysop's hand on the multi-node chat (who, log, say, announce to every node, mute, kick, ban); chat is off unless turned on (`CHAT.md`) |
 | `mkmsgconv` | converts a message area into a base of another kind, checks it, moves the last-read pointers, `-s` switches the configuration (`MAINT.md`) |
 | `mkuserpack` | takes deleted users out of the user files (exclusive event), writes `usermap.txt` old→new numbers (`MAINT.md`) |
 | `mkfilecheck` | checks the file areas against their lists: files missing, not listed, listed twice, wrong case; can fix (`MAINT.md`) |

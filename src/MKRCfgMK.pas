@@ -28,11 +28,14 @@ Type MKRCfgObj = Object(CfgObj)
   MKMsg: ^MsgCfgArray;
   MKFile: ^FileCfgArray;
   MKEcho:   ^EchoCfgType;
+  MKChat:   ^ChatCfgType;              {Chat.Mk, read once with the rest: chat off when the file is not there}
   MKMsgFile: File;
   MKFileFile: File;
   Procedure Load; Virtual; {Loads Bbs config info}
   Procedure Unload; Virtual; {Not normally called direct - unloads config}
   Procedure MKLoad; Virtual;{Normally internal to load MK config}
+  Function  HasChat: Boolean; Virtual;
+  Procedure GetChat(Var C: ChatCfgType); Virtual;
   Function  ValidMsgArea(Area: Word): Word;
   Function  ValidFileArea(Area: Word): Word;
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
@@ -337,12 +340,30 @@ Function MKRCfgObj.GetBbsPath: String;
 
 
 
+Function MKRCfgObj.HasChat: Boolean;
+  Begin
+  HasChat := True;
+  End;
+
+
+Procedure MKRCfgObj.GetChat(Var C: ChatCfgType);
+  Begin
+  C := MKChat^;
+  End;
+
+
 Procedure MKRCfgObj.MKLoad;
+  Var
+    Tmp: ^ChatCfgType;
+    FN: String;
+
   Begin
   New(MKCfg);
   New(MKMsg);
   New(MKFile);
   New(MKEcho);
+  New(MKChat);
+  ChatDefaults(MKChat^);
   Error := LoadFile(FindBbsFile('config.mk') + 'config.mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
     Error := LoadFile(FindBbsFile('messages.mk') + 'messages.mk', MKMsg^, SizeOf(MKMsg^));
@@ -350,6 +371,15 @@ Procedure MKRCfgObj.MKLoad;
     Error := LoadFile(FindBbsFile('files.mk') + 'files.mk', MKFile^, SizeOf(MkFile^));
   If Error = 0 Then
     Error := LoadFile(FindBbsFile('echocfg.mk') + 'echocfg.mk', MKEcho^, SizeOf(MKEcho^));
+  FN := FindBbsFile('chat.mk') + 'chat.mk';
+  If FileExist(FN) Then
+    Begin                              {optional: a missing or unreadable file leaves chat off}
+    New(Tmp);
+    ChatDefaults(Tmp^);
+    If (LoadFile(FN, Tmp^, SizeOf(Tmp^)) = 0) And (Tmp^.Version >= 1) And (Tmp^.Version <= ChatCfgVersion) Then
+      MKChat^ := Tmp^;
+    Dispose(Tmp);
+    End;
   Assign(MKMsgFile, FindBbsFile('messages.mk') + 'messages.mk');
   Assign(MKFileFile, FindBbsFile('files.mk') + 'files.mk');
   FileMode := fmReadOnly + fmDenyNone;
@@ -368,6 +398,7 @@ Procedure MKRCfgObj.MKLoad;
     Dispose(MkMsg);
     Dispose(MkFile);
     Dispose(MKEcho);
+    Dispose(MKChat);
     End;
   End;
 
@@ -380,6 +411,8 @@ Procedure MKRCfgObj.Allocate;
     New(MKMsg);
     New(MKFile);
     New(MKEcho);
+    New(MKChat);
+    ChatDefaults(MKChat^);
     FillChar(MKCfg^, SizeOf(MKCfg^), 0);
     FillChar(MKMsg^, SizeOf(MKMsg^), 0);
     FillChar(MKFile^, SizeOf(MKFile^), 0);
@@ -399,6 +432,7 @@ Procedure MKRCfgObj.Unload;
     Dispose(MKMsg);
     Dispose(MKFile);
     Dispose(MKEcho);
+    Dispose(MKChat);
     Close(MKMsgFile);
     Close(MKFileFile);
     If IoResult <> 0 Then;

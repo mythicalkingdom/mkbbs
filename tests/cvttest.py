@@ -54,7 +54,8 @@ want = {n: os.path.getsize(os.path.join(sample, n)) for n in ('config.mk', 'echo
 want['mailer.mk'] = 12600            # new: the mailer settings, written with the defaults
 want['events.mk'] = 4502             # new: what the events do, written with the defaults
 want['fileecho.mk'] = 33024          # new: the file echoes (TIC), written with the defaults
-check('the four MK files have the sizes of the real ones, mailer.mk, events.mk and fileecho.mk the sizes of their records: %s' % names, names == want)
+want['chat.mk'] = 139                # new: the multi-node chat settings (off), written with the defaults
+check('the four MK files have the sizes of the real ones, mailer.mk, events.mk, fileecho.mk and chat.mk the sizes of their records: %s' % names, names == want)
 ra = os.path.join(work, 'ra.txt')
 mk = os.path.join(work, 'mk.txt')
 r1 = run('mklistmsgarea', ra, RA=inp)

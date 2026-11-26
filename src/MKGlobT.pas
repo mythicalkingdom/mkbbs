@@ -220,6 +220,33 @@ Type FileEchoCfgType = Record
 
 Procedure FileEchoDefaults(Var F: FileEchoCfgType);
 
+{Multi-node chat (Chat.Mk, one record; see MCHAT-PLAN.md).  Off unless the sysop turns it on.}
+Const
+  ChatCfgVersion = 1;
+  cwMask = 0;                          {ChatCfgType.WordAction: the word is replaced by * in the line}
+  cwRefuse = 1;                        {the line is not sent}
+
+Type ChatCfgType = Record
+  Version: Word;                       {ChatCfgVersion}
+  Enabled: Boolean;                    {the switch: False = no multi-node chat on this BBS}
+  MinLevel: Word;                      {the lowest security level that may join}
+  RoomName: String[20];                {shown to the callers}
+  MaxLine: Word;                       {characters in a line, 0 = 160}
+  FloodLines: Byte;                    {more lines than this in FloodSecs seconds: muted for MuteMinutes (0 = no limit)}
+  FloodSecs: Byte;
+  MuteMinutes: Byte;
+  History: Byte;                       {lines of the room a caller sees when joining}
+  PrivateMsg: Boolean;                   {/msg allowed}
+  ShowHandle: Boolean;                 {the handle is shown instead of the name when the user has one}
+  LogChat: Boolean;                    {every line goes to chat.log (private ones too)}
+  WordFile: String[60];                {a text file, one word or phrase on each line; blank = no filter}
+  WordAction: Byte;                    {cwMask or cwRefuse}
+  MaxMinutes: Word;                    {minutes a caller may spend in the room each call, 0 = no limit}
+  Expansion: Array[1..40] of Byte;
+  End;
+
+Procedure ChatDefaults(Var C: ChatCfgType);
+
 Type EventsCfgType = Record
   Version: Word;                       {EventsCfgVersion}
   Ev: Array[1..MaxEventExt] of EventExtType;
@@ -305,6 +332,24 @@ Procedure EventsDefaults(Var E: EventsCfgType);
     E.Ev[i].LateMin := 10;
     E.Ev[i].LateMax := 5;
     End;
+  End;
+
+
+Procedure ChatDefaults(Var C: ChatCfgType);
+  Begin
+  FillChar(C, SizeOf(C), 0);
+  C.Version := ChatCfgVersion;
+  C.Enabled := False;
+  C.RoomName := 'Chat';
+  C.MaxLine := 160;
+  C.FloodLines := 5;
+  C.FloodSecs := 10;
+  C.MuteMinutes := 2;
+  C.History := 10;
+  C.PrivateMsg := True;
+  C.ShowHandle := True;
+  C.LogChat := True;
+  C.WordAction := cwMask;
   End;
 
 

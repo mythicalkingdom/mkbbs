@@ -20,6 +20,7 @@ Unit MKCfgJs;   {The MK configuration kept in one JSON file (bbsconfig.json) ins
            "mailer":   { ... mailer.mk ... }
            "events":   { ... events.mk ... }
            "fileecho": { ... fileecho.mk ... }
+           "chat":     { ... chat.mk ... }
          }
 
      The fields have the names of the record fields (Struct.MK, MKGlobT.pas); CfgJson.Inc (made by tools/genjsoncfg.py)
@@ -314,6 +315,8 @@ Procedure MKJsonCfgObj.MKLoad;
   EventsDefaults(MKEvents^);
   New(MKFileEcho);
   FileEchoDefaults(MKFileEcho^);
+  New(MKChat);
+  ChatDefaults(MKChat^);
   FillChar(MKCfg^, SizeOf(MKCfg^), 0);
   FillChar(MKMsg^, SizeOf(MKMsg^), 0);
   FillChar(MKFile^, SizeOf(MKFile^), 0);
@@ -367,6 +370,9 @@ Procedure MKJsonCfgObj.MKLoad;
         D := Root.Find('fileecho');
         If (D <> Nil) And (D.JSONType = jtObject) Then
           JsonFrom_FileEchoCfgType(TJSONObject(D), MKFileEcho^);
+        D := Root.Find('chat');
+        If (D <> Nil) And (D.JSONType = jtObject) Then
+          JsonFrom_ChatCfgType(TJSONObject(D), MKChat^);
       Finally
         Root.Free;
       End;
@@ -384,6 +390,7 @@ Procedure MKJsonCfgObj.MKLoad;
     Dispose(MKMail);
     Dispose(MKEvents);
     Dispose(MKFileEcho);
+    Dispose(MKChat);
     End;
   End;
 
@@ -454,6 +461,7 @@ Procedure MKJsonCfgObj.MKSave;
     Root.Add('mailer', JsonTo_MailerCfgType(MKMail^));
     Root.Add('events', JsonTo_EventsCfgType(MKEvents^));
     Root.Add('fileecho', JsonTo_FileEchoCfgType(MKFileEcho^));
+    Root.Add('chat', JsonTo_ChatCfgType(MKChat^));
     Error := WriteTree(JsonFile, Root);
   Finally
     Root.Free;

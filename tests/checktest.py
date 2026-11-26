@@ -169,6 +169,44 @@ r = broken(upload_item('', fine.replace('sandbox = off', 'sandbox = on\nrobind =
 check('a robind that is not there: WARN', 'robind = /nonexistent/clam is not there' in r.stdout, r.stdout)
 r = broken(upload_item('', fine.replace(tmp + '/qq', '/proc/nowhere/q')))
 check('a quarantine directory that cannot be made: WARN', 'the quarantine directory /proc/nowhere/q cannot be made' in r.stdout, r.stdout)
+# multi-node chat (chat.mk)
+import struct
+def chat_mk(enabled=1, level=0, log=1, wordfile=''):
+    def f(d):
+        pas = lambda t, n: bytes([len(t)]) + t.encode().ljust(n, b'\0')
+        rec = struct.pack('<HBH', 1, enabled, level) + pas('Chat', 20) + struct.pack('<HBBBBBBB', 160, 5, 10, 2, 10, 1, 1, log) + pas(wordfile, 60) + struct.pack('<BH', 0, 0) + bytes(40)
+        assert len(rec) == 139
+        open(d + '/chat.mk', 'wb').write(rec)
+    return f
+
+
+r = broken(lambda d: None)
+check('no chat.mk: chat is off, an info line only', r.returncode == 0 and 'multi-node chat is off' in r.stdout, r.stdout)
+r = broken(chat_mk(0))
+check('chat.mk with chat off: off', 'multi-node chat is off' in r.stdout and not has(r, 'WARN chat'), r.stdout)
+r = broken(chat_mk(1, 20))
+check('chat on, level 20, logged: an info line with the room and the flood limit, nothing wrong', 'multi-node chat is ON: room "Chat", level 20 and up, flood limit 5 lines in 10 s, every line logged' in r.stdout and 'WARN chat' not in r.stdout, r.stdout)
+def chat_item(enabled):
+    def f(d):
+        upload_item('')(d)
+        m = bytearray(open(d + '/menus/top.mnu', 'rb').read())
+        i = len(m) // 167 - 2
+        m[i * 167] = 174
+        open(d + '/menus/top.mnu', 'wb').write(m)
+        chat_mk(enabled, 20)(d)
+    return f
+
+
+r = broken(chat_item(0))
+check('a menu item for chat and chat off: WARN', 'the multi-node chat command, and chat is off' in r.stdout, r.stdout)
+r = broken(chat_item(1))
+check('a menu item for chat and chat on: nothing to say about it', 'the multi-node chat command' not in r.stdout, r.stdout)
+r = broken(chat_mk(1, 0))
+check('chat on for level 0: WARN (new users may join)', 'WARN chat: the lowest level is 0' in r.stdout, r.stdout)
+r = broken(chat_mk(1, 20, 0))
+check('chat on and not logged: WARN', 'WARN chat: lines are not logged' in r.stdout, r.stdout)
+r = broken(chat_mk(1, 20, 1, '/nonexistent/words.txt'))
+check('a word file that is not there: WARN', 'WARN chat: the word file /nonexistent/words.txt is not there' in r.stdout, r.stdout)
 r = broken(lambda d: os.remove(d + '/games/cowsandbulls.pas'))
 check('the sample door is gone: WARN, the BBS still runs (exit 0)', r.returncode == 0 and 'WARN menu top' in r.stdout and 'cowsandbulls.pas, which is not there' in r.stdout, r.stdout)
 r = broken(lambda d: os.remove(d + '/msgs/gen.mer'))

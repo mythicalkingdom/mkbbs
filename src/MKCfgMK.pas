@@ -21,12 +21,14 @@ Type MKCfgObj = Object(CfgObj)
   MKMail:   ^MailerCfgType;
   MKEvents: ^EventsCfgType;
   MKFileEcho: ^FileEchoCfgType;
+  MKChat: ^ChatCfgType;
   Procedure Load; Virtual; {Loads Bbs config info}
   Procedure Unload; Virtual; {Not normally called direct - unloads config}
   Procedure MKLoad; Virtual;{Normally internal to load MK config}
   Procedure MKMailLoad;
   Procedure MKEventsLoad;
   Procedure MKFileEchoLoad;
+  Procedure MKChatLoad;
   Procedure Allocate; Virtual;{Allocate space for non-loaded config}
   Procedure Save; Virtual;{Save Bbs config info}
   Function  SaveFileName(FN: String): String; Virtual;
@@ -268,6 +270,9 @@ Type MKCfgObj = Object(CfgObj)
   Procedure GetEventExt(Var E: EventsCfgType); Virtual;
   Procedure SetEventExt(Var E: EventsCfgType); Virtual;
   Function  HasFileEcho: Boolean; Virtual;
+  Function  HasChat: Boolean; Virtual;
+  Procedure GetChat(Var C: ChatCfgType); Virtual;
+  Procedure SetChat(Var C: ChatCfgType); Virtual;
   Procedure GetFileEcho(Var F: FileEchoCfgType); Virtual;
   Procedure SetFileEcho(Var F: FileEchoCfgType); Virtual;
   Procedure GetMailer(Var M: MailerCfgType); Virtual;
@@ -671,6 +676,29 @@ Procedure MKCfgObj.MKFileEchoLoad;
   End;
 
 
+Procedure MKCfgObj.MKChatLoad;
+  {Chat.Mk is optional: missing, multi-node chat is off}
+  Var
+    FN: String;
+    Tmp: ^ChatCfgType;
+
+  Begin
+  FN := FindBbsFile('chat.mk') + 'chat.mk';
+  If Not FileExist(FN) Then
+    Exit;
+  New(Tmp);
+  ChatDefaults(Tmp^);
+  If LoadFile(FN, Tmp^, SizeOf(Tmp^)) = 0 Then
+    Begin
+    If (Tmp^.Version >= 1) And (Tmp^.Version <= ChatCfgVersion) Then
+      MKChat^ := Tmp^;
+    End
+  Else
+    Error := 8892;
+  Dispose(Tmp);
+  End;
+
+
 Procedure MKCfgObj.MKLoad;
   Begin
   New(MKCfg);
@@ -683,6 +711,8 @@ Procedure MKCfgObj.MKLoad;
   EventsDefaults(MKEvents^);
   New(MKFileEcho);
   FileEchoDefaults(MKFileEcho^);
+  New(MKChat);
+  ChatDefaults(MKChat^);
   FileMode := fmReadWrite + fmDenyNone;
   Error := LoadFile(FindBbsFile('config.mk') + 'config.mk', MkCfg^, SizeOf(MkCfg^));
   If Error = 0 Then
@@ -698,6 +728,8 @@ Procedure MKCfgObj.MKLoad;
       MKEventsLoad;
     If Error = 0 Then
       MKFileEchoLoad;
+    If Error = 0 Then
+      MKChatLoad;
     End;
   If Error = 0 Then
     CfgInfo^.Loaded := True
@@ -711,6 +743,7 @@ Procedure MKCfgObj.MKLoad;
     Dispose(MKMail);
     Dispose(MKEvents);
     Dispose(MKFileEcho);
+    Dispose(MKChat);
     End;
   End;
 
@@ -729,6 +762,8 @@ Procedure MKCfgObj.Allocate;
     EventsDefaults(MKEvents^);
     New(MKFileEcho);
     FileEchoDefaults(MKFileEcho^);
+    New(MKChat);
+    ChatDefaults(MKChat^);
     FillChar(MKCfg^, SizeOf(MKCfg^), 0);
     FillChar(MKMsg^, SizeOf(MKMsg^), 0);
     FillChar(MKFile^, SizeOf(MKFile^), 0);
@@ -751,6 +786,7 @@ Procedure MKCfgObj.Unload;
     Dispose(MKMail);
     Dispose(MKEvents);
     Dispose(MKFileEcho);
+    Dispose(MKChat);
     CfgInfo^.Loaded := False;
     End;
   End;
@@ -799,7 +835,7 @@ Procedure MKCfgObj.Save;
 
 Function MKCfgObj.SaveFileNames: String;
   Begin
-  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk|events.mk|fileecho.mk';
+  SaveFileNames := 'config.mk|messages.mk|files.mk|echocfg.mk|mailer.mk|events.mk|fileecho.mk|chat.mk';
   End;
 
 
@@ -848,6 +884,8 @@ Procedure MKCfgObj.MKSave;
     Error := SaveFileBak(SaveFileName('events.mk'), MKEvents^, SizeOf(MKEvents^));
   If Error = 0 Then
     Error := SaveFileBak(SaveFileName('fileecho.mk'), MKFileEcho^, SizeOf(MKFileEcho^));
+  If Error = 0 Then
+    Error := SaveFileBak(SaveFileName('chat.mk'), MKChat^, SizeOf(MKChat^));
   End;
 
 
@@ -2714,6 +2752,25 @@ Function MKCfgObj.HasEventExt: Boolean;
 Procedure MKCfgObj.GetEventExt(Var E: EventsCfgType);
   Begin
   E := MKEvents^;
+  End;
+
+
+Function MKCfgObj.HasChat: Boolean;
+  Begin
+  HasChat := True;
+  End;
+
+
+Procedure MKCfgObj.GetChat(Var C: ChatCfgType);
+  Begin
+  C := MKChat^;
+  End;
+
+
+Procedure MKCfgObj.SetChat(Var C: ChatCfgType);
+  Begin
+  MKChat^ := C;
+  MKChat^.Version := ChatCfgVersion;
   End;
 
 

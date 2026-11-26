@@ -8,7 +8,7 @@ Unit MKDoor;
 
 Interface
 
-Uses MKGlobT, MKStr, MKSnoop, MKPty, MKRCfgMK, MKRCfgRA, MKCfgSB, MKCfgQB, MKMsgHud,
+Uses MKGlobT, MKStr, MKChatCore, MKSnoop, MKPty, MKRCfgMK, MKRCfgRA, MKCfgSB, MKCfgQB, MKMsgHud,
   Dos;
 
 
@@ -107,6 +107,7 @@ Type DoorUser = Object
   Procedure AnsiChat;                    {Internal use}
   Procedure AvatarChat;                  {Internal use}
   Procedure DoChat;                      {Start chat}
+  Procedure ShowSysopMessages;           {the sysop's messages to every node, said now}
   Procedure WaitEnter;                   {Wait for enter to be pressed}
   Procedure PressEnter;                  {Ask user to Press Enter}
   Function  InputChr(Var Ch:Char): Boolean; {True if char read and returned
@@ -300,6 +301,9 @@ Type DoorUserPtr = ^DoorUser;
 Var
   Prompts: StrObj;
   User:DoorUser;
+  SysMsgOffset: Int64;                 {sysopmsg.log is read up to here (-1: from the time the caller comes)}
+  SysMsgChecked: LongInt;
+  SysMsgInit: Boolean;
 
 
 Procedure DoShell(Cmd: String; DoSwap: Boolean; DoWindow: Boolean);
@@ -310,6 +314,7 @@ Var
   ShellError: Word;                    {what DoShell could not do: 0 = it ran the program, 2 = no such program, else the DOS error}
   CharsetMode: Byte;                   {0 = by the terminal type, 1 = CP437 as it is, 2 = UTF-8 (mk -U, the menu command)}
   SysopChatWanted: Boolean;            {the sysop (mkmon) asked for a chat; DoChat starts at the next InputChr}
+  InMultiChat: Boolean;                {the multi-node chat room is on the screen: it shows the sysop's messages itself}
   MaintWarnMin: LongInt;               {mklisten: an exclusive event is waiting; said to the caller at the next InputChr (0 = log off, else minutes left)}
 
 Function PromptOr(N: Word; Const Default: String): String; {A prompt of the language file, or this English text when it has none}
@@ -1256,6 +1261,27 @@ Function PromptOr(N: Word; Const Default: String): String;
   End;
 
 
+Procedure DoorUser.ShowSysopMessages;
+  Var
+    L: ShortString;
+
+  Begin
+  SysMsgChecked := CurrentTime;
+  If Not SysMsgInit Then
+    Begin
+    SysMsgInit := True;
+    SysMsgOffset := -1;
+    End;
+  While SysMsgNext(GetEnv('MKRUN'), SysMsgOffset, L) Do
+    Begin
+    DisplayNewLine;
+    DisplayAttr(LightRed);
+    DisplayStrLn(PromptOr(584, 'Message from the sysop:') + ' ' + L);
+    DisplayAttr(LightGray);
+    End;
+  End;
+
+
 Function DoorUser.InputChr(Var Ch:Char): Boolean;
   Begin
   InputChr := False;
@@ -1274,6 +1300,8 @@ Function DoorUser.InputChr(Var Ch:Char): Boolean;
       End;
     MaintWarnMin := -1;
     End;
+  If (Not InMultiChat) And (CurrentTime <> SysMsgChecked) Then
+    ShowSysopMessages;                   {a message of the sysop to every node (mkmon, mkchatctl)}
   If SysopChatWanted Then
     Begin                                {the sysop asked for a chat (mkmon)}
     SysopChatWanted := False;
