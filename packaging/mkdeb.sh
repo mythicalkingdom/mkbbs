@@ -49,10 +49,12 @@ cp build/deb/lang/* "$STAGE/usr/share/mkbbs/lang/"
 # the documentation and the examples
 doc="$STAGE/usr/share/doc/mkbbs"
 mkdir -p "$doc/examples"
-for f in GETTING-STARTED MKBBS MKLISTEN NETWORKING HUBS TOSSER SSH PASSWORDS DOS-DOORS UPLOADS CHAT BACKUP MAINT STATS API SETUP; do
+for f in GETTING-STARTED MKBBS MKLISTEN NETWORKING HUBS TOSSER SSH PASSWORDS DOS-DOORS UPLOADS CHAT EXTENSIONS BACKUP MAINT STATS API SETUP; do
     [ -f "$f.md" ] && install -m 644 "$f.md" "$doc/$f.md"
 done
 install -m 644 mklisten.example.json "$doc/examples/"
+mkdir -p "$doc/examples/ext"
+install -m 644 ext/* "$doc/examples/ext/"
 install -m 644 bbsconfig_mkfreq_example.json "$doc/examples/" 2>/dev/null || true
 cat > "$doc/copyright" <<'CR'
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/

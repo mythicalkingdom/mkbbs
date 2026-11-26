@@ -7,7 +7,7 @@ Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
 MKSys, MKCodes, MKLogHook, MKStats, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
-MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, Dos
+MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, MKScript, Classes, Dos
   ;
 
 
@@ -88,6 +88,11 @@ Var
   NetG, QwkNetList: Boolean;
   QwkNetListName: String;
   QwkMode: Boolean;
+  ScriptName, ScriptCaps: String;       {mk -x: a script of the sysop, no caller (MKScript)}
+  ScriptArgs: TStringList;
+  ScriptSecs: LongInt;
+  j: Word;
+  ScriptNode: Integer;
 
 Begin
 StartUpPath := GetCurrentPath;
@@ -105,9 +110,36 @@ NetG := False;
 QwkNetList := False;
 QwkNetListName := '';
 QwkMode := False;
+ScriptName := '';
+ScriptCaps := '';
+ScriptSecs := -1;
+ScriptArgs := Nil;
 i := 1;
 While i <= ParamCount Do
   Begin
+  If ParamStr(i) = '-x' Then
+    Begin                              {mk -x [-C capabilities] [-T seconds] script [arguments]: the rest of the line is the script's}
+    j := i + 1;
+    While (j < ParamCount) And ((ParamStr(j) = '-C') Or (ParamStr(j) = '-T')) Do
+      Begin
+      If ParamStr(j) = '-C' Then
+        ScriptCaps := ParamStr(j + 1)
+      Else
+        ScriptSecs := Str2Long(ParamStr(j + 1));
+      Inc(j, 2);
+      End;
+    If j > ParamCount Then
+      Begin
+      WriteLn(StdErr, 'usage: mk -x [-C capabilities] [-T seconds] script.bas|script.pas [arguments]');
+      Halt(2);
+      End;
+    ScriptName := ParamStr(j);
+    ScriptArgs := TStringList.Create;
+    ScriptArgs.Add(ParamStr(j));
+    For j := j + 1 To ParamCount Do
+      ScriptArgs.Add(ParamStr(j));
+    Break;
+    End;
   TmpStr := Upper(ParamStr(i));
   If ((TmpStr[1] = '-') or (TmpStr[1] = '/')) Then
     Begin
@@ -176,6 +208,18 @@ While i <= ParamCount Do
     End;
   Inc(i);
   End;
+If ScriptName <> '' Then
+  Begin
+  ScriptNode := ScriptPickNode;        {a node of its own, from the range for scripts}
+  If ScriptNode < 0 Then
+    Begin
+    WriteLn(StdErr, 'mk -x: every script node is in use (MKSCRIPTNODES says which numbers they have)');
+    Halt(2);
+    End;
+  If ScriptNode = 0 Then
+    ScriptNode := 101;
+  NodeNumber := ScriptNode;
+  End;
 BbsType := DetectBbsType;
 Case BbsType Of
   1: Config := NewMKConfig(True);
@@ -218,7 +262,7 @@ If ComSession = Nil Then
 {The sysop monitor (mkmon) may watch this node: mklisten says where the
  sockets live (environment MKRUN).}
 RunDir := GetEnv('MKRUN');
-If (RunDir <> '') And (NodeNumber > 0) Then
+If (RunDir <> '') And (NodeNumber > 0) And (ScriptName = '') Then
   Begin
   SnoopHandler := SysopCommand;
   ComSession := New(SnoopComPtr, Init(ComSession, True,
@@ -239,6 +283,28 @@ Prompts.Load(Config^.FindBbsFile(Config^.GetLangFile(1) + '.lc') +
   Config^.GetLangFile(1) + '.lc');
 CommaChar := Prompts.GetChar(320);
 SysStats.Load;
+If ScriptName <> '' Then
+  Begin
+  {mk -x: a script of the sysop on a script node, nobody is on line}
+  Assign(Output, '');                  {the script writes to the real standard output}
+  Rewrite(Output);
+  LocalMode := True;
+  CurrentPort := 0;
+  User.SetSessionTimeLimit(86400);
+  User.SetStartTime;
+  User.SetIdleTimeLimit(86400);
+  User.SetUserName('script ' + ScriptShortName(ScriptName));
+  User.PostStatus(uoDoor);
+  ExitLevel := ScriptRun(ScriptName, ScriptArgs, ScriptCaps, ScriptSecs);
+  User.PostStatus(uoNotAvail);
+  User.Done;
+  LogEntry.Done;
+  Config^.Done;
+  ScriptFinish;
+  Dispose(ComSession, Done);
+  ComSession := Nil;
+  Halt(ExitLevel);
+  End;
 If NetG And QwkNetList Then
   Begin
   {mk -G -P: the hub profiles (nobody is on line)}

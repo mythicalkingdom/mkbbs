@@ -322,6 +322,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/mchattest.py build build/work/mchat | grep -E "^(ok|FAIL|skip|failures)" | tee build/mchatresult.txt
   if grep -q "^FAIL" build/mchatresult.txt; then exit 1; fi
 fi
+# mk -x: BASIC and Pascal scripts that use the BBS (MHOST-PLAN.md phase 1)
+python3 tests/hosttest.py build build/work/host | grep -E "^(ok|FAIL|skip|failures)" | tee build/hostresult.txt
+if grep -q "^FAIL" build/hostresult.txt; then exit 1; fi
 # mklisten and systemd's sd_notify: READY, WATCHDOG heartbeats, STATUS, STOPPING
 python3 tests/sdnotifytest.py build/mklisten build/fakemk build/work/sdnotify | grep -E "^(ok|FAIL|skip|failures)" | tee build/sdnotifyresult.txt
 if grep -q "^FAIL" build/sdnotifyresult.txt; then exit 1; fi

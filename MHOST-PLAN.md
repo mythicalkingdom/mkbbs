@@ -46,6 +46,8 @@ the BBS (with a caller on the other end) and outside it (with nobody).  **This i
 | `log` | write a line to the BBS log | 1 |
 | `fs` | file I/O in the extension's own folder (the interpreters have it) | 1 |
 
+**Status:** phase 1 is built: `MKHost.pas` (the dispatcher: a command stores its answer and returns the number of lines; `line`, `field`, `meta`, `=` read it, because both languages keep strings to 255 characters), `MKExtCfg.pas` (`extensions.cfg`), `MKScript.pas` (`mk -x`, the script node), `HOST$` in mkbasic (token `$FFA7`, `TBasicTerm.HostCall`) and `HostCall` in mkpascal (`TMKTerm.HostCall`, run-time error 300), the wrappers in `ext/`, `mkcheck`, `EXTENSIONS.md`, `tests/hosttest.py`.  The commands are in `EXTENSIONS.md`.  Left for the later phases: the session objects, a menu command, hooks, writes.
+
 ## Phases
 
 1. **The host and `mk -x`:** `MKHost.pas` (the dispatcher, the capabilities, the read objects above), the hook in each interpreter (small commits in the two other repositories), `mk -x script.bas | script.pas [-C caps] [args]` (the kind by the extension; a mode of `mk` with no comm session, no node

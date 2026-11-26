@@ -20,6 +20,7 @@ read and post messages, upload and download files, play doors, and take their ma
 * **Offline mail:** QWK, QWKE, Bluewave and text packets, with screens, bulletins and a new-files list; replies come back as REP packets.
 * **Doors:** menu command 7 runs any program with `DORINFO1.DEF`, `DOOR.SYS`, `CALLINFO.BBS` and **`DOOR32.SYS`**; command 172 runs doors described in `doors.cfg`, **DOS doors in dosemu2** (no helper script) or native programs, **each in a bubblewrap sandbox** (no network, a private `/tmp`, only its own directories).  A BASIC and a Pascal interpreter run programs inside the BBS.
 * Paging, chat, bulletins and questionnaires, as the menus are set up.
+* **Scripts that use the BBS** (`mk -x script.bas|.pas`): BASIC and Pascal programs of the sysop ask the BBS who is on line, what is in a message area, what a user's record says, with capabilities per script (`EXTENSIONS.md`).
 * **Multi-node chat** (off unless the sysop turns it on): one room for callers on different nodes, logged, with a flood limit, a word filter and a ban list; the sysop watches and moderates it from `mkmon` or `mkchatctl` and can send a message to every node (`CHAT.md`).
 
 **For the sysop**

@@ -20,7 +20,7 @@ Program MKCheck;
 }
 
 Uses SysUtils, Classes, BaseUnix, Unix, Process,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg, MKSandbox, MKUpCfg;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg, MKSandbox, MKUpCfg, MKExtCfg;
 
 Var
   Quiet, Verbose: Boolean;
@@ -426,6 +426,47 @@ Procedure CheckUploads;
   End;
 
 
+Procedure CheckExtensions;
+  {extensions.cfg: the scripts of the sysop (mk -x, menu command, hooks)}
+  Var
+    C: TExtCfg;
+    i: Integer;
+    P, Ext: String;
+    N: Integer;
+
+  Begin
+  C := TExtCfg.Create(Config^.GetBbsPath);
+  Try
+    C.Load;
+    If Not FileExists(C.BbsDir + 'extensions.cfg') Then
+      Begin
+      Info('there is no extensions.cfg: no script has a name or capabilities of its own (mk -x gives a script every read capability)');
+      Exit;
+      End;
+    For i := 0 To C.Problems.Count - 1 Do
+      Warn('extensions.cfg ' + C.Problems[i]);
+    N := 0;
+    For i := 0 To High(C.Entries) Do
+      Begin
+      P := C.FullPath(C.Entries[i]);
+      Ext := LowerCase(ExtractFileExt(P));
+      If C.Entries[i].FileName = '' Then
+        Continue;
+      Inc(N);
+      If Not FileExists(P) Then
+        Warn('extensions.cfg: ' + C.Entries[i].Name + ': ' + P + ' is not there')
+      Else If (Ext <> '.bas') And (Ext <> '.pas') Then
+        Warn('extensions.cfg: ' + C.Entries[i].Name + ': ' + P + ' is not a .bas or a .pas file')
+      Else If C.Entries[i].Caps = '' Then
+        Info('extensions.cfg: ' + C.Entries[i].Name + ' has no capabilities: every call to the BBS is refused');
+      End;
+    Info(IntToStr(N) + ' extension(s) in extensions.cfg');
+  Finally
+    C.Free;
+  End;
+  End;
+
+
 Procedure CheckChat;
   {Chat.Mk (menu command 174): off, or on with what it needs}
   Var
@@ -602,6 +643,7 @@ Procedure CheckMenus;
 
   Begin
   CheckChat;
+  CheckExtensions;
   KnownMenus := TStringList.Create;
   Logoff := False;
   If Not FileExists(Config^.GetMnuPath(1) + 'top.mnu') Then
