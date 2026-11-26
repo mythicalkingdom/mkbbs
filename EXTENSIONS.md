@@ -1,7 +1,7 @@
 # Scripts that use the BBS: `mk -x`
 
 A BASIC or Pascal program of yours can ask the BBS questions: who is on line, what is in a message area, what a user's record says.  It does this with one call, `HOST$("...")` in BASIC and `HostCall('...')` in Pascal, and runs with no caller: from a shell, from cron,
-from an event.  (Scripts inside the BBS for callers, hooks and writes are the next phases: `MHOST-PLAN.md`.)  This is not a door: a door is a program that runs on a caller's terminal and knows nothing of the BBS; a script is given the BBS piece by piece, and only what you allow.
+from an event.  (Hooks and writes are the next phases: `MHOST-PLAN.md`.  Scripts for callers, inside the BBS, are the menu command 175, below.)  This is not a door: a door is a program that runs on a caller's terminal and knows nothing of the BBS; a script is given the BBS piece by piece, and only what you allow.
 
 ```
 mk -x [-C "capabilities"] [-T seconds] script.bas|script.pas [arguments]
@@ -12,6 +12,28 @@ The exit code is 0 when the program ended, 1 when it ended with an error or a li
 
 **It is a node.**  A script runs on a *script node*, a number from `MKSCRIPTNODES` (default `101-108`, so it never takes a caller's node): it has a node file in the run directory and a line in `useron.bbs`, so it is on the node list and in `mkmon`
 as `script <name>`.  When every script node is in use `mk -x` stops with exit code 2.  A script that is stopped by `kill -9` leaves a node file; the next script takes the number over.
+
+## An extension for callers: menu command 175
+
+Give a program a name in `extensions.cfg` (below), then put the menu command **175 Run an extension** on a menu (`mkmenu`); the item's data is the **name** of the extension (never a path), then arguments:
+
+```
+who
+scores top 10
+```
+
+The program runs **for the caller** as menu commands 169 and 170 do (their terminal, Ctrl-C, the interpreters' limits, locked), and it can ask the BBS as a script does, with the capabilities of its entry.  It also has the commands of the session:
+
+| command | what | capability |
+|---|---|---|
+| `bbs.user` | the caller: `name handle city level time_left calls ansi screen_length` | `session:read` |
+| `bbs.node` | `node baud address` | `session:read` |
+| `bbs.file <name>` | shows a text file of the BBS (the screens of the `txtfiles` folder, as a menu item does) | `session:control` |
+| `bbs.pause` | "Press Enter" | `session:control` |
+| `bbs.hangup` | ends the call | `session:control` |
+
+A caller whose security level is under the `level` of the entry is told that it is not available to them, and so is one who picks a name that is not in `extensions.cfg` (and the log says why).  The run stops after the `timeout` of the entry (default 60 seconds of run time, not counting the time spent waiting for a
+key).  Text is CP437 in a session, as for the caller's terminal (in `mk -x` it is UTF-8).  `mkcheck` looks at the menu items: the name, the entry, the program.  Every run is in the log: `Ext <name>: run for <caller>`, refusals, and what `log.write` says.
 
 ## What it may do: capabilities
 
@@ -27,6 +49,7 @@ as `script <name>`.  When every script node is in use `mk -x` stops with exit co
 | `stats:read` | `stats.total`, `stats.by`, `calls.list` |
 | `chat:read` | `chat.who`, `chat.log` |
 | `log:write` | `log.write` (a line in the BBS log, marked `Ext <name>:`) |
+| `session:read`, `session:control` | the commands of a caller's session, in the BBS only (above); `mk -x` has no caller |
 
 `*` is all of them.  A call outside the list is a run-time error ("not allowed: user.list needs users:read") and a line in the log.  The capabilities of a script are:
 

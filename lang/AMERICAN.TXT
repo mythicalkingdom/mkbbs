@@ -499,3 +499,6 @@
 581 Not a command: type /help
 582 type /help for the commands, /quit to leave
 583 Your chat time for this call is used up.
+584 Message from the sysop:
+585 That extension is not available.
+586 Your security level is too low for that.

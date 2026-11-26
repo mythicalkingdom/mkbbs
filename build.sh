@@ -329,6 +329,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/mchattest.py build build/work/mchat | grep -E "^(ok|FAIL|skip|failures)" | tee build/mchatresult.txt
   if grep -q "^FAIL" build/mchatresult.txt; then exit 1; fi
 fi
+# menu command 175: an extension of the sysop runs for the caller (MHOST-PLAN.md phase 2)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/exttest.py build build/work/ext | grep -E "^(ok|FAIL|skip|failures)" | tee build/extresult.txt
+  if grep -q "^FAIL" build/extresult.txt; then exit 1; fi
+fi
 # mk -x: BASIC and Pascal scripts that use the BBS (MHOST-PLAN.md phase 1)
 python3 tests/hosttest.py build build/work/host | grep -E "^(ok|FAIL|skip|failures)" | tee build/hostresult.txt
 if grep -q "^FAIL" build/hostresult.txt; then exit 1; fi

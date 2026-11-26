@@ -197,6 +197,32 @@ def chat_item(enabled):
     return f
 
 
+def ext_item(data, cfgtext=None, files=()):
+    def f(d):
+        upload_item('')(d)
+        m = bytearray(open(d + '/menus/top.mnu', 'rb').read())
+        i = len(m) // 167 - 2
+        m[i * 167] = 175
+        nb = data.encode()
+        m[i * 167 + 84] = len(nb); m[i * 167 + 85:i * 167 + 85 + len(nb)] = nb
+        open(d + '/menus/top.mnu', 'wb').write(m)
+        os.makedirs(d + '/scripts', exist_ok=True)
+        for n in files:
+            open(d + '/scripts/' + n, 'w').write('10 PRINT 1\n')
+        if cfgtext is not None:
+            open(d + '/extensions.cfg', 'w').write(cfgtext)
+    return f
+
+
+r = broken(ext_item('who top 10', '[who]\nfile = scripts/who.bas\ncaps = users:read\n', ['who.bas']))
+check('an extension menu item whose entry and program are there: nothing to say about it', 'WARN menu top item' not in r.stdout or 'extension' not in r.stdout.split('WARN menu top item')[-1], r.stdout)
+r = broken(ext_item('nothere', '[who]\nfile = scripts/who.bas\n', ['who.bas']))
+check('an extension menu item that names no entry: WARN', 'the extension "nothere" is not in extensions.cfg' in r.stdout, r.stdout)
+r = broken(ext_item('', None))
+check('an extension menu item with no name in its data: WARN', 'no name of an extension in its data' in r.stdout, r.stdout)
+r = broken(ext_item('who', '[who]\nfile = scripts/gone.bas\n'))
+check('an extension menu item whose program is not there: WARN', 'the program of the extension who is not there' in r.stdout, r.stdout)
+
 # extensions.cfg
 def ext_cfg(text, files=()):
     def f(d):

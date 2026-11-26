@@ -25,28 +25,32 @@ Type
     Caps: TStringList;                 {the capabilities; '*' = all}
     Who: String;                       {the name of the script, for the log}
     Quiet: Boolean;                    {no log lines (tests)}
+    Cp437: Boolean;                    {in the BBS (a caller's terminal): the script's strings are CP437, the answers are turned into it; mk -x keeps UTF-8}
     Registry: THostRegistry;           {the commands of the script: the BBS is the default provider; others are added with Registry.Add}
     Constructor Create(Const AWho: String; ACaps: TStrings);
     Destructor Destroy; Override;
     Function Call(Const Cmd: String; Out Err: String): String;     {Err <> '': the call failed}
     Procedure SetScriptArgs(Args: TStrings);                      {arg 0 is the name of the script, then what followed it on the command line}
     Function Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out Err: String): Boolean;
-    Private
     Function Allowed(Const Cap: String): Boolean;
+    Private
     Procedure FromJson(Res: THostResult; Root: TObject; Const ListKey: String);
     End;
+
+Function HostToCp437(Const S: String): String;      {UTF-8 text as CP437 (a letter that is not in CP437 becomes ?)}
+Function HostFromCp437(Const S: String): String;    {CP437 text as UTF-8}
 
 Function HostCaps(Const List: String): TStringList;
   {a list of capabilities as written in extensions.cfg or on the command line (separated by commas or blanks); the caller frees it}
 
 Const
-  HostAllReads = 'users:read msgs:read files:read nodes:read events:read stats:read chat:read log:write';
+  HostAllReads = 'users:read msgs:read files:read nodes:read events:read stats:read chat:read log:write session:read';
   HostCommands =
     'system.info node.list events.list stats.total stats.by calls.list msg.areas msg.list msg.read msg.text file.areas file.list user.list user.get chat.who chat.log log.write';
 
 Implementation
 
-Uses fpjson, DateUtils, MKApiData, MKChatCore, MKLogEnt, MKGlobT, MKCfgAbs;
+Uses fpjson, DateUtils, MKCp437, MKApiData, MKChatCore, MKLogEnt, MKGlobT, MKCfgAbs;
 
 
 Function HostCaps(Const List: String): TStringList;
@@ -97,12 +101,77 @@ Procedure THost.SetScriptArgs(Args: TStrings);
   End;
 
 
+Function HostFromCp437(Const S: String): String;
+  Var
+    i: Integer;
+
+  Begin
+  Result := '';
+  For i := 1 To Length(S) Do
+    If S[i] < #128 Then
+      Result := Result + S[i]
+    Else
+      Result := Result + Cp437ToUtf8(Ord(S[i]));
+  End;
+
+
+Function HostToCp437(Const S: String): String;
+  Var
+    i, Need: Integer;
+    U: LongInt;
+    B: Byte;
+
+  Begin
+  Result := '';
+  i := 1;
+  While i <= Length(S) Do
+    Begin
+    If S[i] < #128 Then
+      Begin
+      Result := Result + S[i];
+      Inc(i);
+      Continue;
+      End;
+    If S[i] >= #240 Then Need := 3
+    Else If S[i] >= #224 Then Need := 2
+    Else If S[i] >= #192 Then Need := 1
+    Else Need := 0;
+    If Need = 0 Then
+      Begin
+      Result := Result + '?';
+      Inc(i);
+      Continue;
+      End;
+    U := Ord(S[i]) And ($3F Shr Need);
+    Inc(i);
+    While (Need > 0) And (i <= Length(S)) And (S[i] >= #128) And (S[i] < #192) Do
+      Begin
+      U := (U Shl 6) Or (Ord(S[i]) And $3F);
+      Inc(i);
+      Dec(Need);
+      End;
+    B := 0;
+    If U < 65536 Then
+      B := Utf8ToCp437(U);
+    If B = 0 Then
+      Result := Result + '?'
+    Else
+      Result := Result + Chr(B);
+    End;
+  End;
+
+
 Function THost.Call(Const Cmd: String; Out Err: String): String;
   Var
     E: AnsiString;
 
   Begin
-  Result := Registry.Call(Cmd, E);
+  If Cp437 Then
+    Result := Registry.Call(HostFromCp437(Cmd), E)
+  Else
+    Result := Registry.Call(Cmd, E);
+  If Cp437 Then
+    Result := Copy(HostToCp437(Result), 1, 255);
   Err := E;
   End;
 

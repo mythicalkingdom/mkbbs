@@ -13,7 +13,7 @@ Unit MKExtCfg;   {extensions.cfg: the scripts the sysop gave the BBS, and what e
        timeout = 30                   seconds the program may run (default 60; 0: none)
        desc    = who is on line       shown by mkcheck
 
-     Capabilities: users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write  (writes come later); * = all.
+     Capabilities: users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write, and in the BBS session:read (the current caller, the node) and session:control (show a text file, press-enter pause, hang up); * = all.
      mk -x script uses the entry whose file is that script; a script that is in no entry gets every read capability (the sysop ran it by hand: -C narrows it).
 }
 
@@ -46,7 +46,7 @@ Implementation
 Uses SysUtils;
 
 Const
-  KnownCaps = ' users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write * ';
+  KnownCaps = ' users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write session:read session:control * ';
 
 
 Function ExtKnownCap(Const Cap: String): Boolean;

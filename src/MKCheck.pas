@@ -500,6 +500,44 @@ Procedure CheckChat;
   End;
 
 
+Procedure CheckExtItem(MenuName: String; Item: Integer; Key, Data: String);
+  {menu command 175: the first word of the data is an extension of extensions.cfg whose program is there}
+  Var
+    C: TExtCfg;
+    Name, Prefix, P, Ext: String;
+    E: Integer;
+
+  Begin
+  Prefix := 'menu ' + MenuName + ' item ' + IntToStr(Item) + ' (' + Key + '): ';
+  Name := Trim(Data);
+  If Pos(' ', Name) > 0 Then
+    Name := Copy(Name, 1, Pos(' ', Name) - 1);
+  If Name = '' Then
+    Begin
+    Warn(Prefix + 'the extension command has no name of an extension in its data (extensions.cfg)');
+    Exit;
+    End;
+  C := TExtCfg.Create(Config^.GetBbsPath);
+  Try
+    C.Load;
+    E := C.Find(Name);
+    If E < 0 Then
+      Begin
+      Warn(Prefix + 'the extension "' + Name + '" is not in extensions.cfg: callers are told it is not available');
+      Exit;
+      End;
+    P := C.FullPath(C.Entries[E]);
+    Ext := LowerCase(ExtractFileExt(P));
+    If Not FileExists(P) Then
+      Warn(Prefix + 'the program of the extension ' + Name + ' is not there: ' + P)
+    Else If (Ext <> '.bas') And (Ext <> '.pas') Then
+      Warn(Prefix + 'the program of the extension ' + Name + ' is not a .bas or a .pas file');
+  Finally
+    C.Free;
+  End;
+  End;
+
+
 Procedure CheckChatItem(MenuName: String; Item: Integer; Key: String);
   {menu command 174: chat is on, or the callers are told it is not there}
   Var
@@ -619,6 +657,7 @@ Procedure CheckMenuFile(Name: String; Var HasLogoff: Boolean);
         172: CheckDoorItem(Name, i, R.Key, Data);
         173: CheckUploadItem(Name, i, R.Key, Data);
         174: CheckChatItem(Name, i, R.Key);
+        175: CheckExtItem(Name, i, R.Key, Data);
         169, 170:
           Begin
           W := FirstWord(Data);

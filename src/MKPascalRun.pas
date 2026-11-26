@@ -33,7 +33,12 @@ Unit MKPascalRun;   {Menu command 170: run a Pascal program for the caller}
 
 Interface
 
+Uses Classes, HostReg;
+
 Procedure RunPascalProgram(Data: ShortString);
+
+Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+  {an extension of the sysop (MKExtRun, menu command 175): the program at Full, with the host commands of Reg, for at most Secs seconds of run time (0: no limit); Args are its parameters (ParamStr)}
 
 
 Implementation
@@ -42,7 +47,7 @@ Implementation
 {$IFDEF MKPASCAL}
 
 Uses
-  SysUtils, Classes, mkp_defs, mkp_harness, mkpascal,
+  SysUtils, mkp_defs, mkp_harness, mkpascal,
   MKDoor, MKGlobT, MKCallerIO;
 
 
@@ -53,6 +58,7 @@ Type
     Procedure StopRun(Const Why: String);
   Public
     IO: TCallerIO;
+    Reg: THostRegistry;                {HostCall: the commands of an extension (not ours); Nil for a plain program}
     Constructor Create;
     Destructor Destroy; Override;
     Procedure Write(Const S: RawByteString); Override;
@@ -64,6 +70,7 @@ Type
     Procedure GotoXY(X, Y: Integer); Override;
     Procedure GetXY(Out X, Y: Integer); Override;
     Procedure SetColor(Fg, Bg: Integer); Override;
+    Function  HostCall(Const Cmd: RawByteString; Out Err: String): RawByteString; Override;
   End;
 
   { called by the interpreter every few thousand steps }
@@ -169,6 +176,21 @@ Procedure TPasTerm.SetColor(Fg, Bg: Integer);
   End;
 
 
+Function TPasTerm.HostCall(Const Cmd: RawByteString; Out Err: String): RawByteString;
+  Var
+    E: AnsiString;
+
+  Begin
+  If Reg <> Nil Then
+    Begin
+    Result := Reg.Call(Cmd, E);
+    Err := E;
+    End
+  Else
+    Result := Inherited HostCall(Cmd, Err);
+  End;
+
+
 Procedure TYielder.Yield;
   Begin
   IO.Idle;
@@ -178,6 +200,9 @@ Procedure TYielder.Yield;
 
 
 {------------------------------------------------------------ the command}
+
+Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings); Forward;
+
 
 Procedure RunPascalProgram(Data: ShortString);
   Var
@@ -223,12 +248,30 @@ Procedure RunPascalProgram(Data: ShortString);
     User.PressEnter;
     Exit;
     End;
+  RunPascalText(Full, Text, Rest, Nil, 0, Nil);
+  End;
+
+
+Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+  Var
+    Rest: AnsiString;
+    Term: TPasTerm;
+    Files: TDiskFiles;
+    Session: TMKSession;
+    Yielder: TYielder;
+    Status: TMKRunStatus;
+    Quiet, Failed: Boolean;
+    i, p: Integer;
+
+  Begin
+  Rest := Rest0;
   User.PostStatus(uoDoor);
   RunLog('Pascal program : ' + Full + Copy(' ' + Rest, 1, 255 * Ord(Rest <> '')));
   Status := rsError;
   Failed := False;
   Quiet := False;
   Term := TPasTerm.Create;
+  Term.Reg := Reg;
   Files := TDiskFiles.Create(ExtractFileDir(Full));
   Session := TMKSession.Create(Term, Files);
   Yielder := TYielder.Create;
@@ -236,6 +279,11 @@ Procedure RunPascalProgram(Data: ShortString);
     Yielder.Session := Session;
     Yielder.IO := Term.IO;
     Session.OnYield := @Yielder.Yield;
+    If Secs > 0 Then
+      Session.MaxRuntimeMs := Secs * 1000;
+    If Args <> Nil Then
+      For i := 1 To Args.Count - 1 Do
+        Session.Params.Add(Args[i]);
     Try
       While Rest <> '' Do              {parameters for ParamStr}
         Begin
@@ -285,6 +333,22 @@ Procedure RunPascalProgram(Data: ShortString);
   End;
 
 
+Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+  Var
+    Text: AnsiString;
+
+  Begin
+  If Not ReadWholeFile(Full, Text) Then
+    Begin
+    User.DisplayStrLn('Error: the extension cannot be read');
+    RunLog('Pascal extension cannot be read : ' + Full);
+    User.PressEnter;
+    Exit;
+    End;
+  RunPascalText(Full, Text, '', Reg, Secs, Args);
+  End;
+
+
 {$ELSE}
 
 
@@ -296,6 +360,13 @@ Procedure RunPascalProgram(Data: ShortString);
   User.DisplayStrLn('Pascal is not available in this version of MK');
   If LogEntry.LI <> Nil Then
     LogEntry.WriteEntry('Pascal program ignored (not built in) : ' + Data);
+  User.PressEnter;
+  End;
+
+
+Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+  Begin
+  User.DisplayStrLn('Pascal is not available in this version of MK');
   User.PressEnter;
   End;
 

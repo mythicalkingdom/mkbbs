@@ -29,7 +29,12 @@ Unit MKBasicRun;   {Menu command 169: run a BASIC program for the caller}
 
 Interface
 
+Uses HostReg;
+
 Procedure RunBasicProgram(Path: ShortString);
+
+Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt);
+  {an extension of the sysop (MKExtRun, menu command 175): the program at Full, with the host commands of Reg, for at most Secs seconds of run time (0: no limit)}
 
 
 Implementation
@@ -51,6 +56,7 @@ Type
   Public
     IO: TCallerIO;                     {the caller: keys, Ctrl-C, lines, output}
     InternalText: AnsiString;          {what the interpreter reported as an internal error}
+    Reg: THostRegistry;                {HOST$: the commands of an extension (not ours); Nil for a plain program}
     Constructor Create; Override;
     Destructor Destroy; Override;
     Procedure OutputString(Const S: AnsiString); Override;
@@ -65,6 +71,7 @@ Type
     Procedure Idle; Override;
     Function  PollBreak: Boolean; Override;
     Procedure InternalError(Const What: AnsiString);
+    Function  HostCall(Const cmd: AnsiString; Out err: AnsiString): AnsiString; Override;
   End;
 
 
@@ -169,7 +176,19 @@ Procedure TMKTerm.InternalError(Const What: AnsiString);
   End;
 
 
+Function TMKTerm.HostCall(Const cmd: AnsiString; Out err: AnsiString): AnsiString;
+  Begin
+  If Reg <> Nil Then
+    Result := Reg.Call(cmd, err)
+  Else
+    Result := Inherited HostCall(cmd, err);
+  End;
+
+
 {------------------------------------------------------------ the command}
+
+Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: LongInt); Forward;
+
 
 Procedure RunBasicProgram(Path: ShortString);
   Var
@@ -204,11 +223,26 @@ Procedure RunBasicProgram(Path: ShortString);
     User.PressEnter;
     Exit;
     End;
+  RunBasicText(Full, Text, Nil, 0);
+  End;
+
+
+Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: LongInt);
+  Var
+    Status: AnsiString;
+    Term: TMKTerm;
+    B: TBasic;
+    OldMask: TFPUExceptionMask;
+    Quiet: Boolean;
+    Lim: TBasicLimits;
+
+  Begin
   User.PostStatus(uoDoor);
   RunLog('BASIC program : ' + Full);
   Status := 'error';
   Quiet := False;
   Term := TMKTerm.Create;
+  Term.Reg := Reg;
   B := Nil;
   Try
     Try
@@ -216,6 +250,12 @@ Procedure RunBasicProgram(Path: ShortString);
       B.Locked := True;                {run only, no LIST / LOAD / SAVE / CHAIN}
       B.SystemMode := smEnd;           {SYSTEM ends the program, not the caller's session}
       B.RandomizeMode := rmClock;      {RANDOMIZE does not ask for a seed}
+      If Secs > 0 Then
+        Begin
+        Lim := B.Limits;
+        Lim.MaxRuntimeMs := Secs * 1000;
+        B.Limits := Lim;
+        End;
       B.OnInternalError := @Term.InternalError;
       OldMask := GetExceptionMask;
       MaskFloatExceptions;             {BASIC wants IEEE results, not exceptions}
@@ -257,6 +297,22 @@ Procedure RunBasicProgram(Path: ShortString);
   End;
 
 
+Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt);
+  Var
+    Text: AnsiString;
+
+  Begin
+  If Not ReadWholeFile(Full, Text) Then
+    Begin
+    User.DisplayStrLn('Error: the extension cannot be read');
+    RunLog('BASIC extension cannot be read : ' + Full);
+    User.PressEnter;
+    Exit;
+    End;
+  RunBasicText(Full, Text, Reg, Secs);
+  End;
+
+
 {$ELSE}
 
 
@@ -268,6 +324,13 @@ Procedure RunBasicProgram(Path: ShortString);
   User.DisplayStrLn('BASIC is not available in this version of MK');
   If LogEntry.LI <> Nil Then
     LogEntry.WriteEntry('BASIC program ignored (not built in) : ' + Path);
+  User.PressEnter;
+  End;
+
+
+Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt);
+  Begin
+  User.DisplayStrLn('BASIC is not available in this version of MK');
   User.PressEnter;
   End;
 
