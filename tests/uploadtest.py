@@ -81,6 +81,10 @@ for name, data in [('cur', ''), ('a1', '1'), ('a2', '2'), ('a3', '3')]:
     slot += 1
 open(path, 'wb').write(d)
 
+# an upload hook (extensions.cfg [hooks], MHOST-PLAN.md phase 3): a BASIC script that writes what it was told in the log
+os.makedirs(ra + '/scripts', exist_ok=True)
+open(ra + '/scripts/uphook.bas', 'w').write('10 X = VAL(HOST$("log.write upload hook: event=" + HOST$("arg 1") + " area=" + HOST$("arg 3") + " file=" + HOST$("arg 4") + " size=" + HOST$("arg 5")))\n')
+open(ra + '/extensions.cfg', 'w').write('[uphook]\nfile = scripts/uphook.bas\ncaps = log:write\n[hooks]\nupload = uphook\n')
 cfg = {'mk': build + '/mk', 'rundir': os.path.join(work, 'run'), 'logfile': os.path.join(work, 'listen.log'),
        'workdir': ra, 'nodes': '1-2', 'ports': [{'port': 24671, 'type': 'telnet', 'bind': '127.0.0.1', 'config': ra}]}
 json.dump(cfg, open(os.path.join(work, 'listen.json'), 'w'))
@@ -380,6 +384,7 @@ finally:
 log = ''
 if os.path.exists(cfgpatch.log_file(ra)):
     log = open(cfgpatch.log_file(ra), encoding='latin-1').read()
+check('the upload hook ran for each accepted file (event, area, name, size) and not for the refused one', 'Ext uphook: upload hook: event=upload area=1 file=my_file_1.txt size=1300' in log and log.count('Ext uphook: upload hook:') >= 1 and 'file=a.zip size=5000' in log, log[-800:])
 check('the log has the uploads and the refusal', 'Upload: my_file_1.txt (1300 bytes) in area 1 by Mark May' in log and 'Upload refused (name in use): my_file_1.txt' in log, log[-600:])
 if fails:
     print('LOG', log[-1500:])

@@ -37,8 +37,8 @@ Uses Classes, HostReg;
 
 Procedure RunPascalProgram(Data: ShortString);
 
-Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
-  {an extension of the sysop (MKExtRun, menu command 175): the program at Full, with the host commands of Reg, for at most Secs seconds of run time (0: no limit); Args are its parameters (ParamStr)}
+Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings; Silent: Boolean);
+  {Silent (a hook): an error is only logged, the caller is not asked to press Enter.  An extension of the sysop (MKExtRun, menu command 175): the program at Full, with the host commands of Reg, for at most Secs seconds of run time (0: no limit); Args are its parameters (ParamStr)}
 
 
 Implementation
@@ -201,7 +201,7 @@ Procedure TYielder.Yield;
 
 {------------------------------------------------------------ the command}
 
-Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings); Forward;
+Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings; Silent: Boolean); Forward;
 
 
 Procedure RunPascalProgram(Data: ShortString);
@@ -248,11 +248,11 @@ Procedure RunPascalProgram(Data: ShortString);
     User.PressEnter;
     Exit;
     End;
-  RunPascalText(Full, Text, Rest, Nil, 0, Nil);
+  RunPascalText(Full, Text, Rest, Nil, 0, Nil, False);
   End;
 
 
-Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings; Silent: Boolean);
   Var
     Rest: AnsiString;
     Term: TPasTerm;
@@ -322,7 +322,7 @@ Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: TH
         rsBreak: RunLog('Pascal ended (break)' + Copy(' - caller gone', 1, 15 * Ord(Quiet)));
         End;
       End;
-    If (Not Quiet) And (Failed Or (Status In [rsError, rsLimit, rsBreak])) Then
+    If (Not Quiet) And (Not Silent) And (Failed Or (Status In [rsError, rsLimit, rsBreak])) Then
       User.PressEnter;                 {an error, a limit or a break: let the caller read it}
   Finally
     Yielder.Free;
@@ -333,7 +333,7 @@ Procedure RunPascalText(Const Full, Text: AnsiString; Rest0: AnsiString; Reg: TH
   End;
 
 
-Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings; Silent: Boolean);
   Var
     Text: AnsiString;
 
@@ -345,7 +345,7 @@ Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: L
     User.PressEnter;
     Exit;
     End;
-  RunPascalText(Full, Text, '', Reg, Secs, Args);
+  RunPascalText(Full, Text, '', Reg, Secs, Args, Silent);
   End;
 
 
@@ -364,7 +364,7 @@ Procedure RunPascalProgram(Data: ShortString);
   End;
 
 
-Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings);
+Procedure RunPascalExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Args: TStrings; Silent: Boolean);
   Begin
   User.DisplayStrLn('Pascal is not available in this version of MK');
   User.PressEnter;

@@ -7,7 +7,7 @@ Uses
   MKScrn, MKVCrt, MKSess,
 MKGlobT, MKMenus, MKCmd, MKDoor, MKString, MKLogEnt, MKComAbs,
 MKSys, MKCodes, MKLogHook, MKStats, MKFile, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB,
-MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, MKScript, Classes, Dos
+MKLogOn, MKAvatar, MKSnoop, MKQwkNet, MKQwkLog, MKOfflin, MKPwd, MKScript, MKExtRun, Classes, Dos
   ;
 
 
@@ -88,7 +88,7 @@ Var
   NetG, QwkNetList: Boolean;
   QwkNetListName: String;
   QwkMode: Boolean;
-  ScriptName, ScriptCaps: String;       {mk -x: a script of the sysop, no caller (MKScript)}
+  ScriptName, ScriptCaps, ScriptRunDir: String;       {mk -x: a script of the sysop, no caller (MKScript)}
   ScriptArgs: TStringList;
   ScriptSecs: LongInt;
   j: Word;
@@ -112,6 +112,7 @@ QwkNetListName := '';
 QwkMode := False;
 ScriptName := '';
 ScriptCaps := '';
+ScriptRunDir := '';
 ScriptSecs := -1;
 ScriptArgs := Nil;
 i := 1;
@@ -120,17 +121,19 @@ While i <= ParamCount Do
   If ParamStr(i) = '-x' Then
     Begin                              {mk -x [-C capabilities] [-T seconds] script [arguments]: the rest of the line is the script's}
     j := i + 1;
-    While (j < ParamCount) And ((ParamStr(j) = '-C') Or (ParamStr(j) = '-T')) Do
+    While (j < ParamCount) And ((ParamStr(j) = '-C') Or (ParamStr(j) = '-T') Or (ParamStr(j) = '-R')) Do
       Begin
       If ParamStr(j) = '-C' Then
         ScriptCaps := ParamStr(j + 1)
+      Else If ParamStr(j) = '-R' Then
+        ScriptRunDir := ParamStr(j + 1)
       Else
         ScriptSecs := Str2Long(ParamStr(j + 1));
       Inc(j, 2);
       End;
     If j > ParamCount Then
       Begin
-      WriteLn(StdErr, 'usage: mk -x [-C capabilities] [-T seconds] script.bas|script.pas [arguments]');
+      WriteLn(StdErr, 'usage: mk -x [-C capabilities] [-T seconds] [-R run dir] script.bas|script.pas [arguments]');
       Halt(2);
       End;
     ScriptName := ParamStr(j);
@@ -210,7 +213,11 @@ While i <= ParamCount Do
   End;
 If ScriptName <> '' Then
   Begin
-  ScriptNode := ScriptPickNode;        {a node of its own, from the range for scripts}
+  If ScriptRunDir = '' Then
+    ScriptRunDir := GetEnv('MKRUN');
+  If ScriptRunDir = '' Then
+    ScriptRunDir := GetEnv('MKLISTENRUN');
+  ScriptNode := ScriptPickNode(ScriptRunDir);        {a node of its own, from the range for scripts}
   If ScriptNode < 0 Then
     Begin
     WriteLn(StdErr, 'mk -x: every script node is in use (MKSCRIPTNODES says which numbers they have)');
@@ -295,7 +302,7 @@ If ScriptName <> '' Then
   User.SetIdleTimeLimit(86400);
   User.SetUserName('script ' + ScriptShortName(ScriptName));
   User.PostStatus(uoDoor);
-  ExitLevel := ScriptRun(ScriptName, ScriptArgs, ScriptCaps, ScriptSecs);
+  ExitLevel := ScriptRun(ScriptName, ScriptArgs, ScriptCaps, ScriptSecs, ScriptRunDir);
   User.PostStatus(uoNotAvail);
   User.Done;
   LogEntry.Done;
@@ -390,6 +397,8 @@ Else
     StartUpUser;
     AskName;
     StatsLoggedOn;
+    If User.Ok Then
+      RunHooks('logon', Long2Str(User.GetUserSecLevel), Long2Str(NodeNumber), Long2Str(User.GetUserTimesCalled), '');
     End;
   End;
 If QwkMode Then
@@ -414,6 +423,8 @@ Else
     Halt(1);
     End;
   MenuState := 1;
+  If User.Ok Then
+    RunHooks('menu', Menu.GetName, '', '', '');
   Process;
   End;
 User.WriteUser;
@@ -424,6 +435,7 @@ If User.UserIsLoaded Then
   LogEntry.WriteEntry('Session = ' + GetCommInfo);
   LogEntry.WriteEntry('Current Baud = ' + Long2Str(UserBaud));
   LogEntry.WriteEntry('User off-line');
+  RunHooks('logoff', Long2Str(User.GetNotOkReason), Long2Str(NodeNumber), '', '');
   LogOffSysInfo;
   End;
 User.PostStatus(uoWait);

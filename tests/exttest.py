@@ -69,6 +69,7 @@ class Caller:
                 time.sleep(0.1)
         self.s.sendall(bytes([255, 251, 0, 255, 253, 0]))
         self.buf = b''
+        self.seen = b''
         self.until(b'language choice', 10)
         time.sleep(1.5); self.s.sendall(b'\r')
         self.until(b'last name: ', 10); time.sleep(2.5)
@@ -101,6 +102,7 @@ class Caller:
                     self.s.sendall(b'c')
             except socket.timeout:
                 pass
+        self.seen += strip(b)
         return strip(b)
 
     def line(self, text):
@@ -267,6 +269,63 @@ try:
         more = b'still open'
     check('bbs.hangup ends the call (the program does not go on, the connection closes)', b'BYE' in x and b'AFTER' not in x + (more if more != b'still open' else b'') and more != b'still open', (show(x), more))
     c.close()
+
+    # ---- phase 3: hooks
+    script('hk_logon.bas', '10 PRINT "HK-LOGON|"; HOST$("arg 1"); "|"; HOST$("arg 2"); "|"; HOST$("arg 3"); "|"; HOST$("arg 4")\n')
+    script('hk_menu.bas', '10 PRINT "HK-MENU|"; HOST$("arg 1"); "|"; HOST$("arg 3")\n')
+    script('hk_menutop.bas', '10 PRINT "HK-MENUTOP"\n')
+    script('hk_bad.bas', '10 PRINT "HK-BAD-START"\n20 PRINT HOST$("nonsense")\n')
+    script('hk_slow.bas', '10 GOTO 10\n')
+    script('hk_low.bas', '10 PRINT "HK-LOW-RAN"\n')
+    script('hk_log.bas', '10 X = VAL(HOST$("log.write logoff hook ran; event=" + HOST$("arg 1") + " user=" + HOST$("arg 2") + " reason=" + HOST$("arg 3")))\n')
+    script('hk_hang.bas', '10 PRINT "HK-HANG"\n20 X = VAL(HOST$("bbs.hangup"))\n')
+    open(ra + '/extensions.cfg', 'w').write("""[logon_greet]
+file = scripts/hk_logon.bas
+[menu_all]
+file = scripts/hk_menu.bas
+[menu_top]
+file = scripts/hk_menutop.bas
+[bad]
+file = scripts/hk_bad.bas
+[slow]
+file = scripts/hk_slow.bas
+timeout = 2
+[low]
+file = scripts/hk_low.bas
+level = 60000
+[tally]
+file = scripts/hk_log.bas
+caps = log:write
+[hooks]
+logon = bad low logon_greet slow
+logoff = tally
+menu = menu_all
+menu.top = menu_top
+newuser = nothere
+""")
+    c = Caller()
+    t0 = time.time()
+    seen = c.seen
+    check('logon hook: the greeting reaches the caller with the event, the user, the level, the node', b'HK-LOGON|logon|Mark May|120|1' in seen.replace(b'HK-LOGON| logon', b'HK-LOGON|logon'), show(seen))
+    check('a hook that fails does not stop the caller or the hooks after it (the error is only shown, no Press Enter): the greeting came after it', b'HK-BAD-START' in seen and seen.find(b'HK-BAD-START') < seen.find(b'HK-LOGON'), show(seen))
+    check('a hook for a higher level is skipped, without a word', b'HK-LOW-RAN' not in seen, show(seen))
+    check('menu hooks: the generic one gets the event and the menu (top, then the menu it goes on to), the one for menu.top only the first', b'HK-MENU|menu|top' in seen and b'HK-MENU|menu|realtop' in seen and seen.count(b'HK-MENUTOP') == 1, show(seen))
+    check('a slow hook is stopped by its timeout and the caller gets the menu', c.at_menu and 'Ext slow: ended' in bbslog(), (c.at_menu, bbslog()[-300:]))
+    lg = bbslog()
+    check('the log has what ran: run lines with the caller, the failing one, the missing one', 'Ext logon_greet: run for Mark May' in lg and 'Ext bad: ended' in lg and 'Ext tally' not in lg.split('logon_greet')[0], lg[-600:])
+    c.s.sendall(b'G'); c.s.sendall(b'\r')
+    time.sleep(0.5)
+    c.close()
+    time.sleep(3)
+    lg = bbslog()
+    check('logoff hook: runs at the end of the call with the event, the user and the reason', 'Ext tally: logoff hook ran; event=logoff user=Mark May reason=' in lg, lg[-500:])
+    open(ra + '/extensions.cfg', 'w').write("[hang]\nfile = scripts/hk_hang.bas\ncaps = session:control\n[hooks]\nlogon = hang\n")
+    c = Caller()
+    check('a hook that ends the call (bbs.hangup) ends it: no menu', 'Ext hang: ended' in bbslog() and not c.at_menu, show(c.seen))
+    c.close()
+    open(ra + '/extensions.cfg', 'w').write("[hooks]\nbogus = x\nlogon = ghost\n")
+    r = subprocess.run([build + '/mkcheck', '-c', ra], capture_output=True, text=True)
+    check('mkcheck says an unknown hook and an extension a hook names that is not defined', 'unknown hook bogus' in r.stdout and 'the hook logon names the extension ghost' in r.stdout, r.stdout[-600:])
 finally:
     stop()
 print('failures: %d' % fails)

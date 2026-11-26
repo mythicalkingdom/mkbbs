@@ -16,7 +16,7 @@ Implementation
 
 
 Uses MKFile, MKString, MKCfgAbs, MKDoor, MKGlobT, MKComAbs, MKLogEnt, MKPwd,
-  MKMiscB, MKDos, MKMRead, MKCodes, MKRCfgMK,
+  MKMiscB, MKDos, MKMRead, MKCodes, MKRCfgMK, MKExtRun,
     MKVCrt,
   Dos;
 
@@ -980,6 +980,8 @@ Function AskName: String;
       User.SetUserName(TempName);
       User.PostStatus(uoLogIn);
       ProcessNewUser;
+      If User.Ok Then
+        RunHooks('newuser', Long2Str(User.GetUserSecLevel), Long2Str(NodeNumber), '', '');
       End
     Else
       Begin

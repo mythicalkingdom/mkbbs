@@ -13,6 +13,19 @@ Unit MKExtCfg;   {extensions.cfg: the scripts the sysop gave the BBS, and what e
        timeout = 30                   seconds the program may run (default 60; 0: none)
        desc    = who is on line       shown by mkcheck
 
+     A block [hooks] says which extensions run when something happens in a call (names of extensions of this file, in this order):
+
+       [hooks]
+       logon   = greeter tally        after a caller has logged on, before the first menu
+       logoff  = tally                at the end of the call (the caller may be gone already)
+       newuser = onboarding           a new user has registered
+       upload  = scan                 a file was accepted (area, file name, size)
+       newmsg  = notify               a message was posted (area, number)
+       menu    = banner               a menu was entered (its name);  menu.main = ad  only for the menu main
+
+     A hook runs with the capabilities, the level and the timeout of its entry, with the event's data as its arguments (arg 1 is the event, then the user, then what the event says: see EXTENSIONS.md).
+     A hook that fails, is too slow or is not allowed to this caller is logged and skipped: it never stops the caller.
+
      Capabilities: users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write, and in the BBS session:read (the current caller, the node) and session:control (show a text file, press-enter pause, hang up); * = all.
      mk -x script uses the entry whose file is that script; a script that is in no entry gets every read capability (the sysop ran it by hand: -C narrows it).
 }
@@ -29,6 +42,7 @@ Type
 
   TExtCfg = Class
     Entries: Array Of TExtEntry;
+    Hooks: TStringList;                {event=names of extensions}
     Problems: TStringList;
     BbsDir: String;
     Constructor Create(Const ABbsDir: String);
@@ -37,9 +51,11 @@ Type
     Function Find(Const Name: String): Integer;                 {by name, -1: none}
     Function FindFile(Const Path: String): Integer;             {the entry whose file is this path, -1: none}
     Function FullPath(Const E: TExtEntry): String;
+    Function HookNames(Const Event: String): String;           {the extensions of a hook, '' = none}
   End;
 
 Function ExtKnownCap(Const Cap: String): Boolean;
+Function ExtKnownEvent(Const Ev: String): Boolean;      {logon logoff newuser upload newmsg menu menu.<name>}
 
 Implementation
 
@@ -55,8 +71,21 @@ Function ExtKnownCap(Const Cap: String): Boolean;
   End;
 
 
+Function ExtKnownEvent(Const Ev: String): Boolean;
+  Begin
+  Result := (Pos(' ' + LowerCase(Ev) + ' ', ' logon logoff newuser upload newmsg menu ') > 0) Or ((Copy(LowerCase(Ev), 1, 5) = 'menu.') And (Length(Ev) > 5));
+  End;
+
+
+Function TExtCfg.HookNames(Const Event: String): String;
+  Begin
+  Result := Hooks.Values[LowerCase(Event)];
+  End;
+
+
 Constructor TExtCfg.Create(Const ABbsDir: String);
   Begin
+  Hooks := TStringList.Create;
   BbsDir := ABbsDir;
   If (BbsDir <> '') And (BbsDir[Length(BbsDir)] <> '/') Then
     BbsDir := BbsDir + '/';
@@ -66,6 +95,7 @@ Constructor TExtCfg.Create(Const ABbsDir: String);
 
 Destructor TExtCfg.Destroy;
   Begin
+  Hooks.Free;
   Problems.Free;
   Inherited Destroy;
   End;
@@ -112,6 +142,7 @@ Procedure TExtCfg.Load;
     i, p, k: Integer;
     S, Key, Val, Cur: String;
     Cap: String;
+    InHooks: Boolean;
 
   Procedure Why(Const T: String);
     Begin
@@ -121,6 +152,8 @@ Procedure TExtCfg.Load;
   Begin
   SetLength(Entries, 0);
   Problems.Clear;
+  Hooks.Clear;
+  InHooks := False;
   If Not FileExists(BbsDir + 'extensions.cfg') Then
     Exit;
   L := TStringList.Create;
@@ -141,6 +174,12 @@ Procedure TExtCfg.Load;
           Continue;
           End;
         Cur := Trim(Copy(S, 2, Length(S) - 2));
+        InHooks := LowerCase(Cur) = 'hooks';
+        If InHooks Then
+          Begin
+          Cur := '';
+          Continue;
+          End;
         For k := 1 To Length(Cur) Do
           If Not (Cur[k] In ['A'..'Z', 'a'..'z', '0'..'9', '-', '_']) Then
             Begin
@@ -169,6 +208,16 @@ Procedure TExtCfg.Load;
         Continue;
         End;
       p := Pos('=', S);
+      If InHooks And (p > 0) Then
+        Begin
+        Key := LowerCase(Trim(Copy(S, 1, p - 1)));
+        Val := Trim(Copy(S, p + 1, Length(S)));
+        If Not ExtKnownEvent(Key) Then
+          Why('unknown hook ' + Key + ' (logon logoff newuser upload newmsg menu menu.<name>)')
+        Else
+          Hooks.Values[Key] := Val;
+        Continue;
+        End;
       If (p = 0) Or (Cur = '') Then
         Begin
         Why('not a setting of a block: ' + Copy(S, 1, 40));
@@ -210,6 +259,20 @@ Procedure TExtCfg.Load;
     For i := 0 To High(Entries) Do
       If Entries[i].FileName = '' Then
         Problems.Add('the extension ' + Entries[i].Name + ' has no file');
+    For i := 0 To Hooks.Count - 1 Do
+      Begin
+      Val := Hooks.ValueFromIndex[i];
+      Cap := '';
+      For k := 1 To Length(Val) + 1 Do
+        If (k > Length(Val)) Or (Val[k] In [' ', ',', #9]) Then
+          Begin
+          If (Cap <> '') And (Find(Cap) < 0) Then
+            Problems.Add('the hook ' + Hooks.Names[i] + ' names the extension ' + Cap + ', which is not in this file');
+          Cap := '';
+          End
+        Else
+          Cap := Cap + Val[k];
+      End;
   Finally
     L.Free;
   End;

@@ -25,6 +25,7 @@ Type
     Caps: TStringList;                 {the capabilities; '*' = all}
     Who: String;                       {the name of the script, for the log}
     Quiet: Boolean;                    {no log lines (tests)}
+    RunPath: String;                   {the run directory of the listener ('' = the environment MKRUN)}
     Cp437: Boolean;                    {in the BBS (a caller's terminal): the script's strings are CP437, the answers are turned into it; mk -x keeps UTF-8}
     Registry: THostRegistry;           {the commands of the script: the BBS is the default provider; others are added with Registry.Add}
     Constructor Create(Const AWho: String; ACaps: TStrings);
@@ -385,7 +386,9 @@ Function THost.Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out 
   Begin
   Err := '';
   Result := False;
-  RunDir := GetEnvironmentVariable('MKRUN');
+  RunDir := RunPath;
+  If RunDir = '' Then
+    RunDir := GetEnvironmentVariable('MKRUN');
   BbsDir := Config^.GetBbsPath;
   If (BbsDir <> '') And (BbsDir[Length(BbsDir)] <> '/') Then
     BbsDir := BbsDir + '/';

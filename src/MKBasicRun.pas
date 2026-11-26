@@ -33,8 +33,8 @@ Uses HostReg;
 
 Procedure RunBasicProgram(Path: ShortString);
 
-Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt);
-  {an extension of the sysop (MKExtRun, menu command 175): the program at Full, with the host commands of Reg, for at most Secs seconds of run time (0: no limit)}
+Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Silent: Boolean);
+  {Silent (a hook): an error is only logged, the caller is not asked to press Enter.  An extension of the sysop (MKExtRun, menu command 175): the program at Full, with the host commands of Reg, for at most Secs seconds of run time (0: no limit)}
 
 
 Implementation
@@ -187,7 +187,7 @@ Function TMKTerm.HostCall(Const cmd: AnsiString; Out err: AnsiString): AnsiStrin
 
 {------------------------------------------------------------ the command}
 
-Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: LongInt); Forward;
+Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: LongInt; Silent: Boolean); Forward;
 
 
 Procedure RunBasicProgram(Path: ShortString);
@@ -223,11 +223,11 @@ Procedure RunBasicProgram(Path: ShortString);
     User.PressEnter;
     Exit;
     End;
-  RunBasicText(Full, Text, Nil, 0);
+  RunBasicText(Full, Text, Nil, 0, False);
   End;
 
 
-Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: LongInt);
+Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: LongInt; Silent: Boolean);
   Var
     Status: AnsiString;
     Term: TMKTerm;
@@ -288,7 +288,7 @@ Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: L
     If Term.InternalText <> '' Then
       RunLog('BASIC internal error : ' + Term.InternalText);
     RunLog('BASIC ended (' + Status + ')' + Copy(' - caller gone', 1, 15 * Ord(Quiet)));
-    If (Not Quiet) And (Status <> 'end') And (Status <> 'stop') And (Status <> 'system') Then
+    If (Not Quiet) And (Not Silent) And (Status <> 'end') And (Status <> 'stop') And (Status <> 'system') Then
       User.PressEnter;                 {an error, a limit or a break: let the caller read it}
   Finally
     B.Free;
@@ -297,7 +297,7 @@ Procedure RunBasicText(Const Full, Text: AnsiString; Reg: THostRegistry; Secs: L
   End;
 
 
-Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt);
+Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Silent: Boolean);
   Var
     Text: AnsiString;
 
@@ -309,7 +309,7 @@ Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: Lo
     User.PressEnter;
     Exit;
     End;
-  RunBasicText(Full, Text, Reg, Secs);
+  RunBasicText(Full, Text, Reg, Secs, Silent);
   End;
 
 
@@ -328,7 +328,7 @@ Procedure RunBasicProgram(Path: ShortString);
   End;
 
 
-Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt);
+Procedure RunBasicExtension(Const Full: AnsiString; Reg: THostRegistry; Secs: LongInt; Silent: Boolean);
   Begin
   User.DisplayStrLn('BASIC is not available in this version of MK');
   User.PressEnter;

@@ -348,6 +348,16 @@ try:
     check('"lead": 20 minutes: 30 minutes ahead the caller is still let in', wait(lambda: '-T' in read(argsout), 5), read(argsout))
     c3.close()
     stop(p)
+    # ---------------------------------------------------------------- an event that runs a script of the sysop (mk -x, MHOST-PLAN.md): it finds the run directory of the listener
+    if os.path.exists(os.path.join(build, 'mk')):
+        cfgx = make_cfg('s9', {1: dict(action=1, cmd=build + '/mk -x scripts/ev.bas arg1', flags=2)})
+        os.makedirs(os.path.join(cfgx, 'scripts'), exist_ok=True)
+        open(os.path.join(cfgx, 'scripts', 'ev.bas'), 'w').write('10 N = VAL(HOST$("node.list"))\n20 OPEN "ev.out" FOR OUTPUT AS #1\n30 PRINT #1, "nodes=" + MID$(STR$(N), 2) + " type=" + HOST$("field 1 type") + " node=" + HOST$("field 1 node") + " arg=" + HOST$("arg 1")\n40 CLOSE #1\n')
+        outx = os.path.join(cfgx, 'scripts', 'ev.out')
+        p, log, port, run = start('s9', cfgx, hms(2, 59, 52))
+        check('an event whose command is  mk -x script  runs the script with the run directory of the listener (it is on the node list as a script node, with its argument)',
+              wait(lambda: os.path.exists(outx) and 'arg=' in read(outx), 25) and 'nodes=1 type=script node=101 arg=arg1' in read(outx).replace('\r', ''), read(outx) + read(log)[-400:])
+        stop(p)
 finally:
     for q in procs:
         if q.poll() is None:

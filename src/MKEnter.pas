@@ -68,7 +68,7 @@ Var
 Implementation
 
 
-Uses MKFile, MKString, MKDoor, MKCfgAbs, MKName, MKDos, MKLogEnt,
+Uses MKFile, MKString, MKDoor, MKCfgAbs, MKName, MKDos, MKLogEnt, MKExtRun,
   MKMsgAbs, {MKMsgFid, MKMsgSqu, MKMsgHud,} MKMsgOpn,
   Dos;
 
@@ -666,6 +666,7 @@ Procedure MsgEntObj.GetText;
                  Config^.GetMsgName(ME^.Area));
                ME^.NewMsgNum := TMsg^.GetMsgNum;
                User.UpdateForMsg;
+               RunHooks('newmsg', Long2Str(ME^.Area), Long2Str(ME^.NewMsgNum), '', '');
                End;
              If Not CloseMsgArea(TMsg) Then;
              End;

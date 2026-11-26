@@ -1,4 +1,4 @@
-Unit MKExtRun;   {Menu command 175: run an extension of the sysop for the caller (MHOST-PLAN.md phase 2)}
+Unit MKExtRun;   {Menu command 175: run an extension of the sysop for the caller (MHOST-PLAN.md phase 2), and the hooks of phase 3}
 
 {$MODE OBJFPC}
 {$H+}
@@ -20,11 +20,18 @@ Unit MKExtRun;   {Menu command 175: run an extension of the sysop for the caller
          bbs.pause       "Press Enter"                                                                  (session:control)
          bbs.hangup      ends the call                                                                  (session:control)
      Text the program gives the BBS and gets back is CP437, as for the caller's terminal.
+
+     Hooks (phase 3): the [hooks] block of extensions.cfg names extensions that RunHooks runs at an event of the call: logon, logoff, newuser, upload, newmsg, menu.  The caller's terminal is
+     theirs too (a greeting at the logon is the usual use); what they get is the event as arguments (arg 1 is the event, arg 2 the user, then what the event says).
 }
 
 Interface
 
 Procedure DoExtension(Data: ShortString);
+
+Procedure RunHooks(Const Event, A1, A2, A3, A4: String);
+  {the extensions of [hooks] in extensions.cfg for an event, in order: arg 1 is the event, arg 2 the user, then A1..A4 (empty ones left out).  A hook never stops the caller:
+   it is skipped (a line in the log) when the caller's level is too low, its program is not there or it fails; an error is not shown with "Press Enter".  menu: A1 is the menu}
 
 Implementation
 
@@ -110,6 +117,40 @@ Function TSession.Handle(Const Verb: String; Args: TStrings; Res: THostResult; O
   End;
 
 
+Procedure Execute(Cfg: TExtCfg; E: Integer; Words: TStringList; Silent: Boolean);
+  {run entry E for the caller; Words: the name, then the arguments}
+  Var
+    Name, Full, Ext: String;
+    Caps: TStringList;
+    Host: THost;
+    Sess: TSession;
+
+  Begin
+  Name := Cfg.Entries[E].Name;
+  Full := Cfg.FullPath(Cfg.Entries[E]);
+  Ext := LowerCase(ExtractFileExt(Full));
+  Caps := HostCaps(Cfg.Entries[E].Caps);
+  Host := THost.Create(Name, Caps);
+  Host.Cp437 := True;
+  Caps.Free;
+  Sess := TSession.Create;
+  Sess.Host := Host;
+  Host.Registry.Add('bbs', 'the caller''s session', 'user node file pause hangup', @Sess.Handle);
+  Host.SetScriptArgs(Words);
+  LogEntry.WriteEntry('Ext ' + Name + ': run for ' + User.GetUserName + ' (' + Copy(Cfg.Entries[E].Caps, 1, 120) + ')');
+  Try
+    If Ext = '.bas' Then
+      RunBasicExtension(Full, Host.Registry, Cfg.Entries[E].Timeout, Silent)
+    Else
+      RunPascalExtension(Full, Host.Registry, Cfg.Entries[E].Timeout, Words, Silent);
+  Finally
+    LogEntry.WriteEntry('Ext ' + Name + ': ended');
+    Sess.Free;
+    Host.Free;
+  End;
+  End;
+
+
 Procedure Say(Const S: String);
   Begin
   User.DisplayNewLine;
@@ -125,9 +166,6 @@ Procedure DoExtension(Data: ShortString);
     S, W, Name, Full, Ext: String;
     i, E: Integer;
     Q: Boolean;
-    Caps: TStringList;
-    Host: THost;
-    Sess: TSession;
 
   Begin
   Words := TStringList.Create;
@@ -182,28 +220,105 @@ Procedure DoExtension(Data: ShortString);
     Words.Free;
     Exit;
     End;
-  Caps := HostCaps(Cfg.Entries[E].Caps);
-  Host := THost.Create(Name, Caps);
-  Host.Cp437 := True;
-  Caps.Free;
-  Sess := TSession.Create;
-  Sess.Host := Host;
-  Host.Registry.Add('bbs', 'the caller''s session', 'user node file pause hangup', @Sess.Handle);
-  Host.SetScriptArgs(Words);
-  LogEntry.WriteEntry('Ext ' + Name + ': run for ' + User.GetUserName + ' (' + Copy(Cfg.Entries[E].Caps, 1, 120) + ')');
   Try
-    If Ext = '.bas' Then
-      RunBasicExtension(Full, Host.Registry, Cfg.Entries[E].Timeout)
-    Else
-      RunPascalExtension(Full, Host.Registry, Cfg.Entries[E].Timeout, Words);
+    Execute(Cfg, E, Words, False);
   Finally
-    LogEntry.WriteEntry('Ext ' + Name + ': ended');
-    Sess.Free;
-    Host.Free;
     Cfg.Free;
     Words.Free;
   End;
   End;
+
+
+Var
+  HookCfg: TExtCfg;
+  HookLoaded, InHook: Boolean;
+
+
+Procedure RunOneHook(Const Event, Name: String; Words: TStringList);
+  Var
+    E: Integer;
+    Full, Ext: String;
+
+  Begin
+  E := HookCfg.Find(Name);
+  If E < 0 Then
+    Begin
+    LogEntry.WriteEntry('Ext hook ' + Event + ': ' + Name + ' is not in extensions.cfg');
+    Exit;
+    End;
+  If User.GetUserSecLevel < HookCfg.Entries[E].Level Then
+    Exit;                                {not for this caller: not worth a line in every log}
+  Full := HookCfg.FullPath(HookCfg.Entries[E]);
+  Ext := LowerCase(ExtractFileExt(Full));
+  If (Not FileExists(Full)) Or ((Ext <> '.bas') And (Ext <> '.pas')) Then
+    Begin
+    LogEntry.WriteEntry('Ext hook ' + Event + ': the program of ' + Name + ' is not there or not a .bas / .pas file');
+    Exit;
+    End;
+  Words[0] := Name;
+  Try
+    Execute(HookCfg, E, Words, True);
+  Except
+    On Ex: Exception Do
+      LogEntry.WriteEntry('Ext hook ' + Event + ': ' + Name + ' failed: ' + Ex.ClassName + ': ' + Ex.Message);
+  End;
+  End;
+
+
+Procedure RunHooks(Const Event, A1, A2, A3, A4: String);
+  Var
+    Words: TStringList;
+    Names, W: String;
+    i, k: Integer;
+    List: TStringList;
+    WasOk: Boolean;
+
+  Begin
+  If InHook Then
+    Exit;
+  If Not HookLoaded Then
+    Begin
+    HookLoaded := True;
+    HookCfg := TExtCfg.Create(Config^.GetBbsPath);
+    HookCfg.Load;
+    End;
+  If HookCfg.Hooks.Count = 0 Then
+    Exit;
+  Names := HookCfg.HookNames(Event);
+  If Event = 'menu' Then
+    Names := Names + ' ' + HookCfg.HookNames('menu.' + LowerCase(A1));
+  Names := Trim(Names);
+  If Names = '' Then
+    Exit;
+  InHook := True;
+  WasOk := User.UserInfo^.Ok;
+  List := HostCaps(Names);
+  Words := TStringList.Create;
+  Try
+    For i := 0 To List.Count - 1 Do
+      Begin
+      Words.Clear;
+      Words.Add(List[i]);
+      Words.Add(Event);
+      Words.Add(User.GetUserName);
+      If A1 <> '' Then Words.Add(A1);
+      If A2 <> '' Then Words.Add(A2);
+      If A3 <> '' Then Words.Add(A3);
+      If A4 <> '' Then Words.Add(A4);
+      RunOneHook(Event, List[i], Words);
+      If WasOk And (Not User.UserInfo^.Ok) Then
+        Break;                           {a hook ended the call (bbs.hangup)}
+      End;
+  Finally
+    Words.Free;
+    List.Free;
+    InHook := False;
+  End;
+  k := 0;
+  W := '';
+  End;
+
+
 
 
 End.

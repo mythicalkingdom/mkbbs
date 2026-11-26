@@ -1,10 +1,10 @@
 # Scripts that use the BBS: `mk -x`
 
 A BASIC or Pascal program of yours can ask the BBS questions: who is on line, what is in a message area, what a user's record says.  It does this with one call, `HOST$("...")` in BASIC and `HostCall('...')` in Pascal, and runs with no caller: from a shell, from cron,
-from an event.  (Hooks and writes are the next phases: `MHOST-PLAN.md`.  Scripts for callers, inside the BBS, are the menu command 175, below.)  This is not a door: a door is a program that runs on a caller's terminal and knows nothing of the BBS; a script is given the BBS piece by piece, and only what you allow.
+from an event.  (Writes are the next phase: `MHOST-PLAN.md`.  Scripts for callers, inside the BBS, are the menu command 175 and the hooks, below.)  This is not a door: a door is a program that runs on a caller's terminal and knows nothing of the BBS; a script is given the BBS piece by piece, and only what you allow.
 
 ```
-mk -x [-C "capabilities"] [-T seconds] script.bas|script.pas [arguments]
+mk -x [-C "capabilities"] [-T seconds] [-R run dir] script.bas|script.pas [arguments]
 ```
 
 `MK` names the BBS directory as for every program; `MKRUN` (the listener's run directory) is needed for the node list.  The script is looked for as given, then in the BBS directory.  Its output goes to standard output, `INPUT` / `ReadLn` read standard input.
@@ -34,6 +34,40 @@ The program runs **for the caller** as menu commands 169 and 170 do (their termi
 
 A caller whose security level is under the `level` of the entry is told that it is not available to them, and so is one who picks a name that is not in `extensions.cfg` (and the log says why).  The run stops after the `timeout` of the entry (default 60 seconds of run time, not counting the time spent waiting for a
 key).  Text is CP437 in a session, as for the caller's terminal (in `mk -x` it is UTF-8).  `mkcheck` looks at the menu items: the name, the entry, the program.  Every run is in the log: `Ext <name>: run for <caller>`, refusals, and what `log.write` says.
+
+## Hooks: extensions that run when something happens
+
+Name extensions in a `[hooks]` block of `extensions.cfg` and they run at that point of a call, in the order written:
+
+```
+[hooks]
+logon   = greeter tally       after a caller has logged on, before the first menu
+logoff  = tally               at the end of the call (the caller is usually gone)
+newuser = onboarding          after a new user registered
+upload  = scan                after a file was accepted
+newmsg  = notify              after a message was posted
+menu    = banner              when a menu is entered (generic: every menu)
+menu.main = ad                when the menu "main" is entered
+```
+
+A hook is an ordinary extension: the entry gives its program, capabilities, level and timeout, and it runs for the caller (the same terminal, the commands of the session).  What happens is its **arguments**, as for any program (`arg n`, `ParamStr(n)`):
+
+| event | arg 1 | arg 2 | arg 3 | arg 4 | arg 5 |
+|---|---|---|---|---|---|
+| `logon` | `logon` | the user | level | node | times called |
+| `logoff` | `logoff` | the user | why the call ended (the code of `mk`'s offline reason) | node | |
+| `newuser` | `newuser` | the user | level | node | |
+| `upload` | `upload` | the user | file area | file name (as stored) | size in bytes |
+| `newmsg` | `newmsg` | the user | message area | message number | |
+| `menu` | `menu` | the user | menu name | | |
+
+(`arg 0` is the name of the extension.)  A hook **never stops the caller**: one whose entry has a higher `level` than the caller is skipped without a word; one whose program is not there, or that fails, or that takes longer than its `timeout`, is skipped and the log says
+so (`Ext <name>: ...`); an error is not followed by "Press Enter".  What a hook prints is seen by the caller (a greeting is the usual use), so a hook that must be silent prints nothing.  A hook that calls `bbs.hangup` ends the call and the hooks after it do not run.
+Hooks do not run hooks.  `mkcheck` reads the block: an unknown event, an extension that is not defined.
+
+## Scripts from the listener's events
+
+An event of `mklisten` (`mkconfig` > Events) whose action is a command can run a script: `/usr/bin/mk -x scripts/nightly.bas`.  The listener gives the command its run directory (`MKLISTENRUN`), so the script is on the node list and sees who is on line.
 
 ## What it may do: capabilities
 

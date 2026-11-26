@@ -592,7 +592,10 @@ Procedure GoToMenu(Item: Word);        {Process type 1 or 4}
     If Menu.GetError <> 0 Then
       MenuState := 0
     Else
+      Begin
       MenuState := 1;
+      RunHooks('menu', Menu.GetName, '', '', '');
+      End;
     End;
   End;
 
@@ -606,7 +609,10 @@ Procedure ReturnMenu(Var MN: String);
   If Menu.GetError <> 0 Then
     MenuState := 0
   Else
+    Begin
     MenuState := 1;
+    RunHooks('menu', Menu.GetName, '', '', '');
+    End;
   End;
 
 

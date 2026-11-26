@@ -18,10 +18,10 @@ Interface
 
 Uses Classes;
 
-Function ScriptPickNode: Integer;
+Function ScriptPickNode(Const RunDir: String): Integer;
   {a free script node (the node file of the run directory is made); 0: no run directory, -1: all script nodes are in use}
 
-Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt): Integer;
+Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt; Const RunDir: String): Integer;
 
 Procedure ScriptFinish;
   {remove the node file}
@@ -45,9 +45,9 @@ Function Alive(Pid: LongInt): Boolean;
   End;
 
 
-Function ScriptPickNode: Integer;
+Function ScriptPickNode(Const RunDir: String): Integer;
   Var
-    RunDir, R: String;
+    R: String;
     First, Last, N, Pid, p: Integer;
     L: TStringList;
     Fd: LongInt;
@@ -55,7 +55,6 @@ Function ScriptPickNode: Integer;
 
   Begin
   Result := 0;
-  RunDir := GetEnvironmentVariable('MKRUN');
   If RunDir = '' Then
     Exit;
   R := GetEnvironmentVariable('MKSCRIPTNODES');
@@ -180,7 +179,7 @@ Function TPasScriptTerm.HostCall(Const Cmd: RawByteString; Out Err: String): Raw
 {$ENDIF}
 
 
-Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt): Integer;
+Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt; Const RunDir: String): Integer;
   Var
     Full, Text, Ext, Caps, Name: String;
     Cfg: TExtCfg;
@@ -247,6 +246,7 @@ Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt:
   Cfg.Free;
   CapList := HostCaps(Caps);
   Host := THost.Create(Name, CapList);
+  Host.RunPath := RunDir;
   Host.SetScriptArgs(ScriptArgs);
   CapList.Free;
   LogEntry.WriteEntry('Ext ' + Name + ': run ' + Full + ' (' + Copy(Caps, 1, 120) + ')');

@@ -40,7 +40,7 @@ Function ListLines(Const Name: String; Desc: TStrings): String;
 Implementation
 
 Uses SysUtils, BaseUnix, Unix, Process, MKUpCfg, MKDoorCfg, MKSandbox,
-  MKGlobT, MKDoor, MKCfgAbs, MKComAbs, MKFile, MKString, MKProt, MKCFile, MKOffXfer, MKLogEnt;
+  MKGlobT, MKDoor, MKCfgAbs, MKComAbs, MKFile, MKString, MKProt, MKCFile, MKOffXfer, MKLogEnt, MKExtRun;
 
 
 Function UploadName(Const S: String): String;
@@ -711,6 +711,7 @@ Procedure DoUpload(Data: ShortString);
     Inc(Got);
     Say(P(546, 'Received:') + ' ' + Clean + ' (' + IntToStr(Size) + ')');
     LogEntry.WriteEntry('Upload: ' + Clean + ' (' + IntToStr(Size) + ' bytes) in area ' + IntToStr(Area) + ' by ' + User.GetUserName);
+    RunHooks('upload', IntToStr(Area), Clean, IntToStr(Size), '');
     End;
   If (Names.Count = 0) Or (Not Ok) And (Got = 0) Then
     Begin

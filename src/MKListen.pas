@@ -1505,11 +1505,13 @@ Procedure BuildEnvFor(Var EnvS: TStringList; Var Envv: TPCharArr; Const Dir: Str
   While envp[i] <> Nil Do
     Begin
     W := StrPas(envp[i]);
-    If Copy(W, 1, 3) <> 'MK=' Then
+    If (Copy(W, 1, 3) <> 'MK=') And (Copy(W, 1, 12) <> 'MKLISTENRUN=') Then
       EnvS.Add(W);
     Inc(i);
     End;
   EnvS.Add('MK=' + Dir);
+  If RunDir <> '' Then
+    EnvS.Add('MKLISTENRUN=' + RunDir);   {mk -x (a script run by an event) finds the run directory here; MKRUN would make mk -G open a node of its own}
   For i := 0 To High(Extra) Do
     EnvS.Add(Extra[i]);
   SetLength(Envv, EnvS.Count + 1);
