@@ -729,17 +729,21 @@ Function  GetProtocol(Special: Boolean): Word;
     While Not Finished Do
       Begin
       If Special Then
+        Begin
         If ((TmpChr = Config^.GetProtChar(i)) And (Config^.GetProtSpecAvail(i))) Then
           Begin
           Finished := True;
           GetProtocol := i;
-          End
+          End;
+        End
       Else
+        Begin                                   {(the else of the line above was taken for the else of the inner if: an upload, which is not Special, never found its protocol)}
         If ((TmpChr = Config^.GetProtChar(i)) And (Config^.GetProtNormAvail(i))) Then
           Begin
           Finished := True;
           GetProtocol := i;
           End;
+        End;
       Inc(i);
       If i > 20 Then
         Finished := True;

@@ -461,3 +461,20 @@
 540 Your password expires in
 541 day(s).
 542 The password was not changed: this call ends.
+;
+; Added for MK (uploads, menu command 173)
+543 Uploads are not allowed in this area.
+544 Start the upload with your terminal program now.
+545 No file was received.
+546 Received:
+547 The file was refused:
+548 Describe
+549 (an empty line ends the description):
+550 Upload time given back (seconds):
+551 there is a file of that name already
+552 Description taken from the archive:
+553 it is too large, the limit (KB):
+554 it failed its test:
+555 the scanner found something:
+556 it could not be checked, try again later.
+557 There is not enough free disk space for an upload now.

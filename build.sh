@@ -303,6 +303,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/msgconvtest.py build build/work/msgconv | grep -E "^(ok|FAIL|skip|failures)" | tee build/msgconvresult.txt
   if grep -q "^FAIL" build/msgconvresult.txt; then exit 1; fi
 fi
+# menu command 173: a caller uploads files (Zmodem and Ymodem through sz / sb) into a file area (UPLOAD-PLAN.md)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/uploadtest.py build build/work/upload | grep -E "^(ok|FAIL|skip|failures)" | tee build/uploadresult.txt
+  if grep -q "^FAIL" build/uploadresult.txt; then exit 1; fi
+fi
 # MKNet: addresses, connect and listen over IPv4 and IPv6 on the loopback (IPV6-PLAN.md)
 build/nettest | grep -E "^(ok|FAIL|skip|failures)" | tee build/netresult.txt
 if grep -q "^FAIL" build/netresult.txt; then exit 1; fi

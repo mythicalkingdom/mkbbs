@@ -16,7 +16,7 @@ read and post messages, upload and download files, play doors, and take their ma
 * **Logon:** name and password (plain as in the old days, or PBKDF2 hashes), new-user questionnaire, security levels and flags, time limits, account lock and password expiry, a login guard that blocks addresses after repeated failures.
 * **Menus and screens:** every menu is a file of commands with keys and security levels; screens are ANSI, AVATAR or ASCII; all prompt text comes from language files, so a board can speak several languages.  Display codes put the caller's name, the system's numbers, and **live statistics** (`^T`: calls today, minutes this month, busiest hour ...) into screens and prompts.
 * **Messages:** read, scan, reply, post and search in public and private areas, netmail, echomail and QWK conferences.  Many message base formats side by side: **Hudson, Squish, JAM, Fido `*.MSG`, Merlin, Ezycom, PCBoard, Synchronet (SMB)** and QWK.
-* **Files:** file areas with lists, searches and new-file scans; upload and download with **built-in Zmodem, Ymodem, Ymodem-G and Xmodem**, or external protocols.
+* **Files:** file areas with lists, searches and new-file scans; upload and download with **built-in Zmodem, Ymodem, Ymodem-G and Xmodem**, or external protocols.  Uploads can be **tested, virus scanned (ClamAV or any scanner), described from `FILE_ID.DIZ` and quarantined**, all in a sandbox.
 * **Offline mail:** QWK, QWKE, Bluewave and text packets, with screens, bulletins and a new-files list; replies come back as REP packets.
 * **Doors:** menu command 7 runs any program with `DORINFO1.DEF`, `DOOR.SYS`, `CALLINFO.BBS` and **`DOOR32.SYS`**; command 172 runs doors described in `doors.cfg`, **DOS doors in dosemu2** (no helper script) or native programs, **each in a bubblewrap sandbox** (no network, a private `/tmp`, only its own directories).  A BASIC and a Pascal interpreter run programs inside the BBS.
 * Paging, chat, bulletins and questionnaires, as the menus are set up.
@@ -66,6 +66,7 @@ telnet localhost 2323                      # a caller
 | [`MKLISTEN.md`](MKLISTEN.md) | the listener: ports, nodes, the sysop monitor, the mailer, events, the login guard |
 | [`SETUP.md`](SETUP.md) | `mksetup` and `mkcheck` |
 | [`NETWORKING.md`](NETWORKING.md), [`TOSSER.md`](TOSSER.md), [`HUBS.md`](HUBS.md) | Fido, QWK networks, the tosser, hub profiles |
+| [`UPLOADS.md`](UPLOADS.md) | uploads: command 173, `uploads.cfg`, tests, virus scanner, quarantine |
 | [`DOS-DOORS.md`](DOS-DOORS.md) | doors: `doors.cfg`, DOS doors in dosemu2, `DOOR32.SYS`, the sandbox |
 | [`API.md`](API.md) | the JSON API |
 | [`SSH.md`](SSH.md), [`PASSWORDS.md`](PASSWORDS.md) | SSH access, hashed passwords |
@@ -97,4 +98,4 @@ The screenshots above are made by `tools/screenshots.py` from the real programs 
 
 ### Design notes and to-do list
 
-The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (upload handling, metrics, multi-node chat).
+The `*-PLAN.md` files are design notes for the larger features, and [`MAINTENANCE-PLAN.md`](MAINTENANCE-PLAN.md) holds the to-do list (metrics, multi-node chat).

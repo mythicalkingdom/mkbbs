@@ -137,6 +137,38 @@ r = broken(door_item('lord', good + 'sandbox = off\n'))
 check('sandbox = off: nothing to say about bwrap', 'sandbox' not in r.stdout.replace('sandbox = off', ''), r.stdout)
 r = broken(door_item('lord', good + 'bogus = 1\ncom = 12\n'))
 check('doors.cfg lines that are not understood: WARN with the line number', 'WARN doors.cfg line 7: unknown setting bogus' in r.stdout and 'line 8: com is a number' in r.stdout, r.stdout)
+# menu command 173 (uploads) and uploads.cfg
+def upload_item(data, cfgtext=None):
+    def f(d):
+        m = bytearray(open(d + '/menus/top.mnu', 'rb').read())
+        i = len(m) // 167 - 2
+        m[i * 167] = 173
+        nb = data.encode()
+        m[i * 167 + 84] = len(nb); m[i * 167 + 85:i * 167 + 85 + len(nb)] = nb
+        open(d + '/menus/top.mnu', 'wb').write(m)
+        if cfgtext is not None:
+            open(d + '/uploads.cfg', 'w').write(cfgtext)
+    return f
+
+
+r = broken(upload_item(''))
+check('an upload item and no uploads.cfg: nothing wrong (an info line only)', r.returncode == 0 and not has(r, 'WARN') and 'there is no uploads.cfg' in r.stdout, r.stdout)
+r = broken(upload_item('999'))
+check('an upload item for a file area that is not there: WARN', 'uploads into the file area "999", which is not a file area' in r.stdout, r.stdout)
+os.makedirs(tmp + '/qq', exist_ok=True)
+fine = '[global]\nquarantine = %s/qq\nsandbox = off\nscan = /bin/true %%f\n[type zip]\ntest = /bin/true %%f\ndiz = /bin/true %%f\n' % tmp
+r = broken(upload_item('', fine))
+check('a uploads.cfg with programs that are there: nothing to say', r.returncode == 0 and not has(r, 'WARN'), r.stdout)
+r = broken(upload_item('', fine.replace('/bin/true %f\n[type', '/nonexistent/scanner %f\n[type', 1)))
+check('a scanner that is not there: WARN', 'uploads.cfg: the scanner: /nonexistent/scanner is not there' in r.stdout, r.stdout)
+r = broken(upload_item('', fine.replace('test = /bin/true', 'test = nosuchtool-xyz')))
+check('a test program that is not installed: WARN', 'the test of zip: nosuchtool-xyz is not installed' in r.stdout, r.stdout)
+r = broken(upload_item('', fine.replace('[type zip]', 'bogus = 1\nscanfail = maybe\n[type zip]')))
+check('uploads.cfg lines that are not understood: WARN with the line number', 'WARN uploads.cfg line 5: unknown setting bogus' in r.stdout and 'scanfail is refuse or accept' in r.stdout, r.stdout)
+r = broken(upload_item('', fine.replace('sandbox = off', 'sandbox = on\nrobind = /nonexistent/clam')))
+check('a robind that is not there: WARN', 'robind = /nonexistent/clam is not there' in r.stdout, r.stdout)
+r = broken(upload_item('', fine.replace(tmp + '/qq', '/proc/nowhere/q')))
+check('a quarantine directory that cannot be made: WARN', 'the quarantine directory /proc/nowhere/q cannot be made' in r.stdout, r.stdout)
 r = broken(lambda d: os.remove(d + '/games/cowsandbulls.pas'))
 check('the sample door is gone: WARN, the BBS still runs (exit 0)', r.returncode == 0 and 'WARN menu top' in r.stdout and 'cowsandbulls.pas, which is not there' in r.stdout, r.stdout)
 r = broken(lambda d: os.remove(d + '/msgs/gen.mer'))

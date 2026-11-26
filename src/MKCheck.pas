@@ -20,7 +20,7 @@ Program MKCheck;
 }
 
 Uses SysUtils, Classes, BaseUnix, Unix, Process,
-  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg, MKSandbox;
+  MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKRCfgRA, MKCfgQB, MKCfgSB, MKOpen, MKMsgAbs, MKPwd, MKDoorCfg, MKSandbox, MKUpCfg;
 
 Var
   Quiet, Verbose: Boolean;
@@ -332,6 +332,121 @@ Procedure CheckDoorItem(MenuName: String; Item: Integer; Key, Data: String);
   End;
 
 
+Var
+  UploadsChecked: Boolean = False;
+
+
+Procedure CheckUploads;
+  {uploads.cfg (menu command 173): what it says can be done here}
+  Var
+    C: TUpCfg;
+    i, j: Integer;
+    W, Why, Q: String;
+    Bw: String;
+    Fn: String;
+
+  Procedure Prog(Const Cmd, What: String);
+    Var
+      A: TStringList;
+
+    Begin
+    If Trim(Cmd) = '' Then
+      Exit;
+    A := TStringList.Create;
+    Try
+      If SplitCommand(Cmd, 'file', BbsDir, A) Then
+        Begin
+        W := A[0];
+        If (Pos('/', W) > 0) And Not FileExists(W) Then
+          Warn('uploads.cfg: ' + What + ': ' + W + ' is not there (uploads of that kind are accepted without it)')
+        Else If (Pos('/', W) = 0) And Not OnPath(W) Then
+          Warn('uploads.cfg: ' + What + ': ' + W + ' is not installed (a test is skipped; a missing scanner refuses the file unless scanfail = accept)');
+        End;
+    Finally
+      A.Free;
+    End;
+    End;
+
+  Begin
+  If UploadsChecked Then
+    Exit;
+  UploadsChecked := True;
+  Fn := BbsDir + 'uploads.cfg';
+  If Not FileExists(Fn) Then
+    Begin
+    Info('there is no uploads.cfg: uploaded files are accepted without a test, a scanner or a FILE_ID.DIZ');
+    Exit;
+    End;
+  C := TUpCfg.Create;
+  Try
+    C.Load(Fn);
+    For i := 0 To C.Problems.Count - 1 Do
+      Warn('uploads.cfg ' + C.Problems[i]);
+    Prog(C.Scan, 'the scanner');
+    For i := 0 To High(C.Types) Do
+      Begin
+      Prog(C.Types[i].Test, 'the test of ' + Trim(C.Types[i].Exts));
+      Prog(C.Types[i].Diz, 'the DIZ command of ' + Trim(C.Types[i].Exts));
+      End;
+    For i := 0 To High(C.Areas) Do
+      Begin
+      Prog(C.Areas[i].Scan, 'the scanner of area ' + IntToStr(C.Areas[i].Num));
+      If Config^.GetFileAreaName(C.Areas[i].Num) = '' Then
+        Warn('uploads.cfg: [area ' + IntToStr(C.Areas[i].Num) + '] is not a file area');
+      End;
+    If C.Sandbox Then
+      Begin
+      Bw := FindBwrap('');
+      If Bw = '' Then
+        Warn('uploads.cfg: the tests run in the sandbox and bwrap (bubblewrap) is not installed: they run unwrapped')
+      Else If Not SandboxWorks(Bw, Why) Then
+        Warn('uploads.cfg: the tests run in the sandbox and ' + Why + ': they run unwrapped');
+      End
+    Else
+      Info('uploads.cfg: sandbox = off: the tests and the scanner run with the rights of the BBS user');
+    For j := 0 To C.ROBinds.Count - 1 Do
+      If Not (DirectoryExists(C.ROBinds[j]) Or FileExists(C.ROBinds[j])) Then
+        Warn('uploads.cfg: robind = ' + C.ROBinds[j] + ' is not there');
+    For j := 0 To C.Binds.Count - 1 Do
+      If Not (DirectoryExists(C.Binds[j]) Or FileExists(C.Binds[j])) Then
+        Warn('uploads.cfg: bind = ' + C.Binds[j] + ' is not there');
+    If C.QuarSet Then
+      Q := C.Quarantine
+    Else
+      Q := BbsDir + 'quarantine';
+    If (Q <> '') And (Not DirectoryExists(Q)) And (Not ForceDirectories(Q)) Then
+      Warn('uploads.cfg: the quarantine directory ' + Q + ' cannot be made')
+    Else If (Q <> '') And (fpAccess(PChar(Q), W_OK) <> 0) Then
+      Warn('uploads.cfg: the quarantine directory ' + Q + ' cannot be written');
+    If C.Scan = '' Then
+      Info('uploads.cfg: no scanner is set (scan = ...): uploaded files are not scanned');
+  Finally
+    C.Free;
+  End;
+  End;
+
+
+Procedure CheckUploadItem(MenuName: String; Item: Integer; Key, Data: String);
+  {menu command 173: the area (when named) allows uploads}
+  Var
+    Prefix: String;
+    A: Integer;
+
+  Begin
+  CheckUploads;
+  Prefix := 'menu ' + MenuName + ' item ' + IntToStr(Item) + ' (' + Key + '): ';
+  If Trim(Data) = '' Then
+    Exit;
+  A := StrToIntDef(Trim(Data), 0);
+  If (A <= 0) Or (Config^.GetFileAreaName(A) = '') Then
+    Warn(Prefix + 'uploads into the file area "' + Trim(Data) + '", which is not a file area (the data is an area number, or nothing for the caller''s area)')
+  Else If Config^.GetFileNoUl(A) Or (Config^.GetFileAreaPath(A) = '') Then
+    Warn(Prefix + 'uploads into the file area ' + IntToStr(A) + ', which does not allow uploads (mkconfig: Allow Uploads, the path)')
+  Else If Not DirectoryExists(Config^.GetFileAreaPath(A)) Then
+    Warn(Prefix + 'the folder of file area ' + IntToStr(A) + ' is not there: ' + Config^.GetFileAreaPath(A));
+  End;
+
+
 Procedure CheckMenuFile(Name: String; Var HasLogoff: Boolean);
   Var
     FN: String;
@@ -413,6 +528,7 @@ Procedure CheckMenuFile(Name: String; Var HasLogoff: Boolean);
               Warn('menu ' + Name + ' item ' + IntToStr(i) + ' (' + R.Key + '): runs ' + W + ', which is not in the BBS folder or on the PATH');
           End;
         172: CheckDoorItem(Name, i, R.Key, Data);
+        173: CheckUploadItem(Name, i, R.Key, Data);
         169, 170:
           Begin
           W := FirstWord(Data);
