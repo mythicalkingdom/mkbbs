@@ -316,6 +316,9 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/iplistentest.py build/work/iplisten | grep -E "^(ok|FAIL|skip|failures)" | tee build/iplistenresult.txt
   if grep -q "^FAIL" build/iplistenresult.txt; then exit 1; fi
 fi
+# mklisten and systemd's sd_notify: READY, WATCHDOG heartbeats, STATUS, STOPPING
+python3 tests/sdnotifytest.py build/mklisten build/fakemk build/work/sdnotify | grep -E "^(ok|FAIL|skip|failures)" | tee build/sdnotifyresult.txt
+if grep -q "^FAIL" build/sdnotifyresult.txt; then exit 1; fi
 # the door sandbox (bubblewrap; skipped when bwrap is not installed)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/sandboxtest.py build/work/sandbox | grep -E "^(ok|FAIL|skip|failures)" | tee build/sandboxresult.txt

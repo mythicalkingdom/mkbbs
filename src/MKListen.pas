@@ -148,7 +148,7 @@ Program MKListen;
 *)
 
 Uses
-  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy, MKTls, MKNet;
+  BaseUnix, Sockets, Users, SysUtils, Classes, DateUtils, fpjson, jsonparser, MKEvent, MKProxy, MKTls, MKNet, MKSdNotify;
 
 
 Type
@@ -300,6 +300,27 @@ Procedure Log(Msg: String);
     fpWrite(LogFd, Line[1], Length(Line));
   If Foreground Then
     Write(Line);
+  End;
+
+
+Var
+  WdMs, LastBeat: Int64;                {the systemd watchdog interval and when the last heartbeat went (0: none yet)}
+
+
+Procedure Beat;
+  {the systemd watchdog heartbeat: at a third of the interval; called from the main loop and from the places that wait for a program, so a tool that takes its time does not look like a hang}
+  Var
+    Tick: Int64;
+
+  Begin
+  If WdMs <= 0 Then
+    Exit;
+  Tick := GetTickCount64;
+  If Tick - LastBeat >= WdMs Div 3 Then
+    Begin
+    SdNotify('WATCHDOG=1');
+    LastBeat := Tick;
+    End;
   End;
 
 
@@ -1133,6 +1154,7 @@ Function RunTool(Const Prog: String; Parm: Array Of String; Secs: Integer): Inte
       End;
     If R < 0 Then
       Exit;
+    Beat;
     fpSelect(0, Nil, Nil, Nil, 50);
   Until Now_ > T;
   fpKill(Pid, SIGKILL);
@@ -1434,6 +1456,7 @@ Procedure StopMailer;
       MailerPid := 0;
       Exit;
       End;
+    Beat;
     fpSelect(0, Nil, Nil, Nil, 100);
     End;
   fpKill(MailerPid, SIGKILL);
@@ -1656,6 +1679,7 @@ Function RunCapture(Const Prog: String; Parm: Array Of String; Secs: Integer; Va
   fpClose(Fds[1]);
   T := Now_ + Secs;
   Repeat
+    Beat;
     P.fd := Fds[0];
     P.events := POLLIN;
     P.revents := 0;
@@ -3188,9 +3212,23 @@ Procedure MainLoop;
     Fds: Array Of TPollFd;
     i: Integer;
     R: cInt;
+    LastStat, Tick: Int64;
+    Status, LastStatus: String;
 
   Begin
   SetLength(Fds, Length(Ports));
+  WdMs := SdWatchdogMs;
+  LastBeat := 0;
+  LastStat := 0;
+  LastStatus := '';
+  If SdActive Then
+    Begin
+    SdNotify('READY=1' + #10 + 'STATUS=listening on ' + IntToStr(Length(Ports)) + ' port(s)');
+    If WdMs > 0 Then
+      Log('systemd watchdog: a heartbeat every ' + IntToStr(WdMs Div 2000) + ' s or less')
+    Else
+      Log('systemd notified: ready');
+    End;
   fpSignal(SIGTERM, @OnStop);
   fpSignal(SIGINT, @OnStop);
   fpSignal(SIGHUP, @OnHup);
@@ -3208,11 +3246,26 @@ Procedure MainLoop;
     ReapChildren;
     MailerTick;
     EventsTick;
+    If SdActive Then
+      Begin
+      Beat;
+      Tick := GetTickCount64;
+      If Tick - LastStat >= 10000 Then
+        Begin
+        LastStat := Tick;
+        Status := 'STATUS=' + IntToStr(Length(Children)) + ' caller(s) on ' + IntToStr(Length(Ports)) + ' port(s)';
+        If Status <> LastStatus Then
+          SdNotify(Status);
+        LastStatus := Status;
+        End;
+      End;
     If R > 0 Then
       For i := 0 To High(Ports) Do
         If (Fds[i].revents And POLLIN) <> 0 Then
           Accept(i);
     End;
+  If SdActive Then
+    SdNotify('STOPPING=1');
   StopMailer;
   Log('stopping (' + IntToStr(Length(Children)) + ' callers stay connected)');
   For i := 0 To High(Ports) Do

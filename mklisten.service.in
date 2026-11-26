@@ -4,7 +4,10 @@ Documentation=file:@SYSCONFDIR@/mklisten.example.json
 After=network.target
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+# systemd restarts the listener when it stops sending its heartbeat for this long (mklisten sends one every third of it)
+WatchdogSec=60
 User=@MKUSER@
 Group=@MKUSER@
 ExecStart=@BINDIR@/mklisten -f -c @SYSCONFDIR@/mklisten.json

@@ -125,6 +125,11 @@ mklisten -c /etc/mkbbs/mklisten.json -t
   `KillMode=process` so that **stopping or restarting the listener does not hang up callers**: they are processes of
   their own and carry on until they log off.
 
+  The unit is `Type=notify`: `mklisten` tells systemd `READY=1` when the ports are open (so `systemctl start` returns when the BBS can take calls, and a start that fails on a port is reported as failed), keeps a
+  `STATUS=` line current (`systemctl status` shows "2 caller(s) on 3 port(s)") and sends `WATCHDOG=1` every 20 seconds; with `WatchdogSec=60` systemd restarts a listener that hangs and stops answering.
+  (Waiting for a tool that takes long, such as the tosser or an event program, keeps the heartbeat going.)  Nothing of this happens when `mklisten` is started by hand or as a daemon (`-d`: the
+  process id changes, so use the unit with `-f`); `NOTIFY_SOCKET` and `WATCHDOG_USEC` are what systemd sets, and `src/MKSdNotify.pas` reads them.
+
 ### 6. Try it
 
 ```
