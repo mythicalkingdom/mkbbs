@@ -82,6 +82,9 @@ The text is UTF-8.  Commands take words separated by blanks, `"Mark May"` in quo
 
 The data comes from the same functions as the JSON API (`API.md`), so a script and the API see the same BBS.
 
+`HOST$("help")` lists every command (one line each) and `HOST$("host.list")` the **providers**.  The protocol above (`line`, `field`, `meta`, `=`, `arg`, `help`) is not the BBS's own: it belongs to the registry of host commands, `../mkhostreg-fpc` (`HostReg.pas`), that
+`mkbasic` and `mkpascal` share.  The BBS is the registry's default provider; a program that embeds an interpreter can add providers under their own prefix (`Term.Hosts.Add('weather', ...)`), and a script then calls `weather.now` the same way and reads the answer with the same `line` and `field`.
+
 ## Examples
 
 `ext/` of the source (and `/usr/share/doc/mkbbs/examples/ext` of the package) has `who.bas` and `who.pas`, the unit `mkbbs.pas` (copy it next to a Pascal script: `uses mkbbs;` gives `Query`, `Field`, `Line`, `Meta`, `Value`, `Arg`, `LogLine`) and `hostfn.bas` (`DEF FN` lines for BASIC:

@@ -247,7 +247,7 @@ Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt:
   Cfg.Free;
   CapList := HostCaps(Caps);
   Host := THost.Create(Name, CapList);
-  Host.ScriptArgs := ScriptArgs;
+  Host.SetScriptArgs(ScriptArgs);
   CapList.Free;
   LogEntry.WriteEntry('Ext ' + Name + ': run ' + Full + ' (' + Copy(Caps, 1, 120) + ')');
   Result := 1;

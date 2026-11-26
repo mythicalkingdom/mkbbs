@@ -8,6 +8,13 @@ mkdir -p build
 for u in MKString Crc32 MKMisc Crc16 MKPlat MKDos MKFile MKGlobT MKFFile MKMsgAbs MKMsgEzy MKMsgFid MKMsgHud MKMsgJam MKMsgPkt MKMsgSqu MKMsgMer MKMsgSyn MKComAbs MKStr MKDupe MKCfgAbs MKLogEnt MKCfgMK MKCfgQB MKCfgSB MKRCfgMK MKRCfgRA MKCfgRA CfgGlob Default CfgForm CfgPal CfgColor CfgSec2 CfgPath CfgGen CfgNuser CfgSec CfgPage CfgResp CfgEl CfgXfer CfgEopt CfgAddr CfgFile CfgLang CfgPack CfgList CfgPLan CfgPAddr CfgPPack CfgFArea CfgOff CfgFast CfgEPack CfgNet CfgESys CfgPSys CfgMail CfgOrig CfgDoor CfgOffp CfgEvent CfgMsg CfgMArea CfgMenu CfgBox MKNSrch MKCfgTxt MKRBan QuoteCvt MkTagLn MKReadO MKReadCf HdrEnt MKVCrt MKScrn MKMusic MKAvatar MKDoor MKComFd MKComStd MKComTelnet MKComWS MKProxy MKSess MKSnoop; do
   fpc -B -Fusrc -FEbuild -FUbuild -vew src/$u.pas
 done
+# the registry of host commands that mkbasic, mkpascal and mk -x share (a separate project, next to this one or named by MKHOSTREG)
+HOSTREG="${MKHOSTREG:-../mkhostreg-fpc/src}"
+if [ ! -f "$HOSTREG/HostReg.pas" ]; then
+  echo "HostReg.pas not found in $HOSTREG (the project mkhostreg-fpc: put it next to this one or set MKHOSTREG)" >&2
+  exit 1
+fi
+HOSTFLAGS="-Fu$HOSTREG"
 # menu command 169 runs BASIC programs with the mkbasic interpreter (a separate project): found next to this
 # one or named by MKBASIC; without it the command only says that BASIC is not available
 BASIC_SRC="${MKBASIC:-../mkbasic-fpc/src}"
@@ -25,13 +32,13 @@ if [ -f "$PASCAL_SRC/mkpascal.pas" ]; then
   # its units get their language mode from its own compiler flags (not from directives in the files), so they are
   # compiled on their own, with those flags, into build/pascal; mk then only sees the compiled units
   mkdir -p build/pascal
-  fpc -Mobjfpc -Sh -O2 -vewn -Fu"$PASCAL_SRC" -FUbuild/pascal -FEbuild/pascal "$PASCAL_SRC/mkpascal.pas" > /dev/null
+  fpc -Mobjfpc -Sh -O2 -vewn -Fu"$PASCAL_SRC" $HOSTFLAGS -FUbuild/pascal -FEbuild/pascal "$PASCAL_SRC/mkpascal.pas" > /dev/null
   PASCALFLAGS="-dMKPASCAL -Fubuild/pascal"
   echo "Pascal interpreter: $PASCAL_SRC"
 else
   echo "Pascal interpreter not found in $PASCAL_SRC (set MKPASCAL): menu command 170 will be a stub"
 fi
-fpc -B -Fusrc -FEbuild -FUbuild -vew $BASICFLAGS $PASCALFLAGS -omk src/MK.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew $BASICFLAGS $PASCALFLAGS $HOSTFLAGS -omk src/MK.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omklisten src/MKListen.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmon src/MKMon.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconfig src/MKConfig.pas

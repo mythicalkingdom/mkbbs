@@ -4,15 +4,9 @@ Unit MKHost;   {The BBS as a script sees it: one dispatcher, a command in, text 
 {$H+}
 
 {
-  A script (BASIC: HOST$("..."), Pascal: HostCall('...')) asks the BBS with one string and gets one string back.  Because both languages keep a string to 255 characters,
-  a command does not return its result: it stores it in the host and returns **the number of lines** it has; the script then asks for the lines:
-
-     n = Call('msg.list 3 20')       the number of messages (a negative or an error is a run-time error with the text of Err)
-     Call('line 0')                  the first line of the last result: the names of the fields, separated by TAB (a table)
-     Call('line 1')                  the first record: the values, separated by TAB, in the same order
-     Call('field 1 from')            the value of one field of record 1 (no splitting needed)
-     Call('meta next')               a value of the whole answer (the number to start the next page at)
-     Call('=user.get "Mark May"')    a command with = in front returns line 1 directly (for a single value or record)
+  A script (BASIC: HOST$("..."), Pascal: HostCall('...')) asks the BBS with one string and gets one string back.  The protocol (a command returns the number of lines of its
+  answer; line, field, meta and = read it; arg, argc, help, host.list) is that of HostReg (../mkhostreg-fpc): this unit is the default provider of the registry, the BBS's own
+  commands; other providers can be added to Registry under their own prefix (Registry.Add).
 
   Results that are a table have a first line of field names; the text of a message (msg.text) has no field names and is cut into lines of at most 250 characters.
   A value never has a TAB or a line end in it (they become blanks).  A boolean is 1 or 0, nothing (JSON null) is empty, a list in a value is joined with commas.
@@ -24,27 +18,22 @@ Unit MKHost;   {The BBS as a script sees it: one dispatcher, a command in, text 
 
 Interface
 
-Uses Classes, SysUtils;
+Uses Classes, SysUtils, HostReg;
 
 Type
   THost = Class
     Caps: TStringList;                 {the capabilities; '*' = all}
     Who: String;                       {the name of the script, for the log}
     Quiet: Boolean;                    {no log lines (tests)}
-    ScriptArgs: TStringList;           {arg 0 is the name of the script, then what followed it on the command line (nil: none)}
+    Registry: THostRegistry;           {the commands of the script: the BBS is the default provider; others are added with Registry.Add}
     Constructor Create(Const AWho: String; ACaps: TStrings);
     Destructor Destroy; Override;
     Function Call(Const Cmd: String; Out Err: String): String;     {Err <> '': the call failed}
+    Procedure SetScriptArgs(Args: TStrings);                      {arg 0 is the name of the script, then what followed it on the command line}
+    Function Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out Err: String): Boolean;
     Private
-    Lines: TStringList;                {the result: line 0 the names of the fields (a table), or empty for text}
-    Meta: TStringList;                 {name=value of the whole answer}
-    Table: Boolean;
-    Function ResultCount: Integer;
     Function Allowed(Const Cap: String): Boolean;
-    Procedure Clear;
-    Procedure FromJson(Root: TObject; Const ListKey: String);
-    Procedure FromText(Const S: String);
-    Function Run(Const Verb: String; Args: TStringList; Out Err: String): Boolean;
+    Procedure FromJson(Res: THostResult; Root: TObject; Const ListKey: String);
     End;
 
 Function HostCaps(Const List: String): TStringList;
@@ -53,8 +42,7 @@ Function HostCaps(Const List: String): TStringList;
 Const
   HostAllReads = 'users:read msgs:read files:read nodes:read events:read stats:read chat:read log:write';
   HostCommands =
-    'system.info node.list events.list stats.total stats.by calls.list msg.areas msg.list msg.read msg.text file.areas file.list user.list user.get chat.who chat.log log.write ' +
-    'line field meta count arg argc help';
+    'system.info node.list events.list stats.total stats.by calls.list msg.areas msg.list msg.read msg.text file.areas file.list user.list user.get chat.who chat.log log.write';
 
 Implementation
 
@@ -88,44 +76,40 @@ Constructor THost.Create(Const AWho: String; ACaps: TStrings);
   Caps := TStringList.Create;
   Caps.CaseSensitive := False;
   Caps.AddStrings(ACaps);
-  Lines := TStringList.Create;
-  Meta := TStringList.Create;
+  Registry := THostRegistry.Create;
+  Registry.SetDefault('the BBS', HostCommands, @Self.Handle);
   End;
 
 
 Destructor THost.Destroy;
   Begin
   Caps.Free;
-  Lines.Free;
-  Meta.Free;
+  Registry.Free;
   Inherited Destroy;
+  End;
+
+
+Procedure THost.SetScriptArgs(Args: TStrings);
+  Begin
+  Registry.ScriptArgs.Clear;
+  If Args <> Nil Then
+    Registry.ScriptArgs.AddStrings(Args);
+  End;
+
+
+Function THost.Call(Const Cmd: String; Out Err: String): String;
+  Var
+    E: AnsiString;
+
+  Begin
+  Result := Registry.Call(Cmd, E);
+  Err := E;
   End;
 
 
 Function THost.Allowed(Const Cap: String): Boolean;
   Begin
   Result := (Caps.IndexOf('*') >= 0) Or (Caps.IndexOf(Cap) >= 0);
-  End;
-
-
-Procedure THost.Clear;
-  Begin
-  Lines.Clear;
-  Meta.Clear;
-  Table := False;
-  End;
-
-
-Function Plain(Const S: String): String;
-  {a value for the result: no TAB, no line end}
-  Var
-    i: Integer;
-
-  Begin
-  Result := S;
-  For i := 1 To Length(Result) Do
-    If Result[i] In [#9, #10, #13] Then
-      Result[i] := ' ';
   End;
 
 
@@ -141,7 +125,7 @@ Function Scalar(D: TJSONData): String;
     jtNull: Result := '';
     jtBoolean: If D.AsBoolean Then Result := '1' Else Result := '0';
     jtNumber: Result := D.AsString;
-    jtString: Result := Plain(D.AsString);
+    jtString: Result := HostPlain(D.AsString);
     jtArray:
       Begin
       For i := 0 To D.Count - 1 Do
@@ -152,7 +136,7 @@ Function Scalar(D: TJSONData): String;
         End;
       End;
     Else
-      Result := Plain(D.AsJSON);
+      Result := HostPlain(D.AsJSON);
     End;
   End;
 
@@ -189,7 +173,7 @@ Function JoinTab(L: TStringList): String;
   End;
 
 
-Procedure THost.FromJson(Root: TObject; Const ListKey: String);
+Procedure THost.FromJson(Res: THostResult; Root: TObject; Const ListKey: String);
   {a list in ListKey (a table with a record in each line), or the record itself (a table of one line); the other fields of the answer are the meta values}
   Var
     O: TJSONObject;
@@ -197,10 +181,10 @@ Procedure THost.FromJson(Root: TObject; Const ListKey: String);
     i, k, n: Integer;
     Names, Values, H: TStringList;
     D: TJSONData;
+    Row: String;
 
   Begin
-  Clear;
-  Table := True;
+  Res.Clear;
   O := TJSONObject(Root);
   Arr := Nil;
   If ListKey <> '' Then
@@ -216,8 +200,8 @@ Procedure THost.FromJson(Root: TObject; Const ListKey: String);
     If Arr = Nil Then
       Begin
       Flatten(O, '', Names, Values);
-      Lines.Add(JoinTab(Names));
-      Lines.Add(JoinTab(Values));
+      Res.TableTab(JoinTab(Names));
+      Res.RowTab(JoinTab(Values));
       Exit;
       End;
     For i := 0 To O.Count - 1 Do                {the meta values: what is not the list}
@@ -229,10 +213,10 @@ Procedure THost.FromJson(Root: TObject; Const ListKey: String);
           Values.Clear;
           Flatten(TJSONObject(O.Items[i]), O.Names[i] + '.', Names, Values);
           For k := 0 To Names.Count - 1 Do
-            Meta.Add(Names[k] + '=' + Values[k]);
+            Res.SetMeta(Names[k], Values[k]);
           End
         Else
-          Meta.Add(O.Names[i] + '=' + Scalar(O.Items[i]));
+          Res.SetMeta(O.Names[i], Scalar(O.Items[i]));
         End;
     { the names of the fields: those of the first record (the API gives every record the same fields) }
     Names.Clear;
@@ -240,23 +224,22 @@ Procedure THost.FromJson(Root: TObject; Const ListKey: String);
     If Arr.Count > 0 Then
       Flatten(TJSONObject(Arr[0]), '', Names, Values);
     H.Assign(Names);
-    Lines.Add('');
-    For k := 0 To H.Count - 1 Do
-      Lines[0] := Lines[0] + Copy(#9, 1, Ord(k > 0)) + H[k];
+    Res.TableTab(JoinTab(H));
     For i := 0 To Arr.Count - 1 Do
       Begin
       Names.Clear;
       Values.Clear;
       Flatten(TJSONObject(Arr[i]), '', Names, Values);
-      Lines.Add('');
+      Row := '';
       For k := 0 To H.Count - 1 Do
         Begin
         n := Names.IndexOf(H[k]);
         If n >= 0 Then
-          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + Copy(#9, 1, Ord(k > 0)) + Values[n]
+          Row := Row + Copy(#9, 1, Ord(k > 0)) + Values[n]
         Else
-          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + Copy(#9, 1, Ord(k > 0));
+          Row := Row + Copy(#9, 1, Ord(k > 0));
         End;
+      Res.RowTab(Row);
       End;
   Finally
     Names.Free;
@@ -266,33 +249,7 @@ Procedure THost.FromJson(Root: TObject; Const ListKey: String);
   End;
 
 
-Procedure THost.FromText(Const S: String);
-  Var
-    p, q: Integer;
-    One: String;
-
-  Begin
-  Clear;
-  Table := False;
-  Lines.Add('');
-  p := 1;
-  While p <= Length(S) Do
-    Begin
-    q := Pos(#10, Copy(S, p, Length(S)));
-    If q = 0 Then
-      q := Length(S) - p + 2;
-    One := Copy(S, p, q - 1);
-    Inc(p, q);
-    One := Plain(One);
-    Repeat
-      Lines.Add(Copy(One, 1, 250));
-      Delete(One, 1, 250);
-    Until One = '';
-    End;
-  End;
-
-
-Function Arg(Args: TStringList; i: Integer): String;
+Function Arg(Args: TStrings; i: Integer): String;
   Begin
   If i < Args.Count Then
     Result := Args[i]
@@ -315,7 +272,7 @@ Function EncodeQ(Const S: String): String;
   End;
 
 
-Function PageQuery(Args: TStringList; From: Integer): String;
+Function PageQuery(Args: TStrings; From: Integer): String;
   {limit, after and a search text, as the query string of the API functions}
   Var
     i: Integer;
@@ -335,59 +292,7 @@ Function PageQuery(Args: TStringList; From: Integer): String;
   End;
 
 
-Procedure SplitTab(Const S: String; L: TStringList);
-  Var
-    i: Integer;
-    W: String;
-
-  Begin
-  L.Clear;
-  W := '';
-  For i := 1 To Length(S) Do
-    If S[i] = #9 Then
-      Begin
-      L.Add(W);
-      W := '';
-      End
-    Else
-      W := W + S[i];
-  L.Add(W);
-  End;
-
-
-Function FieldOf(Const Head, Row, Name: String; Out Err: String): String;
-  {the value in the column that has this name (any case)}
-  Var
-    H, R: TStringList;
-    i: Integer;
-
-  Begin
-  Result := '';
-  Err := '';
-  H := TStringList.Create;
-  R := TStringList.Create;
-  Try
-    SplitTab(Head, H);
-    SplitTab(Row, R);
-    For i := 0 To H.Count - 1 Do
-      If CompareText(H[i], Name) = 0 Then
-        Begin
-        If i < R.Count Then
-          Result := Copy(R[i], 1, 255);
-        Exit;
-        End;
-    Err := 'no such field ' + Name;
-  Finally
-    H.Free;
-    R.Free;
-  End;
-  End;
-
-
-Function WordCount(Const S: String): Integer; Forward;
-Function ExtractWord(Const S: String; N: Integer): String; Forward;
-
-Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Boolean;
+Function THost.Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out Err: String): Boolean;
   Var
     O: TJSONObject;
     RunDir, BbsDir, Q: String;
@@ -401,7 +306,11 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     Begin
     If Err = '' Then
       If Not Allowed(Cap) Then
+        Begin
         Err := 'not allowed: ' + Verb + ' needs ' + Cap;
+        If Not Quiet Then
+          LogEntry.WriteEntry('Ext ' + Who + ': refused: ' + Err);
+        End;
     End;
 
   Begin
@@ -420,7 +329,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     O.Add('time', IsoFromUnix(DateTimeToUnix(Now, False)));
     O.Add('bbs_path', BbsDir);
     O.Add('run_path', RunDir);
-    FromJson(O, '');
+    FromJson(Res, O, '');
     End
   Else If Verb = 'node.list' Then
     Begin
@@ -428,7 +337,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     If Err = '' Then
       Begin
       O := ApiNodes(RunDir, BbsDir);
-      FromJson(O, 'nodes');
+      FromJson(Res, O, 'nodes');
       End;
     End
   Else If Verb = 'events.list' Then
@@ -437,7 +346,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     If Err = '' Then
       Begin
       O := ApiEvents(RunDir);
-      FromJson(O, 'events');
+      FromJson(Res, O, 'events');
       End;
     End
   Else If (Verb = 'stats.total') Or (Verb = 'stats.by') Then
@@ -455,12 +364,12 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
         If Verb = 'stats.total' Then
           Begin
           { the totals as one record }
-          FromJson(TJSONObject(O.Find('totals')), '');
-          Meta.Add('from=' + Scalar(O.Find('from')));
-          Meta.Add('to=' + Scalar(O.Find('to')));
+          FromJson(Res, TJSONObject(O.Find('totals')), '');
+          Res.SetMeta('from', Scalar(O.Find('from')));
+          Res.SetMeta('to', Scalar(O.Find('to')));
           End
         Else
-          FromJson(O, 'rows');
+          FromJson(Res, O, 'rows');
         End;
       End;
     End
@@ -476,7 +385,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
         Q := Q + Copy('&', 1, Ord(Q <> '')) + 'since=' + EncodeQ(Arg(Args, 1));
       O := ApiCalls(BbsDir + 'stats', Q, Err);
       If O <> Nil Then
-        FromJson(O, 'calls');
+        FromJson(Res, O, 'calls');
       End;
     End
   Else If Verb = 'msg.areas' Then
@@ -485,7 +394,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     If Err = '' Then
       Begin
       O := ApiMsgAreas;
-      FromJson(O, 'areas');
+      FromJson(Res, O, 'areas');
       End;
     End
   Else If Verb = 'msg.list' Then
@@ -495,7 +404,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
       Begin
       O := ApiMsgList(StrToIntDef(Arg(Args, 0), 0), PageQuery(Args, 1), Allowed('msgs:private'), Err);
       If O <> Nil Then
-        FromJson(O, 'messages');
+        FromJson(Res, O, 'messages');
       End;
     End
   Else If (Verb = 'msg.read') Or (Verb = 'msg.text') Then
@@ -507,11 +416,11 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
       If O <> Nil Then
         Begin
         If Verb = 'msg.text' Then
-          FromText(Scalar(O.Find('text')) + '')
+          Res.Text(Scalar(O.Find('text')))
         Else
           Begin
           O.Delete('text');
-          FromJson(O, '');
+          FromJson(Res, O, '');
           End;
         End;
       End;
@@ -522,7 +431,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     If Err = '' Then
       Begin
       O := ApiFileAreas;
-      FromJson(O, 'areas');
+      FromJson(Res, O, 'areas');
       End;
     End
   Else If Verb = 'file.list' Then
@@ -534,7 +443,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
       If O = Nil Then
         Err := 'no such file area'
       Else
-        FromJson(O, 'files');
+        FromJson(Res, O, 'files');
       End;
     End
   Else If Verb = 'user.list' Then
@@ -543,7 +452,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
     If Err = '' Then
       Begin
       O := ApiUsers(PageQuery(Args, 0));
-      FromJson(O, 'users');
+      FromJson(Res, O, 'users');
       End;
     End
   Else If Verb = 'user.get' Then
@@ -559,11 +468,11 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
         Else
           Q := 'limit=1&deleted=1&after=' + IntToStr(n - 1);
         O := ApiUsers(Q);
-        FromJson(O, 'users');
-        If (Lines.Count < 2) Or (StrToIntDef(Copy(Lines[1], 1, Pos(#9, Lines[1]) - 1), -1) <> n) Then
+        FromJson(Res, O, 'users');
+        If (Res.Count < 1) Or (StrToIntDef(Res.Field(1, 'number', Q), -1) <> n) Then
           Begin
           Err := 'no such user';
-          Clear;
+          Res.Clear;
           End;
         End
       Else
@@ -572,7 +481,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
         If O = Nil Then
           Err := 'no such user'
         Else
-          FromJson(O, '');
+          FromJson(Res, O, '');
         End;
       End;
     End
@@ -586,14 +495,12 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
       Room := TChatRoom.Create(RunDir, '', '', Cc, 0);
       Room.Who(L);
       Room.Free;
-      Clear;
-      Table := True;
-      Lines.Add('node' + #9 + 'name' + #9 + 'real_name');
+      Res.Table(['node', 'name', 'real_name']);
       For n := 0 To L.Count - 1 Do
         Begin
         k := StrToIntDef(Copy(L[n], 6, Pos(':', L[n]) - 6), 0);
         If ChatPresence(RunDir, k, Shown, Real) Then
-          Lines.Add(IntToStr(k) + #9 + Plain(Shown) + #9 + Plain(Real));
+          Res.Row([IntToStr(k), Shown, Real]);
         End;
       L.Free;
       End;
@@ -608,9 +515,7 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
       Room := TChatRoom.Create(RunDir, '', '', Cc, 0);
       Room.Tail(L, StrToIntDef(Arg(Args, 0), 20));
       Room.Free;
-      Clear;
-      Lines.Add('');
-      Lines.AddStrings(L);
+      Res.Text(L.Text);
       L.Free;
       End;
     End
@@ -622,16 +527,9 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
       Q := '';
       For n := 0 To Args.Count - 1 Do
         Q := Q + Copy(' ', 1, Ord(Q <> '')) + Args[n];
-      LogEntry.WriteEntry('Ext ' + Who + ': ' + Copy(Plain(Q), 1, 200));
-      Clear;
+      LogEntry.WriteEntry('Ext ' + Who + ': ' + Copy(HostPlain(Q), 1, 200));
+      Res.Clear;
       End;
-    End
-  Else If Verb = 'help' Then
-    Begin
-    Clear;
-    Lines.Add('');
-    For n := 1 To WordCount(HostCommands) Do
-      Lines.Add(ExtractWord(HostCommands, n));
     End
   Else
     Err := 'unknown command ' + Verb;
@@ -640,171 +538,6 @@ Function THost.Run(Const Verb: String; Args: TStringList; Out Err: String): Bool
   Result := Err = '';
   End;
 
-
-Function WordCount(Const S: String): Integer;
-  Var
-    i: Integer;
-    In_: Boolean;
-
-  Begin
-  Result := 0;
-  In_ := False;
-  For i := 1 To Length(S) Do
-    If S[i] = ' ' Then
-      In_ := False
-    Else If Not In_ Then
-      Begin
-      In_ := True;
-      Inc(Result);
-      End;
-  End;
-
-
-Function ExtractWord(Const S: String; N: Integer): String;
-  Var
-    i, k: Integer;
-    In_: Boolean;
-
-  Begin
-  Result := '';
-  k := 0;
-  In_ := False;
-  For i := 1 To Length(S) Do
-    If S[i] = ' ' Then
-      In_ := False
-    Else
-      Begin
-      If Not In_ Then
-        Begin
-        In_ := True;
-        Inc(k);
-        End;
-      If k = N Then
-        Result := Result + S[i];
-      End;
-  End;
-
-
-Procedure SplitArgs(Const S: String; Out Verb: String; Args: TStringList);
-  {words separated by blanks; "a b" is one word}
-  Var
-    i: Integer;
-    W: String;
-    Quoted, Have: Boolean;
-
-  Begin
-  Verb := '';
-  Args.Clear;
-  W := '';
-  Quoted := False;
-  Have := False;
-  For i := 1 To Length(S) + 1 Do
-    Begin
-    If (i > Length(S)) Or ((S[i] = ' ') And Not Quoted) Then
-      Begin
-      If Have Then
-        Begin
-        If Verb = '' Then
-          Verb := LowerCase(W)
-        Else
-          Args.Add(W);
-        End;
-      W := '';
-      Have := False;
-      End
-    Else If S[i] = '"' Then
-      Begin
-      Quoted := Not Quoted;
-      Have := True;
-      End
-    Else
-      Begin
-      W := W + S[i];
-      Have := True;
-      End;
-    End;
-  End;
-
-
-Function THost.ResultCount: Integer;
-  Begin
-  Result := Lines.Count - 1;
-  If Result < 0 Then
-    Result := 0;
-  End;
-
-
-Function THost.Call(Const Cmd: String; Out Err: String): String;
-  Var
-    C, Verb: String;
-    Args: TStringList;
-    n: Integer;
-    Direct: Boolean;
-
-  Begin
-  Result := '';
-  Err := '';
-  C := Trim(Cmd);
-  Direct := (C <> '') And (C[1] = '=');
-  If Direct Then
-    C := Trim(Copy(C, 2, Length(C)));
-  Args := TStringList.Create;
-  Try
-    SplitArgs(C, Verb, Args);
-    If Verb = 'line' Then
-      Begin
-      n := StrToIntDef(Arg(Args, 0), -1);
-      If (n < 0) Or (n >= Lines.Count) Then
-        Err := 'no such line'
-      Else
-        Result := Copy(Lines[n], 1, 255);
-      End
-    Else If Verb = 'count' Then
-      Result := IntToStr(ResultCount)
-    Else If Verb = 'field' Then
-      Begin
-      n := StrToIntDef(Arg(Args, 0), -1);
-      If (n < 1) Or (n >= Lines.Count) Or (Not Table) Then
-        Err := 'no such line'
-      Else
-        Result := FieldOf(Lines[0], Lines[n], Arg(Args, 1), Err);
-      End
-    Else If Verb = 'argc' Then
-      Begin
-      If ScriptArgs = Nil Then Result := '0' Else Result := IntToStr(ScriptArgs.Count - 1);
-      End
-    Else If Verb = 'arg' Then
-      Begin
-      n := StrToIntDef(Arg(Args, 0), -1);
-      If (ScriptArgs <> Nil) And (n >= 0) And (n < ScriptArgs.Count) Then
-        Result := Copy(ScriptArgs[n], 1, 255);
-      End
-    Else If Verb = 'meta' Then
-      Result := Meta.Values[Arg(Args, 0)]
-    Else If Verb = '' Then
-      Err := 'empty command'
-    Else
-      Begin
-      If Not Run(Verb, Args, Err) Then
-        Begin
-        If (Not Quiet) And (Copy(Err, 1, 11) = 'not allowed') Then
-          LogEntry.WriteEntry('Ext ' + Who + ': refused: ' + Err);
-        Clear;
-        End
-      Else If Direct Then
-        Begin
-        If Lines.Count > 1 Then
-          Result := Copy(Lines[1], 1, 255)
-        Else
-          Result := '';
-        End
-      Else
-        Result := IntToStr(ResultCount);
-      End;
-  Finally
-    Args.Free;
-  End;
-  End;
 
 
 End.

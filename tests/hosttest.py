@@ -173,6 +173,10 @@ s = script('ploop.pas', 'program l; begin while true do; end.\n')
 t0 = time.time()
 r = mkx('-T', '2', s)
 check('Pascal: a program that never ends is stopped by -T 2', r.returncode == 1 and time.time() - t0 < 15, (r.returncode, time.time() - t0, r.stdout))
+# help and host.list come from the registry (HostReg)
+s = script('h.bas', '10 N = VAL(HOST$("help"))\n20 PRINT N; HOST$("line 1"); "|"; HOST$("line " + STR$(N))\n30 PRINT HOST$("host.list"); HOST$("field 1 description")\n')
+r = mkx(s)
+check('help lists the commands of the BBS; host.list names the provider (the BBS is the default one)', r.returncode == 0 and 'system.info' in r.stdout and 'log.write' in r.stdout and ' 1 the BBS' in r.stdout.replace('1the BBS', ' 1 the BBS').replace('1 the BBS', ' 1 the BBS'), r.stdout)
 # the wrappers of ext/: mkbbs.pas for Pascal, the DEF FN lines for BASIC, and the examples
 for f in os.listdir(repo + '/ext'):
     shutil.copy(repo + '/ext/' + f, B + '/scripts/' + f)
