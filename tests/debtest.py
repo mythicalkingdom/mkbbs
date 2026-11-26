@@ -66,5 +66,47 @@ if shutil.which('lintian'):
     check('lintian finds no errors', not errs, errs[:5])
 else:
     print('skip: no lintian')
+# ---- mkdraw and mkcat: in the package mkbbs, and alone in the package mkdraw (packaging/mkdeb-draw.sh)
+check('mkbbs has mkdraw, mkcat, their manual pages and the screen code list, and provides / conflicts with / replaces the package mkdraw (they are the same programs)',
+      all(' ./' + w in lst for w in ('usr/bin/mkdraw', 'usr/bin/mkcat', 'usr/share/man/man1/mkdraw.1.gz', 'usr/share/man/man1/mkcat.1.gz', 'usr/share/mkdraw/codes.mkd', 'usr/share/doc/mkbbs/MKDRAW.md'))
+      and 'Provides: mkdraw' in info and 'Conflicts: mkdraw' in info and 'Replaces: mkdraw' in info, info + lst[-400:])
+for f in glob.glob(repo + '/build/mkdraw_*.deb'):
+    os.remove(f)
+r = subprocess.run([repo + '/packaging/mkdeb-draw.sh'], capture_output=True, text=True, cwd=repo, env=dict(os.environ, VERSION='0.2+test'))
+ddebs = glob.glob(repo + '/build/mkdraw_0.2+test_*.deb')
+check('packaging/mkdeb-draw.sh builds the package mkdraw', r.returncode == 0 and len(ddebs) == 1, r.stdout + r.stderr)
+if ddebs:
+    ddeb = ddebs[0]
+    dinfo = subprocess.run(['dpkg-deb', '-f', ddeb], capture_output=True, text=True).stdout
+    check('control: mkdraw, the version, no Depends (static programs), no Conflicts (it is mkbbs that conflicts)', 'Package: mkdraw' in dinfo and 'Version: 0.2+test' in dinfo and 'Depends:' not in dinfo and 'Conflicts:' not in dinfo, dinfo)
+    dl = subprocess.run(['dpkg-deb', '-c', ddeb], capture_output=True, text=True).stdout
+    dwant = ['usr/bin/mkdraw', 'usr/bin/mkcat', 'usr/share/man/man1/mkdraw.1.gz', 'usr/share/man/man1/mkcat.1.gz', 'usr/share/mkdraw/codes.mkd', 'usr/share/doc/mkdraw/MKDRAW.md', 'usr/share/doc/mkdraw/copyright',
+             'usr/share/doc/mkdraw/changelog.gz']
+    check('only mkdraw and mkcat, their manual pages, the screen code list and the documents are in it (nothing of the BBS)', not [w for w in dwant if ' ./' + w not in dl] and ' ./usr/bin/mk\n' not in dl and 'mklisten' not in dl, dl)
+    dx = work + '/dx'
+    os.makedirs(dx)
+    subprocess.run(['dpkg-deb', '-x', ddeb, dx], check=True)
+    samp = work + '/cp437.txt'
+    open(samp, 'wb').write(b'plain \xc9\xcd\xbb \x82cole\r\n\x1b[1;31mred\x1b[0m\r\n')
+    rr = subprocess.run([dx + '/usr/bin/mkcat', '-u', samp], capture_output=True)
+    check('mkcat from the package turns CP437 into UTF-8 (box drawing, an accented letter) and keeps the colours', rr.returncode == 0 and '╔═╗ \u00e9cole'.encode() in rr.stdout and b'\x1b[1;31mred' in rr.stdout, rr.stdout)
+    rr = subprocess.run([dx + '/usr/bin/mkdraw', '-x'], capture_output=True)
+    check('mkdraw from the package runs (a wrong option: usage, exit 3)', rr.returncode == 3 and b'Usage' in rr.stderr, rr)
+    rr = subprocess.run([dx + '/usr/bin/mkcat', '-q'], capture_output=True)
+    check('mkcat from the package: a wrong option exits 3', rr.returncode == 3, rr.returncode)
+    if shutil.which('groff'):
+        bad = []
+        for m in ('mkdraw', 'mkcat'):
+            g = subprocess.run('zcat %s/usr/share/man/man1/%s.1.gz | groff -man -ww -z' % (dx, m), shell=True, capture_output=True, text=True)
+            if g.stderr.strip():
+                bad.append((m, g.stderr[:200]))
+        check('the manual pages are valid (groff finds no warnings)', not bad, bad)
+    codes = open(dx + '/usr/share/mkdraw/codes.mkd', 'rb').read()
+    check('the screen code list is the one of the BBS (two lines for each code, the first is "Wait on Enter")', codes.startswith(b'Wait on Enter'), codes[:60])
+    if shutil.which('lintian'):
+        rr = subprocess.run(['lintian', '--no-tag-display-limit', ddeb], capture_output=True, text=True)
+        errs = [l for l in rr.stdout.splitlines() if l.startswith('E:')]
+        check('lintian finds no errors in the package mkdraw', not errs, errs[:5])
+
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

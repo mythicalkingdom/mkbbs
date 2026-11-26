@@ -1,0 +1,52 @@
+.TH MKCAT 1 "November 2026" "MK BBS" "User Commands"
+.SH NAME
+mkcat \- show a CP437 text file (a BBS screen, a message, a DOS log) on the terminal
+.SH SYNOPSIS
+.B mkcat
+[\fB\-u\fR | \fB\-c\fR] \fIFILE\fR
+.SH DESCRIPTION
+.B mkcat
+shows a text file in the DOS character set (CP437), such as an ANSI art screen of a BBS, a message or a log, on a terminal of today.
+Only the codes 128 to 255 are converted; control characters and escape sequences (the ANSI colours) go through unchanged.
+A ^Z (the DOS end of file mark) ends the text.
+The file name is used exactly as given.
+.PP
+Where the text is converted to UTF-8 the colour guard of the BBS is on: the text starts with light gray on black, and a colour reset
+(ESC[0m) that sets no foreground or no background is followed by the missing DOS colour, so that the own default colours of a themed
+terminal do not show through the art.
+.SH OPTIONS
+.TP
+.B \-u
+UTF-8: the characters 128 to 255 are converted (box drawing, shading, accented letters).
+.TP
+.B \-c
+CP437: the bytes as they are, for a terminal that speaks CP437 (a BBS terminal such as SyncTERM).
+.PP
+Without an option the output is guarded by where it goes: a terminal gets what its type wants
+(\fBTERM\fR xterm, linux, screen and the like get UTF-8; ansi, syncterm and unknown types get CP437 as it is), and a file or a pipe gets UTF-8.
+.SH ENVIRONMENT
+.TP
+.B TERM
+the terminal type, for the choice between UTF-8 and CP437
+.SH EXIT STATUS
+.TP
+.B 0
+done
+.TP
+.B 1
+the file could not be read
+.TP
+.B 3
+a wrong command line
+.SH EXAMPLES
+.nf
+mkcat welcome.ans
+mkcat \-u welcome.ans > welcome.txt
+mkcat \-c welcome.ans | nc bbs.example.org 23
+.fi
+.SH SEE ALSO
+.BR mkdraw (1)
+.SH AUTHOR
+Part of the MK BBS, https://github.com/mythicalkingdom/mkbbs.
+.SH LICENSE
+GNU General Public License version 3 or (at your option) any later version.

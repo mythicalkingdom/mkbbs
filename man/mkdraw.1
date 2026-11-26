@@ -1,0 +1,131 @@
+.TH MKDRAW 1 "November 2026" "MK BBS" "User Commands"
+.SH NAME
+mkdraw \- text mode screen editor for BBS screens (ANSI, AVATAR, ASCII, Pascal source)
+.SH SYNOPSIS
+.B mkdraw
+[\fB\-n\fR] [\fIFILE\fR]
+.SH DESCRIPTION
+.B mkdraw
+draws and edits the 80 x 23 text screens that bulletin board systems show to their callers: ANSI art, AVATAR screens, plain ASCII
+screens and the Pascal source that writes a screen.
+Every cell of the screen is one IBM PC (CP437) character and one colour attribute (a 4 bit foreground, a 3 bit background and
+blink), as on a DOS machine.
+It is the Free Pascal conversion of the DOS program MKDRAW and uses the Free Vision text mode interface.
+.PP
+The terminal must be at least 80 columns by 25 rows.
+A UTF-8 terminal shows the Unicode equivalents of the CP437 characters, and what is typed or pasted there is turned back into CP437 codes.
+Files are read and written as BBS software has them: CP437 bytes with CR LF line ends.
+.PP
+With a \fIFILE\fR that file is loaded (a file that is not there is an empty screen with that name).
+Without one the screen files (\fI*.a*\fR) of the current directory are listed to choose from; Esc starts with an empty screen.
+.SH OPTIONS
+.TP
+.B \-n
+Leave the files as the original DOS program wrote them.
+Without this option a saved ANSI file (and the Pascal source) is made so that every colour reset (ESC[0m, ESC[m) also sets the
+foreground and the background (light gray on black, the DOS default), so that a terminal with its own default colours shows the art
+as it was drawn.
+.SH KEYS
+Esc opens the fast menu with every command.
+Alt-H shows the help.
+.TP
+.B Alt-A
+choose the colour and attribute
+.TP
+.B Alt-B, Alt-I
+blinking, intensity
+.TP
+.B Alt-U
+take the colour under the cursor
+.TP
+.B Alt-R
+reverse the attribute
+.TP
+.B Alt-D
+drawing mode (the arrow keys draw with a line set)
+.TP
+.B Alt-C, Alt-M
+copy, move an area
+.TP
+.B Alt-F
+fill an area with the attribute
+.TP
+.B Alt-Z
+zap (clear) an area
+.TP
+.B Alt-E
+enclose an area in a frame
+.TP
+.B Alt-V, Alt-Y
+insert, delete a line
+.TP
+.B Alt-W
+double image (2 x 2)
+.TP
+.B Alt-G
+choose a character set of special characters
+.TP
+.B F1..F10
+enter the special characters of the current set (Alt-F1..F10 chooses set 1..10, Ctrl-F1..F5 set 11..15, Alt-1..Alt-9 set 1..9)
+.TP
+.B Ctrl-A..Ctrl-Z
+enter that control code
+.TP
+.B Alt-P
+pick a BBS screen code (see FILES)
+.TP
+.B Alt-L
+load a screen
+.TP
+.B Alt-S, Alt-T
+save an area, save the whole screen
+.TP
+.B Alt-X
+leave
+.PP
+An area is chosen with the arrow keys and Enter (or Space) for each corner; L takes the last area again.
+The mouse of a terminal moves the cursor, and the right button is Esc.
+A name without an extension saves the screen as \fIname.asc\fR, \fIname.ans\fR and \fIname.avt\fR; a name with the extension \fI.ans\fR or \fI.avt\fR saves that kind only, \fI.pas\fR or \fI.inc\fR the Pascal source that writes the screen, and any other extension plain ASCII.
+.SH ENVIRONMENT
+.TP
+.B TERM
+the terminal type
+.TP
+.B MK
+the folder of the BBS, where
+.I codes.mkd
+is looked for second
+.TP
+.B HOME
+where the user's own
+.I codes.mkd
+is looked for
+.SH FILES
+.TP
+.I codes.mkd
+The list of BBS screen codes that Alt-P offers (the codes a BBS expands when it shows a screen).
+It has two lines for each code: the text shown in the list and the code itself.
+The first of these is used: \fIcodes.mkd\fR in the current directory,
+in the folder named by \fBMK\fR,
+\fI~/.config/mkdraw/codes.mkd\fR,
+\fI/usr/local/share/mkdraw/codes.mkd\fR,
+\fI/usr/share/mkdraw/codes.mkd\fR.
+Without any of them a built-in list is used.
+.SH EXIT STATUS
+.TP
+.B 0
+done
+.TP
+.B 2
+the terminal is smaller than 80 x 25
+.TP
+.B 3
+a wrong command line
+.SH SEE ALSO
+.BR mkcat (1)
+.PP
+The MK BBS documentation (\fI/usr/share/doc/mkbbs\fR or \fI/usr/share/doc/mkdraw\fR).
+.SH AUTHOR
+MKDRAW is by Mark May (Mythical Kingdom Software); the Free Pascal conversion is part of the MK BBS, https://github.com/mythicalkingdom/mkbbs.
+.SH LICENSE
+GNU General Public License version 3 or (at your option) any later version.

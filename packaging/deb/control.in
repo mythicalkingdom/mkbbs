@@ -6,6 +6,9 @@ Priority: optional
 Maintainer: @MAINTAINER@
 Installed-Size: @SIZE@
 Depends: libc6 (>= 2.34), adduser
+Provides: mkdraw
+Conflicts: mkdraw
+Replaces: mkdraw
 Recommends: zip, unzip, libssl3t64 | libssl3, stunnel4, bubblewrap
 Suggests: openssh-server | dropbear-bin, dosemu2, curl
 Homepage: https://github.com/mythicalkingdom/mkbbs
@@ -16,6 +19,10 @@ Description: MK BBS: a bulletin board system with FidoNet and QWK networking
  echoes and file requests, a binkp mailer interface, QWK network passes (Telnet
  scripts, FTP, FTPS or your own programs), DOS door support through dosemu2,
  and the configuration, user and file editors.
+ .
+ It includes mkdraw (the ANSI screen editor) and mkcat with their manual
+ pages, the same programs as the package mkdraw, which it replaces: install
+ one or the other.
  .
  The package installs the programs, the systemd unit of the listener (not
  started: edit /etc/mkbbs/mklisten.json first), the language files and the

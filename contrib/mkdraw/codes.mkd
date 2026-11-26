@@ -1,0 +1,181 @@
+Wait on Enter    [^A]
+
+Disable Stopping [^B]
+
+Enable Stopping  [^C]
+
+Enable More?     [^D]
+
+Disable More?    [^E]
+
+Beep             [^G]
+
+Clear Screen     [^L]
+
+Pause one second [^W]
+
+Full Name        [^FA]
+A
+Location         [^FB]
+B
+Password         [^FC]
+C
+Bus/Data phone   [^FD]
+D
+Voice/Home phone [^FE]
+E
+Last call date   [^FF]
+F
+Last call time   [^FG]
+G
+A security flags [^FH]
+H
+B security flags [^FI]
+I
+C security flags [^FJ]
+J
+D security flags [^FK]
+K
+Netmail credit   [^FL]
+L
+Messages Posted  [^FM]
+M
+Last msg read    [^FN]
+N
+Security level   [^FO]
+O
+Total calls      [^FP]
+P
+Num Uploads      [^FQ]
+Q
+Kb Uploads       [^FR]
+R
+Num Downloads    [^FS]
+S
+Kb Downloads     [^FT]
+T
+Mins used today  [^FU]
+U
+Screen length    [^FV]
+V
+First name       [^FW]
+W
+Ansi setting     [^FX]
+X
+More? setting    [^FY]
+Y
+Screen clearing  [^FZ]
+Z
+Full scrn editor [^F0]
+0
+Avatar setting   [^F8]
+8
+Offline msg limit[^F!]
+!
+Offln conf limit [^F@]
+@
+Offln pkt type   [^F#]
+#
+Protocol         [^F$]
+$
+Archive packer   [^F%]
+%
+Lang macro 370   [^F^]
+^
+Lang macro 371   [^F&]
+&
+Lang macro 372   [^F*]
+*
+Lang macro 373   [^F(]
+(
+Lang macro 374   [^F)]
+)
+Lang macro 375   [^F-]
+-
+Lang macro 376   [^F=]
+=
+Lang macro 377   [^F;]
+;
+Lang macro 378   [^F:]
+:
+Lang macro 379   [^F<]
+<
+System calls     [^KA]
+A
+Last caller      [^KB]
+B
+Active msgs      [^KC]
+C
+Low msg number   [^KD]
+D
+High msg number  [^KE]
+E
+Times paged      [^KF]
+F
+Day of week      [^KG]
+G
+Number of users  [^KH]
+H
+Time (24hr)      [^KI]
+I
+Todays date      [^KJ]
+J
+Mins this call   [^KK]
+K
+Secs this call   [^KL]
+L
+Mins today       [^KM]
+M
+Secs today       [^KN]
+N
+Mins remain      [^KO]
+O
+Secs remain      [^KP]
+P
+Daily time limit [^KQ]
+Q
+Baud rate        [^KR]
+R
+Short Day of week[^KS]
+S
+Daily kb limit   [^KT]
+T
+Mins until event [^KU]
+U
+Next event time  [^KV]
+V
+Line number      [^KW]
+W
+Terminate call   [^KX]
+X
+Curr msg area    [^KY]
+Y
+Curr file area   [^KZ]
+Z
+Num msg area     [^K1]
+1
+Num file area    [^K2]
+2
+Offln new file   [^K!]
+!
+Offln send scrns [^K@]
+@
+Offln send bullt [^K#]
+#
+Offln verify pkt [^K$]
+$
+Offln flag rcvd  [^K^]
+^
+Offln own msgs   [^K&]
+&
+Offln all areas  [^K*]
+*
+Offln zero msg   [^K(]
+(
+Offln gateway    [^K)]
+)
+MKDraw Author
+Mark May
+MKDraw Home BBS
+Mythical Kingdom Tech
+

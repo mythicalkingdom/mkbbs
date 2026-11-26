@@ -26,7 +26,7 @@ read and post messages, upload and download files, play doors, and take their ma
 **For the sysop**
 * **`mklisten`** is the front door: it accepts connections on any number of ports, starts one `mk` per caller, runs scheduled **events** (polls, hub passes, purges, backups, your own commands, with exclusive maintenance windows), the **binkp mailer**, and the login guard.  It runs as a systemd service.
 * **`mkmon`**, the sysop monitor on a port of its own: who is on and what they are doing, watch or type into a node, chat, disconnect, add time, the mailer, events and statistics.
-* **Full-screen editors:** `mkconfig` (the whole configuration), `mkmenu`, `mkdraw` (ANSI screens), `mkusered`.  A first-run wizard `mksetup` makes a working BBS in one step and `mkcheck` tells you what would stop it from running well.
+* **Full-screen editors:** `mkconfig` (the whole configuration), `mkmenu`, `mkdraw` (ANSI screens), `mkusered`.  `mkdraw` and `mkcat` (show CP437 screens on a modern terminal) need no BBS: they have manual pages and their own Debian package, `mkdraw` (`make deb-mkdraw`, `MKDRAW.md`).  A first-run wizard `mksetup` makes a working BBS in one step and `mkcheck` tells you what would stop it from running well.
 * **Housekeeping:** `mkmaint` (purge and pack message bases), `mkmsgconv` (move an area to another base kind), `mkuserpurge` and `mkuserpack`, `mkfilecheck`, `mkbackup` and restore, `mkstats` and call statistics.
 * **A read-only JSON API** over HTTP(S) with scoped tokens: status, nodes, events, mailer, statistics, calls, message and file areas, messages, users; and **QWK packets over HTTPS** for hub-and-node links between MK systems.
 
@@ -91,6 +91,7 @@ You need Free Pascal 3.2.2 (`fpc`), `make`, and for TLS a system OpenSSL.
 ```sh
 make && sudo make install          # programs in /usr/local/bin, the mkbbs user, a systemd unit
 make deb                           # or a Debian package: build/mkbbs_<version>_<arch>.deb
+make deb-mkdraw                    # mkdraw and mkcat alone: build/mkdraw_<version>_<arch>.deb
 ```
 
 ### Building and testing

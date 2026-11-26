@@ -7,6 +7,8 @@
 #   make uninstall        remove the programs and the unit again (configuration,
 #                         log directory and user stay)
 #   make deb              a Debian package, build/mkbbs_<version>_<arch>.deb (packaging/mkdeb.sh)
+#   make deb-mkdraw       the package of mkdraw and mkcat alone, build/mkdraw_<version>_<arch>.deb (packaging/mkdeb-draw.sh)
+#   make install-draw     only mkdraw, mkcat, their manual pages and the example codes.mkd
 #
 # Variables:  PREFIX=/usr/local  BINDIR=$(PREFIX)/bin  SYSCONFDIR=/etc/mkbbs
 #             LOGDIR=/var/log/mkbbs  MKUSER=mkbbs
@@ -37,7 +39,7 @@ WANTSD = [ "$(SYSTEMD)" != no ] && { [ -n "$(DESTDIR)" ] || { [ "$$(id -u)" = 0 
 
 PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkbbsssh mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents mkbackup mkmaint mkstats mkuserpurge mkfilecheck mkuserpack mkapi mkapitoken mksetup mkcheck mkmsgconv mkchatctl
 
-.PHONY: all test install uninstall clean lang deb
+.PHONY: all test install install-draw uninstall clean lang deb deb-mkdraw
 
 all: build/.built
 
@@ -54,7 +56,15 @@ lang: build/.built
 test:
 	./build.sh
 
+# mkdraw and mkcat alone (what the package mkdraw has): the programs, the manual pages, the example list of screen codes
+install-draw: build/.built
+	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(PREFIX)/share/man/man1 $(DESTDIR)$(PREFIX)/share/mkdraw
+	install -m 755 build/mkdraw build/mkcat $(DESTDIR)$(BINDIR)/
+	install -m 644 man/mkdraw.1 man/mkcat.1 $(DESTDIR)$(PREFIX)/share/man/man1/
+	install -m 644 contrib/mkdraw/codes.mkd $(DESTDIR)$(PREFIX)/share/mkdraw/codes.mkd
+
 install: build/.built
+	$(MAKE) -s -o build/.built install-draw
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(SYSCONFDIR)
 	for p in $(PROGRAMS); do install -m 755 build/$$p $(DESTDIR)$(BINDIR)/$$p; done
 	@if [ -f $(MKBINK)/Makefile ]; then \
@@ -113,12 +123,18 @@ install: build/.built
 uninstall:
 	for p in $(PROGRAMS) mkbink mkdosdoor; do rm -f $(DESTDIR)$(BINDIR)/$$p; done
 	rm -f $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
+	rm -f $(DESTDIR)$(PREFIX)/share/man/man1/mkdraw.1 $(DESTDIR)$(PREFIX)/share/man/man1/mkcat.1
+	rm -rf $(DESTDIR)$(PREFIX)/share/mkdraw
 	rm -f $(DESTDIR)$(UNITDIR)/mklisten.service $(DESTDIR)$(SYSUSERSDIR)/mkbbs.conf
 	@if [ -z "$(DESTDIR)" ] && [ "$$(id -u)" = 0 ] && command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi
 	@echo "removed the programs and the unit; $(DESTDIR)$(SYSCONFDIR)/mklisten.json, $(DESTDIR)$(LOGDIR) and the $(MKUSER) user are left alone"
 
 deb: build/.built
 	packaging/mkdeb.sh
+
+# build/mkdraw_<version>_<arch>.deb: mkdraw and mkcat for systems that have no BBS (packaging/mkdeb-draw.sh)
+deb-mkdraw: build/.built
+	packaging/mkdeb-draw.sh
 
 clean:
 	rm -rf build

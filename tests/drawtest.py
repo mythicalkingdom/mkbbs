@@ -513,5 +513,37 @@ check('a terminal with less than 80 x 25: a message and exit 2', b'at least 80 x
 r = subprocess.run([os.path.join(build, 'mkdraw'), '-x'], capture_output=True, timeout=20)
 check('a wrong option: usage, exit 3', r.returncode == 3 and b'Usage' in r.stderr, r)
 
+
+# the list of BBS screen codes (codes.mkd): the current folder, then MK, then ~/.config/mkdraw (then /usr/share/mkdraw, where the package puts one)
+def codes_dir(d, prompt):
+    os.makedirs(d, exist_ok=True)
+    open(os.path.join(d, 'codes.mkd'), 'wb').write(('%s\r\n\x01\r\nSecond one\r\n\x02\r\n' % prompt).encode('latin-1'))
+
+
+home = os.path.join(work, 'home')
+codes_dir(os.path.join(home, '.config', 'mkdraw'), 'From the home folder')
+mkdir_ = os.path.join(work, 'mkdir')
+codes_dir(mkdir_, 'From the MK folder')
+cwd_ = os.path.join(work, 'cwd')
+os.makedirs(cwd_, exist_ok=True)
+
+
+def codes_shown(**kw):
+    ss = Session([], **kw)
+    ss.keys(ESC)
+    ss.keys(ALT('p'), wait=0.6)
+    txt = ''.join(ss.t.row(y) for y in range(25))
+    ss.close()
+    return txt
+
+
+txt = codes_shown(cwd=cwd_, env={'HOME': home})
+check('codes.mkd of ~/.config/mkdraw is the list when nothing is nearer', 'From the home folder' in txt, txt[:200])
+txt = codes_shown(cwd=cwd_, env={'HOME': home, 'MK': mkdir_})
+check('... the one in the MK folder comes before it', 'From the MK folder' in txt and 'From the home folder' not in txt, txt[:200])
+codes_dir(cwd_, 'From the current folder')
+txt = codes_shown(cwd=cwd_, env={'HOME': home, 'MK': mkdir_})
+check('... and the one in the current folder before both', 'From the current folder' in txt and 'From the MK folder' not in txt, txt[:200])
+
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

@@ -9,8 +9,8 @@ Unit MKDrawCf;   {MKDraw: the character sets, the BBS screen codes and the pick 
                             are CP437 codes; F1..F10 enter the ones of the current set
        GetBbsStr            pick a BBS screen code (^A, ^F A ... the control codes the BBS expands) to put in the
                             screen; the list is the built-in one or the prompt/code pairs of the file codes.mkd
-                            (two lines for each code: the prompt, the code) in the current directory or the
-                            MK directory
+                            (two lines for each code: the prompt, the code) in the current directory, the MK
+                            directory, ~/.config/mkdraw or /usr/share/mkdraw (the package installs one there)
        GetMenuCmd           the fast menu (Esc): one command of the editor
        GetActionCmd         what a saved screen starts with: nothing, home, clear screen
        GetPickChar          choose the current character set
@@ -67,6 +67,50 @@ Function  CharSetStr(i: Word): String; {The characters of a set for a list, show
 Implementation
 
 Uses Dos, MKString, MKFile, CfgBox, CfgList, Objects;
+
+
+Function CodesFile: String;
+  {the list of BBS screen codes: codes.mkd in the current folder, else in the BBS folder (MK), else the one of the user (~/.config/mkdraw), else the one the package
+   installs (/usr/local/share/mkdraw, /usr/share/mkdraw); '' when there is none}
+  Var
+    FN: String;
+
+  Begin
+  CodesFile := '';
+  FN := 'codes.mkd';
+  If FileExist(FN) Then
+    Begin
+    CodesFile := FN;
+    Exit;
+    End;
+  If GetEnv('MK') <> '' Then
+    Begin
+    FN := WithBackSlash(GetEnv('MK')) + 'codes.mkd';
+    If FileExist(FN) Then
+      Begin
+      CodesFile := FN;
+      Exit;
+      End;
+    End;
+  If GetEnv('HOME') <> '' Then
+    Begin
+    FN := WithBackSlash(GetEnv('HOME')) + '.config/mkdraw/codes.mkd';
+    If FileExist(FN) Then
+      Begin
+      CodesFile := FN;
+      Exit;
+      End;
+    End;
+  FN := '/usr/local/share/mkdraw/codes.mkd';
+  If FileExist(FN) Then
+    Begin
+    CodesFile := FN;
+    Exit;
+    End;
+  FN := '/usr/share/mkdraw/codes.mkd';
+  If FileExist(FN) Then
+    CodesFile := FN;
+  End;
 
 
 Procedure LoadExtChars;
@@ -139,10 +183,8 @@ Procedure InitCustCodes;
     New(CustCodes);
   NumCust := 0;
   FillChar(CustCodes^, SizeOf(CustCodes^), 0);
-  FN := 'codes.mkd';
-  If (Not FileExist(FN)) And (GetEnv('MK') <> '') Then
-    FN := WithBackSlash(GetEnv('MK')) + 'codes.mkd';
-  If FileExist(FN) Then
+  FN := CodesFile;
+  If FN <> '' Then
     Begin
     TF.Init;
     If TF.OpenTextFile(FN) Then

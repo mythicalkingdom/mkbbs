@@ -49,7 +49,7 @@ cp build/deb/lang/* "$STAGE/usr/share/mkbbs/lang/"
 # the documentation and the examples
 doc="$STAGE/usr/share/doc/mkbbs"
 mkdir -p "$doc/examples"
-for f in GETTING-STARTED MKBBS MKLISTEN NETWORKING HUBS TOSSER SSH PASSWORDS DOS-DOORS UPLOADS CHAT EXTENSIONS BACKUP MAINT STATS API SETUP; do
+for f in GETTING-STARTED MKBBS MKLISTEN NETWORKING HUBS TOSSER SSH PASSWORDS DOS-DOORS UPLOADS CHAT EXTENSIONS MKDRAW BACKUP MAINT STATS API SETUP; do
     [ -f "$f.md" ] && install -m 644 "$f.md" "$doc/$f.md"
 done
 install -m 644 mklisten.example.json "$doc/examples/"
@@ -90,6 +90,9 @@ mkbbs for Debian
 * The programs have short names (mk, mkread, mkcat ...): they are all in /usr/bin.
 * Removing the package keeps the user mkbbs, /var/log/mkbbs and your BBS directories; purging also removes /etc/mkbbs/mklisten.json.
 RD
+
+# the manual pages are compressed in a package
+find "$STAGE/usr/share/man" -type f -name '*.1' -exec gzip -9n {} +
 
 # strip the programs: the FPC binaries carry their symbols
 for f in "$STAGE"/usr/bin/*; do

@@ -99,9 +99,9 @@ one JSON file (5).  Between 1 and 5 nothing is lost.
 | `mkmenu` | menu editor for `*.mnu` files |
 | `mkusered` | user editor |
 | `mkread` | the message reader for the sysop, local |
-| `mkdraw` | screen editor for ANSI, AVATAR and ASCII screens |
+| `mkdraw` | screen editor for ANSI, AVATAR and ASCII screens (`man mkdraw`, `MKDRAW.md`; also a package of its own) |
 | `mklc` | language compiler: `mklc english.txt` makes `english.lc` |
-| `mkcat` | show a CP437 screen or log on a terminal |
+| `mkcat` | show a CP437 screen or log on a terminal (`man mkcat`) |
 | `mklistmsgarea` | list the message areas to a text file |
 | `mknodeidx`, `mknodelist` | build the nodelist index, look an address up |
 | `mkcfgcvt`, `mklower` | convert a configuration, make references lower case |
@@ -235,7 +235,9 @@ of the sample BBS, never on the sample itself.
 | `NETWORKING.md` | QWK and Fido networking set-up |
 | `PASSWORDS.md` | plain and hashed passwords: the setting, what changes, converting the user base |
 | `TOSSER.md` | the Fido tosser in detail |
-| `packaging/` | `mkdeb.sh` and the maintainer scripts of the Debian package (`make deb`) |
+| `packaging/` | `mkdeb.sh` and the maintainer scripts of the Debian package (`make deb`), `mkdeb-draw.sh` for the package of `mkdraw` and `mkcat` alone (`make deb-mkdraw`) |
+| `man/` | the manual pages of `mkdraw` and `mkcat` |
+| `contrib/mkdraw/` | the example list of BBS screen codes (`codes.mkd`) |
 | `HUBS.md` | QWK hubs: every map file setting, switch and exit code, the transports (Telnet, FTP, FTPS, exec), what was checked against what |
 | `hubs/*.scr` | QWK hub profiles (installed in `share/mkbbs/hubs`; `mk -G -P` lists them; NETWORKING.md) |
 | `STATS.md` | the statistics: what `mk` writes for each call, the reports of `mkstats` |

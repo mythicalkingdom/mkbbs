@@ -1,0 +1,22 @@
+Package: mkdraw
+Version: @VERSION@
+Architecture: @ARCH@
+Section: editors
+Priority: optional
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Homepage: https://github.com/mythicalkingdom/mkbbs
+Description: ANSI screen editor and CP437 viewer for BBS screens
+ mkdraw is a text mode editor for the 80 x 23 screens that bulletin board
+ systems show to their callers: ANSI art, AVATAR, plain ASCII and the Pascal
+ source that writes a screen.  Every cell is one IBM PC (CP437) character with
+ a colour attribute, as on a DOS machine; a UTF-8 terminal shows the Unicode
+ equivalents.  It has the box drawing sets, area commands, and a list of BBS
+ screen codes.
+ .
+ mkcat shows such a file (a screen, a message, a DOS log) on a terminal of
+ today: it turns the CP437 characters into UTF-8, or leaves them for a BBS
+ terminal such as SyncTERM, and keeps the colours of the art as drawn.
+ .
+ Both are part of the MK BBS (package mkbbs, which includes them); they need
+ no BBS to run.
