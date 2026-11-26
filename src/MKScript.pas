@@ -21,7 +21,7 @@ Uses Classes;
 Function ScriptPickNode(Const RunDir: String): Integer;
   {a free script node (the node file of the run directory is made); 0: no run directory, -1: all script nodes are in use}
 
-Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt; Const RunDir: String): Integer;
+Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt; Const RunDir: String; DryRun: Boolean): Integer;
 
 Procedure ScriptFinish;
   {remove the node file}
@@ -179,7 +179,7 @@ Function TPasScriptTerm.HostCall(Const Cmd: RawByteString; Out Err: String): Raw
 {$ENDIF}
 
 
-Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt; Const RunDir: String): Integer;
+Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt: String; TimeoutOpt: LongInt; Const RunDir: String; DryRun: Boolean): Integer;
   Var
     Full, Text, Ext, Caps, Name: String;
     Cfg: TExtCfg;
@@ -247,6 +247,10 @@ Function ScriptRun(Const Script: String; ScriptArgs: TStringList; Const CapsOpt:
   CapList := HostCaps(Caps);
   Host := THost.Create(Name, CapList);
   Host.RunPath := RunDir;
+  Host.DryRun := DryRun;
+  Host.OwnNode := NodeNumber;
+  Host.DefaultFrom := Config^.GetSysopName;
+  Host.ScriptDir := ExtractFileDir(Full);
   Host.SetScriptArgs(ScriptArgs);
   CapList.Free;
   LogEntry.WriteEntry('Ext ' + Name + ': run ' + Full + ' (' + Copy(Caps, 1, 120) + ')');

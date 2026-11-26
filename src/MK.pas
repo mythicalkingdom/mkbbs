@@ -91,6 +91,7 @@ Var
   ScriptName, ScriptCaps, ScriptRunDir: String;       {mk -x: a script of the sysop, no caller (MKScript)}
   ScriptArgs: TStringList;
   ScriptSecs: LongInt;
+  ScriptDry: Boolean;
   j: Word;
   ScriptNode: Integer;
 
@@ -113,6 +114,7 @@ QwkMode := False;
 ScriptName := '';
 ScriptCaps := '';
 ScriptRunDir := '';
+ScriptDry := False;
 ScriptSecs := -1;
 ScriptArgs := Nil;
 i := 1;
@@ -121,8 +123,14 @@ While i <= ParamCount Do
   If ParamStr(i) = '-x' Then
     Begin                              {mk -x [-C capabilities] [-T seconds] script [arguments]: the rest of the line is the script's}
     j := i + 1;
-    While (j < ParamCount) And ((ParamStr(j) = '-C') Or (ParamStr(j) = '-T') Or (ParamStr(j) = '-R')) Do
+    While (j < ParamCount) And ((ParamStr(j) = '-C') Or (ParamStr(j) = '-T') Or (ParamStr(j) = '-R') Or (ParamStr(j) = '-n')) Do
       Begin
+      If ParamStr(j) = '-n' Then
+        Begin
+        ScriptDry := True;
+        Inc(j);
+        Continue;
+        End;
       If ParamStr(j) = '-C' Then
         ScriptCaps := ParamStr(j + 1)
       Else If ParamStr(j) = '-R' Then
@@ -133,7 +141,7 @@ While i <= ParamCount Do
       End;
     If j > ParamCount Then
       Begin
-      WriteLn(StdErr, 'usage: mk -x [-C capabilities] [-T seconds] [-R run dir] script.bas|script.pas [arguments]');
+      WriteLn(StdErr, 'usage: mk -x [-n] [-C capabilities] [-T seconds] [-R run dir] script.bas|script.pas [arguments]');
       Halt(2);
       End;
     ScriptName := ParamStr(j);
@@ -302,7 +310,7 @@ If ScriptName <> '' Then
   User.SetIdleTimeLimit(86400);
   User.SetUserName('script ' + ScriptShortName(ScriptName));
   User.PostStatus(uoDoor);
-  ExitLevel := ScriptRun(ScriptName, ScriptArgs, ScriptCaps, ScriptSecs, ScriptRunDir);
+  ExitLevel := ScriptRun(ScriptName, ScriptArgs, ScriptCaps, ScriptSecs, ScriptRunDir, ScriptDry);
   User.PostStatus(uoNotAvail);
   User.Done;
   LogEntry.Done;

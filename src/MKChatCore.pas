@@ -74,9 +74,9 @@ Procedure ChatBan(Const BanFile, Name: String);
 Function ChatUnban(Const BanFile, Name: String): Boolean;
 
 { a message of the sysop to every node, in or out of the room (the callers see it at their next key wait) }
-Procedure SysMsgSend(Const RunDir, Text: String);
-Function SysMsgPoll(Const RunDir: String; Var Offset: Int64; Lines: TStrings): Integer;   {Offset -1: from now on}
-Function SysMsgNext(Const RunDir: ShortString; Var Offset: Int64; Var Line: ShortString): Boolean;   {the same, one message at a time (for the units that are in Turbo Pascal mode)}
+Procedure SysMsgSend(Const RunDir, Text: String; ToNode: Integer = 0);   {ToNode 0: every node}
+Function SysMsgPoll(Const RunDir: String; Var Offset: Int64; ForNode: Integer; Lines: TStrings): Integer;   {Offset -1: from now on; the messages for every node and for this one}
+Function SysMsgNext(Const RunDir: ShortString; Var Offset: Int64; ForNode: Integer; Var Line: ShortString): Boolean;   {the same, one message at a time (for the units that are in Turbo Pascal mode)}
 
 Implementation
 
@@ -905,7 +905,7 @@ Function ChatUnban(Const BanFile, Name: String): Boolean;
   End;
 
 
-Procedure SysMsgSend(Const RunDir, Text: String);
+Procedure SysMsgSend(Const RunDir, Text: String; ToNode: Integer);
   Var
     T: String;
     i: Integer;
@@ -925,15 +925,15 @@ Procedure SysMsgSend(Const RunDir, Text: String);
     If Fd >= 0 Then
       fpClose(Fd);
     End;
-  AppendLine(RunDir + '/sysopmsg.log', IntToStr(Now_) + #9 + Copy(T, 1, 250) + #10);
+  AppendLine(RunDir + '/sysopmsg.log', IntToStr(Now_) + #9 + Copy(T, 1, 250) + #9 + IntToStr(ToNode) + #10);
   End;
 
 
-Function SysMsgNext(Const RunDir: ShortString; Var Offset: Int64; Var Line: ShortString): Boolean;
+Function SysMsgNext(Const RunDir: ShortString; Var Offset: Int64; ForNode: Integer; Var Line: ShortString): Boolean;
   Var
     St: Stat;
-    S: String;
-    p: Integer;
+    S, One: String;
+    p, Used, T: Integer;
 
   Begin
   Result := False;
@@ -956,22 +956,34 @@ Function SysMsgNext(Const RunDir: ShortString; Var Offset: Int64; Var Line: Shor
     Exit;
   If Not ReadAll(RunDir + '/sysopmsg.log', S, Offset) Then
     Exit;
-  p := Pos(#10, S);
-  If p = 0 Then
-    Exit;
-  Line := Copy(Field(Copy(S, 1, p - 1), 1), 1, 250);
-  Inc(Offset, p);
-  Result := True;
+  Used := 0;
+  While True Do
+    Begin
+    p := Pos(#10, Copy(S, Used + 1, Length(S)));
+    If p = 0 Then
+      Break;
+    One := Copy(S, Used + 1, p - 1);
+    Inc(Used, p);
+    T := StrToIntDef(Field(One, 2), 0);        {the node it is for; 0 (and the old lines without it): every node}
+    If (T = 0) Or (T = ForNode) Then
+      Begin
+      Line := Copy(Field(One, 1), 1, 250);
+      Inc(Offset, Used);
+      Result := True;
+      Exit;
+      End;
+    End;
+  Inc(Offset, Used);                    {nothing for this node: those lines are read}
   End;
 
 
-Function SysMsgPoll(Const RunDir: String; Var Offset: Int64; Lines: TStrings): Integer;
+Function SysMsgPoll(Const RunDir: String; Var Offset: Int64; ForNode: Integer; Lines: TStrings): Integer;
   Var
     L: ShortString;
 
   Begin
   Result := 0;
-  While SysMsgNext(RunDir, Offset, L) Do
+  While SysMsgNext(RunDir, Offset, ForNode, L) Do
     Begin
     Lines.Add(L);
     Inc(Result);

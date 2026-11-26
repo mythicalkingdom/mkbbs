@@ -1,10 +1,10 @@
 # Scripts that use the BBS: `mk -x`
 
 A BASIC or Pascal program of yours can ask the BBS questions: who is on line, what is in a message area, what a user's record says.  It does this with one call, `HOST$("...")` in BASIC and `HostCall('...')` in Pascal, and runs with no caller: from a shell, from cron,
-from an event.  (Writes are the next phase: `MHOST-PLAN.md`.  Scripts for callers, inside the BBS, are the menu command 175 and the hooks, below.)  This is not a door: a door is a program that runs on a caller's terminal and knows nothing of the BBS; a script is given the BBS piece by piece, and only what you allow.
+from an event.  (Scripts for callers, inside the BBS, are the menu command 175 and the hooks, below.)  This is not a door: a door is a program that runs on a caller's terminal and knows nothing of the BBS; a script is given the BBS piece by piece, and only what you allow.
 
 ```
-mk -x [-C "capabilities"] [-T seconds] [-R run dir] script.bas|script.pas [arguments]
+mk -x [-n] [-C "capabilities"] [-T seconds] [-R run dir] script.bas|script.pas [arguments]
 ```
 
 `MK` names the BBS directory as for every program; `MKRUN` (the listener's run directory) is needed for the node list.  The script is looked for as given, then in the BBS directory.  Its output goes to standard output, `INPUT` / `ReadLn` read standard input.
@@ -83,6 +83,11 @@ An event of `mklisten` (`mkconfig` > Events) whose action is a command can run a
 | `stats:read` | `stats.total`, `stats.by`, `calls.list` |
 | `chat:read` | `chat.who`, `chat.log` |
 | `log:write` | `log.write` (a line in the BBS log, marked `Ext <name>:`) |
+| `msgs:post` | `msg.new`, `msg.line`, `msg.post`, `msg.cancel`: write a message (below) |
+| `users:write` | `user.set` (a defined list of fields of a user's record), `bbs.set` in a session |
+| `files:add` | `file.add`: put a file of the script into a file area |
+| `node:send`, `node:kick`, `node:time` | `node.send` a message to a node (0 = every node); `node.kick` hang up a node; `node.time` give or take minutes of a node; `bbs.addtime` in a session |
+| `chat:say`, `chat:moderate` | `chat.say`; `chat.mute`, `chat.unmute`, `chat.kick` |
 | `session:read`, `session:control` | the commands of a caller's session, in the BBS only (above); `mk -x` has no caller |
 
 `*` is all of them.  A call outside the list is a run-time error ("not allowed: user.list needs users:read") and a line in the log.  The capabilities of a script are:
@@ -104,6 +109,31 @@ level   = 100                      # for the menu command and hooks, a later pha
 ```
 
 `mkcheck` reads it: a file that is not there, an unknown capability or setting.
+
+## Writes
+
+A script that is in no entry gets the read capabilities only: **writes must be given** (`-C "msgs:post"`, or the `caps` of its entry).  A write goes through the code the BBS uses itself (the message base objects with their locks, the user file object, the node's own socket), is written in the log (`Ext <name>: posted message 12 in area 3 ...`) and
+can be tried first with **`mk -x -n`**, a dry run in which nothing is changed and the log says `dry run: would ...`.
+
+| command | what |
+|---|---|
+| `msg.new <area> "<to>" "<subject>" [private] [from "<name>"]` | starts a message (a local or an echo area; netmail needs an address and is not supported yet); the sender is the sysop (in `mk -x`) or the caller (in a session) unless `from` says otherwise |
+| `msg.line <text>` | adds a line (at most 200 lines of 250 characters) |
+| `msg.post` | writes it: the answer has the `number` the base gave it; an echo area gets the tear line and the origin as when a caller posts |
+| `msg.cancel` | drops the message that was started |
+| `file.add <area> <file> [description]` | copies a file **from the script's own folder** (a name, no path) into the folder of the file area under a safe name and lists it in `files.bbs`; a name that is there is refused |
+| `user.set <number or "name"> <field> <value>` | `level`, `flags` (the number), `flagon` / `flagoff` (flag 1..32), `city`, `elapsed` (minutes used today), `credit` (netmail credit).  **Never the password.**  A user who is on line is refused (the change would be lost when the call ends); in a session the caller changes with `bbs.set <field> <value>` |
+| `node.send <node> <text>` | a message to the caller of a node, shown at the next key wait; node 0 is every node |
+| `node.kick <node>`, `node.time <node> <minutes>` | hang up a node, add or take minutes (1..255); the answer has the node's `reply`.  Not the node the program runs on (in a session: `bbs.hangup`, `bbs.addtime`) |
+| `chat.say <text>`, `chat.mute <node> [minutes]`, `chat.unmute <node>`, `chat.kick <node>` | the sysop's side of the chat room (`CHAT.md`) |
+
+```
+10 Q$ = CHR$(34)
+20 X = VAL(HOST$("msg.new 1 " + Q$ + "All" + Q$ + " " + Q$ + "Nightly report" + Q$))
+30 X = VAL(HOST$("msg.line 12 calls today"))
+40 N = VAL(HOST$("msg.post"))
+50 PRINT "posted as message "; HOST$("field 1 number")
+```
 
 ## How a call works
 

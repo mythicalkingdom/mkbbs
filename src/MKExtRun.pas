@@ -46,6 +46,15 @@ Type
   End;
 
 
+Function Arg0(Args: TStrings): String;
+  Begin
+  If Args.Count > 0 Then
+    Result := Args[0]
+  Else
+    Result := '';
+  End;
+
+
 Function U8(Const S: String): String;
   {a CP437 string of the BBS as the registry keeps text (UTF-8); THost.Call turns it back}
   Var
@@ -64,13 +73,19 @@ Function U8(Const S: String): String;
 Function TSession.Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out Err: String): Boolean;
   Var
     Cap: String;
-    Name: String;
+    Name, F: String;
+    V: LongInt;
+    Sec: SecType;
 
   Begin
   Err := '';
   Result := False;
   If (Verb = 'bbs.user') Or (Verb = 'bbs.node') Then
     Cap := 'session:read'
+  Else If Verb = 'bbs.set' Then
+    Cap := 'users:write'
+  Else If Verb = 'bbs.addtime' Then
+    Cap := 'node:time'
   Else
     Cap := 'session:control';
   If Not Host.Allowed(Cap) Then
@@ -99,6 +114,54 @@ Function TSession.Handle(Const Verb: String; Args: TStrings; Res: THostResult; O
       End;
     Name := Args[0];
     BbsDisplay.DisplayBbsFile(Name, '');
+    End
+  Else If Verb = 'bbs.set' Then
+    Begin
+    If Args.Count < 2 Then
+      Begin
+      Err := 'bbs.set <level|flags|flagon|flagoff|city|elapsed|credit> <value>';
+      Exit;
+      End;
+    F := LowerCase(Args[0]);
+    V := StrToIntDef(Args[1], MaxLongInt);
+    Host.WriteLog('set ' + F + ' of the caller ' + User.GetUserName + ' to ' + Args[1]);
+    If Not Host.DryRun Then
+      Begin
+      If F = 'city' Then
+        User.SetUserCity(Copy(Args[1], 1, 25))
+      Else If ((F = 'level') And (V >= 0) And (V <= 65535)) Or (F = 'flags') And (V <> MaxLongInt) Or ((F = 'flagon') Or (F = 'flagoff')) And (V >= 1) And (V <= 32) Then
+        Begin
+        User.GetUserSec(Sec);
+        If F = 'level' Then Sec.Level := V
+        Else If F = 'flags' Then Sec.Flags := V
+        Else If F = 'flagon' Then Sec.Flags := Sec.Flags Or LongInt(1 Shl (V - 1))
+        Else Sec.Flags := Sec.Flags And Not LongInt(1 Shl (V - 1));
+        User.SetUserSec(Sec);
+        End
+      Else If (F = 'elapsed') And (V >= 0) And (V <= 32767) Then
+        User.SetUserElapsed(V)
+      Else If (F = 'credit') And (V >= -32768) And (V <= 32767) Then
+        User.SetUserCredit(V)
+      Else
+        Begin
+        Err := 'the fields to set are level, flags, flagon, flagoff, city, elapsed and credit, with a value that fits';
+        Exit;
+        End;
+      End;
+    Res.Clear;
+    End
+  Else If Verb = 'bbs.addtime' Then
+    Begin
+    V := StrToIntDef(Arg0(Args), 0);
+    If (V = 0) Or (Abs(V) > 255) Then
+      Begin
+      Err := 'bbs.addtime <minutes, -255..255 and not 0>';
+      Exit;
+      End;
+    Host.WriteLog('gave the caller ' + User.GetUserName + ' ' + IntToStr(V) + ' minutes');
+    If Not Host.DryRun Then
+      User.AdjustTime(V * 60);
+    Res.Clear;
     End
   Else If Verb = 'bbs.pause' Then
     User.PressEnter
@@ -132,10 +195,13 @@ Procedure Execute(Cfg: TExtCfg; E: Integer; Words: TStringList; Silent: Boolean)
   Caps := HostCaps(Cfg.Entries[E].Caps);
   Host := THost.Create(Name, Caps);
   Host.Cp437 := True;
+  Host.DefaultFrom := User.GetUserName;
+  Host.OwnNode := NodeNumber;
+  Host.ScriptDir := ExtractFileDir(Full);
   Caps.Free;
   Sess := TSession.Create;
   Sess.Host := Host;
-  Host.Registry.Add('bbs', 'the caller''s session', 'user node file pause hangup', @Sess.Handle);
+  Host.Registry.Add('bbs', 'the caller''s session', 'user node file pause hangup set addtime', @Sess.Handle);
   Host.SetScriptArgs(Words);
   LogEntry.WriteEntry('Ext ' + Name + ': run for ' + User.GetUserName + ' (' + Copy(Cfg.Entries[E].Caps, 1, 120) + ')');
   Try

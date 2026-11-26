@@ -26,7 +26,7 @@ Unit MKExtCfg;   {extensions.cfg: the scripts the sysop gave the BBS, and what e
      A hook runs with the capabilities, the level and the timeout of its entry, with the event's data as its arguments (arg 1 is the event, then the user, then what the event says: see EXTENSIONS.md).
      A hook that fails, is too slow or is not allowed to this caller is logged and skipped: it never stops the caller.
 
-     Capabilities: users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write, and in the BBS session:read (the current caller, the node) and session:control (show a text file, press-enter pause, hang up); * = all.
+     Capabilities: users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write, and the writes msgs:post users:write files:add node:send node:kick node:time chat:say chat:moderate (a script that is in no entry does not get them: -C or an entry), and in the BBS session:read (the current caller, the node) and session:control (show a text file, press-enter pause, hang up); * = all.
      mk -x script uses the entry whose file is that script; a script that is in no entry gets every read capability (the sysop ran it by hand: -C narrows it).
 }
 
@@ -62,7 +62,7 @@ Implementation
 Uses SysUtils;
 
 Const
-  KnownCaps = ' users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write session:read session:control * ';
+  KnownCaps = ' users:read msgs:read msgs:private files:read nodes:read events:read stats:read chat:read log:write session:read session:control msgs:post users:write files:add node:send node:kick node:time chat:say chat:moderate * ';
 
 
 Function ExtKnownCap(Const Cap: String): Boolean;

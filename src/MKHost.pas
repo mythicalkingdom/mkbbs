@@ -25,6 +25,10 @@ Type
     Caps: TStringList;                 {the capabilities; '*' = all}
     Who: String;                       {the name of the script, for the log}
     Quiet: Boolean;                    {no log lines (tests)}
+    DryRun: Boolean;                   {writes are only logged ("dry run: would ..."), nothing is changed}
+    DefaultFrom: String;               {the name a message is from when the script names none}
+    OwnNode: Integer;                  {the node this program runs on: it cannot hang itself up or give itself time through the snoop socket (it would wait for itself)}
+    ScriptDir: String;                 {the folder of the script: file.add takes its files from there}
     RunPath: String;                   {the run directory of the listener ('' = the environment MKRUN)}
     Cp437: Boolean;                    {in the BBS (a caller's terminal): the script's strings are CP437, the answers are turned into it; mk -x keeps UTF-8}
     Registry: THostRegistry;           {the commands of the script: the BBS is the default provider; others are added with Registry.Add}
@@ -34,7 +38,12 @@ Type
     Procedure SetScriptArgs(Args: TStrings);                      {arg 0 is the name of the script, then what followed it on the command line}
     Function Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out Err: String): Boolean;
     Function Allowed(Const Cap: String): Boolean;
+    Procedure WriteLog(Const What: String);       {a line of the log for a change a script made (or would make)}
     Private
+    Draft: TStringList;                {the lines of the message being written (msg.new, msg.line, msg.post)}
+    DraftOn, DraftPriv: Boolean;
+    DraftArea: Integer;
+    DraftFrom, DraftTo, DraftSubj: String;
     Procedure FromJson(Res: THostResult; Root: TObject; Const ListKey: String);
     End;
 
@@ -47,11 +56,12 @@ Function HostCaps(Const List: String): TStringList;
 Const
   HostAllReads = 'users:read msgs:read files:read nodes:read events:read stats:read chat:read log:write session:read';
   HostCommands =
-    'system.info node.list events.list stats.total stats.by calls.list msg.areas msg.list msg.read msg.text file.areas file.list user.list user.get chat.who chat.log log.write';
+    'system.info node.list events.list stats.total stats.by calls.list msg.areas msg.list msg.read msg.text file.areas file.list user.list user.get chat.who chat.log log.write ' +
+    'msg.new msg.line msg.post msg.cancel file.add user.set node.send node.kick node.time chat.say chat.mute chat.unmute chat.kick';
 
 Implementation
 
-Uses fpjson, DateUtils, MKCp437, MKApiData, MKChatCore, MKLogEnt, MKGlobT, MKCfgAbs;
+Uses fpjson, DateUtils, BaseUnix, MKCp437, MKApiData, MKChatCore, MKLogEnt, MKGlobT, MKCfgAbs, MKHostW;
 
 
 Function HostCaps(Const List: String): TStringList;
@@ -81,6 +91,7 @@ Constructor THost.Create(Const AWho: String; ACaps: TStrings);
   Caps := TStringList.Create;
   Caps.CaseSensitive := False;
   Caps.AddStrings(ACaps);
+  Draft := TStringList.Create;
   Registry := THostRegistry.Create;
   Registry.SetDefault('the BBS', HostCommands, @Self.Handle);
   End;
@@ -89,6 +100,7 @@ Constructor THost.Create(Const AWho: String; ACaps: TStrings);
 Destructor THost.Destroy;
   Begin
   Caps.Free;
+  Draft.Free;
   Registry.Free;
   Inherited Destroy;
   End;
@@ -174,6 +186,13 @@ Function THost.Call(Const Cmd: String; Out Err: String): String;
   If Cp437 Then
     Result := Copy(HostToCp437(Result), 1, 255);
   Err := E;
+  End;
+
+
+Procedure THost.WriteLog(Const What: String);
+  Begin
+  If Not Quiet Then
+    LogEntry.WriteEntry('Ext ' + Who + ': ' + Copy(Copy('dry run: would ', 1, 15 * Ord(DryRun)) + What, 1, 220));
   End;
 
 
@@ -362,6 +381,62 @@ Function PageQuery(Args: TStrings; From: Integer): String;
   End;
 
 
+Function RestOf(Args: TStrings; From: Integer): String;
+  Var
+    i: Integer;
+
+  Begin
+  Result := '';
+  For i := From To Args.Count - 1 Do
+    Result := Result + Copy(' ', 1, Ord(Result <> '')) + Args[i];
+  End;
+
+
+Function OnLineNames(Const RunDir, BbsDir: String): TStringList;
+  {the names (CP437, lower case) of the users on a node now}
+  Var
+    O: TJSONObject;
+    A: TJSONArray;
+    i: Integer;
+
+  Begin
+  Result := TStringList.Create;
+  O := ApiNodes(RunDir, BbsDir);
+  Try
+    A := TJSONArray(O.Find('nodes'));
+    If A <> Nil Then
+      For i := 0 To A.Count - 1 Do
+        Result.Add(LowerCase(HostToCp437(TJSONObject(A[i]).Get('user', ''))));
+  Finally
+    O.Free;
+  End;
+  End;
+
+
+Function NodeIsUp(Const RunDir: String; Node: Integer): Boolean;
+  Var
+    L: TStringList;
+    Pid: Integer;
+
+  Begin
+  Result := False;
+  If (RunDir = '') Or (Node < 1) Or (Not FileExists(RunDir + '/node' + IntToStr(Node) + '.info')) Then
+    Exit;
+  L := TStringList.Create;
+  Try
+    Try
+      L.LoadFromFile(RunDir + '/node' + IntToStr(Node) + '.info');
+      Pid := StrToIntDef(L.Values['pid'], 0);
+      Result := (Pid > 0) And ((fpKill(Pid, 0) = 0) Or (fpGetErrno = ESysEPERM));
+    Except
+      Result := False;
+    End;
+  Finally
+    L.Free;
+  End;
+  End;
+
+
 Function THost.Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out Err: String): Boolean;
   Var
     O: TJSONObject;
@@ -371,6 +446,9 @@ Function THost.Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out 
     Cc: ChatCfgType;
     Room: TChatRoom;
     Shown, Real: String;
+    Num: LongInt;
+    W1, W2, W3, W4: String;
+    Lst: TStringList;
 
   Procedure Need(Const Cap: String);
     Begin
@@ -600,6 +678,238 @@ Function THost.Handle(Const Verb: String; Args: TStrings; Res: THostResult; Out 
       For n := 0 To Args.Count - 1 Do
         Q := Q + Copy(' ', 1, Ord(Q <> '')) + Args[n];
       LogEntry.WriteEntry('Ext ' + Who + ': ' + Copy(HostPlain(Q), 1, 200));
+      Res.Clear;
+      End;
+    End
+  Else If Verb = 'msg.new' Then
+    Begin
+    Need('msgs:post');
+    If Err = '' Then
+      Begin
+      n := StrToIntDef(Arg(Args, 0), 0);
+      If (n < 1) Or (n > Config^.GetMaxMsgAreas) Or (Config^.GetMsgName(n) = '') Then
+        Err := 'no such message area'
+      Else If Config^.GetMsgType(n) = NetMail Then
+        Err := 'netmail areas need an address: not supported yet'
+      Else If (Arg(Args, 1) = '') Or (Arg(Args, 2) = '') Then
+        Err := 'msg.new <area> "<to>" "<subject>" [private] [from "<name>"]'
+      Else
+        Begin
+        Draft.Clear;
+        DraftOn := True;
+        DraftArea := n;
+        DraftTo := Arg(Args, 1);
+        DraftSubj := Arg(Args, 2);
+        DraftFrom := DefaultFrom;
+        DraftPriv := False;
+        For k := 3 To Args.Count - 1 Do
+          If LowerCase(Args[k]) = 'private' Then
+            DraftPriv := True
+          Else If (LowerCase(Args[k]) = 'from') And (k + 1 < Args.Count) Then
+            DraftFrom := Args[k + 1];
+        If DraftFrom = '' Then
+          DraftFrom := Config^.GetSysopName;
+        Res.Clear;
+        End;
+      End;
+    End
+  Else If Verb = 'msg.line' Then
+    Begin
+    Need('msgs:post');
+    If Err = '' Then
+      Begin
+      If Not DraftOn Then
+        Err := 'no message was started (msg.new)'
+      Else If Draft.Count >= 200 Then
+        Err := 'a message has at most 200 lines'
+      Else
+        Draft.Add(Copy(RestOf(Args, 0), 1, 250));
+      Res.Clear;
+      End;
+    End
+  Else If Verb = 'msg.cancel' Then
+    Begin
+    Need('msgs:post');
+    DraftOn := False;
+    Draft.Clear;
+    Res.Clear;
+    End
+  Else If Verb = 'msg.post' Then
+    Begin
+    Need('msgs:post');
+    If Err = '' Then
+      Begin
+      If Not DraftOn Then
+        Err := 'no message was started (msg.new)'
+      Else
+        Begin
+        W1 := 'post a message in area ' + IntToStr(DraftArea) + ' from "' + DraftFrom + '" to "' + DraftTo + '": ' + DraftSubj + ' (' + IntToStr(Draft.Count) + ' lines)';
+        Num := 0;
+        If DryRun Then
+          WriteLog(W1)
+        Else If HwPostMsg(DraftArea, DraftFrom, DraftTo, DraftSubj, DraftPriv, Draft, Num, Err) Then
+          WriteLog('posted message ' + IntToStr(Num) + ' in area ' + IntToStr(DraftArea) + ' from "' + DraftFrom + '" to "' + DraftTo + '": ' + DraftSubj);
+        If Err = '' Then
+          Begin
+          Res.Table(['number']);
+          Res.Row([IntToStr(Num)]);
+          DraftOn := False;
+          Draft.Clear;
+          End;
+        End;
+      End;
+    End
+  Else If Verb = 'file.add' Then
+    Begin
+    Need('files:add');
+    If Err = '' Then
+      Begin
+      n := StrToIntDef(Arg(Args, 0), 0);
+      W1 := Arg(Args, 1);
+      W2 := RestOf(Args, 2);
+      If DryRun Then
+        Begin
+        WriteLog('add the file ' + W1 + ' to file area ' + IntToStr(n) + ' (' + W2 + ')');
+        Res.Table(['name']);
+        Res.Row([W1]);
+        End
+      Else If HwAddFile(n, ScriptDir, W1, W2, W3, Err) Then
+        Begin
+        WriteLog('added the file ' + W3 + ' to file area ' + IntToStr(n) + ' (' + W2 + ')');
+        Res.Table(['name']);
+        Res.Row([W3]);
+        End;
+      End;
+    End
+  Else If Verb = 'user.set' Then
+    Begin
+    Need('users:write');
+    If Err = '' Then
+      Begin
+      W1 := Arg(Args, 0);
+      W2 := Arg(Args, 1);
+      W3 := RestOf(Args, 2);
+      If (W1 = '') Or (W2 = '') Or (W3 = '') Then
+        Err := 'user.set <number or "name"> <field> <value>'
+      Else If DryRun Then
+        Begin
+        WriteLog('set ' + W2 + ' of user ' + W1 + ' to ' + W3);
+        Res.Clear;
+        End
+      Else
+        Begin
+        Lst := OnLineNames(RunDir, BbsDir);
+        If HwUserSet(W1, W2, W3, Lst, W4, Err) Then
+          Begin
+          WriteLog('set ' + W2 + ' of user ' + W4 + ' to ' + W3);
+          Res.Clear;
+          End;
+        Lst.Free;
+        End;
+      End;
+    End
+  Else If (Verb = 'node.send') Or (Verb = 'node.kick') Or (Verb = 'node.time') Then
+    Begin
+    If Verb = 'node.send' Then Need('node:send') Else If Verb = 'node.kick' Then Need('node:kick') Else Need('node:time');
+    If Err = '' Then
+      Begin
+      n := StrToIntDef(Arg(Args, 0), -1);
+      If (n < 0) Or ((n = 0) And (Verb <> 'node.send')) Then
+        Err := Verb + ' needs a node number'
+      Else If (n > 0) And Not NodeIsUp(RunDir, n) Then
+        Err := 'node ' + IntToStr(n) + ' is not in use'
+      Else If (n > 0) And (n = OwnNode) And (Verb <> 'node.send') Then
+        Err := 'that is the node this program runs on (in a session: bbs.hangup, bbs.addtime)'
+      Else If Verb = 'node.send' Then
+        Begin
+        W1 := RestOf(Args, 1);
+        If W1 = '' Then
+          Err := 'node.send <node, 0 = all> <text>'
+        Else If DryRun Then
+          WriteLog('send "' + W1 + '" to node ' + IntToStr(n))
+        Else
+          Begin
+          SysMsgSend(RunDir, W1, n);
+          WriteLog('sent "' + W1 + '" to node ' + IntToStr(n));
+          End;
+        End
+      Else If Verb = 'node.kick' Then
+        Begin
+        If DryRun Then
+          WriteLog('hang up node ' + IntToStr(n))
+        Else If HwNodeCommand(RunDir, n, 'K', 0, W1) Then
+          Begin
+          WriteLog('hung up node ' + IntToStr(n));
+          Res.Table(['reply']);
+          Res.Row([W1]);
+          End
+        Else
+          Err := W1;
+        End
+      Else
+        Begin
+        k := StrToIntDef(Arg(Args, 1), 0);
+        If (k = 0) Or (Abs(k) > 255) Then
+          Err := 'node.time <node> <minutes, -255..255 and not 0>'
+        Else If DryRun Then
+          WriteLog('give node ' + IntToStr(n) + ' ' + IntToStr(k) + ' minutes')
+        Else If HwNodeCommand(RunDir, n, Chr(Ord('+') + 2 * Ord(k < 0)), Abs(k), W1) Then
+          Begin
+          WriteLog('gave node ' + IntToStr(n) + ' ' + IntToStr(k) + ' minutes');
+          Res.Table(['reply']);
+          Res.Row([W1]);
+          End
+        Else
+          Err := W1;
+        End;
+      End;
+    End
+  Else If (Verb = 'chat.say') Or (Verb = 'chat.mute') Or (Verb = 'chat.unmute') Or (Verb = 'chat.kick') Then
+    Begin
+    If Verb = 'chat.say' Then Need('chat:say') Else Need('chat:moderate');
+    If Err = '' Then
+      Begin
+      If Verb = 'chat.say' Then
+        Begin
+        W1 := RestOf(Args, 0);
+        If W1 = '' Then
+          Err := 'chat.say <text>'
+        Else If DryRun Then
+          WriteLog('say in the chat room: ' + W1)
+        Else
+          Begin
+          ChatSysopLine(RunDir, 'X', W1);
+          WriteLog('said in the chat room: ' + W1);
+          End;
+        End
+      Else
+        Begin
+        n := StrToIntDef(Arg(Args, 0), 0);
+        k := StrToIntDef(Arg(Args, 1), 5);
+        If (n < 1) Or Not ChatPresence(RunDir, n, Shown, Real) Then
+          Err := 'node ' + IntToStr(n) + ' is not in the chat room'
+        Else If DryRun Then
+          WriteLog(Verb + ' node ' + IntToStr(n))
+        Else
+          Begin
+          If Verb = 'chat.kick' Then
+            Begin
+            ChatCtl(RunDir, 'kick', n, 0);
+            ChatSysopLine(RunDir, 'N', Shown + ' was removed from the room by the sysop');
+            End
+          Else If Verb = 'chat.mute' Then
+            Begin
+            ChatCtl(RunDir, 'mute', n, k);
+            ChatSysopLine(RunDir, 'N', Shown + ' was muted by the sysop for ' + IntToStr(k) + ' minute(s)');
+            End
+          Else
+            Begin
+            ChatCtl(RunDir, 'mute', n, 0);
+            ChatSysopLine(RunDir, 'N', Shown + ' may speak again');
+            End;
+          WriteLog(Verb + ' node ' + IntToStr(n) + ' (' + Shown + ')');
+          End;
+        End;
       Res.Clear;
       End;
     End

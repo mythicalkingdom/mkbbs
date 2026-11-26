@@ -30,57 +30,15 @@ Uses Classes;
 
 Procedure DoUpload(Data: ShortString);
 
-Function UploadName(Const S: String): String;
-  {the name as the BBS keeps it: the characters of the rule above, at most 64 of them, no leading dot; '' when nothing is left}
-
-Function ListLines(Const Name: String; Desc: TStrings): String;
-  {the text to append to files.bbs for a file and its description lines}
-
 
 Implementation
 
 Uses SysUtils, BaseUnix, Unix, Process, MKUpCfg, MKDoorCfg, MKSandbox,
-  MKGlobT, MKDoor, MKCfgAbs, MKComAbs, MKFile, MKString, MKProt, MKCFile, MKOffXfer, MKLogEnt, MKExtRun;
+  MKGlobT, MKDoor, MKCfgAbs, MKComAbs, MKFile, MKString, MKProt, MKCFile, MKOffXfer, MKLogEnt, MKExtRun, MKFileList;
 
 
-Function UploadName(Const S: String): String;
-  Var
-    i: Integer;
-    R: String;
-
-  Begin
-  R := '';
-  For i := 1 To Length(S) Do
-    If S[i] In ['A'..'Z', 'a'..'z', '0'..'9', '.', '_', '-', '+'] Then
-      R := R + S[i]
-    Else
-      R := R + '_';
-  While (R <> '') And (R[1] = '.') Do
-    Delete(R, 1, 1);
-  If Length(R) > 64 Then
-    R := Copy(R, 1, 64);
-  UploadName := R;
-  End;
 
 
-Function ListLines(Const Name: String; Desc: TStrings): String;
-  Var
-    i: Integer;
-    First, Pad: String;
-
-  Begin
-  If Length(Name) < 13 Then
-    Pad := StringOfChar(' ', 13 - Length(Name))
-  Else
-    Pad := ' ';
-  If Desc.Count > 0 Then
-    First := Copy(Desc[0], 1, 45)
-  Else
-    First := '(no description)';
-  ListLines := Name + Pad + First + #10;
-  For i := 1 To Desc.Count - 1 Do
-    ListLines := ListLines + StringOfChar(' ', 13) + Copy(Desc[i], 1, 60) + #10;
-  End;
 
 
 Function P(N: Word; Const Default: String): String;
@@ -157,22 +115,6 @@ Function Receive(Const WorkPath: String): Boolean;
   End;
 
 
-Function InArea(Const Dir, Name: String): Boolean;
-  {a file of this name (whatever the case) is in Dir}
-  Var
-    SR: TSearchRec;
-
-  Begin
-  InArea := False;
-  If FindFirst(Dir + '*', faAnyFile, SR) = 0 Then
-    Begin
-    Repeat
-      If SameText(SR.Name, Name) Then
-        InArea := True;
-    Until (FindNext(SR) <> 0) Or (InArea);
-    FindClose(SR);
-    End;
-  End;
 
 
 Function MoveFile(Const From, To_: String): Boolean;
@@ -472,24 +414,6 @@ Procedure AskDescription(Const Name: String; Desc: TStrings);
     Desc.Add(L);
     Inc(n);
     End;
-  End;
-
-
-Procedure AppendList(Const ListFile, Text: String);
-  Var
-    F: TFileStream;
-
-  Begin
-  If FileExists(ListFile) Then
-    F := TFileStream.Create(ListFile, fmOpenReadWrite Or fmShareDenyNone)
-  Else
-    F := TFileStream.Create(ListFile, fmCreate);
-  Try
-    F.Seek(0, soEnd);
-    F.WriteBuffer(Text[1], Length(Text));
-  Finally
-    F.Free;
-  End;
   End;
 
 

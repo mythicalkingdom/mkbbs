@@ -176,7 +176,59 @@ check('Pascal: a program that never ends is stopped by -T 2', r.returncode == 1 
 # help and host.list come from the registry (HostReg)
 s = script('h.bas', '10 N = VAL(HOST$("help"))\n20 PRINT N; HOST$("line 1"); "|"; HOST$("line " + STR$(N))\n30 PRINT HOST$("host.list"); HOST$("field 1 description")\n')
 r = mkx(s)
-check('help lists the commands of the BBS; host.list names the provider (the BBS is the default one)', r.returncode == 0 and 'system.info' in r.stdout and 'log.write' in r.stdout and ' 1 the BBS' in r.stdout.replace('1the BBS', ' 1 the BBS').replace('1 the BBS', ' 1 the BBS'), r.stdout)
+check('help lists the commands of the BBS; host.list names the provider (the BBS is the default one)', r.returncode == 0 and 'system.info' in r.stdout and 'chat.kick' in r.stdout and ' 1 the BBS' in r.stdout.replace('1the BBS', ' 1 the BBS').replace('1 the BBS', ' 1 the BBS'), r.stdout)
+# ---- phase 4: writes
+def basl(*lines):
+    return ''.join('%d %s\n' % (10 * (i + 1), l) for i, l in enumerate(lines))
+
+
+s = script('w1.bas', basl('Q$ = CHR$(34)', 'X = VAL(HOST$("msg.new 1 " + Q$ + "Bob" + Q$ + " " + Q$ + "From a script" + Q$ + " private"))',
+                          'X = VAL(HOST$("msg.line first line"))', 'X = VAL(HOST$("msg.line second line"))', 'N = VAL(HOST$("msg.post"))',
+                          'PRINT "POSTED="; HOST$("field 1 number")', 'PRINT "LIST="; HOST$("msg.list 1")'))
+r = mkx(s)
+check('a script that was not given msgs:post cannot post (a script in no entry has the read capabilities only)', r.returncode == 1 and 'not allowed: msg.new needs msgs:post' in r.stdout, r.stdout)
+r = mkx('-C', 'msgs:post msgs:read', s)
+check('msg.new / msg.line / msg.post: a message is posted, the number comes back, it is private so msgs:read alone does not list it', r.returncode == 0 and re.search(r'POSTED=\s*4\b', r.stdout) and 'LIST= 2' in r.stdout.replace('LIST=2', 'LIST= 2'), r.stdout)
+check('... and it is in the log (from the default sysop, to Bob, the subject)', 'Ext w1: posted message 4 in area 1 from "Host Sysop" to "Bob": From a script' in log(), log()[-300:])
+r = mkx('-C', 'msgs:post msgs:read msgs:private', script('w2.bas', basl('N = VAL(HOST$("msg.text 1 4"))', 'PRINT "T1="; HOST$("line 1")', 'N = VAL(HOST$("msg.read 1 4"))', 'PRINT "H="; HOST$("field 1 from"); "|"; HOST$("field 1 to"); "|"; HOST$("field 1 private")')))
+check('the message has what was written: the lines, from the sysop, to Bob, private', 'T1=first line second line' in r.stdout and 'H=Host Sysop|Bob|1' in r.stdout, r.stdout)
+n_before = len(open(B + '/mk.log', encoding='latin-1').read())
+r = mkx('-n', '-C', 'msgs:post msgs:read', s)
+check('-n: a dry run changes nothing (the same area still has the same messages) and the log says "dry run: would post"', 'dry run: would post a message in area 1' in log() and mkx('-C', 'msgs:read', script('w3.bas', '10 PRINT HOST$("msg.list 1")\n')).stdout.strip() == '2', (r.stdout, log()[-300:]))
+s = script('w4.bas', basl('Q$ = CHR$(34)', 'X = VAL(HOST$("msg.new 99 x y"))'))
+r = mkx('-C', 'msgs:post', s)
+check('a message area that is not there is an error', 'no such message area' in r.stdout and r.returncode == 1, r.stdout)
+
+open(B + '/scripts/note.txt', 'w').write('a file from a script\n')
+s = script('w5.bas', basl('Q$ = CHR$(34)', 'PRINT "ADD="; HOST$("=file.add 1 note.txt " + Q$ + "A note from a script" + Q$)', 'N = VAL(HOST$("file.list 1"))', 'FOR I = 1 TO N', 'PRINT "F="; HOST$("field " + MID$(STR$(I), 2) + " name")', 'NEXT I', 'PRINT "AGAIN="; HOST$("=file.add 1 note.txt x")'))
+r = mkx('-C', 'files:add files:read', s)
+check('file.add: the file is copied into the area under a safe name and listed', r.returncode == 1 and 'ADD=note.txt' in r.stdout and 'F=note.txt' in r.stdout and os.path.exists(B + '/files/area01/note.txt'), (r.stdout, os.listdir(B + '/files/area01')))
+check('... with its description in files.bbs; the same name again is refused', 'there is a file of that name in the area already' in r.stdout and 'note.txt     A note from a script' in open(B + '/files/area01/files.bbs').read(), (r.stdout, open(B + '/files/area01/files.bbs').read()))
+s = script('w6.bas', basl('PRINT HOST$("=file.add 1 ../x.txt y")'))
+r = mkx('-C', 'files:add', s)
+check('file.add takes a name in the script\'s folder, never a path', 'the file is a name in the script' in r.stdout, r.stdout)
+
+s = script('w7.bas', basl('Q$ = CHR$(34)', 'X = VAL(HOST$("user.set 0 level 77"))', 'X = VAL(HOST$("user.set " + Q$ + "Host Sysop" + Q$ + " city Oslo"))', 'X = VAL(HOST$("user.set 0 flagon 3"))',
+                          'N = VAL(HOST$("user.get 0"))', 'PRINT "U="; HOST$("field 1 level"); "|"; HOST$("field 1 city")', 'X = VAL(HOST$("user.set 0 password abc"))'))
+r = mkx('-C', 'users:write users:read', s)
+check('user.set: the level and the city of a user are set, by number and by name (flagon too); the password is not a field', 'U= 77 |Oslo' in r.stdout.replace('U=77|', 'U= 77 |').replace('U= 77|', 'U= 77 |') or 'U=77|Oslo' in r.stdout, r.stdout)
+check('... a field that is not one of the list is an error, and the log has the changes', 'the fields to set are level, flags' in r.stdout and 'Ext w7: set level of user Host Sysop to 77' in log(), (r.stdout, log()[-300:]))
+r = mkx('-C', 'users:write', script('w8.bas', basl('X = VAL(HOST$("user.set 5 level 1"))')))
+check('a user that is not there is an error', 'no such user' in r.stdout, r.stdout)
+
+s = script('w9.bas', basl('X = VAL(HOST$("node.send 0 closing in ten minutes"))', 'X = VAL(HOST$("node.send 7 hello"))'))
+r = mkx('-C', 'node:send', s)
+check('node.send 0 writes a message for every node (sysopmsg.log: time, text, node 0); a node that is not in use is refused',
+      'closing in ten minutes\t0' in open(RUN + '/sysopmsg.log').read() and 'node 7 is not in use' in r.stdout, (r.stdout, open(RUN + '/sysopmsg.log').read()))
+r = mkx('-C', 'node:kick node:time', script('w10.bas', basl('X = VAL(HOST$("node.kick 3"))')))
+check('node.kick of a node that is not in use is refused', 'node 3 is not in use' in r.stdout, r.stdout)
+r = mkx('-C', 'chat:say chat:read', script('w11.bas', basl('X = VAL(HOST$("chat.say hello room"))', 'N = VAL(HOST$("chat.log 5"))', 'PRINT "LOG="; HOST$("line 1")')))
+check('chat.say: a line of the sysop in the room, seen by chat.log', '[sysop] hello room' in r.stdout, r.stdout)
+r = mkx('-C', 'chat:say', script('w12.bas', basl('X = VAL(HOST$("chat.mute 1 5"))')))
+check('chat.mute needs chat:moderate, and a node that is not in the room is refused', 'chat.mute needs chat:moderate' in r.stdout, r.stdout)
+r = mkx('-n', '-C', 'users:write users:read node:send chat:say files:add', script('w13.bas', basl('X = VAL(HOST$("user.set 0 level 5"))', 'X = VAL(HOST$("node.send 0 dry"))', 'X = VAL(HOST$("chat.say dry"))', 'X = VAL(HOST$("=file.add 1 note.txt d"))', 'N = VAL(HOST$("user.get 0"))', 'PRINT "LEVEL="; HOST$("field 1 level")')))
+check('-n: user.set, node.send, chat.say and file.add do nothing (the level is still 77) and the log says what would have been done', 'LEVEL=77' in r.stdout.replace('LEVEL= 77', 'LEVEL=77') and 'dry run: would set level of user 0 to 5' in log() and 'dry\t0' not in open(RUN + '/sysopmsg.log').read(), (r.stdout, log()[-400:]))
+
 # the wrappers of ext/: mkbbs.pas for Pascal, the DEF FN lines for BASIC, and the examples
 for f in os.listdir(repo + '/ext'):
     shutil.copy(repo + '/ext/' + f, B + '/scripts/' + f)

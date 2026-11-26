@@ -237,9 +237,9 @@ r = broken(lambda d: None)
 check('no extensions.cfg: an info line only', r.returncode == 0 and 'there is no extensions.cfg' in r.stdout, r.stdout)
 r = broken(ext_cfg('[who]\nfile = scripts/who.bas\ncaps = users:read nodes:read\n', ['who.bas']))
 check('an extension with its file and known capabilities: nothing wrong, counted', r.returncode == 0 and 'WARN extensions' not in r.stdout and '1 extension(s) in extensions.cfg' in r.stdout, r.stdout)
-r = broken(ext_cfg('[who]\nfile = scripts/nothere.bas\ncaps = users:read\n[b]\nfile = scripts/x.txt\n[c]\nfile = scripts/c.bas\ncaps = users:write\nbogus = 1\n', ['x.txt', 'c.bas']))
+r = broken(ext_cfg('[who]\nfile = scripts/nothere.bas\ncaps = users:read\n[b]\nfile = scripts/x.txt\n[c]\nfile = scripts/c.bas\ncaps = users:destroy\nbogus = 1\n', ['x.txt', 'c.bas']))
 check('a file that is not there, a file that is not .bas / .pas, an unknown capability and setting: WARN each, with the line',
-      'extensions.cfg: who: ' in r.stdout and 'nothere.bas is not there' in r.stdout and 'x.txt is not a .bas or a .pas file' in r.stdout and 'WARN extensions.cfg line 8: unknown capability users:write' in r.stdout
+      'extensions.cfg: who: ' in r.stdout and 'nothere.bas is not there' in r.stdout and 'x.txt is not a .bas or a .pas file' in r.stdout and 'WARN extensions.cfg line 8: unknown capability users:destroy' in r.stdout
       and 'WARN extensions.cfg line 9: unknown setting bogus' in r.stdout, r.stdout)
 r = broken(ext_cfg('[who]\ncaps = users:read\n[who]\nfile = a.bas\n'))
 check('an extension with no file, the same name twice: WARN', 'the extension who has no file' in r.stdout and 'the extension who is there already' in r.stdout, r.stdout)

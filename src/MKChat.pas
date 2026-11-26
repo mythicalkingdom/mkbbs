@@ -233,7 +233,7 @@ Procedure DoMultiChat(Data: ShortString);
           Line(Lines[i], LightCyan);
         Redraw;
         End;
-      While SysMsgNext(RunDir, SysMsgOffset, Sm) Do
+      While SysMsgNext(RunDir, SysMsgOffset, NodeNumber, Sm) Do
         Say_(PromptOr(584, 'Message from the sysop:') + ' ' + Sm, LightRed);
       If Room.Kicked Then
         Done := True;

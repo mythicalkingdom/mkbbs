@@ -139,7 +139,7 @@ used = {chr(d[i * REC + 7 + 1 + 75]).upper() for i in range(1, len(d) // REC) if
 free = [k for k in 'WXYZ1234567ABCDEFGHJKLNOPQRSTUV890' if k not in used]
 keys = {}
 slot = 1
-CASES = [('who', 'who'), ('args', 'args one "two words"'), ('deny', 'deny'), ('high', 'high'), ('nothere', 'nothere'), ('loop', 'loop'), ('hang', 'hang'), ('bad', 'bad')]
+CASES = [('who', 'who'), ('args', 'args one "two words"'), ('deny', 'deny'), ('high', 'high'), ('nothere', 'nothere'), ('loop', 'loop'), ('hang', 'hang'), ('bad', 'bad'), ('wr', 'wr'), ('kick1', 'kick1')]
 for name, data in CASES:
     while slot * REC < len(d) and d[slot * REC] != 0:
         slot += 1
@@ -186,6 +186,22 @@ script('high.bas', '10 PRINT "SHOULD NOT RUN"\n')
 script('loop.bas', '10 GOTO 10\n')
 script('hang.bas', '10 PRINT "BYE"\n20 X = VAL(HOST$("bbs.hangup"))\n30 PRINT "AFTER"\n')
 script('bad.txt', 'x')
+script('wr.bas', '''10 Q$ = CHR$(34)
+20 X = VAL(HOST$("node.send 1 hello from the other node"))
+30 X = VAL(HOST$("node.time 1 7"))
+40 PRINT "TIME="; HOST$("field 1 reply")
+50 X = VAL(HOST$("bbs.set city Bergen"))
+60 X = VAL(HOST$("bbs.addtime 3"))
+70 B = VAL(HOST$("bbs.user"))
+80 PRINT "CITY="; HOST$("field 1 city")
+90 X = VAL(HOST$("node.kick 2"))
+100 PRINT "NOT REACHED"
+''')
+script('kick1.bas', '''10 X = VAL(HOST$("node.kick 1"))
+20 PRINT "KICK="; HOST$("field 1 reply")
+30 X = VAL(HOST$("user.set " + CHR$(34) + "Mark May" + CHR$(34) + " level 3"))
+40 PRINT "NOT REACHED"
+''')
 open(ra + '/extensions.cfg', 'w').write("""# test extensions
 [who]
 file = scripts/who.bas
@@ -207,6 +223,12 @@ file = scripts/hang.bas
 caps = session:control
 [bad]
 file = scripts/bad.txt
+[wr]
+file = scripts/wr.bas
+caps = node:send node:time node:kick session:read users:write
+[kick1]
+file = scripts/kick1.bas
+caps = node:kick users:write
 """)
 
 cfg = {'mk': build + '/mk', 'rundir': os.path.join(work, 'run'), 'logfile': os.path.join(work, 'listen.log'),
@@ -269,6 +291,35 @@ try:
         more = b'still open'
     check('bbs.hangup ends the call (the program does not go on, the connection closes)', b'BYE' in x and b'AFTER' not in x + (more if more != b'still open' else b'') and more != b'still open', (show(x), more))
     c.close()
+
+
+    # ---- phase 4: writes in a session, on another node
+    b = Caller()
+    check('a second caller on node 1', b.at_menu)
+    a = Caller()
+    x = run(a, 'wr', b'Press (Enter)', 12)
+    check('node.send and node.time reach the other node (its caller is told, the node answers with the time); bbs.set and bbs.addtime change the caller of the session',
+          b'TIME=Added 7 min' in x and b'CITY=Bergen' in x, show(x))
+    y = b.until(b'hello from the other node', 8)
+    check('... the caller of node 1 sees the message of the sysop at once, at the menu prompt', b'Message from the sysop: hello from the other node' in y, show(y))
+    check('... a program cannot hang up the node it runs on through the socket (it would wait for itself): it is told to use bbs.hangup', b'NOT REACHED' not in x and b'that is the node this program runs on' in x, show(x))
+    check('the log says what the extension changed', 'Ext wr: set city of the caller Mark May to Bergen' in bbslog() and 'Ext wr: gave the caller Mark May 3 minutes' in bbslog() and 'Ext wr: sent "hello from the other node" to node 1' in bbslog(), bbslog()[-600:])
+    a.s.sendall(b'\r'); a.until(b'Command >', 8)
+    x = run(a, 'kick1', b'Press (Enter)', 12)
+    check('node.kick hangs up the caller of another node', b'KICK=Node 1 disconnected' in x, show(x))
+    check('... and user.set refuses a user who is on line (the other caller was kicked, this one is the same name)', b'that user is on line now' in x, show(x))
+    b.s.settimeout(3)
+    closed = False
+    try:
+        for _ in range(10):
+            d = b.s.recv(4096)
+            if not d:
+                closed = True
+                break
+    except (socket.timeout, OSError):
+        closed = False
+    check('the kicked caller\'s connection is closed', closed)
+    a.close(); b.close()
 
     # ---- phase 3: hooks
     script('hk_logon.bas', '10 PRINT "HK-LOGON|"; HOST$("arg 1"); "|"; HOST$("arg 2"); "|"; HOST$("arg 3"); "|"; HOST$("arg 4")\n')

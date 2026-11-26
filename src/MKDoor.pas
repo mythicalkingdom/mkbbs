@@ -1272,7 +1272,7 @@ Procedure DoorUser.ShowSysopMessages;
     SysMsgInit := True;
     SysMsgOffset := -1;
     End;
-  While SysMsgNext(GetEnv('MKRUN'), SysMsgOffset, L) Do
+  While SysMsgNext(GetEnv('MKRUN'), SysMsgOffset, NodeNumber, L) Do
     Begin
     DisplayNewLine;
     DisplayAttr(LightRed);
