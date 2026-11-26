@@ -6,7 +6,7 @@ Unit MKApiTok;   {The token file of the JSON API: apitokens.json in the BBS dire
 // "expires": "2027-11-24", "from": ["127.0.0.1", "10.0.0.0/8"], "note": "the dashboard", "user": "" } ] }
 //
 // A token is mkapi_ and 43 random base64url characters (256 bits); only its SHA-256 is kept.  The file is mode 600 and is written whole (a new file replaces the old one).  Who uses a token last is
-// kept in apitokens.use (id, time, address), a separate file, so the token file is not rewritten for every request.  The scopes: status nodes events mailer stats calls areas files messages messages:private users, qwk and qwk:reply (QWK packets: they need a token that names a QWK node's user), users:private
+// kept in apitokens.use (id, time, address), a separate file, so the token file is not rewritten for every request.  The scopes: metrics status nodes events mailer stats calls areas files messages messages:private users, qwk and qwk:reply (QWK packets: they need a token that names a QWK node's user), users:private
 // (reserved), * (all) and, for tokens that name a user, self:... (reserved: version 1 gives such a token no endpoint).
 //
 
@@ -50,7 +50,7 @@ Uses BaseUnix, Unix, DateUtils, fpjson, jsonparser, MKPwd;
 
 Const
   B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  Known: Array[0..14] Of String = ('status', 'nodes', 'events', 'mailer', 'stats', 'calls', 'areas', 'files', 'messages', 'messages:private', 'users', 'users:private', 'qwk', 'qwk:reply', '*');
+  Known: Array[0..15] Of String = ('metrics', 'status', 'nodes', 'events', 'mailer', 'stats', 'calls', 'areas', 'files', 'messages', 'messages:private', 'users', 'users:private', 'qwk', 'qwk:reply', '*');
 
 
 Function TokenFileName(Dir: String): String;

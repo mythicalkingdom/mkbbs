@@ -254,6 +254,19 @@ try:
     check('/v1/stats?by=user: a row for each user, over two months', st == 200 and j['totals']['calls'] == 5 and rows['Ann']['calls'] == 2 and rows['Bob']['logons'] == 1 and rows['(nobody)']['calls'] == 2, (st, body))
     st, _, body = get('/v1/stats?by=nonsense', allq)
     check('/v1/stats with a wrong "by" or a bad date: 400', st == 400 and get('/v1/stats?from=yesterday', allq)[0] == 400, (st, body))
+    # /v1/metrics: Prometheus text, scope metrics
+    mtok = tool('add', 'prom', '-s', 'metrics', '-q').stdout.strip()
+    st, head, body = get('/v1/metrics', mtok)
+    m = body.decode('utf-8', 'replace')
+    check('/v1/metrics: 200, text/plain version 0.0.4, the length, no caching', st == 200 and 'Content-Type: text/plain; version=0.0.4' in head and 'Content-Length: %d' % len(body) in head and 'no-store' in head, (st, head))
+    check('/v1/metrics: every metric has a HELP and a TYPE line and every line is "name{labels} number"', all(re.fullmatch(r'#( HELP| TYPE) \w+ .+|\w+(\{[^}]*\})? -?[0-9.]+', l) for l in m.splitlines()) and m.endswith('\n') and '# TYPE mkbbs_calls_total counter' in m, m[:800])
+    check('/v1/metrics: info, nodes, and the call counters from the statistics files (3 logons, 1 failed, 1 no logon)',
+          re.search(r'^mkbbs_info\{version="[^"]+",bbs="[^"]*"\} 1$', m, re.M) and re.search(r'^mkbbs_nodes_in_use \d+$', m, re.M)
+          and 'mkbbs_calls_total{result="ok"} 3\n' in m and 'mkbbs_calls_total{result="failed"} 1\n' in m and 'mkbbs_calls_total{result="no_logon"} 1\n' in m
+          and re.search(r'^mkbbs_call_minutes_total 16\.\d$', m, re.M) is not None, m[:1500])
+    check('/v1/metrics: no events file and no mailer are said by their "up" gauges', 'mkbbs_mailer_up 0\n' in m and re.search(r'^mkbbs_events_up [01]$', m, re.M), m[-600:])
+    check('/v1/metrics: HEAD works; a token without the scope: 403; the scope of another endpoint does not open it', get('/v1/metrics', mtok, method='HEAD')[0] == 200 and get('/v1/metrics', tok)[0] == 403 and get('/v1/status', mtok)[0] == 403)
+    check('/v1: lists /v1/metrics', '/v1/metrics' in json.loads(get('/v1', mtok)[2])['paths'])
     st, _, body = get('/v1/calls?limit=3', allq)
     j = json.loads(body)
     check('/v1/calls?limit=3: the last calls, newest first, with start, user, result, seconds, address', st == 200 and j['count'] == 3 and len(j['calls']) == 3 and j['calls'][0]['user'] == 'Ann' and j['calls'][0]['seconds'] == 60 and j['calls'][0]['address'] == '192.0.2.4'
@@ -326,7 +339,7 @@ try:
     alln = json.loads(get('/v1/users?limit=1000', allq)[2])
     withdel = json.loads(get('/v1/users?limit=1000&deleted=1', allq)[2])
     check('deleted users are hidden unless asked for (?deleted=1)', all(not u['deleted'] for u in alln['users']) and withdel['count'] >= alln['count'], (alln['count'], withdel['count']))
-    check('every data endpoint needs its scope: a token with only "status" gets 403 on all of them', all(get(pth, tool('add', 'st' + str(i), '-s', 'status', '-q').stdout.strip())[0] == 403 for i, pth in enumerate(['/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/1', '/v1/messages/1', '/v1/messages/1/1', '/v1/users', '/v1/users/x'])))
+    check('every data endpoint needs its scope: a token with only "status" gets 403 on all of them', all(get(pth, tool('add', 'st' + str(i), '-s', 'status', '-q').stdout.strip())[0] == 403 for i, pth in enumerate(['/v1/metrics', '/v1/nodes', '/v1/events', '/v1/mailer', '/v1/stats', '/v1/calls', '/v1/areas/messages', '/v1/areas/files', '/v1/areas/files/1', '/v1/messages/1', '/v1/messages/1/1', '/v1/users', '/v1/users/x'])))
     # TLS
     st, head, body = get('/v1/status', tok, port=24862, tls=True)
     check('TLS: the same answer over HTTPS (certificate and name checked)', st == 200 and 'bbs' in json.loads(body), (st, head, body))

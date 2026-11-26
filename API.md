@@ -49,6 +49,7 @@ mkapitoken [-c config dir] list | revoke ID | rotate ID [-q]
 
 | scope | for |
 |---|---|
+| `metrics` | `/v1/metrics` (Prometheus text) |
 | `status` | `/v1/status` |
 | `nodes` | `/v1/nodes` |
 | `events` | `/v1/events` |
@@ -91,6 +92,24 @@ The nodes in use, as `mkmon` shows them: `node`, `user`, `handle`, `activity` (b
 ### `GET /v1/events`  (`events`)
 `available` (false when `mklisten` has no events), `new_logons_refused`, `callers`, `queued`, `running`, `stale` (`mklisten` has not refreshed the file for 15 seconds) and `events`: `number`, `enabled`, `time` (`HH:MM`),
 `days` (`sun`..`sat`), `state` (idle, waiting, retry, running, disabled), `exclusive`, `next_in_minutes`, `last_run`, `last_result`, `errorlevel`, `action`.
+
+### `GET /v1/metrics`  (`metrics`)
+The numbers of the BBS as **Prometheus text** (`text/plain; version=0.0.4`), for a scrape job; not JSON.  Counters (`_total`) are sums over all the monthly statistics files; the rest are gauges.
+
+| metric | what |
+|---|---|
+| `mkbbs_info{version,bbs}` | always 1 |
+| `mkbbs_nodes_in_use`, `mkbbs_nodes_activity{activity}` | nodes with a caller or a connection, and by what the caller does |
+| `mkbbs_calls_total{result}` | `ok`, `failed`, `no_logon` |
+| `mkbbs_call_minutes_total`, `mkbbs_upload_files_total`, `mkbbs_upload_kbytes_total`, `mkbbs_download_files_total`, `mkbbs_download_kbytes_total`, `mkbbs_messages_total` | caller activity |
+| `mkbbs_calls_today`, `mkbbs_failed_logons_today`, `mkbbs_callers_today` | since midnight |
+| `mkbbs_events_up`, `mkbbs_events_stale`, `mkbbs_new_logons_refused`, `mkbbs_event_callers`, `mkbbs_events_queued`, `mkbbs_events_running` | the event scheduler of `mklisten` (the others are there only when `events.info` is) |
+| `mkbbs_event_enabled`, `mkbbs_event_last_result`, `mkbbs_event_next_minutes` `{event}` | each event |
+| `mkbbs_mailer_up` | 1 when `mkbink` answers on its control socket |
+| `mkbbs_mailer_calls_total{result}`, `mkbbs_mailer_bytes_total{direction}`, `mkbbs_mailer_files_total{direction}`, `mkbbs_mailer_sessions{direction}` | the mailer |
+| `mkbbs_mailer_link_failures`, `_link_waiting_files`, `_link_waiting_bytes` `{link}` | each link |
+
+Prometheus: `bearer_token_file` with a token made by `mkapitoken add prom -s metrics`, `metrics_path: /v1/metrics`.  Alerts worth having: `mkbbs_events_stale == 1`, `mkbbs_mailer_up == 0`, `increase(mkbbs_calls_total{result="failed"}[10m]) > 5`.
 
 ### `GET /v1/mailer`  (`mailer`)
 What the mailer (`mkbink`) says on its control socket; nothing is sent to it.  `{"running": false}` when there is none, otherwise `me` (address, name, sysop, started, port, version), `statistics` (calls, ok,

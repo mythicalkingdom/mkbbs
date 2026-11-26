@@ -13,7 +13,7 @@ Program MKApiTokenTool;
 
      add and rotate print the token ONCE (-q: only the token, for scripts); only its SHA-256 is kept, so it cannot be shown again.  A token is valid up to and including the day of -e
      (none: no end), only from the addresses of -f (none: from anywhere; a.b.c.d/n nets are understood).  -u names a BBS user (by name): such a token acts for that user (version 1: no endpoint
-     takes it yet).  Scopes: status nodes events mailer stats calls areas users users:private *   (self:... only with -u).  mkapi reads the file at every request: no restart.
+     takes it yet).  Scopes: metrics status nodes events mailer stats calls areas users users:private *   (self:... only with -u).  mkapi reads the file at every request: no restart.
      The exit code: 0 done, 1 not usable.
 }
 
@@ -114,7 +114,7 @@ Procedure DoAdd;
   Tk.From_ := TStringList.Create;
   Split(Scopes, Tk.Scopes);
   If Tk.Scopes.Count = 0 Then
-    Die('-s: name the scopes (status nodes events mailer stats calls areas users users:private *)');
+    Die('-s: name the scopes (metrics status nodes events mailer stats calls areas users users:private *)');
   For i := 0 To Tk.Scopes.Count - 1 Do
     Begin
     If Not ScopeKnown(Tk.Scopes[i]) Then
