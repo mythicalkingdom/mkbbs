@@ -13,6 +13,7 @@ Program MKConnect;
           -t telnet|telnets|raw|ssh    the kind of connection (default telnet)
           -u                           the terminal wants UTF-8 (the CP437 of the system is converted)   -c   it does not (the bytes are passed as they are)
           -b file                      another phone book (default ~/.config/mkconnect/phonebook)
+          -d folder                    where downloaded files come (default ~/Downloads when it is there, else the current folder)
           -h                           this text
 
      In a call: Ctrl-] is the attention key (a menu), Alt-P sends the password of the system, Alt-N its login name, Alt-H hangs up, Alt-X hangs up and leaves, Alt-D goes to the dialer, Alt-C is capture.
@@ -30,7 +31,7 @@ Var
   K: TConnKind;
   ForceU, ForceC: Boolean;
   R: Integer;
-  EntryName: String;
+  EntryName, DownDir: String;
   Book: TConnBook;
   St: TDialerState;
   Pw, Pw2, Why: String;
@@ -38,12 +39,13 @@ Var
 
 Procedure Usage;
   Begin
-  WriteLn(StdErr, 'Usage: mkconnect [-t telnet|telnets|raw|ssh] [-u | -c] [-b phonebook] [-e name | host[:port]]');
+  WriteLn(StdErr, 'Usage: mkconnect [-t telnet|telnets|raw|ssh] [-u | -c] [-b phonebook] [-d folder] [-e name | host[:port]]');
   Halt(3);
   End;
 
 Begin
 Host := '';
+DownDir := '';
 EntryName := '';
 Kind := '';
 BookFile := '';
@@ -71,6 +73,12 @@ While i <= ParamCount Do
     If i > ParamCount Then Usage;
     EntryName := ParamStr(i);
     End
+  Else If A = '-d' Then
+    Begin
+    Inc(i);
+    If i > ParamCount Then Usage;
+    DownDir := ParamStr(i);
+    End
   Else If A = '-u' Then ForceU := True
   Else If A = '-c' Then ForceC := True
   Else If (A = '-h') Or (A = '--help') Then Usage
@@ -88,6 +96,13 @@ If ForceU Then Opts.TermUtf8 := True;
 If ForceC Then Opts.TermUtf8 := False;
 Opts.CapDir := GetCurrentDir;
 Opts.LogFile := IncludeTrailingPathDelimiter(ConnConfigDir) + 'calls.log';
+If DownDir = '' Then
+  Begin
+  DownDir := IncludeTrailingPathDelimiter(GetEnvironmentVariable('HOME')) + 'Downloads';
+  If (GetEnvironmentVariable('HOME') = '') Or Not DirectoryExists(DownDir) Then
+    DownDir := GetCurrentDir;
+  End;
+Opts.DownDir := ExpandFileName(DownDir);
 Opts.ConnectMs := 15000;
 If (Host <> '') And (EntryName <> '') Then
   Usage;

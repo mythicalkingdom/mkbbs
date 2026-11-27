@@ -255,6 +255,7 @@ Procedure Help;
     '  Ctrl-]  the attention key: a menu on the bottom row',
     '  Alt-P  send the password of this system        Alt-N  send its login name',
     '  Alt-C  capture on / off                        Alt-T  the character set of the display',
+    '  Alt-U  upload files to the system              Alt-L  download (Esc or Ctrl-X cancels a transfer)',
     '  Alt-H  hang up        Alt-D  hang up, dialer       Alt-X  hang up and leave',
     '  (an Alt key is the Esc key and a letter pressed together)',
     '',
@@ -265,12 +266,12 @@ Procedure Help;
 { ---------------------------------------------------------------- the form of one system }
 
 Type
-  TFieldKind = (fText, fNumber, fKind, fCharset, fSecret);
+  TFieldKind = (fText, fNumber, fKind, fCharset, fProto, fSecret);
 
 Const
-  NFields = 10;
-  FLabel: Array[0..NFields - 1] Of String = ('Name', 'Host', 'Port', 'Kind', 'Character set', 'Login name', 'Password', 'Script', 'SSH user', 'Note');
-  FType: Array[0..NFields - 1] Of TFieldKind = (fText, fText, fNumber, fKind, fCharset, fText, fSecret, fText, fText, fText);
+  NFields = 11;
+  FLabel: Array[0..NFields - 1] Of String = ('Name', 'Host', 'Port', 'Kind', 'Character set', 'Protocol', 'Login name', 'Password', 'Script', 'SSH user', 'Note');
+  FType: Array[0..NFields - 1] Of TFieldKind = (fText, fText, fNumber, fKind, fCharset, fProto, fText, fSecret, fText, fText, fText);
 
 
 Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
@@ -287,7 +288,8 @@ Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
     Begin
     V[0] := E.Name; V[1] := E.Host; V[2] := IntToStr(E.Port); V[3] := ConnKindName(E.Kind);
     If E.Utf8 Then V[4] := 'UTF-8' Else V[4] := 'CP437';
-    V[5] := E.Login; V[6] := E.Password; V[7] := E.Script; V[8] := E.SshUser; V[9] := E.Note;
+    V[5] := ConnProtoName(E.Proto);
+    V[6] := E.Login; V[7] := E.Password; V[8] := E.Script; V[9] := E.SshUser; V[10] := E.Note;
     End;
 
   Function Store: Boolean;
@@ -319,7 +321,8 @@ Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
     ConnKindFrom(V[3], Kd);
     E.Kind := Kd;
     E.Utf8 := V[4] = 'UTF-8';
-    E.Login := V[5]; E.Password := V[6]; E.Script := V[7]; E.SshUser := V[8]; E.Note := V[9];
+    If ConnProtoFrom(V[5]) <> #0 Then E.Proto := ConnProtoFrom(V[5]);
+    E.Login := V[6]; E.Password := V[7]; E.Script := V[8]; E.SshUser := V[9]; E.Note := V[10];
     Result := True;
     End;
 
@@ -339,6 +342,11 @@ Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
     Else If FType[Cur] = fCharset Then
       Begin
       If V[4] = 'CP437' Then V[4] := 'UTF-8' Else V[4] := 'CP437';
+      End
+    Else If FType[Cur] = fProto Then
+      Begin
+      n := Pos(ConnProtoFrom(V[5]), 'ZYGX1') - 1;
+      V[5] := ConnProtoName(Copy('ZYGX1', ((n + Dir + 5) Mod 5) + 1, 1)[1]);
       End;
     End;
 
@@ -368,7 +376,7 @@ Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
       Shown := V[i];
       If (FType[i] = fSecret) And (Not Show) Then
         Shown := StringOfChar('*', Utf8Len(V[i]));
-      If (FType[i] In [fKind, fCharset]) Then
+      If (FType[i] In [fKind, fCharset, fProto]) Then
         Shown := '< ' + Shown + ' >';
       If Utf8Len(Shown) > VW - 1 Then
         Shown := Copy(Shown, Length(Shown) - (VW - 1) + 1, VW - 1);
@@ -398,8 +406,8 @@ Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
       kcUp: If Cur > 0 Then Dec(Cur);
       kcDown, kcTab: If Cur < NFields - 1 Then Inc(Cur);
       kcEnter: If Cur < NFields - 1 Then Inc(Cur) Else If Store Then Exit(True);
-      kcLeft: If FType[Cur] In [fKind, fCharset] Then Cycle(-1);
-      kcRight: If FType[Cur] In [fKind, fCharset] Then Cycle(1);
+      kcLeft: If FType[Cur] In [fKind, fCharset, fProto] Then Cycle(-1);
+      kcRight: If FType[Cur] In [fKind, fCharset, fProto] Then Cycle(1);
       kcBack: If FType[Cur] In [fText, fNumber, fSecret] Then DelLastChar(V[Cur]);
       kcF: Begin
            If K.n = 10 Then
@@ -419,7 +427,7 @@ Function EditEntry(Var E: TConnEntry; Const Title: String): Boolean;
           V[Cur] := ''
         Else If Plain(K) Then
           Begin
-          If FType[Cur] In [fKind, fCharset] Then
+          If FType[Cur] In [fKind, fCharset, fProto] Then
             Begin
             If K.ch = ' ' Then Cycle(1);
             End

@@ -48,7 +48,11 @@ Type WindowObj = Object
   End;
 
 
+Type ProtHookProc = Procedure(What: Char; Const S: String; N: LongInt);
+
 Var
+  ProtHook: ProtHookProc;              {a program that shows the progress of a transfer itself (mkconnect): called with what changed, even when ProtQuiet:
+                                        P the protocol, N the file name, S the size, L the bytes done (N), E the errors (N), T the elapsed seconds (N), C the characters per second (N), M a message}
   ProtQuiet: Boolean;                  {file transfer: no progress window (the caller's line is the transfer; the screen is not his)}
   ProtLastMsg: String;                 {the last message of a transfer, for the log}
 
@@ -206,6 +210,8 @@ Procedure ProtocolWindowObj.OpenWindow;
 
 Procedure ProtocolWindowObj.ShowProt(Prot: String);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('P', Prot, 0);
   If ProtQuiet Then
     Begin
     Exit;
@@ -217,6 +223,8 @@ Procedure ProtocolWindowObj.ShowProt(Prot: String);
 
 Procedure ProtocolWindowObj.ShowName(filename: String);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('N', filename, 0);
   If ProtQuiet Then
     Begin
     Exit;
@@ -231,6 +239,8 @@ Procedure ProtocolWindowObj.ShowName(filename: String);
 
 Procedure ProtocolWindowObj.ShowSize(l: LongInt);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('S', '', l);
   If ProtQuiet Then
     Begin
     Exit;
@@ -247,6 +257,8 @@ Procedure ProtocolWindowObj.ShowElapsed(ET: LongInt);
     Seconds: Word;
 
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('T', '', ET);
   If ProtQuiet Then
     Begin
     Exit;
@@ -261,6 +273,8 @@ Procedure ProtocolWindowObj.ShowElapsed(ET: LongInt);
 
 Procedure ProtocolWindowObj.ShowCPS(CPS: LongInt);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('C', '', CPS);
   If ProtQuiet Then
     Begin
     Exit;
@@ -288,6 +302,8 @@ Procedure ProtocolWindowObj.ShowCheck(is32: Boolean);
 
 Procedure ProtocolWindowObj.Message(s: String);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('M', s, 0);
   If ProtQuiet Then
     Begin
     ProtLastMsg := s;
@@ -303,6 +319,8 @@ Procedure ProtocolWindowObj.Message(s: String);
 
 Procedure ProtocolWindowObj.ShowLoc(l: LongInt);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('L', '', l);
   If ProtQuiet Then
     Begin
     Exit;
@@ -315,6 +333,8 @@ Procedure ProtocolWindowObj.ShowLoc(l: LongInt);
 
 Procedure ProtocolWindowObj.Errors(w: Word);
   Begin
+  If @ProtHook <> Nil Then
+    ProtHook('E', '', w);
   If ProtQuiet Then
     Begin
     Exit;

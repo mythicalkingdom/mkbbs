@@ -39,6 +39,7 @@ class Bbs(threading.Thread):
         self.calls = 0
         self.conn = None
         self.closed = threading.Event()
+        self.pause = False
         self.start()
 
     def run(self):
@@ -55,6 +56,12 @@ class Bbs(threading.Thread):
             st = 0
             try:
                 while True:
+                    if self.pause:
+                        time.sleep(0.02)
+                        continue
+                    r, _, _ = select.select([c], [], [], 0.05)
+                    if not r:
+                        continue
                     d = c.recv(4096)
                     if not d:
                         break
@@ -81,6 +88,56 @@ class Bbs(threading.Thread):
             except OSError:
                 pass
             self.closed.set()
+
+    def bridge(self, argv, cwd, secs=60):
+        """an lrzsz program (sz, rz, sb, rb, sx) works on the Telnet session: what it writes goes to the caller with 255 doubled, what the caller sends (255 255 = a data byte) goes to its input"""
+        self.pause = True
+        time.sleep(0.15)
+        c = self.conn
+        p = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        iac = False
+        end = time.time() + secs
+        out_open = True
+        while time.time() < end and out_open:
+            r, _, _ = select.select([c, p.stdout], [], [], 0.2)
+            if c in r:
+                try:
+                    d = c.recv(65536)
+                except OSError:
+                    break
+                if not d:
+                    break
+                data = bytearray()
+                for b in d:
+                    if iac:
+                        iac = False
+                        if b == 255:
+                            data.append(255)
+                        continue
+                    if b == 255:
+                        iac = True
+                    else:
+                        data.append(b)
+                try:
+                    p.stdin.write(bytes(data)); p.stdin.flush()
+                except (BrokenPipeError, OSError):
+                    pass
+            if p.stdout in r:
+                d = os.read(p.stdout.fileno(), 65536)
+                if not d:
+                    out_open = False
+                else:
+                    c.sendall(d.replace(b'\xff', b'\xff\xff'))
+        try:
+            p.stdin.close()
+        except OSError:
+            pass
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            p.kill()
+        self.pause = False
+        return p.returncode
 
     def say(self, b):
         self.conn.sendall(b)
@@ -271,7 +328,7 @@ def fill(t, fields):
     for text in fields:
         t.send(text.encode() + b'\r' if text is not None else b'\r')
         t.screen(0.15)
-fill(t, ['Test BBS', '127.0.0.1', '\x15%d' % bbs.port, None, None, 'Mark May', 'hunter2 x'])
+fill(t, ['Test BBS', '127.0.0.1', '\x15%d' % bbs.port, None, None, None, 'Mark May', 'hunter2 x'])
 x = t.key(b'\x1b[21~', 0.8)            # F10
 check('F10 saves the form: the system is in the list (the password is not shown)', 'Test BBS' in x and '127.0.0.1' in x and 'hunter2' not in x and 'login: Mark May' in x, x)
 check('the phone book is saved at once, sealed: no host and no password in the file, mode 600', os.path.exists(book) and open(book, 'rb').read(4) == b'MKCB' and b'127.0.0.1' not in open(book, 'rb').read() and (os.stat(book).st_mode & 0o777) == 0o600, '')
@@ -338,5 +395,102 @@ t.send(b'\x1bh')
 code = t.wait(6)
 check('Alt-H hangs up and ends the program', code == 0, code)
 t.kill()
+
+# ---- file transfers (MKProt: Zmodem, Ymodem, Xmodem) against lrzsz on the BBS side
+import hashlib
+srv = work + '/srv'
+dl = work + '/dl'
+os.makedirs(srv, exist_ok=True); os.makedirs(dl, exist_ok=True)
+def blob(name, n):
+    d = os.urandom(n)
+    open(os.path.join(srv, name), 'wb').write(d)
+    return hashlib.sha256(d).hexdigest()
+def sha(path):
+    return hashlib.sha256(open(path, 'rb').read()).hexdigest() if os.path.exists(path) else None
+if all(shutil.which(x) for x in ('sz', 'rz', 'sb', 'rb', 'sx')):
+    h_auto = blob('auto.bin', 70000)
+    t = Pty(['-d', dl, '127.0.0.1:%d' % bbs.port])
+    t.until(b'Welcome to the test BBS')
+    bbs.say(b'\r\nStarting the Zmodem send now.\r\n')
+    time.sleep(0.3)
+    rc = bbs.bridge(['sz', '-b', os.path.join(srv, 'auto.bin')], srv)
+    time.sleep(1.0)
+    t.read(0.6)
+    check('a Zmodem sender that starts by itself is taken up at once: the file comes into the download folder (Zmodem, 70 000 bytes with every byte value)', rc == 0 and sha(dl + '/auto.bin') == h_auto, (rc, os.listdir(dl)))
+    check('... the progress is on the bottom row, and the result: "received auto.bin"', b'Receiving (zmodem)' in t.out and b'received auto.bin' in t.out, t.out[-300:])
+    bbs.say(b'\r\nBack at the prompt> ')
+    t.read(0.8)
+    check('what the system says after the transfer (its prompt) is shown, not thrown away', b'Back at the prompt>' in t.out, t.out[-200:])
+    # a manual download: Alt-L, the protocol, then the system starts its sender
+    h_man = blob('man.bin', 30000)
+    t.send(b'\x1bl')
+    t.read(0.5)
+    check('Alt-L asks for the protocol on the bottom row', b'Z)modem' in t.out and b'Ymodem-G' in t.out, t.out[-300:])
+    t.send(b'z')
+    time.sleep(0.5)
+    rc = bbs.bridge(['sz', '-b', os.path.join(srv, 'man.bin')], srv)
+    time.sleep(0.8)
+    t.read(0.5)
+    check('Alt-L, Z: a download that the user asked for', rc == 0 and sha(dl + '/man.bin') == h_man, (rc, os.listdir(dl)))
+    # an upload
+    recv = work + '/recv'
+    os.makedirs(recv, exist_ok=True)
+    h_up = blob('up.bin', 50000)
+    t.send(b'\x1bu')
+    t.read(0.4)
+    t.send(b'z')
+    t.read(0.4)
+    check('Alt-U: the protocol, then the names of the files, asked on the bottom row', b'Send which file' in t.out, t.out[-300:])
+    t.send((srv + '/up.bin').encode() + b'\r')
+    time.sleep(0.5)
+    rc = bbs.bridge(['rz', '-b', '-y'], recv)
+    time.sleep(0.8)
+    t.read(0.5)
+    check('Zmodem upload: the file arrives whole at the system', rc == 0 and sha(recv + '/up.bin') == h_up, (rc, os.listdir(recv)))
+    check('... "sent up.bin" on the bottom row', b'sent up.bin' in t.out, t.out[-200:])
+    # a Ymodem batch with a wildcard
+    h1 = blob('b1.dat', 20000); h2 = blob('b2.dat', 3000)
+    t.send(b'\x1bu')
+    t.read(0.3)
+    t.send(b'y')
+    t.read(0.3)
+    t.send((srv + '/b?.dat').encode() + b'\r')
+    time.sleep(0.5)
+    rc = bbs.bridge(['rb', '-b', '-y'], recv)
+    time.sleep(0.8)
+    t.read(0.5)
+    check('Ymodem batch with a wildcard: both files arrive', rc == 0 and sha(recv + '/b1.dat') == h1 and sha(recv + '/b2.dat') == h2, (rc, os.listdir(recv)))
+    # Xmodem: one file, with a name to save it under
+    h_x = blob('x.src', 10240)
+    t.send(b'\x1bl')
+    t.read(0.3)
+    t.send(b'x')
+    t.read(0.4)
+    check('Xmodem sends no name: the program asks what to save it as', b'Save as' in t.out, t.out[-300:])
+    t.send(b'\x15xfer.dat\r')
+    time.sleep(0.5)
+    rc = bbs.bridge(['sx', os.path.join(srv, 'x.src')], srv)
+    time.sleep(0.8)
+    t.read(0.5)
+    check('Xmodem download: the file is saved under that name', sha(dl + '/xfer.dat') is not None and open(dl + '/xfer.dat', 'rb').read().rstrip(b'\x1a')[:10240] == open(srv + '/x.src', 'rb').read()[:10240], (rc, os.listdir(dl)))
+    # cancel with Esc while nothing comes
+    bbs.got = b''
+    t.send(b'\x1bl')
+    t.read(0.3)
+    t.send(b'z')
+    t.read(0.6)
+    t.send(b'\x1b')
+    t.read(3.0)
+    check('Esc cancels a transfer: the bar says so and the call goes on (a typed letter reaches the system)', b'cancelled' in t.out, t.out[-300:])
+    t.send(b'k')
+    time.sleep(0.6)
+    check('... after the cancel the keys are the system\'s again', bbs.got.endswith(b'k'), bbs.got[-40:])
+    t.send(b'\x1bh')
+    t.wait(5)
+    t.kill()
+    lg = open(work + '/home/.config/mkconnect/calls.log').read()
+    check('the transfers are in the call log (kind, protocol, files, result)', 'download zmodem' in lg and 'auto.bin' in lg and 'upload zmodem' in lg and 'up.bin' in lg and 'received auto.bin' in lg and 'sent up.bin' in lg and 'cancelled' in lg, lg[-600:])
+else:
+    print('skip: no lrzsz (sz rz sb rb sx)')
 print('failures: %d' % fails)
 sys.exit(1 if fails else 0)

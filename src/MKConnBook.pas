@@ -12,6 +12,7 @@ Unit MKConnBook;   {the phone book of mkconnect: the systems, one file, sealed w
       port = 23
       kind = telnet            telnet | telnets | raw | ssh
       charset = cp437          cp437 | utf8   (what the system sends)
+      protocol = zmodem        zmodem | ymodem | ymodemg | xmodem | xmodem1k   (the one the transfer prompt offers first)
       login = Mark May         the name sent by the key for the login name (and the script's variable login)
       password = secret        sent by its own key (and the script's variable password)
       script = login.scr       an MKHubScr script run after the connect
@@ -35,6 +36,7 @@ Type
     Port: Word;
     Kind: TConnKind;
     Utf8: Boolean;                      {the system sends UTF-8 (False: CP437)}
+    Proto: Char;                        {the protocol offered first: Z Zmodem, Y Ymodem, G Ymodem-G, X Xmodem, 1 Xmodem-1K}
     Calls: LongInt;
     Last: Int64;
   End;
@@ -62,6 +64,8 @@ Function ConnDefaultPort(K: TConnKind): Word;
 Function ConnKindName(K: TConnKind): String;
 Function ConnKindFrom(Const S: String; Out K: TConnKind): Boolean;
 Procedure ConnNewEntry(Out E: TConnEntry);
+Function ConnProtoName(C: Char): String;
+Function ConnProtoFrom(Const S: String): Char;      {#0 when it is none}
 
 Implementation
 
@@ -122,8 +126,37 @@ Function ConnKindFrom(Const S: String; Out K: TConnKind): Boolean;
   End;
 
 
+Function ConnProtoName(C: Char): String;
+  Begin
+  Case C Of
+    'Y': Result := 'ymodem';
+    'G': Result := 'ymodemg';
+    'X': Result := 'xmodem';
+    '1': Result := 'xmodem1k';
+    Else
+      Result := 'zmodem';
+    End;
+  End;
+
+
+Function ConnProtoFrom(Const S: String): Char;
+  Var
+    T: String;
+
+  Begin
+  T := LowerCase(Trim(S));
+  Result := #0;
+  If T = 'zmodem' Then Result := 'Z'
+  Else If T = 'ymodem' Then Result := 'Y'
+  Else If T = 'ymodemg' Then Result := 'G'
+  Else If T = 'xmodem' Then Result := 'X'
+  Else If T = 'xmodem1k' Then Result := '1';
+  End;
+
+
 Procedure ConnNewEntry(Out E: TConnEntry);
   Begin
+  E.Proto := 'Z';
   E.Name := '';
   E.Host := '';
   E.Login := '';
@@ -262,6 +295,10 @@ Function TConnBook.Load(Const Password: String; Out Why: String): Integer;
         If ConnKindFrom(Val, K) Then E.Kind := K;
         End
       Else If Key = 'charset' Then E.Utf8 := LowerCase(Trim(Val)) = 'utf8'
+      Else If Key = 'protocol' Then
+        Begin
+        If ConnProtoFrom(Val) <> #0 Then E.Proto := ConnProtoFrom(Val);
+        End
       Else If Key = 'login' Then E.Login := Val
       Else If Key = 'password' Then E.Password := Val
       Else If Key = 'script' Then E.Script := Val
@@ -319,6 +356,7 @@ Function TConnBook.Save(Const Password: String; Sealed_: Boolean; Out Why: Strin
         L.Add('port = ' + IntToStr(Port));
         L.Add('kind = ' + ConnKindName(Kind));
         If Utf8 Then L.Add('charset = utf8') Else L.Add('charset = cp437');
+        L.Add('protocol = ' + ConnProtoName(Proto));
         If Login <> '' Then L.Add('login = ' + Clean(Login));
         If Items[i].Password <> '' Then L.Add('password = ' + Clean(Items[i].Password));
         If Script <> '' Then L.Add('script = ' + Clean(Script));

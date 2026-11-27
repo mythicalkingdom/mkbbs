@@ -11,7 +11,10 @@ Const
   MaxCErrors = 15;
 
 
+Type ProtCancelProc = Function: Boolean;
+
 Var
+  ProtCancelHook: ProtCancelProc;      {a program that reads its own keyboard (mkconnect): True cancels the transfer}
   ProtKeepInput: Boolean;              {a transfer with a BBS (this program is the caller): what follows the end of the transfer (the BBS prompt) is not thrown away}
   ProtTrace: Boolean;                  {every byte received (r) and sent (s) goes to StdErr (tests)}
 
@@ -295,6 +298,8 @@ Function ProtObj.CancelKey: Boolean;
    transfer through the carrier.}
   Begin
   CancelKey := False;
+  If @ProtCancelHook <> Nil Then
+    CancelKey := ProtCancelHook();
   End;
 
 
@@ -378,7 +383,15 @@ Function Z_GetByte(tenths: Integer): Integer;
       Done := True;
       End
     Else
+      Begin
       If CommWaitChar(50) Then;          {waits, not a busy loop}
+      If @ProtCancelHook <> Nil Then
+        If ProtCancelHook() Then
+          Begin
+          Z_GetByte := ZTimeOut;         {the operator cancels: the waiting ends at once, the caller of the transfer sees the cancel}
+          Done := True;
+          End;
+      End;
     End;
   End;
 
