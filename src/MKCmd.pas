@@ -619,7 +619,7 @@ Procedure ReturnMenu(Var MN: String);
 
 Procedure ProcessCmd(Item: Word);
   Var
-    TmpStr: String;
+    TmpStr, TmpStr2: String;
     Tmp: LongInt;
     Code: Word;
 
@@ -731,11 +731,17 @@ Procedure ProcessCmd(Item: Word);
          If Upper(TmpStr) = '/F' Then
            Begin
            If Config^.FileViewAccess(User.GetUserFileTemplate, Sec) Then
-             DoFileList(Config^.GetFileAreaPath(User.GetUserFileTemplate));
+             Begin
+             TmpStr2 := Config^.GetFileListPath(User.GetUserFileTemplate);
+             If (TmpStr2 <> '') And (Not DirExist(TmpStr2)) Then
+               DoFileList(Config^.GetFileAreaPath(User.GetUserFileTemplate), TmpStr2)     {the list of the area: files.bbs or a PCBoard DIR file}
+             Else
+               DoFileList(Config^.GetFileAreaPath(User.GetUserFileTemplate), '');
+             End;
            End
          Else
            If Length(TmpStr) > 0 Then
-             DoFileList(TmpStr);
+             DoFileList(TmpStr, ExtractWord(Menu.GetData(Item), 2));
          End;
     034: DoPackView(Sec);                   {Global archive viewing}
     035: DoTextSearch(Sec);                 {Global text search}

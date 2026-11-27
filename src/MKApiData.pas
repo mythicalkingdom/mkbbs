@@ -28,7 +28,7 @@ Function ApiUser(Const Name, Query: String): TJSONObject;                 {Nil: 
 Implementation
 
 Uses BaseUnix, Unix, Sockets, DateUtils, StrUtils,
-  MKGlobT, MKCfgAbs, MKMsgAbs, MKOpen, MKName, MKCp437, MKFile;
+  MKGlobT, MKCfgAbs, MKMsgAbs, MKOpen, MKName, MKCp437, MKFile, MKFileList;
 
 Type
   UserOnRec = Packed Record            {as UserOnType in Struct.MK}
@@ -966,6 +966,8 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
   {the files of an area: name, description (from files.bbs, continuation lines joined with a line feed), size and date; a file the list does not name has no description}
   Var
     Dir, ListFile, Q, After, Name, D, T: String;
+    PName, PDesc, PText: ShortString;
+    PSize, PTime: LongInt;
     Lines: TStringList;
     Desc, Names: TStringList;
     SR: TSearchRec;
@@ -1011,7 +1013,9 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
       T := Lines[i];
       If (T = '') Or (T[1] = ';') Or (T[1] = '/') Then
         Continue;
-      If T[1] > ' ' Then
+      If PcbPrimary(T, PName, PSize, PTime, PDesc) Then       {a PCBoard DIR line: name, size, date, description}
+        k := Desc.Add(PName + #1 + PcbStripCodes(PDesc))
+      Else If T[1] > ' ' Then
         Begin
         Name := T;
         D := '';
@@ -1025,7 +1029,11 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
         k := Desc.Add(Name + #1 + D);
         End
       Else If k >= 0 Then
+        Begin
+        If PcbSecondary(T, PText) Then
+          T := PcbStripCodes(PText);
         Desc[k] := Desc[k] + #10 + Trim(T);
+        End;
       End;
     Lines.Free;
     End;

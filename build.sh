@@ -335,6 +335,14 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/mchattest.py build build/work/mchat | grep -E "^(ok|FAIL|skip|failures)" | tee build/mchatresult.txt
   if grep -q "^FAIL" build/mchatresult.txt; then exit 1; fi
 fi
+# PCBoard DIR files: the lines (MKFileList) and menu command 31 over telnet
+fpc -B -Fusrc -FEbuild -FUbuild -vew -opcbdirtest tests/pcbdirtest.pas 2>&1 | grep -E "Error|Fatal" || true
+build/pcbdirtest | grep -E "^(FAIL|failures)" | tee build/pcbdirresult.txt
+if grep -q "^FAIL" build/pcbdirresult.txt; then exit 1; fi
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/dirlisttest.py build build/work/dirlist | grep -E "^(FAIL|skip|failures)" | tee build/dirlistresult.txt
+  if grep -q "^FAIL" build/dirlistresult.txt; then exit 1; fi
+fi
 # menu command 175: an extension of the sysop runs for the caller (MHOST-PLAN.md phase 2)
 if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/exttest.py build build/work/ext | grep -E "^(ok|FAIL|skip|failures)" | tee build/extresult.txt

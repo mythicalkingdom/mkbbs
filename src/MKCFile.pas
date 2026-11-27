@@ -32,7 +32,7 @@ Type ListFileObj = Object
 Procedure DisplayStopMsg;
 Procedure DoNewFiles(Var Sec: SecType);
 Procedure DoPackView(Var Sec: SecType);
-Procedure DoFileList(PathStr: String);
+Procedure DoFileList(PathStr: String; ListName: String);   {ListName: the file with the list ('' = files.bbs in the path); files.bbs and PCBoard DIR lines are both read}
 Procedure DoDirList(PathStr: String);
 Function  GetProtocol(Special: Boolean): Word;
 Function  GetPacker: Word;
@@ -46,7 +46,7 @@ Var
 Implementation
 
 Uses
-  MKDoor, MKCfgAbs, MKString, MKBFile, MKPack, MKFile, MKComAbs, MKDos,
+  MKDoor, MKCfgAbs, MKString, MKBFile, MKPack, MKFile, MKComAbs, MKDos, MKFileList,
   Dos;
 
 
@@ -454,7 +454,7 @@ Procedure DoDirList(PathStr: String);
 
 
 
-Procedure DoFileList(PathStr: String);
+Procedure DoFileList(PathStr: String; ListName: String);
   Const MaxFiles = 800;
 
   Type DirRec = Record
@@ -475,19 +475,46 @@ Procedure DoFileList(PathStr: String);
     j: LongInt;
     Match: Boolean;
     SR2: SearchRec;
+    ListPath, PName, PDesc, PText: String;
+    PSize, PTime: LongInt;
+    InF: Text;
+    IncLine: String;
+    LastFile, PcbMode: Boolean;
 
   Begin
   ListFile.Init;
   New(DR);
+  LastFile := False;
   User.SetMore(True);
   User.ResetLines(1);
   User.DisplayNewLine;
   TF.Init;
   PathStr := FixDirPath(PathStr);
   AddBackSlash(PathStr);
-  If FileExist(PathStr + 'files.bbs') Then
+  ListPath := PathStr + 'files.bbs';
+  If ListName <> '' Then
     Begin
-    If TF.OpenTextFile(PathStr + 'files.bbs') Then
+    If Pos('/', ListName) > 0 Then
+      ListPath := ListName
+    Else
+      ListPath := PathStr + ListName;
+    End;
+  PcbMode := False;
+  If FileExist(ListPath) Then
+    Begin
+    Assign(InF, ListPath);               {a PCBoard DIR file has primary lines: then the other lines are text}
+    {$I-} Reset(InF); {$I+}
+    If IoResult = 0 Then
+      Begin
+      While (Not Eof(InF)) And (Not PcbMode) Do
+        Begin
+        ReadLn(InF, IncLine);
+        If PcbPrimary(IncLine, PName, PSize, PTime, PDesc) Then
+          PcbMode := True;
+        End;
+      Close(InF);
+      End;
+    If TF.OpenTextFile(ListPath) Then
       Begin
       DisplayStopMsg;
       FilesThisArea := 0;
@@ -510,9 +537,39 @@ Procedure DoFileList(PathStr: String);
           User.SetStopMore(True);
           CommFlushOut;
           End;
-        If ((TmpStr[1] <= '/') Or (TmpStr[1] = ';') Or (Length(TmpStr) = 0) Or
+        If (Length(TmpStr) > 0) And (TmpStr[1] = '%') Then
+          Begin                                   {PCBoard: a file to show here}
+          Assign(InF, FixDirPath(Copy(TmpStr, 2, 250)));
+          {$I-} Reset(InF); {$I+}
+          If IoResult = 0 Then
+            Begin
+            While (Not Eof(InF)) And (User.Ok) And (Not User.StopMore) Do
+              Begin
+              ReadLn(InF, IncLine);
+              User.DisplayStrLn(PcbStripCodes(IncLine));
+              End;
+            Close(InF);
+            End;
+          LastFile := False;
+          End
+        Else If PcbPrimary(TmpStr, PName, PSize, PTime, PDesc) Then
+          Begin                                   {PCBoard DIR line: name, size, date, description}
+          ListFile.SetName(PName);
+          ListFile.SetSize(PSize);
+          ListFile.SetDate(PTime);
+          ListFile.SetDesc(PcbStripCodes(PDesc));
+          ListFile.ShowFile;
+          LastFile := True;
+          End
+        Else If LastFile And PcbSecondary(TmpStr, PText) Then
+          User.DisplayStrLn(PcbStripCodes(PText))
+        Else If PcbMode Or ((TmpStr[1] <= '/') Or (TmpStr[1] = ';') Or (Length(TmpStr) = 0) Or
         (TmpStr[1] > #127) or (TmpStr[1] <= ' ')) Then
-          User.DisplayStrLn(TmpStr)
+          Begin
+          User.DisplayStrLn(PcbStripCodes(TmpStr));
+          If Length(TmpStr) = 0 Then
+            LastFile := False;
+          End
         Else
           Begin
           FileName := Copy(ExtractWord(TmpStr,1),1,13);
@@ -547,12 +604,12 @@ Procedure DoFileList(PathStr: String);
       If TF.CloseTextFile Then;
       End
     Else
-      User.DisplayStrLn('Unable to open files.bbs');
+      User.DisplayStrLn('Unable to open the list file');
     End
   Else
     Begin
-    User.DisplayStrLn('Missing files.bbs');
-    User.DisplayStrLn(PathStr + 'files.bbs');
+    User.DisplayStrLn('Missing the list file');
+    User.DisplayStrLn(ListPath);
     End;
   TF.Done;
   User.DisplayNewLine;

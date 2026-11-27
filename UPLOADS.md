@@ -75,3 +75,19 @@ timeout = 180
 The log has `Upload: name (bytes) in area N by caller` for each accepted file and `Upload refused: name by caller in area N: reason` for the others.  The quarantine holds `<date>-<name>` and `<date>-<name>.why` (caller, area, time, reason, and what the command printed); clean it with a cron job, for example `find /opt/bbs/quarantine -mtime +30 -delete`.
 
 Design notes: [`UPLOAD-PLAN.md`](UPLOAD-PLAN.md).
+
+
+## File lists: files.bbs and PCBoard DIR files
+
+The list files command (menu command 31) shows the list of an area with the size and date of the files.  The list is `files.bbs` in the folder of the area,
+the list file that the area names in the configuration, or, when the data of the menu item is `<folder> <list file>`, that file in that folder.
+It can also be a **PCBoard DIR file**, as PCBFiler makes them (the format of its documentation):
+
+* a primary line: the file name, the size (flush right in column 20, no commas), the date from column 24 as `MM-DD-YY` (`DD-MMM-YY` with a time is read too) and the
+  description from column 34; the size and the date are those of the list, so the file need not be in the folder;
+* a secondary line (more description): a space first and a vertical bar `|` somewhere; the bar is not shown;
+* a line that starts with `%` names a file that is shown there (an include file; DOS back slashes are turned into slashes);
+* anything else (headers, footers, rules) is shown as it is; `@Xhh` colour codes are taken out.
+
+The reading is by words and not by columns, so a list that is a few columns off is still taken.  A list with primary lines is a DIR file: its other lines are text,
+not files.  The API (`/v1` file lists) reads the descriptions from both kinds.  New uploads are added to `files.bbs` as before.
