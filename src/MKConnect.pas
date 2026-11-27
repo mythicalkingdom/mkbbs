@@ -13,6 +13,8 @@ Program MKConnect;
           -t telnet|telnets|raw|ssh    the kind of connection (default telnet)
           -u                           the terminal wants UTF-8 (the CP437 of the system is converted)   -c   it does not (the bytes are passed as they are)
           -b file                      another phone book (default ~/.config/mkconnect/phonebook)
+          -s script                    run this script after the connect (a file, one in ~/.config/mkconnect/scripts, or a built in one: synchronet, mk)
+          -r rounds, -w seconds        multi-dial: how many times the marked systems are tried (3) and the wait between two tries (5)
           -d folder                    where downloaded files come (default ~/Downloads when it is there, else the current folder)
           -h                           this text
 
@@ -31,7 +33,8 @@ Var
   K: TConnKind;
   ForceU, ForceC: Boolean;
   R: Integer;
-  EntryName, DownDir: String;
+  EntryName, DownDir, ScriptArg: String;
+  Rounds, PauseSecs: Integer;
   Book: TConnBook;
   St: TDialerState;
   Pw, Pw2, Why: String;
@@ -39,13 +42,16 @@ Var
 
 Procedure Usage;
   Begin
-  WriteLn(StdErr, 'Usage: mkconnect [-t telnet|telnets|raw|ssh] [-u | -c] [-b phonebook] [-d folder] [-e name | host[:port]]');
+  WriteLn(StdErr, 'Usage: mkconnect [-t telnet|telnets|raw|ssh] [-u | -c] [-b phonebook] [-d folder] [-s script] [-r rounds] [-w seconds] [-e name | host[:port]]');
   Halt(3);
   End;
 
 Begin
 Host := '';
 DownDir := '';
+ScriptArg := '';
+Rounds := 3;
+PauseSecs := 5;
 EntryName := '';
 Kind := '';
 BookFile := '';
@@ -79,6 +85,18 @@ While i <= ParamCount Do
     If i > ParamCount Then Usage;
     DownDir := ParamStr(i);
     End
+  Else If (A = '-r') Or (A = '-w') Then
+    Begin
+    Inc(i);
+    If i > ParamCount Then Usage;
+    If A = '-r' Then Rounds := StrToIntDef(ParamStr(i), 3) Else PauseSecs := StrToIntDef(ParamStr(i), 5);
+    End
+  Else If A = '-s' Then
+    Begin
+    Inc(i);
+    If i > ParamCount Then Usage;
+    ScriptArg := ParamStr(i);
+    End
   Else If A = '-u' Then ForceU := True
   Else If A = '-c' Then ForceC := True
   Else If (A = '-h') Or (A = '--help') Then Usage
@@ -104,6 +122,8 @@ If DownDir = '' Then
   End;
 Opts.DownDir := ExpandFileName(DownDir);
 Opts.ConnectMs := 15000;
+Opts.ScriptName := ScriptArg;
+Opts.ScriptDir := IncludeTrailingPathDelimiter(ConnConfigDir) + 'scripts';
 If (Host <> '') And (EntryName <> '') Then
   Usage;
 If Host = '' Then
@@ -185,6 +205,8 @@ If Host = '' Then
   St.Book := Book;
   St.Password := Pw;
   St.Opts := Opts;
+  St.Rounds := Rounds;
+  St.PauseSecs := PauseSecs;
   RunDialer(St);
   Halt(0);
   End;

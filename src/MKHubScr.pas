@@ -50,6 +50,10 @@ Const
 Type HubXferProc = Function(Upload: Boolean; Arg: String): Boolean;
 
 
+Type
+  HubCharProc = Procedure(C: Char);      {every character that arrives, as it arrives (mkconnect shows it on the terminal while the script runs)}
+  HubCancelFn = Function: Boolean;         {asked now and then: True stops the script (the user pressed a key)}
+
 Type HubScriptObj = Object
   Sess: AbsComPtr;
   Lines: Array[1..MaxHubLines] Of String[200];
@@ -66,6 +70,9 @@ Type HubScriptObj = Object
   AutoReply: Boolean;
   DefTimeout: Word;
   Xfer: HubXferProc;
+  OnChar: HubCharProc;
+  CancelFn: HubCancelFn;
+  Cancelled: Boolean;
   LogName: String;
   LogOpen: Boolean;
   LogF: Text;
@@ -122,6 +129,9 @@ Constructor HubScriptObj.Init(S: AbsComPtr);
   AutoReply := True;
   DefTimeout := 30;
   Xfer := Nil;
+  OnChar := Nil;
+  CancelFn := Nil;
+  Cancelled := False;
   LogName := '';
   LogOpen := False;
   LogLine := '';
@@ -246,6 +256,8 @@ Procedure HubScriptObj.Feed(C: Char);
     i: Word;
 
   Begin
+  If @OnChar <> Nil Then
+    OnChar(C);
   Case EscState Of
     0: Case C Of
          #27: EscState := 1;
@@ -309,6 +321,9 @@ Procedure HubScriptObj.Feed(C: Char);
 Procedure HubScriptObj.Pump(Ms: Word);
   {take in what arrives; wait up to Ms for the first character}
   Begin
+  If @CancelFn <> Nil Then
+    If CancelFn() Then
+      Cancelled := True;
   If Not Sess^.WaitForChar(Ms) Then
     Exit;
   While Sess^.WaitForChar(0) Do
@@ -464,6 +479,8 @@ Function HubScriptObj.Wait(Alts: String; Secs: Word; Var Matched: String): Boole
   Deadline := MKTicks + Int64(Secs) * 1000;
   Repeat
     Pump(0);
+    If Cancelled Then
+      Exit;
     L := Lower(Txt);
     Best := 0;
     A := Alts;
@@ -616,7 +633,7 @@ Function HubScriptObj.Run: Boolean;
   Active[0] := True;
   Taken[0] := True;
   PC := 0;
-  While (Not Stop) And (PC < NumLines) Do
+  While (Not Stop) And (PC < NumLines) And (Not Cancelled) Do
     Begin
     Inc(PC);
     S := Lines[PC];
@@ -791,7 +808,12 @@ Function HubScriptObj.Run: Boolean;
     Else
       Fail('unknown command "' + Cmd + '"');
     End;
-  If Ok And (Depth > 0) Then
+  If Cancelled Then
+    Begin
+    ErrText := 'cancelled';
+    Ok := False;
+    End
+  Else If Ok And (Depth > 0) Then
     Begin
     ErrText := 'if without endif';
     Ok := False;

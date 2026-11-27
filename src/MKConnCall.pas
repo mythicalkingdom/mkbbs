@@ -32,14 +32,16 @@ Type
     CapDir: String;                    {where a capture file is made}
     LogFile: String;                   {a line for each call ('' = none)}
     DownDir: String;                   {where the files of a download come}
+    ScriptName: String;                {a script given on the command line (it wins over the one of the entry)}
+    ScriptDir: String;                 {where the scripts are kept}
     ConnectMs: LongInt;
   End;
 
-Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Integer;
+Function RunCall(Var EIn: TConnEntry; Const OIn: TCallOpts; Out MsgOut: String): Integer;
 
 Implementation
 
-Uses SysUtils, BaseUnix, Termio, Classes, MKComAbs, MKComClient, MKComFd, MKComTelnet, MKCp437, MKSgr, MKTuiCp, MKProt, MKVideo;
+Uses SysUtils, BaseUnix, Termio, Classes, MKComAbs, MKComClient, MKComFd, MKComTelnet, MKCp437, MKSgr, MKTuiCp, MKProt, MKVideo, MKHubScr;
 
 Const
   CtrlRB = #29;                        {Ctrl-]}
@@ -52,6 +54,7 @@ Var
   XSize, XDone, XErr, XCps, XSecs: LongInt;
   XDrawAt: Int64;
   XCancelled: Boolean;
+  XferOk: Boolean;
 
 
 Procedure OnWinch(Sig: cInt); cdecl;
@@ -207,6 +210,22 @@ Procedure XHook(What: Char; Const S: ShortString; N: LongInt);
   End;
 
 
+Function CancelIn(Const B: Array Of Byte; N: LongInt): Boolean;
+  {Ctrl-X and Ctrl-C cancel; so does an Esc that does not start a key of the terminal (Esc [ or Esc O)}
+  Var
+    i: LongInt;
+
+  Begin
+  Result := False;
+  For i := 0 To N - 1 Do
+    Case B[i] Of
+      24, 3: Result := True;
+      27: If (i = N - 1) Or ((B[i + 1] <> 91) And (B[i + 1] <> 79)) Then
+            Result := True;
+      End;
+  End;
+
+
 Function XCancel: Boolean;
   {the keyboard during a transfer: Esc, Ctrl-X or Ctrl-C cancels, whatever else was typed is thrown away}
   Var
@@ -226,9 +245,8 @@ Function XCancel: Boolean;
     N := fpRead(0, B, SizeOf(B));
     If N <= 0 Then
       Break;
-    For i := 0 To N - 1 Do
-      If B[i] In [27, 24, 3] Then
-        Result := True;
+    If CancelIn(B, N) Then
+      Result := True;
     P.revents := 0;
     End;
   If Result Then
@@ -236,32 +254,36 @@ Function XCancel: Boolean;
   End;
 
 
-Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Integer;
-  Var
-    S: AbsComPtr;
-    Err: ShortString;
-    Saved, Raw: Termios;
-    HaveSaved: Boolean;
-    Started, LastDraw: Int64;
-    Guard: SgrGuardObj;
-    Convert: Boolean;                  {the system sends CP437 and the terminal wants UTF-8}
-    Cap: TFileStream;
-    CapName, Note: String;
-    NoteUntil: Int64;
-    InMenu, EscPending, Done: Boolean;
-    EscAt: Int64;
-    U8: String;
-    U8Need: Integer;
-    Sent, Got: Int64;
-    Why: String;
-    ConnOk: Boolean;
-    Buf: Array[0..4095] Of Byte;
-    Fds: Array[0..1] Of TPollFd;
-    i, N, NetF, NFds: LongInt;
-    Telnet_: Boolean;
-    AutoZ: Boolean;                    {a Zmodem sender announced itself in what came}
-    ZState: Integer;
-    DefProto: Char;
+Var
+  E: TConnEntry;                       {the call: the entry, the options, what is to be said, how it ends (the procedures below are not nested: a script calls some of them)}
+  Opts: TCallOpts;
+  Msg: String;
+  CallResult: Integer;
+  S: AbsComPtr;
+  Err: ShortString;
+  Saved, Raw: Termios;
+  HaveSaved: Boolean;
+  Started, LastDraw: Int64;
+  Guard: SgrGuardObj;
+  Convert: Boolean;                  {the system sends CP437 and the terminal wants UTF-8}
+  Cap: TFileStream;
+  CapName, Note: String;
+  NoteUntil: Int64;
+  InMenu, EscPending, Done: Boolean;
+  EscAt: Int64;
+  U8: String;
+  U8Need: Integer;
+  Sent, Got: Int64;
+  Why: String;
+  ConnOk: Boolean;
+  Buf: Array[0..4095] Of Byte;
+  Fds: Array[0..1] Of TPollFd;
+  i, N, NetF, NFds: LongInt;
+  Telnet_: Boolean;
+  AutoZ: Boolean;                    {a Zmodem sender announced itself in what came}
+  ZState: Integer;
+  DefProto: Char;
+
 
   Function Now_: Int64;
     Begin
@@ -509,6 +531,18 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
       End;
     End;
 
+  Function Plain(Const T: String): String;
+    {only printable ASCII: text of a system must not break the log or the bar}
+    Var
+      i: Integer;
+
+    Begin
+    Result := T;
+    For i := 1 To Length(Result) Do
+      If (Result[i] < ' ') Or (Result[i] > '~') Then
+        Result[i] := ' ';
+    End;
+
   Procedure LogXfer(Const What, Names, Res: String);
     Var
       T: TextFile;
@@ -519,7 +553,7 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
     Try
       AssignFile(T, Opts.LogFile);
       If FileExists(Opts.LogFile) Then Append(T) Else Rewrite(T);
-      WriteLn(T, FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), '  ', E.Name, '  ', What, '  ', Names, '  ', Res);
+      WriteLn(T, FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), '  ', E.Name, '  ', What, '  ', Names, '  ', Plain(Res));
       CloseFile(T);
     Except
       ;
@@ -543,6 +577,7 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
       Pl: TPollFd;
 
     Begin
+    XferOk := False;
     Files := TStringList.Create;
     Try
       If Upload Then
@@ -688,6 +723,7 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
       LogXfer(Copy('upload', 1, 6 * Ord(Upload)) + Copy('download', 1, 8 * Ord(Not Upload)) + ' ' + ConnProtoName(Proto), Listed, Res);
       Note := Res;
       NoteUntil := Now_ + 8;
+      XferOk := Ok;
       If Ok And Upload Then
         Inc(Sent, XSize)
       Else If Ok Then
@@ -734,6 +770,143 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
     End;
 
 
+  Var
+    H: HubScriptObj;
+
+  Procedure ScriptChar(C: Char);
+    Begin
+    Buf[0] := Ord(C);
+    Display(1);
+    End;
+
+  Function ScriptCancel: Boolean;
+    Var
+      P: TPollFd;
+      B: Array[0..63] Of Byte;
+      N: LongInt;
+
+    Begin
+    Result := False;
+    P.fd := 0; P.events := POLLIN; P.revents := 0;
+    While fpPoll(@P, 1, 0) > 0 Do
+      Begin
+      N := fpRead(0, B, SizeOf(B));
+      If N <= 0 Then
+        Break;
+      If CancelIn(B, N) Then
+        Result := True;
+      P.revents := 0;
+      End;
+    If TermSig Then
+      Result := True;
+    End;
+
+  Function ScriptXfer(Upload: Boolean; Arg: ShortString): Boolean;
+    Var
+      Pr: Char;
+      V: String;
+
+    Begin
+    V := H.GetVar('protocol');
+    Pr := DefProto;
+    If V <> '' Then
+      Pr := UpCase(V[1]);
+    If Not (Pr In ['Z', 'Y', 'G', 'X', '1']) Then
+      Pr := 'Z';
+    If Upload Then
+      Xfer(True, Pr, Arg, '')
+    Else If Pr In ['X', '1'] Then
+      Xfer(False, Pr, '', Arg)
+    Else
+      Xfer(False, Pr, '', '');
+    Result := XferOk;
+    End;
+
+  Function FindScript(Const Name: String; Out Text: AnsiString): Boolean;
+    {a file (a name with a folder, or one in the scripts folder), else a script built in (HubProfile)}
+    Var
+      F: TStringList;
+      Path: String;
+
+    Begin
+    Result := False;
+    Text := '';
+    Path := Name;
+    If (Pos('/', Name) = 0) And (Pos('~', Name) = 0) And (Opts.ScriptDir <> '') Then
+      If FileExists(IncludeTrailingPathDelimiter(Opts.ScriptDir) + Name) Then
+        Path := IncludeTrailingPathDelimiter(Opts.ScriptDir) + Name;
+    If FileExists(Path) Then
+      Begin
+      F := TStringList.Create;
+      Try
+        F.LoadFromFile(Path);
+        Text := F.Text;
+        Result := True;
+      Finally
+        F.Free;
+      End;
+      Exit;
+      End;
+    Text := HubProfile(Name);
+    Result := Text <> '';
+    End;
+
+  Function RunScript(Const Name: String): Boolean;
+    {the script, on the open session, while the user watches the screen: any key of the user (Esc, Ctrl-X) stops it}
+    Var
+      Text: AnsiString;
+      Ok: Boolean;
+      Why: String;
+
+    Begin
+    Result := True;
+    If Name = '' Then
+      Exit;
+    If Not FindScript(Name, Text) Then
+      Begin
+      SetNote('script ' + Name + ' not found');
+      LogXfer('script', Name, 'not found');
+      Exit(False);
+      End;
+    H.Init(S);
+    Try
+      H.OnChar := @ScriptChar;
+      H.CancelFn := @ScriptCancel;
+      H.SetXfer(@ScriptXfer);
+      H.SetVar('login', E.Login);
+      H.SetVar('password', E.Password);
+      H.SetVar('name', E.Name);
+      H.SetVar('host', E.Host);
+      H.SetVar('protocol', ConnProtoName(DefProto)[1]);
+      SetNote('script ' + Name + ' (Esc stops it)');
+      Status;
+      If Not H.Load(Text) Then
+        Begin
+        SetNote('script ' + Name + ' is too long');
+        Exit(False);
+        End;
+      Ok := H.Run;
+      Why := Plain(H.ErrText);
+    Finally
+      H.Done;
+    End;
+    AutoZ := False;
+    ZState := 0;
+    If Ok Then
+      Begin
+      SetNote('script ' + Name + ' done');
+      LogXfer('script', Name, 'done');
+      End
+    Else
+      Begin
+      SetNote('script ' + Name + ' stopped: ' + Why);
+      LogXfer('script', Name, 'stopped: ' + Why);
+      End;
+    Result := Ok;
+    NoteUntil := Now_ + 8;
+    End;
+
+
   Procedure Menu;
     Begin
     InMenu := True;
@@ -744,8 +917,8 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
     {an Alt key or a letter of the menu}
     Begin
     Case LowerCase(C) Of
-      'h', 'd': Begin Result := crDone; Done := True; End;
-      'x': Begin Result := crQuit; Done := True; End;
+      'h', 'd': Begin CallResult := crDone; Done := True; End;
+      'x': Begin CallResult := crQuit; Done := True; End;
       'p': Begin
            If E.Password = '' Then
              SetNote('this system has no password in the phone book')
@@ -876,8 +1049,9 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
     End;
     End;
 
+Function DoCall: Integer;
   Begin
-  Result := crDone;
+  CallResult := crDone;
   Msg := '';
   Sent := 0;
   Got := 0;
@@ -941,6 +1115,11 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
     Status;
     TtyWrite(#27'[1;1H');
     ConnOk := True;
+    If Opts.ScriptName <> '' Then
+      RunScript(Opts.ScriptName)
+    Else If E.Script <> '' Then
+      RunScript(E.Script);
+    Status;
     While (Not Done) And (Not TermSig) Do
       Begin
       If Winch Then
@@ -1015,7 +1194,7 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
       End;
     If Not ConnOk Then
       Begin
-      Result := crDone;
+      CallResult := crDone;
       TtyWrite(#27'[' + IntToStr(Rows - 1) + ';1H'#13#10'[the system closed the connection: press a key]');
       LogCall('closed by the system');
       Msg := 'the system closed the connection';
@@ -1028,11 +1207,11 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
       End
     Else If TermSig Then
       Begin
-      Result := crQuit;
+      CallResult := crQuit;
       LogCall('the terminal ended the program');
       End
     Else
-      LogCall(Copy('hung up', 1, 7 * Ord(Result = crDone)) + Copy('left the program', 1, 16 * Ord(Result = crQuit)));
+      LogCall(Copy('hung up', 1, 7 * Ord(CallResult = crDone)) + Copy('left the program', 1, 16 * Ord(CallResult = crQuit)));
   Finally
     CapOff;
     S^.Hangup;
@@ -1042,6 +1221,18 @@ Function RunCall(Var E: TConnEntry; Const Opts: TCallOpts; Out Msg: String): Int
       TCSetAttr(0, TCSANOW, Saved);
     fpSignal(SIGWINCH, SignalHandler(SIG_DFL));
   End;
+  Result := CallResult;
+  End;
+
+
+Function RunCall(Var EIn: TConnEntry; Const OIn: TCallOpts; Out MsgOut: String): Integer;
+  Begin
+  E := EIn;
+  Opts := OIn;
+  Msg := '';
+  Result := DoCall;
+  EIn := E;
+  MsgOut := Msg;
   End;
 
 

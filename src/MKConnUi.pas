@@ -19,6 +19,8 @@ Type
     Password: String;                  {the start password the book is sealed with ('' = not sealed)}
     Sealed: Boolean;
     Opts: TCallOpts;
+    Rounds: Integer;                   {multi-dial: how many times the list is gone through}
+    PauseSecs: Integer;                {... and the wait between two tries}
   End;
 
 Procedure RunDialer(Var St: TDialerState);
@@ -28,7 +30,7 @@ Function AskPasswordTty(Const Prompt: String; Out Pw: String): Boolean;
 
 Implementation
 
-Uses SysUtils, DateUtils, BaseUnix, Termio, Video, MKTuiCp, MKTuiScr, MKTuiKeys;
+Uses SysUtils, Classes, DateUtils, BaseUnix, Termio, Video, MKTuiCp, MKTuiScr, MKTuiKeys;
 
 Const
   cBlack = 0; cBlue = 1; cGreen = 2; cCyan = 3; cRed = 4; cBrown = 6; cLGray = 7; cDGray = 8; cLBlue = 9; cLCyan = 11; cLRed = 12; cYellow = 14; cWhite = 15;
@@ -248,6 +250,8 @@ Procedure Help;
     'In the dialing directory:',
     '  Enter  dial the system          A add      E edit      D delete',
     '  F or /  find                    S sort by name / by last call',
+    '  Space  mark (several)           M  multi-dial: the marked systems (or this one) in turn, a pause between,',
+    '                                  round after round (-r rounds, -w seconds) until one answers; Esc stops',
     '  P  change the start password    Esc  the menu     Q or Alt-X  leave',
     '  Up Down PgUp PgDn Home End  move',
     '',
@@ -496,6 +500,12 @@ Procedure RunDialer(Var St: TDialerState);
     Why, Q: String;
     R: Integer;
     NeedFull: Boolean;
+    Marks: TStringList;
+
+  Function IsMarked(k: Integer): Boolean;
+    Begin
+    Result := Marks.IndexOf(LowerCase(St.Book.Items[k].Name)) >= 0;
+    End;
 
   Procedure Save;
     Begin
@@ -536,6 +546,8 @@ Procedure RunDialer(Var St: TDialerState);
         ScrPutsN(1, 2 + y, Pad(Line, ScrW - 1), ScrW - 1, cBlack, cCyan)
       Else
         ScrPutsN(1, 2 + y, Line, ScrW - 1, cLGray, cBlack);
+      If IsMarked(k) Then
+        ScrPuts(0, 2 + y, '*', cLRed, cBlack);
       End;
     If St.Book.Count = 0 Then
       ScrPuts(2, 3, 'No systems yet: press A to add one.', cLGray, cBlack);
@@ -553,7 +565,7 @@ Procedure RunDialer(Var St: TDialerState);
       ScrPutsN(1, ScrH - 2, D, ScrW - 2, cLCyan, cBlack);
       End;
     ScrFill(0, ScrH - 1, ScrW, 32, cBlack, cLGray);
-    ScrPutsN(1, ScrH - 1, 'Enter Dial  A Add  E Edit  D Delete  F Find  S Sort  P Password  F1 Help  Esc Menu  Q Quit', ScrW - 2, cBlack, cLGray);
+    ScrPutsN(1, ScrH - 1, 'Enter Dial  Space Mark  M Multi-dial  A Add  E Edit  D Delete  F Find  S Sort  F1 Help  Esc Menu  Q Quit', ScrW - 2, cBlack, cLGray);
     ScrHideCursor;
     If NeedFull Then
       Begin
@@ -564,14 +576,12 @@ Procedure RunDialer(Var St: TDialerState);
       ScrFlush;
     End;
 
-  Procedure Dial;
+  Procedure DialIdx(Ix: Integer);
     Var
       Ent: TConnEntry;
 
     Begin
-    If St.Book.Count = 0 Then
-      Exit;
-    Ent := St.Book.Items[Sel];
+    Ent := St.Book.Items[Ix];
     KeysDone;
     DoneVideo;
     R := RunCall(Ent, St.Opts, Q);
@@ -580,15 +590,94 @@ Procedure RunDialer(Var St: TDialerState);
     ClearScreen;
     NeedFull := True;
     Msg := Q;
-    If Ent.Calls <> St.Book.Items[Sel].Calls Then
+    If Ent.Calls <> St.Book.Items[Ix].Calls Then
       Begin
-      St.Book.Items[Sel].Calls := Ent.Calls;
-      St.Book.Items[Sel].Last := Ent.Last;
-      St.Book.Items[Sel].Utf8 := St.Book.Items[Sel].Utf8;
+      St.Book.Items[Ix].Calls := Ent.Calls;
+      St.Book.Items[Ix].Last := Ent.Last;
       Save;
       End;
     If R = crQuit Then
       Done := True;
+    End;
+
+  Procedure Dial;
+    Begin
+    If St.Book.Count = 0 Then
+      Exit;
+    DialIdx(Sel);
+    End;
+
+  Procedure Mark;
+    Var
+      p: Integer;
+
+    Begin
+    If St.Book.Count = 0 Then
+      Exit;
+    p := Marks.IndexOf(LowerCase(St.Book.Items[Sel].Name));
+    If p >= 0 Then
+      Marks.Delete(p)
+    Else
+      Marks.Add(LowerCase(St.Book.Items[Sel].Name));
+    If Sel < St.Book.Count - 1 Then
+      Inc(Sel);
+    End;
+
+  Procedure Multi;
+    {the marked systems (the selected one when none is marked) are tried in turn, with a pause, round after round, until a call is made}
+    Var
+      L: TStringList;
+      Rd, n, j, Ix, w: Integer;
+      Stop: Boolean;
+      Why2: String;
+      Until_: Int64;
+
+    Begin
+    L := TStringList.Create;
+    Try
+      For j := 0 To St.Book.Count - 1 Do
+        If IsMarked(j) Then
+          L.Add(St.Book.Items[j].Name);
+      If (L.Count = 0) And (St.Book.Count > 0) Then
+        L.Add(St.Book.Items[Sel].Name);
+      If L.Count = 0 Then
+        Exit;
+      Stop := False;
+      For Rd := 1 To St.Rounds Do
+        Begin
+        For n := 0 To L.Count - 1 Do
+          Begin
+          Ix := St.Book.Find(L[n]);
+          If Ix < 0 Then
+            Continue;
+          Sel := Ix;
+          DialIdx(Ix);
+          If Done Or (R <> crFailed) Then
+            Exit;
+          Why2 := Q;
+          { the pause: the reason is on the screen, Esc stops }
+          Until_ := GetTickCount64 + Int64(St.PauseSecs) * 1000;
+          While (GetTickCount64 < Until_) And (Not Stop) Do
+            Begin
+            w := (Until_ - GetTickCount64 + 999) Div 1000;
+            Msg := 'Multi-dial, try ' + IntToStr((Rd - 1) * L.Count + n + 1) + ' of ' + IntToStr(St.Rounds * L.Count) + ', next in ' + IntToStr(w) + ' s, Esc stops: ' + Why2;
+            Draw;
+            KeyWait(100);
+            While KeyRead(K) Do
+              If K.code = kcEsc Then
+                Stop := True;
+            End;
+          If Stop Then
+            Begin
+            Msg := 'multi-dial stopped';
+            Exit;
+            End;
+          End;
+        End;
+      Msg := 'multi-dial: nobody answered (' + Why2 + ')';
+    Finally
+      L.Free;
+    End;
     End;
 
   Procedure Add;
@@ -712,6 +801,7 @@ Procedure RunDialer(Var St: TDialerState);
     End;
 
   Begin
+  Marks := TStringList.Create;
   Done := False;
   NeedFull := False;
   Top := 0;
@@ -767,6 +857,8 @@ Procedure RunDialer(Var St: TDialerState);
             Done := True
           Else If Plain(K) Then
             Case LowerCase(K.ch)[1] Of
+              ' ': Mark;
+              'm': Multi;
               'a': Add;
               'e': Edit;
               'd': Del;
@@ -785,6 +877,7 @@ Procedure RunDialer(Var St: TDialerState);
     KeysDone;
     DoneVideo;
     fpWrite(1, #27'[0m'#27'[2J'#27'[H', 11);          {leave a clean screen}
+    Marks.Free;
   End;
   End;
 
