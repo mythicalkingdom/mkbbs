@@ -1,0 +1,19 @@
+Package: mkconnect
+Version: @VERSION@
+Architecture: @ARCH@
+Section: comm
+Priority: optional
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Depends: libc6 (>= 2.34)
+Recommends: libssl3t64 | libssl3, openssh-client
+Homepage: https://github.com/mythicalkingdom/mkbbs
+Description: terminal program for BBSs with a dialing directory
+ mkconnect calls bulletin board systems over Telnet, Telnet in TLS, raw TCP
+ or ssh, in the way of QModem: a dialing directory sealed with a start
+ password, the screens of the system as they were drawn (CP437 turned into
+ UTF-8, colours kept), Zmodem, Ymodem and Xmodem transfers both ways with
+ automatic Zmodem start, login scripts, multi-dial and a call log.
+ .
+ It is part of the MK BBS (package mkbbs, which includes it); it needs no
+ BBS to run.

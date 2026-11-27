@@ -8,6 +8,8 @@
 #                         log directory and user stay)
 #   make deb              a Debian package, build/mkbbs_<version>_<arch>.deb (packaging/mkdeb.sh)
 #   make deb-mkdraw       the package of mkdraw and mkcat alone, build/mkdraw_<version>_<arch>.deb (packaging/mkdeb-draw.sh)
+#   make deb-mkconnect    the package of mkconnect alone, build/mkconnect_<version>_<arch>.deb (packaging/mkdeb-connect.sh)
+#   make install-connect  only mkconnect and its manual page
 #   make install-draw     only mkdraw, mkcat, their manual pages and the example codes.mkd
 #
 # Variables:  PREFIX=/usr/local  BINDIR=$(PREFIX)/bin  SYSCONFDIR=/etc/mkbbs
@@ -39,7 +41,7 @@ WANTSD = [ "$(SYSTEMD)" != no ] && { [ -n "$(DESTDIR)" ] || { [ "$$(id -u)" = 0 
 
 PROGRAMS = mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkbbsssh mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents mkbackup mkmaint mkstats mkuserpurge mkfilecheck mkuserpack mkapi mkapitoken mksetup mkcheck mkmsgconv mkchatctl mkconnect
 
-.PHONY: all test install install-draw uninstall clean lang deb deb-mkdraw
+.PHONY: all test install install-draw install-connect uninstall clean lang deb deb-mkdraw deb-mkconnect
 
 all: build/.built
 
@@ -63,8 +65,15 @@ install-draw: build/.built
 	install -m 644 man/mkdraw.1 man/mkcat.1 $(DESTDIR)$(PREFIX)/share/man/man1/
 	install -m 644 contrib/mkdraw/codes.mkd $(DESTDIR)$(PREFIX)/share/mkdraw/codes.mkd
 
+# mkconnect alone (what the package mkconnect has): the program and its manual page
+install-connect: build/.built
+	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(PREFIX)/share/man/man1
+	install -m 755 build/mkconnect $(DESTDIR)$(BINDIR)/
+	install -m 644 man/mkconnect.1 $(DESTDIR)$(PREFIX)/share/man/man1/
+
 install: build/.built
 	$(MAKE) -s -o build/.built install-draw
+	$(MAKE) -s -o build/.built install-connect
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(SYSCONFDIR)
 	for p in $(PROGRAMS); do install -m 755 build/$$p $(DESTDIR)$(BINDIR)/$$p; done
 	@if [ -f $(MKBINK)/Makefile ]; then \
@@ -123,7 +132,7 @@ install: build/.built
 uninstall:
 	for p in $(PROGRAMS) mkbink mkdosdoor; do rm -f $(DESTDIR)$(BINDIR)/$$p; done
 	rm -f $(DESTDIR)$(SYSCONFDIR)/mklisten.example.json
-	rm -f $(DESTDIR)$(PREFIX)/share/man/man1/mkdraw.1 $(DESTDIR)$(PREFIX)/share/man/man1/mkcat.1
+	rm -f $(DESTDIR)$(PREFIX)/share/man/man1/mkdraw.1 $(DESTDIR)$(PREFIX)/share/man/man1/mkcat.1 $(DESTDIR)$(PREFIX)/share/man/man1/mkconnect.1
 	rm -rf $(DESTDIR)$(PREFIX)/share/mkdraw
 	rm -f $(DESTDIR)$(UNITDIR)/mklisten.service $(DESTDIR)$(SYSUSERSDIR)/mkbbs.conf
 	@if [ -z "$(DESTDIR)" ] && [ "$$(id -u)" = 0 ] && command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi
@@ -135,6 +144,10 @@ deb: build/.built
 # build/mkdraw_<version>_<arch>.deb: mkdraw and mkcat for systems that have no BBS (packaging/mkdeb-draw.sh)
 deb-mkdraw: build/.built
 	packaging/mkdeb-draw.sh
+
+# build/mkconnect_<version>_<arch>.deb: mkconnect alone (packaging/mkdeb-connect.sh)
+deb-mkconnect: build/.built
+	packaging/mkdeb-connect.sh
 
 clean:
 	rm -rf build

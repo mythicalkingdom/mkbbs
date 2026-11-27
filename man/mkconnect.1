@@ -1,0 +1,105 @@
+.TH MKCONNECT 1 "November 2026" "MK BBS" "User Commands"
+.SH NAME
+mkconnect \- a terminal program for bulletin board systems, with a dialing directory
+.SH SYNOPSIS
+.B mkconnect
+[\fIoptions\fR]
+.br
+.B mkconnect
+[\fIoptions\fR] \fIhost\fR[:\fIport\fR]
+.br
+.B mkconnect
+[\fIoptions\fR] \fB\-e\fR \fIname\fR
+.SH DESCRIPTION
+.B mkconnect
+calls bulletin board systems over the network, in the way of QModem on DOS: a list of systems (the dialing directory), a terminal that
+shows the screens of the system as they were drawn, file transfers, login scripts, a log.
+It runs in an ordinary text terminal and does not emulate one: the terminal in which it runs does the work, and
+.B mkconnect
+turns the IBM PC character set (CP437) of the system into UTF-8 where the terminal wants it and keeps the colours of the art as drawn.
+The bottom row of the screen is a status bar with the name of the system, the time on line, the character set and the progress of a transfer.
+.PP
+Without a host or a name the dialing directory is shown.
+The phone book,
+.IR ~/.config/mkconnect/phonebook ,
+is sealed with a start password that is asked when the program starts (ChaCha20, HMAC\-SHA256, PBKDF2); an empty password at the first start
+leaves it as a plain text file (mode 600).
+It can hold the login name and the password of each system.
+.SH OPTIONS
+.TP
+.BR \-t " " telnet | telnets | raw | ssh
+the kind of connection (default telnet).
+.B telnets
+is Telnet inside TLS; the certificate of the system is not checked.
+.B ssh
+runs the system ssh on a pseudo terminal; \fIuser@host\fR may be given.
+.B raw
+is a plain TCP connection.
+.TP
+.B \-u
+the terminal wants UTF-8: the CP437 of the system is converted.
+.TP
+.B \-c
+the terminal does not: the bytes are passed as they are.
+Without either, the type of the terminal (\fBTERM\fR) decides, as for mkcat(1).
+.TP
+.BI \-e " name"
+call a system of the phone book by its name.
+.TP
+.BI \-b " file"
+another phone book.
+.TP
+.BI \-s " script"
+run a script after the connect: a file, one in
+.IR ~/.config/mkconnect/scripts ,
+or a built in one (synchronet, mk).
+It wins over the script of the entry.
+.TP
+.BI \-d " folder"
+where downloaded files come (default
+.I ~/Downloads
+when it is there, else the current folder).
+.TP
+.BI \-r " rounds" ", " \-w " seconds"
+multi\-dial: how many times the marked systems are tried (3) and the wait between two tries (5).
+.SH IN A CALL
+.TP
+.B Ctrl\-]
+the attention key: a menu on the bottom row (a second Ctrl\-] sends one to the system).
+.TP
+.B Alt\-P
+send the password of the system and a carriage return.
+.B Alt\-N
+sends the login name.
+.TP
+.B Alt\-U, Alt\-L
+upload, download: Zmodem, Ymodem, Ymodem\-G, Xmodem or Xmodem\-1K.
+A Zmodem sender that the system starts is taken up at once.
+Esc or Ctrl\-X cancels.
+.TP
+.B Alt\-C
+capture on or off (a file \fIname\-date.cap\fR in the current folder).
+.B Alt\-T
+changes the character set of the display.
+.TP
+.B Alt\-H, Alt\-D, Alt\-X
+hang up; hang up and go to the dialer; hang up and leave.
+.PP
+An Alt key is the Esc key and a letter pressed together.
+.SH THE DIALING DIRECTORY
+Enter dials, A adds, E edits, D deletes, F or / finds, S sorts, Space marks, M is multi\-dial (the marked systems, or the selected one, are tried in
+turn with a pause, round after round, until one answers; Esc stops), P changes the start password, F1 helps, Q or Alt\-X leaves.
+.SH FILES
+.TP
+.I ~/.config/mkconnect/phonebook
+the dialing directory.
+.TP
+.I ~/.config/mkconnect/scripts/
+scripts (MKHubScr language: expect, send, when, upload, download, variables login, password, name, host, protocol).
+.TP
+.I ~/.config/mkconnect/calls.log
+a line for each call, transfer and script.
+.SH SEE ALSO
+mkcat(1), mkdraw(1), ssh(1).
+.PP
+MKCONNECT.md in the documentation.

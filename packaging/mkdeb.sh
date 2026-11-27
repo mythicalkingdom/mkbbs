@@ -49,7 +49,7 @@ cp build/deb/lang/* "$STAGE/usr/share/mkbbs/lang/"
 # the documentation and the examples
 doc="$STAGE/usr/share/doc/mkbbs"
 mkdir -p "$doc/examples"
-for f in GETTING-STARTED MKBBS MKLISTEN NETWORKING HUBS TOSSER SSH PASSWORDS DOS-DOORS UPLOADS CHAT EXTENSIONS MKDRAW BACKUP MAINT STATS API SETUP; do
+for f in GETTING-STARTED MKBBS MKLISTEN NETWORKING HUBS TOSSER SSH PASSWORDS DOS-DOORS UPLOADS CHAT EXTENSIONS MKDRAW MKCONNECT BACKUP MAINT STATS API SETUP; do
     [ -f "$f.md" ] && install -m 644 "$f.md" "$doc/$f.md"
 done
 install -m 644 mklisten.example.json "$doc/examples/"

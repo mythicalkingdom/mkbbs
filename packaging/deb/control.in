@@ -6,9 +6,9 @@ Priority: optional
 Maintainer: @MAINTAINER@
 Installed-Size: @SIZE@
 Depends: libc6 (>= 2.34), adduser
-Provides: mkdraw
-Conflicts: mkdraw
-Replaces: mkdraw
+Provides: mkdraw, mkconnect
+Conflicts: mkdraw, mkconnect
+Replaces: mkdraw, mkconnect
 Recommends: zip, unzip, libssl3t64 | libssl3, stunnel4, bubblewrap
 Suggests: openssh-server | dropbear-bin, dosemu2, curl
 Homepage: https://github.com/mythicalkingdom/mkbbs
