@@ -44,7 +44,18 @@ part of this repository like `mkdraw` and `mkcat`.
 4. **telnets and ssh:** the TLS client session, `ssh` on a pty (the entry names user, host, port and key as `ssh` takes them).
 5. **Documents and package:** a man page, `MKCONNECT.md`, the package `mkconnect` (like `mkdraw`: static program, own `.deb`, also included in `mkbbs`) and the tests of `build.sh`.
 
-## Questions
+## Answers (2026-11-26)
+
+* **Attention key: `Ctrl-]`.**  A dedicated key sends the password of the system being called: **Alt-P** (the menu has P); **Alt-N** sends its login name.
+* **The phone book is encrypted with a start password**, asked when the program starts (ChaCha20 with HMAC-SHA256, the key from PBKDF2-HMAC-SHA256; `MKConnCrypt.pas`, tested against RFC 8439).  An empty password leaves the file as plain text (mode 600) when the user chooses so at the first start.  The passwords of the systems are in the phone book.
+* **Files** are in `~/.config/mkconnect` (the phone book and `calls.log`); `XDG_CONFIG_HOME` is honoured.
+
+## Status
+
+**Phase 1 is built:** `MKTuiCp` / `MKTuiScr` / `MKTuiKeys` (copied from mkedit), `MKConnCrypt` (the seal), `MKConnBook` (the phone book), `MKConnUi` (the dialing directory: list, form, find, sort, start password, help, Esc menu), `MKConnCall` (the call: pass-through with the CP437 to UTF-8 conversion and the colour guard, the status bar on the bottom row with a scroll region, Ctrl-], Alt keys, capture, the call log, the terminal's answers to the system's questions passed through), `MKConnect` (the program: `mkconnect`, `mkconnect host[:port]`, `mkconnect -e name`, `-t`, `-u`/`-c`, `-b`).  Tests: `conncrypttest`, `connbooktest`, `tests/connecttest.py` (a pty against a small Telnet BBS, with an emulated terminal).
+Not yet: `telnets` and `ssh` (phase 4: the entry is accepted and the call says it is not in this version), transfers, scripts, multi-dial, the man page and the package.  The window size is told to the system when the call starts, not again when the terminal changes.
+
+## Questions (answered above)
 
 * The attention key: `Ctrl-]` (telnet's) as the default, or another?  It must be a key that a BBS never needs.
 * A password in the phone book (file mode 600) or asked at each call?  Both, per entry?

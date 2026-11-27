@@ -77,6 +77,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwk src/MKQwk.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkqwkcfg src/MKQwkCfg.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkcat src/MKCat.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkdraw src/MKDraw.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkconnect src/MKConnect.pas
 # tosstest needs it (a clean build directory has none yet)
 fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/pkttest tests/pkttest.pas 2>&1 | grep -E "Error|Fatal" || true
 for t in tosssetup tossdump tossmake tosscfg qwkmsgtest netsetup prottest clienttest clientxfer scripttest postmsg useradd setlr pwdtest pwusertest pwstate eventtest hubexectest hubreplayunit nettest; do fpc -B -Fusrc -FEbuild -FUbuild -vew -o$t tests/$t.pas 2>&1 | grep -E "Error|Fatal" || true; done
@@ -221,6 +222,10 @@ par_6() {
 python3 tests/drawtest.py build build/work/draw | grep -E "^(FAIL|failures)"
 }
 lane D par_6
+# mkconnect: the sealed phone book (ChaCha20 / RFC 8439 vectors), its file, the call and the dialer on a pty against a small Telnet BBS (MKCONNECT-PLAN.md)
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/conncrypttest tests/conncrypttest.pas && build/conncrypttest | grep -E "^(FAIL|failures)"
+fpc -B -Fusrc -FEbuild -FUbuild -vew -obuild/connbooktest tests/connbooktest.pas && build/connbooktest | grep -E "^(FAIL|failures)"
+python3 tests/connecttest.py build build/work/connect | grep -E "^(FAIL|failures)"
 # mkcat: CP437 text to the terminal
 python3 tests/cattest.py build build/work/cat | grep -E "^(FAIL|failures)"
 # the offline mail door (mkqwk): local mode on a private copy of the sample BBS, a real QWK packet
