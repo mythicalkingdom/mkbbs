@@ -28,8 +28,9 @@ IAC, DONT, DO, WONT, WILL, SB, SE = 255, 254, 253, 252, 251, 250, 240
 
 class Bbs(threading.Thread):
     """a Telnet BBS: it offers ECHO off and binary, sends a CP437 screen and a prompt, reads what the caller sends (the telnet commands taken out) and keeps it"""
-    def __init__(self):
+    def __init__(self, ctx=None):
         super().__init__(daemon=True)
+        self.ctx = ctx
         self.srv = socket.socket()
         self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.srv.bind(('127.0.0.1', 0))
@@ -48,6 +49,11 @@ class Bbs(threading.Thread):
                 c, _ = self.srv.accept()
             except OSError:
                 return
+            if self.ctx:
+                try:
+                    c = self.ctx.wrap_socket(c, server_side=True)
+                except Exception:
+                    continue
             self.calls += 1
             self.conn = c
             self.closed.clear()
@@ -428,6 +434,47 @@ t.send(b'\x1b')
 x = t.screen(1.0)
 check('Esc during the pause stops the multi-dial', 'multi-dial stopped' in x, [l.strip() for l in x.split('\n') if l.strip()][-4:])
 t.send(b'q')
+t.wait(5)
+t.kill()
+
+
+# ---- telnets (TLS first) and ssh (the system ssh on a pseudo terminal)
+import ssl
+if shutil.which('openssl'):
+    crt = work + '/tls.crt'; key = work + '/tls.key'
+    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', crt, '-days', '2', '-subj', '/CN=localhost'], capture_output=True)
+    cx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    cx.load_cert_chain(crt, key)
+    tb = Bbs(cx)
+    t = Pty(['-t', 'telnets', '127.0.0.1:%d' % tb.port])
+    check('telnets: the call is made through TLS (a self-signed certificate is taken), the screen is shown', t.until(b'Welcome to the test BBS', 8), t.out[-200:])
+    t.send(b'hello\r')
+    time.sleep(0.5)
+    check('... typed text arrives on the other end', b'hello' in tb.got, tb.got)
+    t.send(b'\x1bh')
+    t.wait(5)
+    t.kill()
+    t = Pty(['-t', 'telnets', '127.0.0.1:%d' % bbs.port])       # a plain Telnet system on a TLS call
+    t.read(3.0)
+    check('telnets to a system that does not speak TLS: a message, not a hang', b'TLS handshake failed' in t.out, t.out[-200:])
+    t.kill()
+else:
+    print('skip: no openssl')
+# ssh: a fake ssh in the PATH (a script) shows what the program does: the arguments, a terminal, the size
+fb = work + '/fakebin'
+os.makedirs(fb, exist_ok=True)
+open(fb + '/ssh', 'w').write('#!/bin/sh\necho "ARGS: $*"\nif [ -t 0 ]; then echo "TTY: yes"; fi\necho "SIZE: $(stty size)"\nprintf "pass: "\nread x\necho "GOT: $x"\n')
+os.chmod(fb + '/ssh', 0o755)
+t = Pty(['-t', 'ssh', 'guest@127.0.0.1:2222'], env={'PATH': fb + ':' + os.environ['PATH']}, rows=30, cols=100)
+t.read(1.5)
+check('ssh: the system ssh is run with the port and user@host', b'ARGS: -p 2222' in t.out and b'guest@127.0.0.1' in t.out, t.out[-300:])
+check('... on a pseudo terminal of the size of the screen (one row less: the bar)', b'TTY: yes' in t.out and b'SIZE: 29 100' in t.out, t.out[-300:])
+t.send(b'abc\r')
+t.read(0.8)
+check('... what is typed goes to ssh (a password is typed there), and its answer is shown', b'GOT: abc' in t.out, t.out[-200:])
+t.read(1.0)
+check('when ssh ends the program says so', b'closed the connection' in t.out, t.out[-200:])
+t.send(b'x')
 t.wait(5)
 t.kill()
 

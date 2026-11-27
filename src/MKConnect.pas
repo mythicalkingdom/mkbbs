@@ -231,6 +231,12 @@ If Kind <> '' Then
   E.Kind := K;
   If E.Port = 23 Then E.Port := ConnDefaultPort(K);
   End;
+P := Pos('@', E.Host);
+If (E.Kind = ckSsh) And (P > 1) Then
+  Begin
+  E.SshUser := Copy(E.Host, 1, P - 1);
+  E.Host := Copy(E.Host, P + 1, 255);
+  End;
 ForceDirectories(ConnConfigDir);
 R := RunCall(E, Opts, Msg);
 If Msg <> '' Then

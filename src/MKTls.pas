@@ -14,6 +14,8 @@ Interface
 Function TlsAvailable(var Why: String): Boolean;
 Function TlsCheckServer(const Cert, Key: String; var Why: String): Boolean;
 Function TlsAccept(Fd: LongInt; const Cert, Key: String; Secs: LongInt; var Conn: Pointer; var Err: String): Boolean;
+{ the client role (mkconnect): the handshake on a connected socket; the certificate of the system is NOT checked (a BBS most often has a self-signed one): what is gained is that the line cannot be read on the way; SNI is sent for a name }
+Function TlsConnect(Fd: LongInt; const Host: String; Secs: LongInt; var Conn: Pointer; var Err: String): Boolean;
 Function TlsRead(Conn: Pointer; Buf: Pointer; N: LongInt): LongInt;     {n bytes; 0 closed; -1 failed; -2 try again}
 Function TlsWrite(Conn: Pointer; Buf: Pointer; N: LongInt): LongInt;    {n bytes; -1 failed}
 Function TlsPending(Conn: Pointer): LongInt;                            {bytes already decrypted and waiting}
@@ -27,6 +29,7 @@ Uses SysUtils, BaseUnix, Sockets, ctypes, openssl, MKTlsLib;
 Var
   Ctx: Pointer;
   CtxCert, CtxKey: String;
+  CliCtx: Pointer;
 
 
 Function TlsAvailable(var Why: String): Boolean;
@@ -136,6 +139,71 @@ Function TlsAccept(Fd: LongInt; const Cert, Key: String; Secs: LongInt; var Conn
     End;
   Conn := S;
   TlsAccept := True;
+  End;
+
+
+Function TlsConnect(Fd: LongInt; const Host: String; Secs: LongInt; var Conn: Pointer; var Err: String): Boolean;
+  Var
+    S: PSSL;
+    TV: TTimeVal;
+    R: LongInt;
+    H: AnsiString;
+    IsIp: Boolean;
+    i: Integer;
+
+  Begin
+  TlsConnect := False;
+  Conn := Nil;
+  If Not TlsAvailable(Err) Then
+    Exit;
+  If Not Assigned(pTlsMethod) Then
+    Begin
+    Err := 'this OpenSSL has no TLS_client_method';
+    Exit;
+    End;
+  If CliCtx = Nil Then
+    Begin
+    CliCtx := SslCtxNew(PSSL_METHOD(pTlsMethod()));
+    If CliCtx = Nil Then
+      Begin
+      Err := 'no TLS context';
+      Exit;
+      End;
+    If Assigned(pCtxCtrl) Then
+      pCtxCtrl(CliCtx, SSL_CTRL_SET_MIN_PROTO_VERSION, TLS1_2_VERSION, Nil);
+    End;
+  S := SslNew(PSSL_CTX(CliCtx));
+  If S = Nil Then
+    Begin
+    Err := 'no TLS session';
+    Exit;
+    End;
+  IsIp := Host <> '';
+  For i := 1 To Length(Host) Do
+    If Not (Host[i] In ['0'..'9', '.', ':', 'a'..'f', 'A'..'F']) Then
+      IsIp := False;
+  If (Host <> '') And Not IsIp Then
+    Begin
+    H := Host;
+    SslCtrl(S, 55, 0, PChar(H));         {SSL_CTRL_SET_TLSEXT_HOSTNAME, host_name: SNI}
+    End;
+  SslSetFd(S, Fd);
+  TV.tv_sec := Secs;
+  TV.tv_usec := 0;
+  fpSetSockOpt(Fd, SOL_SOCKET, SO_RCVTIMEO, @TV, SizeOf(TV));
+  fpSetSockOpt(Fd, SOL_SOCKET, SO_SNDTIMEO, @TV, SizeOf(TV));
+  R := SslConnect(S);
+  TV.tv_sec := 0;
+  fpSetSockOpt(Fd, SOL_SOCKET, SO_RCVTIMEO, @TV, SizeOf(TV));
+  fpSetSockOpt(Fd, SOL_SOCKET, SO_SNDTIMEO, @TV, SizeOf(TV));
+  If R <> 1 Then
+    Begin
+    Err := 'the TLS handshake failed (does the system speak TLS on this port?)';
+    SslFree(S);
+    Exit;
+    End;
+  Conn := S;
+  TlsConnect := True;
   End;
 
 

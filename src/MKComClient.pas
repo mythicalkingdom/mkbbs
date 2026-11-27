@@ -26,6 +26,7 @@ Uses MKComAbs;
 Var
   ClientTerm: String[40];
   ClientCols, ClientRows: Word;
+  ClientTls: Boolean;                  {TLS first (telnets): the certificate of the system is not checked}
   ClientPreamble: String;              {sent first, before any Telnet negotiation (a PROXY header for a listener behind a front end); '' = none}
 
 
@@ -35,7 +36,7 @@ Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolea
 Implementation
 
 
-Uses BaseUnix, SysUtils, MKComFd, MKComTelnet, MKNet;
+Uses BaseUnix, SysUtils, MKComFd, MKComTelnet, MKNet, MKTls;
 
 
 Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolean; Var Err: String): AbsComPtr;
@@ -44,6 +45,7 @@ Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolea
     Raw: FdComPtr;
     Tel: TelnetComPtr;
     E: AnsiString;
+    TlsConn: Pointer;
 
   Begin
   ConnectTcp := Nil;
@@ -55,6 +57,20 @@ Function ConnectTcp(Host: String; Port: Word; TimeoutMs: LongInt; Telnet: Boolea
     End;
   New(Raw, InitFd(Fd, Fd));
   Raw^.SetRemoteAddr(NetJoinHostPort(Host, Port));
+  If ClientTls Then
+    Begin
+    If Not TlsConnect(Fd, Host, 15, TlsConn, E) Then
+      Begin
+      Err := E;
+      Dispose(Raw, Done);
+      Exit;
+      End;
+    Raw^.Tls := TlsConn;
+    Raw^.TlsRd := TlsReadFn(@TlsRead);
+    Raw^.TlsWr := TlsWriteFn(@TlsWrite);
+    Raw^.TlsPend := TlsPendFn(@TlsPending);
+    Raw^.TlsFree := TlsFreeFn(@TlsClose);
+    End;
   If ClientPreamble <> '' Then
     Begin
     Raw^.OpenSession;
@@ -91,4 +107,5 @@ ClientTerm := 'ansi';
 ClientCols := 80;
 ClientRows := 24;
 ClientPreamble := '';
+ClientTls := False;
 End.

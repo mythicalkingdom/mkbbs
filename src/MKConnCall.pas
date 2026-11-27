@@ -41,7 +41,14 @@ Function RunCall(Var EIn: TConnEntry; Const OIn: TCallOpts; Out MsgOut: String):
 
 Implementation
 
-Uses SysUtils, BaseUnix, Termio, Classes, MKComAbs, MKComClient, MKComFd, MKComTelnet, MKCp437, MKSgr, MKTuiCp, MKProt, MKVideo, MKHubScr;
+Uses SysUtils, BaseUnix, Termio, Classes, MKComAbs, MKComClient, MKComFd, MKComTelnet, MKCp437, MKSgr, MKTuiCp, MKProt, MKVideo, MKHubScr, ctypes;
+
+{ the pseudo terminal functions of the C library }
+Function posix_openpt(Flags: LongInt): LongInt; cdecl; external 'c' name 'posix_openpt';
+Function grantpt(Fd: LongInt): LongInt; cdecl; external 'c' name 'grantpt';
+Function unlockpt(Fd: LongInt): LongInt; cdecl; external 'c' name 'unlockpt';
+Function ptsname(Fd: LongInt): PChar; cdecl; external 'c' name 'ptsname';
+Function execvp(Prog: PChar; Argv: PPChar): LongInt; cdecl; external 'c' name 'execvp';
 
 Const
   CtrlRB = #29;                        {Ctrl-]}
@@ -55,6 +62,9 @@ Var
   XDrawAt: Int64;
   XCancelled: Boolean;
   XferOk: Boolean;
+  SshPid: LongInt;                     {the ssh child (0: none)}
+  SshFd: LongInt;                      {the master side of its pseudo terminal}
+  WsB: Array[0..3] Of Word;
 
 
 Procedure OnWinch(Sig: cInt); cdecl;
@@ -207,6 +217,87 @@ Procedure XHook(What: Char; Const S: ShortString; N: LongInt);
     'M': XMsg := Copy(S, 1, 40);
     End;
   XDraw(What = 'M');
+  End;
+
+
+Function SshOpen(Const Host: String; Port: Word; Const User: String; Out Err: ShortString): AbsComPtr;
+  {the system ssh on a pseudo terminal: what it writes is the session; its questions (a password, a host key) are answered on the terminal}
+  Var
+    M, Sl: LongInt;
+    Name: String;
+    Args: Array[0..9] Of PChar;
+    NA: Integer;
+    Ws: Array[0..3] Of Word;
+    PortS, Target: String;
+    Raw: FdComPtr;
+
+  Begin
+  Result := Nil;
+  Err := '';
+  M := posix_openpt(2 Or $100);          {O_RDWR, O_NOCTTY}
+  If (M < 0) Or (grantpt(M) <> 0) Or (unlockpt(M) <> 0) Then
+    Begin
+    Err := 'no pseudo terminal';
+    Exit;
+    End;
+  Name := StrPas(ptsname(M));
+  Ws[0] := ClientRows; Ws[1] := ClientCols; Ws[2] := 0; Ws[3] := 0;
+  fpIoctl(M, TIOCSWINSZ, @Ws);
+  PortS := IntToStr(Port);
+  Target := Host;
+  If User <> '' Then
+    Target := User + '@' + Host;
+  SshPid := fpFork;
+  If SshPid < 0 Then
+    Begin
+    Err := 'fork failed';
+    fpClose(M);
+    Exit;
+    End;
+  If SshPid = 0 Then
+    Begin
+    fpSetSid;
+    Sl := fpOpen(PChar(Name), O_RDWR);
+    fpIoctl(Sl, TIOCSCTTY, Nil);
+    fpDup2(Sl, 0); fpDup2(Sl, 1); fpDup2(Sl, 2);
+    If Sl > 2 Then fpClose(Sl);
+    fpClose(M);
+    NA := 0;
+    Args[NA] := 'ssh'; Inc(NA);
+    Args[NA] := '-p'; Inc(NA);
+    Args[NA] := PChar(PortS); Inc(NA);
+    Args[NA] := '-o'; Inc(NA);
+    Args[NA] := 'ServerAliveInterval=30'; Inc(NA);
+    Args[NA] := PChar(Target); Inc(NA);
+    Args[NA] := Nil;
+    execvp('ssh', @Args[0]);
+    fpExit(127);
+    End;
+  SshFd := M;
+  New(Raw, InitFd(M, M));
+  Raw^.SetRemoteAddr(Host + ':' + PortS);
+  If Not Raw^.OpenSession Then
+    Begin
+    Dispose(Raw, Done);
+    Err := 'the session did not open';
+    Exit;
+    End;
+  Result := Raw;
+  End;
+
+
+Procedure SshEnd;
+  Var
+    St: cint;
+
+  Begin
+  If SshPid > 0 Then
+    Begin
+    fpKill(SshPid, SIGHUP);
+    fpWaitPid(SshPid, St, 0);
+    SshPid := 0;
+  SshFd := -1;
+    End;
   End;
 
 
@@ -1067,12 +1158,8 @@ Function DoCall: Integer;
   DefProto := E.Proto;
   If DefProto = #0 Then
     DefProto := 'Z';
-  Telnet_ := E.Kind = ckTelnet;
-  If E.Kind In [ckTelnets, ckSsh] Then
-    Begin
-    Msg := ConnKindName(E.Kind) + ' is not in this version of mkconnect yet';
-    Exit(crFailed);
-    End;
+  Telnet_ := E.Kind In [ckTelnet, ckTelnets];
+  SshPid := 0;
   If E.Host = '' Then
     Begin
     Msg := 'the entry has no host';
@@ -1083,7 +1170,22 @@ Function DoCall: Integer;
   ClientCols := Cols;
   ClientRows := Rows - 1;
   TtyWrite('Connecting to ' + E.Host + ':' + IntToStr(E.Port) + ' ...'#13#10);
-  S := ConnectTcp(E.Host, E.Port, Opts.ConnectMs, Telnet_, Err);
+  If E.Kind = ckSsh Then
+    Begin
+    TtyWrite('Starting ssh ...'#13#10);
+    S := SshOpen(E.Host, E.Port, E.SshUser, Err);
+    If S = Nil Then
+      Begin
+      Msg := 'cannot start ssh: ' + Err;
+      Exit(crFailed);
+      End;
+    End
+  Else
+    Begin
+    ClientTls := E.Kind = ckTelnets;
+    S := ConnectTcp(E.Host, E.Port, Opts.ConnectMs, Telnet_, Err);
+    ClientTls := False;
+    End;
   If S = Nil Then
     Begin
     Msg := 'cannot connect to ' + E.Host + ':' + IntToStr(E.Port) + ': ' + Err;
@@ -1128,6 +1230,11 @@ Function DoCall: Integer;
         TtySize(Cols, Rows);
         SetRegion;
         Status;
+        If SshFd >= 0 Then
+          Begin
+          WsB[0] := Rows - 1; WsB[1] := Cols; WsB[2] := 0; WsB[3] := 0;
+          fpIoctl(SshFd, TIOCSWINSZ, @WsB);
+          End;
         End;
       If Not S^.GetCarrier Then
         Begin
@@ -1216,6 +1323,7 @@ Function DoCall: Integer;
     CapOff;
     S^.Hangup;
     Dispose(S, Done);
+    SshEnd;
     TtyWrite(#27'[0m'#27'[r'#27'[' + IntToStr(Rows) + ';1H'#27'[2K'#13#10);
     If HaveSaved Then
       TCSetAttr(0, TCSANOW, Saved);
