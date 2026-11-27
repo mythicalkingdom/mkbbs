@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKSdNotify;   {systemd's sd_notify: READY=1, WATCHDOG=1, STATUS=..., STOPPING=1 on the socket named by NOTIFY_SOCKET}
 
 {$mode objfpc}{$H+}

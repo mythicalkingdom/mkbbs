@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 
 {               MKQwk Copyright 1991, 1993 by Mark May                }
 {      Mythical Kingdom Software 1:110/290 513-237-7737 V32/HST       }

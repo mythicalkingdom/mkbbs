@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program scripttest;
 {$mode tp}
 {$H+}

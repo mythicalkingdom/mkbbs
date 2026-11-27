@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKTic;   {TIC files (file echoes): read, write, the Path and Seenby lines, the CRC of a file.  See TIC-PLAN.md}
 
 {

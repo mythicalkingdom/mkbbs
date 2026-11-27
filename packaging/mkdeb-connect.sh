@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds build/mkconnect_<version>_<arch>.deb: mkconnect, its manual page and a short document, for systems that have no BBS.
 # The package mkbbs has the same programs (it Provides / Conflicts / Replaces mkconnect), so one or the other is installed.
 #

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMenuCf;   {MKMenu: the menu file and its editing screens (Free Vision)}
 
 {$I MKB.Def}

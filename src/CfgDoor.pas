@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgDoor;   {Log-on doors, converted from CFGDOOR}
 
 {$I MKB.Def}

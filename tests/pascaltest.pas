@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program pascaltest;
 {$mode tp}
 { Menu command 170: Pascal programs run for the caller (MKPascalRun) on a scripted loopback session.

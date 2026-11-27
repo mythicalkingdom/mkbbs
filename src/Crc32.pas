@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 UNIT Crc32;
 
 {$I MKB.Def}

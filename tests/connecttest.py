@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkconnect (MKCONNECT-PLAN.md phase 1) on a pseudo terminal, against a small Telnet BBS of this test: the screens are converted from CP437 to UTF-8, the status bar is kept on the
 bottom row, what is typed reaches the system (a letter in CP437), the attention key and the Alt keys, capture, hang up, the phone book (sealed with the start password), the dialer.
 usage: connecttest.py <build dir> <work dir>"""

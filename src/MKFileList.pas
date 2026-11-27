@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKFileList;   {The pieces of a file area listing (files.bbs) that uploads and scripts share}
 
 {$MODE OBJFPC}

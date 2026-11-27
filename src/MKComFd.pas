@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKComFd;   {Comm session on a pair of file descriptors (socket, pipe, pty)}
 
 {$I MKB.Def}

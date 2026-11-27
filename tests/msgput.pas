@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program MsgPut;
 {$mode objfpc}{$H+}
 { helper of apitest: msgput add <area id> <from> <to> <subject> <private 0|1> <text, lines separated by |> [reply-to] [kludge]

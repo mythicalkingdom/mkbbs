@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 173 (upload files, UPLOAD-PLAN.md) in the real mk, over telnet, on a private copy of the sample BBS: the built-in Zmodem and Ymodem receive a
 file (sz / sb of lrzsz) into a file area, the name is made safe, the caller describes it, it is listed in files.bbs, the caller is credited and gets the time back;
 a name that is in the area is refused; an area that does not allow uploads (or the caller's level is too low) says so.   usage: uploadtest.py <build dir> <work dir>"""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 172 (a door of doors.cfg) in the real mk, over telnet, on a private copy of the sample BBS, with a fake dosemu (a script that records what it was given and
 acts as a door on its terminal) and a native door.   usage: doortest.py <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time

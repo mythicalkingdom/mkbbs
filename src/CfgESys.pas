@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgESys;   {One echomail system, converted from CFGESYS}
 
 {$I MKB.Def}

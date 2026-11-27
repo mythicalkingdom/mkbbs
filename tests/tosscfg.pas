@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program tosscfg;
 {$mode tp}
 { tosscfg: which echo systems are linked to which areas (areas 6 9 10 11 12 15), for tests/tosstest.py }

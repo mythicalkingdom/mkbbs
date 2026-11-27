@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKDoorCfg;   {doors.cfg: the doors of the BBS (DOORS-PLAN.md)}
 
 {$MODE OBJFPC}

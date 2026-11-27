@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mklistmsgarea and mknodelist on the sample BBS.   usage: toolstest.py <build dir> <work dir>"""
 import os, subprocess, sys
 

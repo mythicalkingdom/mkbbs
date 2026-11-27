@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgOffp;   {Offline mail parameters, converted from CFGOFFP}
 
 {$I MKB.Def}

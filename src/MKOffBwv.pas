@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOffBwv;       {BlueWave Offline mail Object}
 
 {$I MKB.Def}

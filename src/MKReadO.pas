@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKReadO;   {MKRead command line (-C<config file>, -T<M|R|Q|S|E> BBS type)}
 
 {$I MKB.Def}

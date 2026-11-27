@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A small FTP server for tests: plain or explicit FTPS (AUTH TLS, PBSZ, PROT P), passive mode, USER/PASS, TYPE, EPSV/PASV, RETR, STOR, DELE, QUIT.
 Files are in a directory (no sub-directories needed: paths are taken as they are below it).  It records what happened in .log (a list of strings),
 whether the data connection resumed the TLS session of the control connection (.resumed list), and what was stored."""

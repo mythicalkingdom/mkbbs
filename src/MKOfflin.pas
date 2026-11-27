@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOfflin; {Offline mail functions}
 {$I MKB.Def}
 

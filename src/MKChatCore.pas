@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKChatCore;   {The room of the multi-node chat: spool files in the run directory, presence, flood limit, word filter, log (MCHAT-PLAN.md); no screen in here}
 
 {$MODE OBJFPC}

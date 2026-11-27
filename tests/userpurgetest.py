@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkuserpurge on a private copy of the sample BBS: the users who have not called for a long time are marked deleted (the records stay, nothing else changes), the ones that are protected
 are not (keep file, security level), a dry run, the warning list.  The expectation is made from users.bbs itself.   usage: userpurgetest.py <build dir> <work dir>"""
 import os, re, shutil, subprocess, sys, datetime

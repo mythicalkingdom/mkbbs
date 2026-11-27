@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The Debian package (packaging/mkdeb.sh): it is built, has the right fields and files, the maintainer scripts are valid shell, lintian finds no errors (when it is
 there), and the programs inside it run (the package is unpacked, not installed: no root needed).   usage: debtest.py <build dir> <work dir>"""
 import glob, json, os, re, shutil, subprocess, sys

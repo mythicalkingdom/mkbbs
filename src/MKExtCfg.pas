@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKExtCfg;   {extensions.cfg: the scripts the sysop gave the BBS, and what each may do (MHOST-PLAN.md)}
 
 {$MODE OBJFPC}

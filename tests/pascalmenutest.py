@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 170 (run a Pascal program) in the real mk, over telnet, on a private copy of the sample BBS and of
 its menus: the top menu gets items that run programs.  Whatever ends a program (normal end, error, Ctrl-C at an
 readln, Ctrl-C in a loop, parameters after the path, a missing file) has to bring the caller back to the menu prompt.

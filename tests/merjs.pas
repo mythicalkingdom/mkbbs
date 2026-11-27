@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program merjs;
 {$mode tp}
 { read a base written by MessageMerlin.js (usage: merjs <file>) }

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program ConvText;   {helper of msgconvtest: convtext <area id> <number> : the text of a message as hex}
 {$mode objfpc}{$H+}
 Uses SysUtils, MKGlobT, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen;

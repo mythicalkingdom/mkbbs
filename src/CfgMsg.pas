@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgMsg;   {One message area, converted from CFGMSG}
 
 {$I MKB.Def}

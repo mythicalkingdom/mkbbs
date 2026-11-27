@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The real mk (sample BBS, private copy) with mklisten and the sysop monitor: log in, the monitor
 shows the user, chat from the monitor, take / give time, disconnect.
 usage: chattest.py <work dir>   (needs bbs/bbsc/ra and build/mk, mklisten, mkmon)"""

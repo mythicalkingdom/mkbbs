@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mklisten and systemd's sd_notify: READY=1 once the ports are open, WATCHDOG=1 heartbeats at a third of WATCHDOG_USEC (also while a slow tool is waited for),
 STATUS= lines, STOPPING=1 at SIGTERM; nothing when NOTIFY_SOCKET is not set or WATCHDOG_PID names another process.
 usage: sdnotifytest.py <mklisten> <fakemk> <work dir>"""

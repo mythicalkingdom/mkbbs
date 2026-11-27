@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds build/mkbbs_<version>_<arch>.deb from the programs in build/ (make deb builds them first).
 #
 #   packaging/mkdeb.sh                      version 0.2+git<date>.<commit>, maintainer from git

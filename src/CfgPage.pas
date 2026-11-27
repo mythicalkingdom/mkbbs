@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgPage;   {Converted from CFGPAGE for Free Vision}
 
 {$I MKB.Def}

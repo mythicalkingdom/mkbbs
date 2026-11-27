@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKKbd;   {Keyboard driver for Free Vision on Unix terminals}
 
 {$MODE OBJFPC}

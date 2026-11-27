@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Password limits at the login (mk -L on a pty, private copy of the sample BBS): an account is locked after wrong passwords in a row (even the right one is
 refused while it is locked), the failures are told at the next good log-on, a password that has expired must be changed, one that is about to is
 announced.   usage: pwlimittest.py <build dir> <work dir>"""

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKScript;   {mk -x script: a BASIC or Pascal program of the sysop that uses the BBS, with no caller (MHOST-PLAN.md)}
 
 {$MODE OBJFPC}

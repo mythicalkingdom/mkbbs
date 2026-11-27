@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKSess;   {Builds the caller's session from the command line options}
 
 {$I MKB.Def}

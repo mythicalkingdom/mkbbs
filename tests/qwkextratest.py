@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The extras of a QWK packet from the door (mkqwk -L): the BBS screens, bulletins and the new files list (MKOffExt): what is in the
 ZIP, the CONTROL.DAT names, a name with no file left out, the switches (Never / Always / as the user chose), and the new files date
 moving only when the packet was made.  Private copy of the sample BBS.   usage: qwkextratest.py <build dir> <work dir>"""

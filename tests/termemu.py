@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A small terminal emulator for the pty tests: characters, colours, blink, the cursor, the scroll region of the tests that need it (CP437 glyphs of the low codes are the
 Unicode ones).  Copied from drawtest.py (Term); tests/connecttest.py uses it to read the dialing directory."""
 import re

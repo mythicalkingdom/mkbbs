@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgList;   {Numbered lists of things to edit (languages, areas, addresses ...)}
 
 {$I MKB.Def}

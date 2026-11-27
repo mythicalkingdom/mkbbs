@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkfreq (the answer to an FTN file request): security profiles, file areas with "Allow file requests", magic names, passwords,
 limits, refusals, on a private copy of the sample BBS.  usage: mkfreqtest.py <build dir> <work dir>"""
 import json, os, shutil, subprocess, sys

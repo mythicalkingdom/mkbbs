@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Makes the screenshots of the README (docs/screenshots/*.png) from the real programs: the sample BBS is copied to a private directory, mklisten runs it (with the
 binkp mailer mkbink when it is built next to this project), a caller logs on over telnet, mkmon and mkconfig run on pseudo terminals; every screen is drawn by a terminal emulator
 (pyte) and rendered with a monospace font.

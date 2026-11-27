@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 172 with the real dosemu2: a DOS door (a small .COM made by dosdoor_com: INT 14h on COM1; it sends the first line of DOOR.SYS, says hello, waits for a character and
 answers) run for a caller over telnet in the real mk: the answer comes through COM1, the character typed reaches the door, the drop files are in its directory,
 the work directory goes at the end and when the caller hangs up, old work directories are removed.   needs dosemu2.   usage: dosdoorcmdtest.py <work dir>"""

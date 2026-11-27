@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """the small DOS door of the dosemu2 tests: a .COM (INT 14h on COM1) that sends the first 6 bytes of DOOR.SYS, says HELLO FROM DOS, waits for a
 character and answers GOT:<it>"""
 import struct

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """QWK packets over the JSON API (QWK-API-PLAN.md, phase 2): the node's settings, the packet (a waiting packet is sent again), the acknowledgement that moves the last-read pointers only when they are still
 where they were (compare and set), the repeat of an acknowledgement, the expiry, ?rebuild=1, the size limit that leaves the rest for the next packet, the lock, and who may ask (a token with the user of a QWK
 node, the scope qwk).  Real mkapi and mklisten on a private copy of the sample BBS.   usage: qwkapitest.py <work dir>"""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -G<id>: a pass with a QWK network system (MKQwkNet), on a private copy of the sample BBS.  The system is the user
 "Chuck Ebenschweiger" (QWK node flag, ZIP, area 6 in his offline mail); its map file says conference 12 = area 6.
 usage: qwknettest.py <build dir> <work dir>"""

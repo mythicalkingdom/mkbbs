@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKCallerIO;   {The caller as an embedded interpreter sees it: keys, Ctrl-C, lines, output}
 
 {$MODE OBJFPC}

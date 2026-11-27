@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKPascalRun;   {Menu command 170: run a Pascal program for the caller}
 
 {$MODE OBJFPC}

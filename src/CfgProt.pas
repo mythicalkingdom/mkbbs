@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgProt;    {Transfer protocols: the internal ones (1 - 10) and the external ones with their command lines (11 - 20)}
 
 {$I MKB.Def}

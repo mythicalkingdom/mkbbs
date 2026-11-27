@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The client session (MKComClient) against the real thing: mklisten with a "qwk" port starts mk -Q; clientxfer logs in
 (Login:, Password:, QWK:), downloads the packet and uploads a reply packet with the Zmodem of MKProt through the Telnet
 client session.  Private copy of the sample BBS.  usage: clientxfertest.py <build dir> <work dir>"""

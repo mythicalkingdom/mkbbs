@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mksetup: makes a BBS that mk can run: the folder, the configuration (read back with mkcfgcvt), the language file, two local message areas (Merlin), a file area with an example file, the sample door, the
 menu and the screens; refuses a folder that has a configuration; then the real mk (mk -L on a pty, started from another directory) takes a new caller through registration to the menu, reads a message
 area, lists the files, and says goodbye with the screen.   usage: setuptest.py <build dir> <work dir>"""

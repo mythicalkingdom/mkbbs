@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk writes in the BBS log whenever it cannot load a language file, a menu, a screen or a questionnaire.  The real mk over telnet on a private copy of the sample BBS and
 of its menus: the language files are taken away for one call; then menu items for a menu, a screen, a screen with hot keys and a questionnaire that are not there.
 usage: missingtest.py <work dir>"""

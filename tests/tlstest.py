@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Native TLS in mklisten ("tls": true on a port, the "tls" section with the certificate and the key): the handshake is done by the program that serves the caller
 (mk -Y, here fakemk), no stunnel.   A Telnet, a raw and a WebSocket port; a certificate that is checked (CA file, name); the real address of the caller (no PROXY
 header needed); a caller that does not speak TLS; a port that is not opened when the certificate is missing or the libraries are (MK_TLS_NO_LIBS) while the other ports run;

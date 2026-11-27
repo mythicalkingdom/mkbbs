@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMsgAbs;       {Abstract Msg Object}
 
 {$I MKB.Def}

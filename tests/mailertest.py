@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Mailer settings: the mkconfig pages (Mailer, Mailer Links) save mailer.mk, and mkbinkcfg turns the configuration into
 the settings file of mkbink (checked with "mkbink check" when the mkbink project is built next to this one).
 usage: mailertest.py <work dir>"""

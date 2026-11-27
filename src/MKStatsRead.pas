@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKStatsRead;   {Statistics for the display codes ^T: the calls of the BBS (stats/YYYY-MM.tsv) added up for today, a week, a month, a year and all that is on record}
 
 {$mode objfpc}{$H+}

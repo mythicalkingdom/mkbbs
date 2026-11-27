@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The file echo pages of mkconfig (EchoMail > File Echoes, File Echo Options, File Echo Systems): shown, saved in fileecho.mk
 (a record of fixed size, laid out as MKGlobT.pas says), and read back by the next run; a BBS without the file gets the defaults.
 Private copy of the sample BBS.   usage: fileechoedittest.py <work dir>"""

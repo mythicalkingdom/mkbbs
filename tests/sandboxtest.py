@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The door sandbox (bubblewrap) in the real mk over telnet: a native door that probes its surroundings runs with sandbox default (no network, no /home, a /tmp of its own, only its
 node and door directories, a pid space of its own), off (sees everything), net (the network stays); menu command 7 with command7 = default; bwrap missing: the door is not run.
 needs bwrap.   usage: sandboxtest.py <work dir>"""

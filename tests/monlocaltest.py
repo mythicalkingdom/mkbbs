@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkmon L key: the BBS in local mode (mk -L -N<localnode>) on the sysop connection, back to the node table.
 usage: monlocaltest.py <mklisten> <mkmon> <workdir>"""
 import os, re, socket, subprocess, sys, time, json, stat
@@ -70,6 +71,10 @@ r = subprocess.run([mklisten, '-t', '-c', config('bad', localnode=2)], capture_o
 check('localnode inside the nodes of a port is refused', r.returncode != 0 and 'localnode' in r.stderr)
 r = subprocess.run([mklisten, '-t', '-c', config('ok', localnode=9)], capture_output=True, text=True)
 check('localnode outside them is accepted', r.returncode == 0)
+r = subprocess.run([mklisten, '-t', '-c', config('sbad', scriptnodes='2-4')], capture_output=True, text=True)
+check('scriptnodes that overlap the nodes of a port are refused', r.returncode != 0 and 'scriptnodes' in r.stderr)
+r = subprocess.run([mklisten, '-t', '-c', config('sok', scriptnodes='50-52')], capture_output=True, text=True)
+check('scriptnodes outside them are accepted', r.returncode == 0)
 
 # not set up: a message, the table stays
 lst = subprocess.Popen([mklisten, '-c', config('none')], stdout=subprocess.DEVNULL)

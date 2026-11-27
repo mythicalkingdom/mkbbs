@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKUpload;   {Menu command 173: a caller uploads files into a file area (UPLOAD-PLAN.md)}
 
 {$MODE OBJFPC}

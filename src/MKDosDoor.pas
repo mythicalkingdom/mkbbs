@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKDosDoor;   {Menu command 172: run a door of doors.cfg for the caller (DOORS-PLAN.md A)}
 
 {$MODE OBJFPC}

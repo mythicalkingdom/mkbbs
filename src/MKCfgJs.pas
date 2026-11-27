@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKCfgJs;   {The MK configuration kept in one JSON file (bbsconfig.json) instead of the .mk record files}
 
 {$MODE OBJFPC}

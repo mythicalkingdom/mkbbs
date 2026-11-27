@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit HdrEnt;   {Header of a new message (Free Vision), converted from HDRENT}
 
 {$I MKB.Def}

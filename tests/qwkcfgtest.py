@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkqwkcfg (configuration of the offline mail door) on a private copy of the sample BBS, driven in a pseudo terminal.
 usage: qwkcfgtest.py <build dir> <work dir>"""
 import os, shutil, subprocess, sys

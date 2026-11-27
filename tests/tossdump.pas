@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program tossdump;
 {$mode tp}
 { tossdump <area> ...: the messages of the message areas of the configuration (MK=...) }

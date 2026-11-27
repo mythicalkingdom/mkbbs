@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKCp437;   {CP437 (the DOS character set) <-> UTF-8, and which terminals want which}
 
 {$I MKB.Def}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkqwk in local mode (-L): the QWK packet of a user's new mail, on a private copy of the sample BBS.
 The user's settings are in users.mko (area 6 on, QWK, ZIP), the messages in area 6 are the two local ones tossmake writes.
 usage: qwktest.py <build dir> <work dir>"""

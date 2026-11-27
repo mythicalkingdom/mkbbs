@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKConnUi;   {the dialing directory of mkconnect: a list of systems, forms, small dialogs (MKCONNECT-PLAN.md phase 1)}
 
 {$MODE OBJFPC}

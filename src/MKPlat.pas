@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKPlat;
 { MKPlat - platform shims for the MK units (Free Pascal).
 

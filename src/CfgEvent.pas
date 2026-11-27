@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgEvent;   {Events, converted from CFGEVENT}
 
 {$I MKB.Def}

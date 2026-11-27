@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program tossmake;
 {$mode tp}
 { tossmake: local messages as the BBS writes them (mk's editor): echomail in area 6 and netmail in area 4 }

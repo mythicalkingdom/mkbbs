@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKEvent;   {When an event is due: no files, no clock, only numbers (see EVENTS-PLAN.md)}
 
 {$MODE OBJFPC}

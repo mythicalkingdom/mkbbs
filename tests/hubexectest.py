@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -G<id> with "transport exec" in the map file (MKHubExec, MKQwkNet ExecPass) and profiles as files (-P, the search path, the header).  One private copy of
 the sample BBS; get / put are small scripts.   usage: hubexectest.py <build dir> <work dir>"""
 import json, os, re, shutil, subprocess, sys, time

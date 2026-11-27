@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKUserEd through a pseudo terminal on a private copy of the sample BBS directory (the user files):
 browse, edit, delete, search, go to, add, validate; every run starts a fresh program on the same files.
 usage: usertest.py <work dir>   (needs bbs/bbsc/ra, i.e. the sample BBS)"""

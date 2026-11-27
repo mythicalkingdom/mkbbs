@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program basictest;
 {$mode tp}
 { Menu command 169: BASIC programs run for the caller (MKBasicRun) on a scripted loopback session.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A telnet client with an 80x25 screen (for the tests of the sysop monitor)."""
 import re, socket, time
 

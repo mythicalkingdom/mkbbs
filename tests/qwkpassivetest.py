@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -Q: the login of a QWK network system (MKQwkLog), on a pty, on a private copy of the sample BBS.  The system is the user
 "Mark May" (QWK node flag, password NODEPW, protocol R = a script that copies the packet / drops a reply packet).
 usage: qwkpassivetest.py <build dir> <work dir>"""

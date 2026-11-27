@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program stdtest;
 {$mode tp}
 { MKComStd on a pipe: run as   printf 'abc' | stdtest   -> prints "ABC" (no more output once the caller is gone) }

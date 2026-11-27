@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Helpers for the tests that run a program on a private copy of the sample BBS.
 
 The paths in the binary configuration (config.mk) are Pascal strings in fixed size fields, so a path can be

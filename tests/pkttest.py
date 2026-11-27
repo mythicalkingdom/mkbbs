@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKMsgPkt against javascript/MessagePacket.js (node): packets written by one are read by the other, and the
 bytes of the same messages written by both are the same.  Also runs "pkttest self".
 usage: pkttest.py <build dir> <work dir>"""

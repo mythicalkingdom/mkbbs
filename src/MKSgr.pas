@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKSgr;   {Colour guard for text that is shown on a terminal with its own colours (UTF-8 terminals)}
 
 {$I MKB.Def}

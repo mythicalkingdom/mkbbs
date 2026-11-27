@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMsgSyn;       {Synchronet (SMB) Msg Object}
 
 {$I MKB.Def}

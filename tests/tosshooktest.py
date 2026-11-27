@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The whole way in: a mkbink calls the mkbink of the BBS (started as mklisten starts it, MK in its environment), the
 packet arrives in the inbound, the command mkbinkcfg wrote (on-inbound = mktoss) tosses it into the area.
 needs ../mkbink/build/mkbink.   usage: tosshooktest.py <build dir> <work dir>"""

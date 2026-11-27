@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgPAddr;   {Addresses list, converted from CFGPADDR}
 
 {$I MKB.Def}

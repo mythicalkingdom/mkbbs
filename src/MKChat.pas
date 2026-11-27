@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKChat;   {Menu command 174: the multi-node chat room for a caller (MCHAT-PLAN.md); off unless the sysop turned it on (mkconfig: Chat)}
 
 {$MODE OBJFPC}

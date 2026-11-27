@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mktoss on a private copy of the sample BBS: packets (made with MessagePacket.js under node) in the inbound
 are tossed into the Hudson areas of the sample.
 usage: tosstest.py <build dir> <work dir>"""

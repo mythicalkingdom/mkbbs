@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program ConvDump;   {helper of msgconvtest: convdump <area id> : one line for each message that is not deleted: number, header fields, flags, links, a check sum of the text}
 {$mode objfpc}{$H+}
 Uses SysUtils, MKGlobT, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen;

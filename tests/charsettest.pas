@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program charsettest;
 {$mode tp}
 { CP437 <-> UTF-8: the character table, the choice by terminal type, and the translation in DoorUser's text

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgMail;   {Mailer (mkbink) settings and links}
 
 {$I MKB.Def}

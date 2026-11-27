@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The MK configuration in one JSON file (MKCfgJs): mkcfgcvt 1 -> 5 -> 1 -> 5 gives the same file, the programs find the
 file with the MKJSON environment variable (a directory or the file), text is UTF-8 in the file and CP437 in the .mk
 files.  Works on private copies: the sample BBS must not change.

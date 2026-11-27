@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKComTelnet;   {Telnet protocol filter over another session}
 
 {$I MKB.Def}

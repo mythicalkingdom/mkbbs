@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program tosssetup;
 {$mode tp}
 { tosssetup <inbound> <outbound> <unsecure> [<mailer port>]: (with a port the mailer is switched on with one link, the hub) (system 2 = 1:110/200 is added for the forwarding tests) the sample configuration (MK=...) made ready for tests/tosstest.py:

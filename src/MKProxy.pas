@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKProxy;   {PROXY protocol header (HAProxy v1 and v2), as sent by stunnel}
 
 {$I MKB.Def}

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgBox;   {Small message boxes (replaces the CfgYN unit of the Object Professional programs)}
 
 {$I MKB.Def}

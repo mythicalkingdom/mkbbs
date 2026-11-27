@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The machinery of the JSON API for paths that change something (QWK packets, phase 1 of QWK-API-PLAN.md): request bodies to a spool file after the token, the limit (413), Content-Length rules (411, 400),
 Expect: 100-continue, a body that stops (408) or a caller who goes, the methods a path takes (405 with Allow), binary answers streamed from a file (GET and HEAD), the log line with the bytes, no spool
 file left; the qwk scopes of mkapitoken and the limits in apitokens.json.  The test paths /v1/test/... exist only with MKAPI_TEST=1.   usage: apibodytest.py <work dir>"""

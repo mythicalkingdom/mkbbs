@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKComWS;   {WebSocket (RFC 6455) filter over another session}
 
 {$I MKB.Def}

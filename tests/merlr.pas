@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program MerLR;
 {$mode objfpc}{$H+}
 { helper of userpacktest: merlr new|set|get <Merlin base> [user [value]] }

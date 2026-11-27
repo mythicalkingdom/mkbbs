@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKReadCf;   {MKRead settings, tag line editor, help texts, twit list (Free Vision)}
 
 {$I MKB.Def}

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgOff;   {Available offline mail types, converted from CFGOFF}
 
 {$I MKB.Def}

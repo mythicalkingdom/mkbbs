@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program pkttest;
 {$mode tp}
 {$H+}

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKUserFm;   {MKUserEd: the user record, its edit form, validation templates (Free Vision)}
 
 {$I MKB.Def}

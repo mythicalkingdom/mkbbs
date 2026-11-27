@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKNodeHost;   {The internet address of a node from the nodelist index (mknodeidx), for mkbinkcfg and the mailer screen of mkmon}
 
 {$I MKB.Def}

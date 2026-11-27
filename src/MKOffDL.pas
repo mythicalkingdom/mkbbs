@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOffDL;        {offline mail: the messages of a packet for a caller}
 
 {$I MKB.Def}

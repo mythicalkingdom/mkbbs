@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKComStd;   {Comm session on standard input / output}
 
 {$I MKB.Def}

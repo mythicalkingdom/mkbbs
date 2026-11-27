@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds build/mkdraw_<version>_<arch>.deb: mkdraw and mkcat, their manual pages, the example list of screen codes and a short document, for systems that have no BBS.
 # The package mkbbs has the same programs (it Provides / Conflicts / Replaces mkdraw), so one or the other is installed.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -G<id> with a "hub" in the map file (MKQwkNet DoHub): two private copies of the sample BBS.  The hub is the first copy
 (mklisten with a "qwk" port: mk -Q), the node is the second one: its pass logs in with the mk profile, sends its reply packet
 (a local message), receives the packet of the hub and posts it, without anybody moving a file.

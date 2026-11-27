@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHost;   {The BBS as a script sees it: one dispatcher, a command in, text out (MHOST-PLAN.md)}
 
 {$MODE OBJFPC}

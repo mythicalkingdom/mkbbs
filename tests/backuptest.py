@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkbackup on a private copy of the sample BBS: a backup, its list and test, damage found, a restore (dry run, kept files, -f, another root), retention, the lock of
 the message bases, the config .bak.   usage: backuptest.py <build dir> <work dir>"""
 import glob, hashlib, os, shutil, subprocess, sys, tarfile, time

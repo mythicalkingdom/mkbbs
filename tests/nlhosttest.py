@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkbinkcfg looks the host of a link without one up in the nodelist (IBN / INA flags).
 usage: nlhosttest.py <build dir> <work dir>"""
 import os, shutil, subprocess, sys

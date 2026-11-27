@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -G<id> with "transport ftp" / "ftps" in the map file (MKFtp, MKQwkNet FtpPass) against a fake FTP server (tests/fakeftp.py): plain and explicit TLS,
 the TLS session reused for the data connection, the certificate checked (CA file, name).   usage: hubftptest.py <build dir> <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time, zipfile

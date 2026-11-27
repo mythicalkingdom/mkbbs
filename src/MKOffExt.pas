@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOffExt;   {What goes into an offline mail packet besides the messages: BBS screens, bulletins, the new files list}
 
 {$I MKB.Def}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkdraw through a pseudo terminal: load an ANSI screen, type, draw, copy, save as ASC / ANS / AVT / PAS and check the
 files byte by byte.  A small terminal emulator (characters, colours, blink) reads what Free Vision draws.
 usage: drawtest.py <build dir> <work dir>"""

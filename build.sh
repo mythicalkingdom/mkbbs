@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build all converted MK units and run the tests.
 # Usage: ./build.sh                 build everything and run the tests (objects go to ./build)
 #        ./build.sh --build-only    just the programs (what "make" does)

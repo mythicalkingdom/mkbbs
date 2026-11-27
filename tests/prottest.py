@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKProt against the real lrzsz (sz / rz, sx / rx, sb / rb) over a socketpair, both directions, for Zmodem, Xmodem (checksum
 and CRC), 1k-Xmodem and Ymodem; Ymodem-G and 1k-Xmodem-G (lrzsz has none) between two MKProt; data that a text filter would damage:
 every byte value, CR LF, CR NUL, IAC IAC, a few hundred KB.   usage: prottest.py <build dir> <work dir>"""

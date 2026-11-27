@@ -78,6 +78,7 @@ small setup:
   "maxperip": 3,
   "busy": "All lines are busy.",
   "localnode": 9,
+  "scriptnodes": "101-108",
   "ports": [
     { "port": 2323, "type": "telnet", "baud": 38400, "charset": "auto", "config": "/bbs/ra" },
     { "port": 2325, "type": "ws", "config": "/bbs/ra" },

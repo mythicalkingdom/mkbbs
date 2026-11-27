@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKCfgNew;   {Which object holds the MK configuration: the JSON file (MKJSON is set) or the .mk files}
 
 {$I MKB.Def}

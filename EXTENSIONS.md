@@ -10,7 +10,7 @@ mk -x [-n] [-C "capabilities"] [-T seconds] [-R run dir] script.bas|script.pas [
 `MK` names the BBS directory as for every program; `MKRUN` (the listener's run directory) is needed for the node list.  The script is looked for as given, then in the BBS directory.  Its output goes to standard output, `INPUT` / `ReadLn` read standard input.
 The exit code is 0 when the program ended, 1 when it ended with an error or a limit, 2 when it could not be started.
 
-**It is a node.**  A script runs on a *script node*, a number from `MKSCRIPTNODES` (default `101-108`, so it never takes a caller's node): it has a node file in the run directory and a line in `useron.bbs`, so it is on the node list and in `mkmon`
+**It is a node.**  A script runs on a *script node*, a number from the range `"scriptnodes"` of `mklisten.json` (the listener hands it to `mk` as `MKSCRIPTNODES`; run by hand, set that variable; default `101-108`, so it never takes a caller's node): it has a node file in the run directory and a line in `useron.bbs`, so it is on the node list and in `mkmon`
 as `script <name>`.  When every script node is in use `mk -x` stops with exit code 2.  A script that is stopped by `kill -9` leaves a node file; the next script takes the number over.
 
 ## An extension for callers: menu command 175

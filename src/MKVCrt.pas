@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKVCrt;   {Virtual console: the Crt calls on an in-memory screen}
 
 {$I MKB.Def}

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKSandbox;   {the door sandbox: bubblewrap (DOORS-PLAN.md C)}
 
 {$MODE OBJFPC}

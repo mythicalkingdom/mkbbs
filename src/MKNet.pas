@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKNet;   {TCP over IPv4 and IPv6: connect, listen, addresses as text (IPV6-PLAN.md)}
 
 {$MODE OBJFPC}

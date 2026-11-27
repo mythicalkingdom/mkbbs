@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKComClient (a TCP client session with Telnet): a Python server negotiates the way a BBS does and checks the answers.
 usage: clienttest.py <build dir>"""
 import os, socket, subprocess, sys, threading, time

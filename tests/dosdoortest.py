@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tools/mkdosdoor: a DOS door in dosemu2 with COM1 on the terminal (the pseudo terminal MK gives menu command 7): the caller's characters reach the
 door and its answers come back, the drop files are in the directory the door runs in with the COM port line that was asked for, nodes have work
 directories of their own that are gone at the end.  The door is a small .COM made here (INT 14h on COM1; it reads DOOR.SYS and sends its first line,

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgFArea;   {File Areas list, converted from CFGFAREA}
 
 {$I MKB.Def}

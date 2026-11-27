@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program LrTool;   {helper of msgconvtest (MK=<config dir>):  lrtool get|set <area id> <user number> [value]   the last-read pointer of the user (JAM: by the check sum of the name, as mkmsgconv)
                                                           lrtool useron <name> <node>             a caller on line (useron.bbs)
                                                           lrtool useron -                         nobody on line}

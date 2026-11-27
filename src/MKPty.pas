@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKPty;   {Run a program for the caller on a pseudo terminal}
 
 {$I MKB.Def}

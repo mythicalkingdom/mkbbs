@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKUpCfg;   {uploads.cfg: what happens to a file a caller has uploaded (UPLOAD-PLAN.md)}
 
 {$MODE OBJFPC}

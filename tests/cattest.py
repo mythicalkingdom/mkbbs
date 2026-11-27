@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkcat: CP437 text to the terminal.  usage: cattest.py <build dir> <work dir>"""
 import os, pty, shutil, subprocess, sys
 

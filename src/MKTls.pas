@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKTls;          {TLS on the connection, in the server role: the program itself speaks TLS to the caller (the libraries of OpenSSL, if they are there)}
 
 {$mode objfpc}{$H+}

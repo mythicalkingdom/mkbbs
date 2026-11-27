@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKConnCall;   {one call of mkconnect: the connection, the screen of the terminal passed through, the keys, the status bar (MKCONNECT-PLAN.md phase 1)}
 
 {$MODE OBJFPC}

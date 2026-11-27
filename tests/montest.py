@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Sysop monitor: mklisten with a telnet port and a sysop port, fakemk as the BBS.
 usage: montest.py <mklisten> <fakemk> <mkmon> <workdir>"""
 import os, re, socket, subprocess, sys, time, json, hashlib

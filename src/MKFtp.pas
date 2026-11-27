@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKFtp;          {a small FTP client: plain or FTPS (explicit TLS), passive mode, one file at a time}
 
 {$mode objfpc}{$H+}

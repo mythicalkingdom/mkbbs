@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The statistics: mk writes a line for each call when it ends (<BBS directory>/stats/YYYY-MM.tsv: a call with a log-on, one with a failed log-on, one that went before a name), and
 mkstats reports on them.  Real mk over telnet behind mklisten on a private copy of the sample BBS; and mkstats on made-up files.   usage: statstest.py <build dir> <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time

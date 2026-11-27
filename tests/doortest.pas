@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program doortest;
 {$mode tp}
 { MKVCrt (virtual screen), MKScrn, MKAvatar (ANSI), MKMusic and MKDoor on a

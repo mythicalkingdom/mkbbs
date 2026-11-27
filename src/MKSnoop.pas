@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKSnoop;   {Lets the sysop watch a session: a filter that copies the output}
 
 {$I MKB.Def}

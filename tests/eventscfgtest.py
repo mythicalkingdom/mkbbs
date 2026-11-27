@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """events.mk (what the events do: EventsCfgType): written by hand here, read by the MK configuration, carried through the JSON
 configuration and back byte for byte; a configuration without the file gets the defaults.  Private copies of the sample BBS.
 usage: eventscfgtest.py <build dir> <work dir>"""

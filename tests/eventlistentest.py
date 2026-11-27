@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mklisten runs the events: commands at their times, the errorlevel script events.sh, the mailer actions, days and status, the
 four ways to handle a missed event, exclusive events (callers refused, waited for, forced off) and the events.run file.
 A clock offset in the "events" section makes it quick; the time zone is the machine's.   usage: eventlistentest.py <work dir>"""

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 unit MKTuiKeys;   {copied from mkedit (the same author), the text user interface of mkconnect}
 {$mode objfpc}{$H+}
 { Keyboard input for a Unix terminal: raw mode, xterm/VT/Linux-console escape sequences including

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHubTalk;      {talk to a hub by hand and record the call as a transcript: the way a new profile is written}
 
 {$I MKB.Def}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Translate an Object Professional entry-screen unit (CFGxxx.PAS) to a CfgForm unit.
 usage: cfgconv.py original/CFGGEN.PAS src/CfgGen.pas"""
 import re, sys

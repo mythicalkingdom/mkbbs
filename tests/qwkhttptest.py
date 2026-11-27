@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -G with the http / https transport (QWK-API-PLAN.md phase 4) against a real hub: two private copies of the sample BBS, the hub with an api port (mklisten, mkapi) and a node user with a token, the node
 calling it with the map file "hub http://..." (a front that can drop or damage an answer sits between them in some tests).  A pass: the packet is fetched, the reply packet is sent, the packet is posted and only
 then acknowledged; an acknowledgement that could not be sent is sent at the next pass; the refusals; the transcript; TLS.   usage: qwkhttptest.py <work dir>"""

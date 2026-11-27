@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Backslash codes in menu prompts (\\n a line break, \\f<c> and \\k<c> the display codes, \\\\ a backslash) in the real mk, over telnet, on a private copy of the sample BBS
 and of its menus: the top menu gets prompt-only items (type 0).   usage: promptesctest.py <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time

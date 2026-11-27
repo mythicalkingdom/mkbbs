@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKTicToss;   {Tossing TIC files (file echoes): the files that came in with a TIC go to their file area.  See TIC-PLAN.md}
 
 {

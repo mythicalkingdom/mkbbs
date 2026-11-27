@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKBasicRun;   {Menu command 169: run a BASIC program for the caller}
 
 {$MODE OBJFPC}

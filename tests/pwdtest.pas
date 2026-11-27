@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program PwdTest;
 {$MODE TP}
 { MKPwd: SHA-256, HMAC, PBKDF2 against known results, the hash block (set, check, wrong, upper flag, clear), record sizes }

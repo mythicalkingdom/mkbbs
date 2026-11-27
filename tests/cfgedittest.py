@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkconfig edits through a pseudo terminal on private copies of the sample BBS (a path, the General screen, an event, a transfer protocol), and the saved
 config.mk is checked.  The copies are in a short directory with the paths of config.mk pointing at them, so a save can never reach the sample.
 usage: cfgedittest.py <work dir>"""

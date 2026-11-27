@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKLC: every sample *.LC of the original folder is turned back into text, compiled again and must
 come out byte for byte the same.   usage: lctest.py <mklc> <work dir>"""
 import glob, os, shutil, struct, subprocess, sys

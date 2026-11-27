@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program smoke;
 {$mode tp}
 uses Dos, Crc16, MKDos, MKMsgJam, MKMsgSqu, MKMsgPkt, MKMsgMer, MKString, MKMisc, MKFile, MKFFile, MKGlobT, MKMsgAbs;

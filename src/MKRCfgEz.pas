@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKRCfgEz;
 { Read-Only config object for Ezy }
 

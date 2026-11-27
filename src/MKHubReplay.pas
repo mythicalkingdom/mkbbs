@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHubReplay;    {a fake hub made from a transcript: a session that answers a script with what a hub said when it was recorded}
 
 {$I MKB.Def}

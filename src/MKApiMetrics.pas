@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKApiMetrics;   {GET /v1/metrics: the numbers of the BBS in the text format of Prometheus (version 0.0.4)}
 
 {$mode objfpc}{$H+}

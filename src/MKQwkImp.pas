@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKQwkImp;       {the messages of a QWK message file go into message areas}
 
 {$I MKB.Def}

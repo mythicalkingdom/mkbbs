@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program fakemk;
 {$mode tp}
 { Stands in for "mk" in the listener test.  Takes the same options (-N -S -B -A),

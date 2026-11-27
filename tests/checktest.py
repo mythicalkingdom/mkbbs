@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkcheck on a BBS that mksetup made (nothing wrong), then on copies of it with one thing broken at a time: each break is reported as FAIL or WARN with the reason, the exit code follows.
 usage: checktest.py <build dir> <work dir>"""
 import os, re, shutil, subprocess, sys

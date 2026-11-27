@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 { The fields of the ExtUsers.Bbs record that come before the password hash (included twice by Struct.MK) }
   Handle: String[35];                  {Users handle}
   Birthdate: String[6];                {BirthDate YYMMDD}

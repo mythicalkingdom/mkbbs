@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program MKListen;
 
 {$MODE OBJFPC}
@@ -37,6 +38,8 @@ Program MKListen;
           "workdir":  "/bbs",                  current directory of mk
           "localnode": 9,                      node number for the L key of mkmon (mk -L; not one of the
                                                nodes of a port; 0 or left out: no L key)
+          "scriptnodes": "101-108",             node numbers of the scripts (mk -x, the hooks and events of EXTENSIONS.md); not the
+                                               nodes of a port; left out: 101-108 (the same as MKSCRIPTNODES for mk)
           "nodes":    "1-8",                   node numbers handed out (N, "N-M" or [N, M])
           "maxperip": 3,                       callers per address on a port (0 = any)
           "busy":     "All lines are busy.",   sent when no node is free
@@ -226,6 +229,8 @@ Var
   ApiPath: String = '';
   LocalNode: Integer = 0;              {node number of the local MK that the L key of mkmon runs, 0 = no L key}
   RunDir: String = '';
+  ScriptFirst: Integer = 0;            {the node numbers of the scripts (mk -x), 0 = the default of mk (101-108)}
+  ScriptLast: Integer = 0;
   RunUser, RunGroup: String;
   LogPath, PidPath, WorkDir: String;
   BusyMsg: String = 'Sorry, all lines are busy. Please try again later.';
@@ -749,6 +754,7 @@ Procedure LoadConfig;
     Else If Key = 'mkapi' Then ApiPath := JStr(V, 'mkapi')
     Else If Key = 'rundir' Then RunDir := JStr(V, 'rundir')
     Else If Key = 'localnode' Then LocalNode := JInt(V, 'localnode', 0, 255)
+    Else If Key = 'scriptnodes' Then ParseNodes(V, ScriptFirst, ScriptLast, 'scriptnodes')
     Else If Key = 'user' Then RunUser := JStr(V, 'user')
     Else If Key = 'group' Then RunGroup := JStr(V, 'group')
     Else If Key = 'logfile' Then LogPath := JStr(V, 'logfile')
@@ -793,6 +799,10 @@ Procedure LoadConfig;
     For i := 0 To High(Ports) Do
       If (Not Ports[i].Sysop) And (Not Ports[i].Api) And (LocalNode >= Ports[i].First) And (LocalNode <= Ports[i].Last) Then
         Die(CfgFile + ': "localnode" ' + IntToStr(LocalNode) + ' is one of the nodes of port ' + IntToStr(Ports[i].Port));
+  If ScriptFirst > 0 Then
+    For i := 0 To High(Ports) Do
+      If (Not Ports[i].Sysop) And (Not Ports[i].Api) And (ScriptFirst <= Ports[i].Last) And (ScriptLast >= Ports[i].First) Then
+        Die(CfgFile + ': "scriptnodes" ' + IntToStr(ScriptFirst) + '-' + IntToStr(ScriptLast) + ' overlaps the nodes of port ' + IntToStr(Ports[i].Port));
   MkPath := ResolveProg(MkPath);
   If MonPath = '' Then
     Begin
@@ -1505,13 +1515,15 @@ Procedure BuildEnvFor(Var EnvS: TStringList; Var Envv: TPCharArr; Const Dir: Str
   While envp[i] <> Nil Do
     Begin
     W := StrPas(envp[i]);
-    If (Copy(W, 1, 3) <> 'MK=') And (Copy(W, 1, 12) <> 'MKLISTENRUN=') Then
+    If (Copy(W, 1, 3) <> 'MK=') And (Copy(W, 1, 12) <> 'MKLISTENRUN=') And ((ScriptFirst = 0) Or (Copy(W, 1, 15) <> 'MKSCRIPTNODES=')) Then
       EnvS.Add(W);
     Inc(i);
     End;
   EnvS.Add('MK=' + Dir);
   If RunDir <> '' Then
     EnvS.Add('MKLISTENRUN=' + RunDir);   {mk -x (a script run by an event) finds the run directory here; MKRUN would make mk -G open a node of its own}
+  If ScriptFirst > 0 Then
+    EnvS.Add('MKSCRIPTNODES=' + IntToStr(ScriptFirst) + '-' + IntToStr(ScriptLast));   {the setting "scriptnodes": mk -x takes its node number from it}
   For i := 0 To High(Extra) Do
     EnvS.Add(Extra[i]);
   SetLength(Envv, EnvS.Count + 1);

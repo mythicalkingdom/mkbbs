@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 007 (run an external program / door) in the real mk, over telnet, on a private copy of the sample BBS and of
 its menus.  usage: doormenutest.py <work dir>"""
 import sys, json, os, re, shutil, socket, subprocess, sys, time, zipfile

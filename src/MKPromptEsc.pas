@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKPromptEsc;   {Backslash codes in a menu prompt: \n a line break, \f<c> and \k<c> the display codes ^F and ^K, \\ a backslash}
 
 {$I MKB.Def}

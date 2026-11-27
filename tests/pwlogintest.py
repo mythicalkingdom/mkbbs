@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Passwords at the login (mk -Q on a pty, private copy of the sample BBS): a plain password (any case, as in the DOS days) and a
 hashed one (exactly as typed, blanks and a slash allowed, the right one only).
 usage: pwlogintest.py <build dir> <work dir>"""

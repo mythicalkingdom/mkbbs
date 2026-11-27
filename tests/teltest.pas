@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program teltest;
 {$mode tp}
 { MKComFd + MKComTelnet over a socket pair: the test plays the caller. }

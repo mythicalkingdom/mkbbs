@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program holdbasetest;
 {$mode tp}
 { hold for pickup in JAM, Squish and Merlin: written with SetHold, read back after reopening, changed with ReWriteHdr;

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A file request, the whole way in: a mkbink asks the mkbink of a BBS (settings made by mkbinkcfg, started like mklisten does it) for
 files, with a password; mkbink hands the .req to mkfreq (on-freq), the the files go in a second batch of the same session,
 what could not be sent is told in a netmail (hold mail: the asker picks it up with a call) (Tell by netmail: mkfreq's note, posted and sent by mktoss).

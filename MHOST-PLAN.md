@@ -64,5 +64,5 @@ the BBS (with a caller on the other end) and outside it (with nobody).  **This i
 ## Open
 
 * The text format of results (plain TAB lists, as above, or JSON).
-* The range of script node numbers (how many, and where it is set: `mklisten.json` knows the caller nodes).
+* The range of script node numbers: **done** (`"scriptnodes"` in `mklisten.json`, checked against the nodes of the ports, handed to `mk` as `MKSCRIPTNODES`).
 * (Decided 2026-11-26: the results are plain tab-separated lines.)

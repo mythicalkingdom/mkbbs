@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgForm;   {Data driven entry forms for the configuration editor (Free Vision)}
 
 {$I MKB.Def}

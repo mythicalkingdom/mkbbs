@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKQwkNet;       {QWK network: one pass with a remote QWK system (mk -G<RemoteId>)}
 
 {$I MKB.Def}

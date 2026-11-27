@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKMsgQwk against javascript/MessageQWK.js (node): files written by one are read by the other, and the bytes of the
 same messages written by both are the same (MESSAGES.DAT style and REP style).  Also runs "qwkmsgtest self".
 usage: qwkmsgtest.py <build dir> <work dir>"""

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program NetTest;   {MKNet: the address functions, and connect / listen over IPv4 and IPv6 on the loopback (IPV6-PLAN.md phase 1)}
 
 {$MODE OBJFPC}

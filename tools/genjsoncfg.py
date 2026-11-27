@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Generates src/CfgJson.Inc: Pascal code that turns the records of the MK configuration (Struct.MK, MKGlobT.pas) into
 JSON objects and back (fpjson), field by field.  Run it again when a record changes:   python3 tools/genjsoncfg.py
 

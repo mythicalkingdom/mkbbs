@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 174 (run an extension, MHOST-PLAN.md phase 2) in the real mk over telnet, two nodes at once, on a private copy of the sample BBS: off by default, the level
 and the ban list, lines of both nodes, joins and leaves, /who, /msg, /me, /ignore, control characters dropped, the word file, the flood limit, chat.log.
 usage: mchattest.py <build dir> <work dir>"""

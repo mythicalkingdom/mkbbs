@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program connbooktest;
 { the phone book: plain and sealed, the wrong password, values kept as they are (blanks in a password, UTF-8), sorting, deleting }
 {$mode objfpc}{$H+}

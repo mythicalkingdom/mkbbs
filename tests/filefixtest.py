@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """FileFix (mktoss): a netmail to FileFix / FileMgr from an echo system links and unlinks file echoes (fileecho.mk), lists them, asks the hub;
 the password is the FileFix one, or the Areafix one when none is set; groups limit what a system sees.  Private copy of the sample BBS.
 usage: filefixtest.py <build dir> <work dir>"""

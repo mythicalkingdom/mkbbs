@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Statistics display codes ^T<period><item> (in a prompt: \t and the two letters) in the real mk, over telnet, on a private copy of the sample BBS with statistics lines of known days: the numbers are worked out
 here from the lines.   usage: statcodestest.py <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time

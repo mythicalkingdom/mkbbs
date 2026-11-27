@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The Mailer screen of the sysop monitor: mklisten runs the real mkbink (mailer on in a copy of the sample BBS, a link to a
 second mkbink), mkmon on the sysop port shows it.  Needs the mkbink project built next to this one.
 usage: mailmontest.py <work dir>"""

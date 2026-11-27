@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgOrig;   {Origin lines, converted from CFGORIG}
 
 {$I MKB.Def}

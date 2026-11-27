@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program mertest;
 {$mode tp}
 { Merlin message base tests: round trip, replies, delete, last read, repair.

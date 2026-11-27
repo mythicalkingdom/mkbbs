@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgFast;   {"Fast" message area options: one flag per message area, converted from CFGFAST}
 
 {$I MKB.Def}

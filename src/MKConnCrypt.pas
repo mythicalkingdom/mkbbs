@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKConnCrypt;   {the phone book of mkconnect, sealed with the start password: ChaCha20 and HMAC-SHA256 (MKCONNECT-PLAN.md)}
 
 {$MODE OBJFPC}

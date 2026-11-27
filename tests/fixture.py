@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The fixture: a snapshot of the sample BBS that the tests copy, instead of the live sample (bbs/).
 
   fixture.py make      take the snapshot (build/fixture/): the configuration directory (bbs/bbsc/ra), the menus, the node list and the mkqwk

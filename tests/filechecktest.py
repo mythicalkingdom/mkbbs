@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkfilecheck: file areas against their lists (files.bbs).  Two file areas of a private copy of the sample get directories that the test makes: a listed file that is not there, a file that is
 there and not listed, a file listed twice, a name in another case; -f takes the lines of missing files out (with their description lines), -l lists the others, files.bbs.bak; the exit code.
 usage: filechecktest.py <build dir> <work dir>"""

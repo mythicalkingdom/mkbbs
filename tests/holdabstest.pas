@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program holdabstest;
 {$mode tp}
 { the abstract message object: hold is False and SetHold does nothing (bases without the flag); the packet unit answers through the abstract pointer }

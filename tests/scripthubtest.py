@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKHubScr (the script engine of the call to a hub) against fake hubs that vary: split prompts, ANSI noise, terminal queries,
 optional "press a key" prompts, delays, a missing prompt, a dropped connection.  usage: scripthubtest.py <build dir> <work dir>"""
 import os, re, socket, subprocess, sys, threading, time

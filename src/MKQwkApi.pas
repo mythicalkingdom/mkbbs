@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKQwkApi;   {QWK packets for a node through the JSON API: the packet, its acknowledgement (QWK-API-PLAN.md)}
 
 {$mode objfpc}{$H+}

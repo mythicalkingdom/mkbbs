@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKDrawCf;   {MKDraw: the character sets, the BBS screen codes and the pick lists}
 
 {$I MKB.Def}

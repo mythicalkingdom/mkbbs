@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgPLan;   {Languages list, converted from CFGPLAN}
 
 {$I MKB.Def}

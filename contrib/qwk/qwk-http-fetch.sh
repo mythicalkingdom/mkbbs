@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # qwk-http-fetch.sh: take the QWK packet of a node from an MK hub through the JSON API (API.md, "QWK packets for a node"), and send the reply packet.
 #
 #   qwk-http-fetch.sh URL TOKEN DIR [REPLY.REP]

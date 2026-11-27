@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program defaultstest;
 {$mode tp}
 { the defaults of a new configuration: an echo system is sent to as Normal mail (Hold is only sent when the system calls us) }

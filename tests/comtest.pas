@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program comtest;
 {$mode tp}
 { MKComAbs: the abstract session, its defaults and the old-style wrappers,

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program wstest;
 {$mode tp}
 { MKComWS (WebSocket filter) and MKProxy (PROXY header) over a socket pair; the test plays the caller. }

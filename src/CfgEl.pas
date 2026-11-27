@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgEl;   {Converted from CFGEL for Free Vision}
 
 {$I MKB.Def}

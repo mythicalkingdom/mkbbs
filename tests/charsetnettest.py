@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """CP437 -> UTF-8 in the real mk over telnet: five callers log in to the sample BBS (private copy) and what they
 receive is checked: the terminal type they report (or not) and the port's "charset" decide whether the DOS box
 characters arrive as CP437 bytes or as UTF-8.   usage: charsetnettest.py <work dir>"""

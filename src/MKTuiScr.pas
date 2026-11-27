@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 unit MKTuiScr;   {copied from mkedit (the same author), the text user interface of mkconnect}
 {$mode objfpc}{$H+}
 {$POINTERMATH ON}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkcfgcvt: the Remote Access configuration of the sample BBS converted to the MK format must load and
 list the same message areas; QuickBBS and SuperBBS files are written.  The sample itself must not change.
 usage: cvttest.py <build dir> <work dir>"""

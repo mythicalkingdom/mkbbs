@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """IPv6 in mklisten (IPV6-PLAN.md phase 2): ports with no bind listen on IPv4 and IPv6, bind limits a port to one family, the address of the caller is text in its
 usual form (IPv4 on the dual stack socket is a.b.c.d), PROXY headers with IPv6 addresses, loopback rules of sysop / proxy ports with ::1, maxperip per address, the
 configuration checks, and the login guard for an IPv6 address (real mk over telnet on a private copy of the sample BBS).   usage: iplistentest.py <work dir>"""

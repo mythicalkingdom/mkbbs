@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKRead through a pseudo terminal on a private copy of the sample BBS:
 read a Squish message, then reply into the local Hudson area and check the base grew.
 usage: readtest.py <work dir>   (needs bbs/bbsc/ra, i.e. the sample BBS)"""

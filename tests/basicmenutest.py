@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Menu command 169 (run a BASIC program) in the real mk, over telnet, on a private copy of the sample BBS and of
 its menus: the top menu gets items that run programs.  Whatever ends a program (normal end, error, Ctrl-C at an
 INPUT, Ctrl-C in a loop, a missing file) has to bring the caller back to the menu prompt.

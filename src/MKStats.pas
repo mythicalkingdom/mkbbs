@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKStats;        {one line for each call, written when it ends: what mkstats makes its reports from}
 
 {$I MKB.Def}

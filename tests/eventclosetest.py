@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A caller of the real mk (sample BBS, private copy, mklisten) who logs on shortly before an exclusive event is told when the BBS
 closes and his call is cut to that (mk -T); the sysop's time adjustments still work.   usage: eventclosetest.py <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKApiTok;   {The token file of the JSON API: apitokens.json in the BBS directory}
 
 {$mode objfpc}{$H+}

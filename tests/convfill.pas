@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program ConvFill;   {helper of msgconvtest: convfill <area> : writes a few different messages into the area (by the configuration), deletes the third}
 {$mode objfpc}{$H+}
 Uses SysUtils, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKMsgAbs, MKMsgHud, MKMsgJam, MKMsgSqu, MKMsgFid, MKMsgMer, MKMsgSyn, MKOpen;

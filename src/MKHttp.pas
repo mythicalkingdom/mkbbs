@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHttp;         {a small HTTP/1.1 client: one request on its own connection, plain or TLS, bodies from and to files}
 
 {$mode objfpc}{$H+}

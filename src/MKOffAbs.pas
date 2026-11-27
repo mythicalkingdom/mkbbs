@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOffAbs;       {Abstract Offline mail Object}
 
 {$I MKB.Def}

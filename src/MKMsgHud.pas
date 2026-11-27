@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMsgHud;        {Hudson/QuickBbs-style Message Base}
 
 {$I MKB.Def}

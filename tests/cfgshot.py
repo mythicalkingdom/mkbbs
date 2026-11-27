@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Runs build/mkconfig in a pseudo terminal, sends keys and prints the final screen as text.
 # usage: CFGDIR=<bbs config dir> cfgshot.py KEYS...      (\x1b = ESC, \r = Enter, \t = Tab)
 # e.g.   cfgshot.py '\x1bg' '\x1b[B' '\r'              opens General > Bbs Paths

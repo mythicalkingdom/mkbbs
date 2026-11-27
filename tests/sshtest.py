@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The SSH front of the BBS: mkbbsssh (the shell of the account "bbs") between an SSH daemon and mklisten.  A real ssh client goes through a daemon that runs as the
 test user (OpenSSH, and Dropbear when it is installed; key login, the password-less login needs root and is not tested here) and its forced command mkbbsssh to a
 Telnet port of mklisten with "proxy": true and reaches the BBS (language choice, name prompt); the real address of the caller (SSH_CONNECTION) is the one

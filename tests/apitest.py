@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The JSON API, phase 1: the "api" port type of mklisten, mkapi (HTTP, JSON, GET and HEAD only, one request), the token file and mkapitoken (hash only, mode 600, scopes, expiry, addresses), TLS,
 the login guard counting bad tokens.  Real programs on a private copy of the sample BBS.   usage: apitest.py <work dir>"""
 import json, os, re, shutil, socket, ssl, stat, subprocess, sys, time, hashlib

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKLogHook;      {a way for the low level units to write a line in the log of the call (the log unit needs them, so they cannot use it)}
 
 {$I MKB.Def}

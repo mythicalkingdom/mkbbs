@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKPwd;          {Hashed passwords: SHA-256, HMAC, PBKDF2 and the hash block of the ExtUsers.Bbs record}
 
 {$I MKB.Def}

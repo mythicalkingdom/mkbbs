@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Program EventTest;   {The arithmetic of MKEvent: days of the week, occurrences, the four ways to handle a missed event}
 
 {$MODE OBJFPC}

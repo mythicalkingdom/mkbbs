@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkmaint: the purge of the message areas by their limits (days kept, received days, messages kept), a dry run, what never goes (unread private mail, a message waiting to be
 sent).  Private copies of the sample BBS.   usage: maintest.py <build dir> <work dir>"""
 import json, os, re, shutil, subprocess, sys, time

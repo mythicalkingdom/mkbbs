@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit Default;   {Default values for a new configuration; paths are relative to the BBS directory}
 
 {$I MKB.Def}

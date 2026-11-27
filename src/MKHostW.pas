@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHostW;   {What a script may change in the BBS: a message, a file in a file area, a user's record, a node (MHOST-PLAN.md phase 4)}
 
 {$MODE OBJFPC}

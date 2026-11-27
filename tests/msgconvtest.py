@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkmsgconv (MSGCONV-PLAN.md phase 1): an area of each kind (Hudson, Squish, Fido *.msg, JAM, Merlin, Synchronet) is filled with a few different messages and converted into every
 other kind; the new base is read by a second program (convdump) and compared with the old one; reply links go through the number map; a deleted message stays out; the old base is not
 changed; a destination with messages is refused; a message waiting to be sent stops the area; the dry run writes nothing.   usage: msgconvtest.py <build dir> <work dir>"""

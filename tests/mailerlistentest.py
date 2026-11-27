@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mklisten runs the mailer: mkbinkcfg when the BBS configuration changes, mkbink started / told to read its settings /
 stopped / restarted, and gone when mklisten is.  Done with small fake programs; then once with the real mkbink and
 mkbinkcfg when the mkbink project is built next to this one.   usage: mailerlistentest.py <work dir>"""

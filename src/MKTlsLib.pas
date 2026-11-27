@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKTlsLib;       {the OpenSSL libraries, loaded when they are wanted: nothing is linked, so MK runs without them (without TLS)}
 
 {$mode objfpc}{$H+}

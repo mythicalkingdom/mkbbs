@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMsgQwk;       {QWK message file (MESSAGES.DAT, REP) message object}
 
 {$I MKB.Def}

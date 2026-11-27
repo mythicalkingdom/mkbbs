@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -G<id> -K (talk to a hub by hand, record the call) and mk -G<id> -F<transcript> (the profile against a recording), MKHubTalk / MKHubReplay.
 A fake hub is a thread; one private copy of the sample BBS.   usage: hubtalktest.py <build dir> <work dir>"""
 import json, os, shutil, socket, subprocess, sys, threading, time

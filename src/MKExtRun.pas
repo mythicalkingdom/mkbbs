@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKExtRun;   {Menu command 175: run an extension of the sysop for the caller (MHOST-PLAN.md phase 2), and the hooks of phase 3}
 
 {$MODE OBJFPC}

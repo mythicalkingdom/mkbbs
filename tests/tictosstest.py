@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tossing TIC files (mktoss, MKTicToss): the file goes to the file area of the echo with a line in files.bbs and its date; what is wrong goes
 to badtic/ with the reason in the log; duplicates, a changed file of the same name, Replaces, the check command, a TIC that waits for its
 file, pass-through.  Private copy of the sample BBS.   usage: tictosstest.py <build dir> <work dir>"""

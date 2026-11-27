@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The statistics screen of the sysop monitor (S in the node list): today, the week, the month, the year; totals, calls by hour, the last calls.  mklisten with a sysop port, a telnet
 client with an 80x25 screen, statistics files that are made up.   usage: statsmontest.py <work dir>"""
 import json, os, re, shutil, subprocess, sys, tempfile, time

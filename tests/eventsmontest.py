@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The events screen of the sysop monitor (E in the node list): the events mklisten runs, their state, next time, and R to run
 one now (mklisten does it).  mklisten with events and a sysop port, a telnet client with an 80x25 screen.
 usage: eventsmontest.py <work dir>"""

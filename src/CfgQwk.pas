@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgQwk;     {Configuration screens of the offline mail door (config.mko), converted from MKQMAIN, MKQDEF, MKQCONF, MKQPACK, MKQPROT, MKQSCRN, MKQUSER}
 
 {$I MKB.Def}

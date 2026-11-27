@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMsgFid;       {Fido *.Msg Unit}
 
 {$I MKB.Def}

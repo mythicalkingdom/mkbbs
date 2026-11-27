@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKComClient;    {a session that is a connection to another system: a TCP client with Telnet}
 
 {$I MKB.Def}

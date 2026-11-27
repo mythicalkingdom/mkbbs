@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgAddr;   {Converted from CFGADDR for Free Vision}
 
 {$I MKB.Def}

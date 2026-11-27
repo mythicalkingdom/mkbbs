@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHubScr;       {a script for the call to a QWK hub: expect / send over a session, with forgiving matching}
 
 {$I MKB.Def}

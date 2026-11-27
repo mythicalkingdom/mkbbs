@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKConnBook;   {the phone book of mkconnect: the systems, one file, sealed with the start password (MKCONNECT-PLAN.md)}
 
 {$MODE OBJFPC}

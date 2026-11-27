@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMonMail;   {The mailer (mkbink) screen and the events screen of the sysop monitor, in the style of the old FrontDoor status screen}
 
 {$I MKB.Def}

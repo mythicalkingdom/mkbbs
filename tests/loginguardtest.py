@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The login guard of mklisten: a caller that fails to log on (mk ends with the errorlevel 88) is counted by address; at "fails" of them
 within "window" seconds the address is refused for "block" seconds (a message, no node).  A good log-on is no failure.
 Real mk over telnet on a private copy of the sample BBS.   usage: loginguardtest.py <work dir>"""

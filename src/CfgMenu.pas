@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgMenu;   {Main menu of the configuration editor (Free Vision)}
 
 {$I MKB.Def}

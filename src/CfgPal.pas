@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgPal;   {Terminal palette tweak and a clean screen for the Free Vision programs}
 
 {$I MKB.Def}

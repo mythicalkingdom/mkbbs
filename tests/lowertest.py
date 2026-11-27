@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mklower: the references in a BBS that was set up with mixed case (language file names in config.mk, menu names and
 screens in the menus) are made lower case; a private copy of the sample BBS.   usage: lowertest.py <mklower>"""
 import os, shutil, subprocess, sys

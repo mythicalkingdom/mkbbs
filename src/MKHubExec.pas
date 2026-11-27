@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKHubExec;      {the exec transport of a QWK hub: run a program of the sysop, without a shell, with a time limit}
 
 {$I MKB.Def}

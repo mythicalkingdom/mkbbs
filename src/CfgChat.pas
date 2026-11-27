@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgChat;   {Multi-node chat settings (Chat.Mk); see MCHAT-PLAN.md}
 
 {$I MKB.Def}

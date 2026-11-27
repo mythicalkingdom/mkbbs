@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mk -x script: BASIC and Pascal programs of the sysop use the BBS through HOST$ / HostCall (MHOST-PLAN.md phase 1): the objects (system, users, message and file areas,
 messages, nodes, events, chat, statistics, log), the capabilities of extensions.cfg and -C, the script node, the time limit, arguments, errors.
 usage: hosttest.py <build dir> <work dir>"""

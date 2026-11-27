@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKMsgEzy;       {EZYCom Msg Unit}
 
 {$I MKB.Def}

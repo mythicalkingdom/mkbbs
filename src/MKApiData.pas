@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKApiData;   {The answers of the JSON API (read only): built from the files and sockets the BBS already has}
 
 {$mode objfpc}{$H+}

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKBinkQ;   {Giving a file to the mailer (mkbink queue): shared by mktoss and mkhatch}
 
 {$I MKB.Def}

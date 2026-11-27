@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A file echo, the whole way: a hub (a plain mkbink, 1:110/100) sends a file and its TIC to the BBS (1:110/290, mkbink with mktoss as its
 on-inbound command, started as mklisten starts it); the tosser stores the file in the file area (files.bbs, the date), passes it on to
 a second system (a plain mkbink, 1:110/200) that the BBS calls, with a TIC of its own; then the BBS hatches a file (mkhatch) that goes to the

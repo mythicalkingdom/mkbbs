@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgNet;   {Networks an echomail system may use (A-Z), converted from CFGNET}
 
 {$I MKB.Def}

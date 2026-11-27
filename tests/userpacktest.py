@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkuserpack on a private copy of the sample BBS: users marked deleted (mkuserpurge) leave users.bbs and extusers.bbs in step, usersidx.bbs is made again (the entries of the users who stay are the
 old ones), the map (usermap.txt and a dated copy), the refusal while a mk runs, the dry run, a second pack.   usage: userpacktest.py <build dir> <work dir>"""
 import glob, os, shutil, subprocess, sys

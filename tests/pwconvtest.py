@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mkpwconv -x (extusers.bbs to the record with the hash block) and the refusal of mk and mkusered to work on a file of the old size.
 usage: pwconvtest.py <build dir> <work dir>"""
 import os, subprocess, sys, shutil

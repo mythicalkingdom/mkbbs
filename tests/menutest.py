@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """MKMenu through a pseudo terminal on a private copy of a sample menu: edit, pick a command,
 insert, delete, save; the bytes of the file are checked.
 usage: menutest.py <work dir>   (needs bbs/bbsc/ra and bbs/bbsc/myth/menus, i.e. the sample BBS)"""

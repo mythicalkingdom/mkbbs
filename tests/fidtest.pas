@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program fidtest;
 {$mode tp}
 { the hold flag of the Fido *.msg unit: attribute word at offset 186, hold = $0200 }

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKQwkLog;       {mk -Q: the login of a QWK network system (or any caller who has a script)}
 
 {$I MKB.Def}

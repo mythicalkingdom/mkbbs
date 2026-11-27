@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit CfgFEcho;   {File echoes (TIC): the echoes, their options and the systems' passwords (FileEcho.Mk); see TIC-PLAN.md}
 
 {$I MKB.Def}

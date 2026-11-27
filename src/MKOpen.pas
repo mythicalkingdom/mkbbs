@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOpen; {Open a message area using an MsgAreaId}
 
 {$I MKB.Def}

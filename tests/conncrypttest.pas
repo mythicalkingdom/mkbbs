@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program conncrypttest;
 { the cipher against RFC 8439, and the sealed file: it opens with the password, not with another, not when one byte is changed }
 {$mode objfpc}{$H+}

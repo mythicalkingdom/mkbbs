@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # MK BBS (Free Pascal)
 #
 #   make                  build the programs (build/mk mklisten mkmon mkconfig mkread mkmenu mkusered mklc mklistmsgarea mknodelist mknodeidx mkcfgcvt mkbinkcfg mklower mktoss mkhatch mkbbsssh mkqwk mkqwkcfg mkcat mkdraw mkpwconv mkfreq mkevents mkbackup mkmaint mkstats mkuserpurge mkfilecheck mkuserpack mkapi mkapitoken mksetup mkcheck mkmsgconv mkchatctl mkconnect)

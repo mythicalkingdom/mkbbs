@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program merstress;
 {$mode tp}
 { Merlin stress and recovery tests.

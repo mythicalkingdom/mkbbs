@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 program scanflagstest;
 {$mode tp}
 { what the scanner of mktoss relies on: a message written like the BBS editor does (local, echo) is "to export" when read

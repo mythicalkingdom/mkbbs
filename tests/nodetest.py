@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """mknodeidx / mknodelist on a private copy of the sample BBS: the index built from the sample nodelists must be
 byte for byte the index of the real BBS (nodeidx.ra), and nodes are found through it.
 usage: nodetest.py <build dir> <work dir>"""

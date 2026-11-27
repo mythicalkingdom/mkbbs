@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The event editor of mkconfig (Events): the new fields (action, command, late handling, exclusive, log, timeout) are shown,
 saved in events.mk, and read back by the next run; the list shows what an event does.  Private copy of the sample BBS.
 usage: eventsedittest.py <work dir>"""

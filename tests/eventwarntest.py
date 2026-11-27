@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A caller who is online when an exclusive event is waiting for the callers is told (the real mk, mklisten): a plain event only says it, a forced
 one with "warn" gives the minutes and disconnects after them.   usage: eventwarntest.py <work dir>"""
 import json, os, re, shutil, socket, subprocess, sys, time

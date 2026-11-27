@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKOffXfer;      {offline mail: running the packers and the file transfer programs}
 
 {$I MKB.Def}

@@ -1,3 +1,4 @@
+{ SPDX-License-Identifier: GPL-3.0-or-later }
 Unit MKTarGz;        {tar archives (ustar) inside gzip: written and read here, nothing else is needed to make or open a backup}
 
 {$mode objfpc}{$H+}
