@@ -52,7 +52,7 @@ Program MKFreq;
 }
 
 Uses
-  BaseUnix, Dos, MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKWild;
+  BaseUnix, Dos, MKString, MKFile, MKGlobT, MKCfgAbs, MKRCfgMK, MKCfgNew, MKWild, MKFileIdx;
 
 
 Const
@@ -387,12 +387,13 @@ Function SearchAreas(Pattern, Req: String): Word;
   End;
 
 
-{ a list of the files the profile may request, in a file next to the answer file }
+{ a list of the files the profile may request, in a file next to the answer file (the files of an area come from the index of MKFileIdx when it is there and up to date) }
 Function MakeList(Name: String; Var ListPath: String): Boolean;
   Var
     T: Text;
     i: Word;
-    SR: SearchRec;
+    j: LongInt;
+    Ents: TFileEnts;
     Dir: String;
     p: Word;
     N: LongInt;
@@ -417,20 +418,15 @@ Function MakeList(Name: String; Var ListPath: String): Boolean;
     If AreaAllowed(i) Then
       Begin
       WriteLn(T, Config^.GetFileAreaName(i));
-      Dir := WithSlash(AbsPath(Config^.GetFileAreaPath(i)));
-      FindFirst(Dir + '*', AnyFile, SR);
-      While DosError = 0 Do
+      AreaFiles(i, Ents, True);
+      For j := 0 To High(Ents) Do
         Begin
-        If (SR.Attr And Directory) = 0 Then
-          Begin
-          WriteLn(T, '  ', PadRight(SR.Name, ' ', 14), SR.Size:10);
-          Inc(N);
-          End;
-        FindNext(SR);
+        WriteLn(T, '  ', PadRight(Ents[j].Name, ' ', 14), Ents[j].Size:10);
+        Inc(N);
         End;
-      FindClose(SR);
       WriteLn(T);
       End;
+  IndexFlush;
   WriteLn(T, N, ' file(s)');
   Close(T);
   MakeList := IoResult = 0;

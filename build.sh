@@ -54,6 +54,7 @@ fpc -B -Fusrc -FEbuild -FUbuild -vew -omkmaint src/MKMaint.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkstats src/MKStatsRep.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpurge src/MKUserPurge.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfilecheck src/MKFileCheck.pas
+fpc -B -Fusrc -FEbuild -FUbuild -vew -omkfilelist src/MKAllFiles.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkuserpack src/MKUserPack.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapi src/MKApi.pas
 fpc -B -Fusrc -FEbuild -FUbuild -vew -omkapitoken src/MKApiTokTool.pas
@@ -405,6 +406,11 @@ if [ -f bbs/bbsc/ra/config.mk ]; then
   python3 tests/filechecktest.py build build/work/filecheck | grep -E "^(ok|FAIL|skip|failures)" | tee build/filecheckresult.txt
   python3 tests/userpacktest.py build build/work/userpack | grep -E "^(ok|FAIL|skip|failures)" | tee build/userpackresult.txt
   if grep -q "^FAIL" build/userpurgeresult.txt build/filecheckresult.txt build/userpackresult.txt; then exit 1; fi
+fi
+# mkfilelist: the list of all files for a security profile, and the index of the file areas (a flat binary cache)
+if [ -f bbs/bbsc/ra/config.mk ]; then
+  python3 tests/filelisttest.py build build/work/filelist | grep -E "^(ok|FAIL|skip|failures)" | tee build/filelistresult.txt
+  if grep -q "^FAIL" build/filelistresult.txt; then exit 1; fi
 fi
 # the statistics screen of the sysop monitor (S)
 if [ -f bbs/bbsc/ra/config.mk ]; then

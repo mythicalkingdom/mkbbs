@@ -498,7 +498,10 @@ Procedure DoFileList(PathStr: String; ListName: String);
       ListPath := ListName
     Else
       ListPath := PathStr + ListName;
-    End;
+    End
+  Else If Not FileExist(ListPath) Then
+    If FindDirFile(PathStr, '') <> '' Then          {no files.bbs: a PCBoard DIR file of the folder}
+      ListPath := FindDirFile(PathStr, '');
   PcbMode := False;
   If FileExist(ListPath) Then
     Begin

@@ -28,7 +28,7 @@ Function ApiUser(Const Name, Query: String): TJSONObject;                 {Nil: 
 Implementation
 
 Uses BaseUnix, Unix, Sockets, DateUtils, StrUtils,
-  MKGlobT, MKCfgAbs, MKMsgAbs, MKOpen, MKName, MKCp437, MKFile, MKFileList;
+  MKGlobT, MKCfgAbs, MKMsgAbs, MKOpen, MKName, MKCp437, MKFile, MKFileList, MKFileIdx;
 
 Type
   UserOnRec = Packed Record            {as UserOnType in Struct.MK}
@@ -963,15 +963,12 @@ Function ApiFileAreas: TJSONObject;
 
 
 Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
-  {the files of an area: name, description (from files.bbs, continuation lines joined with a line feed), size and date; a file the list does not name has no description}
+  {the files of an area: name, description (continuation lines joined with a line feed), size and date; a file the list does not name has no description.  From the index when it is there and
+   the area has not changed (MKFileIdx), else from the list (files.bbs or a PCBoard DIR file) and the folder}
   Var
-    Dir, ListFile, Q, After, Name, D, T: String;
-    PName, PDesc, PText: ShortString;
-    PSize, PTime: LongInt;
-    Lines: TStringList;
-    Desc, Names: TStringList;
-    SR: TSearchRec;
-    i, k, Limit, Got: Integer;
+    Q, After, Name, D: String;
+    Ents: TFileEnts;
+    i, Limit, Got: Integer;
     Arr: TJSONArray;
     O: TJSONObject;
     Last: String;
@@ -984,81 +981,22 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
   Limit := IntParam(Query, 'limit', 100, 1, 1000);
   After := QueryParam(Query, 'after');
   Q := LowerCase(QueryParam(Query, 'q'));
-  Dir := Config^.GetFileAreaPath(Area);
-  If (Dir <> '') Then
-    Dir := IncludeTrailingPathDelimiter(Dir);
-  ListFile := Config^.GetFileListPath(Area);
-  If (ListFile = '') Or DirectoryExists(ListFile) Then
-    ListFile := Dir + 'files.bbs';
   Result := TJSONObject.Create;
   Result.Add('area', Area);
   Result.Add('name', Cp437Str(Config^.GetFileAreaName(Area)));
   Arr := TJSONArray.Create;
   Result.Add('files', Arr);
-  Desc := TStringList.Create;                   {listed name -> description}
-  Desc.CaseSensitive := True;
-  Names := TStringList.Create;                  {the files that are there}
-  Names.CaseSensitive := True;
-  If FileExists(ListFile) Then
-    Begin
-    Lines := TStringList.Create;
-    Try
-      Lines.LoadFromFile(ListFile);
-    Except
-      Lines.Clear;
-    End;
-    k := -1;
-    For i := 0 To Lines.Count - 1 Do
-      Begin
-      T := Lines[i];
-      If (T = '') Or (T[1] = ';') Or (T[1] = '/') Then
-        Continue;
-      If PcbPrimary(T, PName, PSize, PTime, PDesc) Then       {a PCBoard DIR line: name, size, date, description}
-        k := Desc.Add(PName + #1 + PcbStripCodes(PDesc))
-      Else If T[1] > ' ' Then
-        Begin
-        Name := T;
-        D := '';
-        k := Pos(' ', T);
-        If k = 0 Then k := Pos(#9, T);
-        If k > 0 Then
-          Begin
-          Name := Copy(T, 1, k - 1);
-          D := Trim(Copy(T, k + 1, 2000));
-          End;
-        k := Desc.Add(Name + #1 + D);
-        End
-      Else If k >= 0 Then
-        Begin
-        If PcbSecondary(T, PText) Then
-          T := PcbStripCodes(PText);
-        Desc[k] := Desc[k] + #10 + Trim(T);
-        End;
-      End;
-    Lines.Free;
-    End;
-  If (Dir <> '') And DirectoryExists(Dir) Then
-    If FindFirst(Dir + '*', faAnyFile, SR) = 0 Then
-      Begin
-      Repeat
-        If ((SR.Attr And faDirectory) = 0) And (SR.Name[1] <> '.') And (LowerCase(SR.Name) <> 'files.bbs') And (LowerCase(SR.Name) <> 'files.bbs.bak') And (LowerCase(SR.Name) <> 'files.bbs.new') Then
-          Names.AddObject(SR.Name, TObject(PtrInt(SR.Time)));
-      Until FindNext(SR) <> 0;
-      FindClose(SR);
-      End;
-  Names.CustomSort(@CompareNamesNoCase);
+  AreaFiles(Area, Ents, True);
+  IndexFlush;
   Got := 0;
   Last := '';
   More := False;
-  For i := 0 To Names.Count - 1 Do
+  For i := 0 To High(Ents) Do
     Begin
-    Name := Names[i];
+    Name := Ents[i].Name;
     If (After <> '') And (CompareText(Name, After) <= 0) Then
       Continue;
-    D := '';
-    For k := 0 To Desc.Count - 1 Do
-      If Copy(Desc[k], 1, Length(Name) + 1) = Name + #1 Then
-        D := Copy(Desc[k], Length(Name) + 2, 4000);
+    D := Ents[i].Desc;
     If (Q <> '') And (Pos(Q, LowerCase(Name)) = 0) And (Pos(Q, LowerCase(D)) = 0) Then
       Continue;
     If Got >= Limit Then
@@ -1072,12 +1010,8 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
       O.Add('description', Cp437Str(D))
     Else
       O.Add('description', TJSONNull.Create);
-    If FindFirst(Dir + Name, faAnyFile, SR) = 0 Then
-      Begin
-      O.Add('size', SR.Size);
-      O.Add('date', FormatDateTime('yyyy-mm-dd', FileDateToDateTime(SR.Time)));
-      FindClose(SR);
-      End;
+    O.Add('size', Ents[i].Size);
+    O.Add('date', FormatDateTime('yyyy-mm-dd', FileDateToDateTime(Ents[i].Time)));
     Arr.Add(O);
     Last := Name;
     Inc(Got);
@@ -1087,8 +1021,6 @@ Function ApiFileList(Area: Integer; Const Query: String): TJSONObject;
     Result.Add('next', Last)
   Else
     Result.Add('next', TJSONNull.Create);
-  Desc.Free;
-  Names.Free;
   End;
 
 

@@ -16,6 +16,7 @@ part has a document with the details; this one does not repeat them.
 | **`SETUP.md`** | the quick start: `mksetup` makes a BBS that runs, to change afterwards |
 | **`API.md`** | read the BBS from scripts and dashboards: the read only JSON API (`mkapi`, `mkapitoken`), tokens, scopes, TLS |
 | **`STATS.md`** | see the calls: totals, busiest hours, top callers (`mkstats`) |
+| **`FILELIST.md`** | the list of all files for a security level (`mkfilelist`), made by cron or an event, and the index of the file areas |
 | **`MAINT.md`** | purge and pack old messages (`mkmaint`), purge and pack users (`mkuserpurge`, `mkuserpack`), check the file lists (`mkfilecheck`) |
 | **`BACKUP.md`** | back the BBS up and restore it (`mkbackup`), and the `.bak` copies of the configuration files |
 | `mklisten.example.json` | a starting configuration for the listener |

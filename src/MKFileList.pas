@@ -36,6 +36,12 @@ Function InArea(Const Dir, Name: String): Boolean;
 
 Procedure AppendList(Const ListFile, Text: String);
 
+Function PcbListLines(Const Name: String; Size: Int64; When: TDateTime; Desc: TStrings): String;
+  {the lines of a PCBoard DIR file for a file: name to column 12, the size flush right in column 20, the date from column 24 (MM-DD-YY), the description from column 34, the rest with the bar}
+
+Function FindDirFile(Const Dir, ConfList: String): String;
+  {the PCBoard DIR file of an area that has no files.bbs: the list file that the area names (when it is there and is not files.bbs), or a file DIR in the folder (any case); '' when there is none}
+
 Procedure AddListing(Const Dir, ConfList, Name: String; Desc: TStrings);
   {lists the file Name (it is in Dir) with its description.  Where: files.bbs of Dir when it is there; else the list file that the area names (ConfList) when
    that is a file that is there, or a file DIR of Dir (any case) and the list is a PCBoard DIR file: a primary line (name, size, date, description) and secondary
@@ -283,7 +289,7 @@ Function FindDirFile(Const Dir, ConfList: String): String;
   End;
 
 
-Function PcbListLines(Const Name: String; Size: Int64; Desc: TStrings): String;
+Function PcbListLines(Const Name: String; Size: Int64; When: TDateTime; Desc: TStrings): String;
   {name to column 12, the size flush right in column 20, the date from column 24 (MM-DD-YY), the description from column 34, the rest with the bar}
   Var
     i: Integer;
@@ -291,7 +297,7 @@ Function PcbListLines(Const Name: String; Size: Int64; Desc: TStrings): String;
     Y, M, D: Word;
 
   Begin
-  DecodeDate(Date, Y, M, D);
+  DecodeDate(When, Y, M, D);
   N := Name;
   While Length(N) < 12 Do
     N := N + ' ';
@@ -324,7 +330,7 @@ Procedure AddListing(Const Dir, ConfList, Name: String; Desc: TStrings);
         Size := SR.Size;
         FindClose(SR);
         End;
-      AppendList(Pcb, PcbListLines(Name, Size, Desc));
+      AppendList(Pcb, PcbListLines(Name, Size, Date, Desc));
       Exit;
       End;
     End;

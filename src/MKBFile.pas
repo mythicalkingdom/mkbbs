@@ -5,15 +5,16 @@ Unit MKBFile;
 
 Interface
 
-Uses MKGlobT, MKFile, MKCfgAbs, MKString,
+Uses MKGlobT, MKFile, MKCfgAbs, MKString, MKFileIdx, MKWild,
   Dos;
 
 Const MaxFiles = 800;
 
 Type NewRec = Record
-    Name: String[12];
+    Name: String;
     Date: LongInt;
     Size: LongInt;
+    Desc: String;                      {the first line of the description in the list}
     End;
 
 Type NewInfo = Record
@@ -26,7 +27,7 @@ Type NewInfo = Record
   Sec: SecType;
   MaxAreas: Word;
   AreaNo: Word;
-  FBbs: TFile;
+  Next: Word;                          {the entry of NewArray that the next search starts at}
   End;
 
 
@@ -38,7 +39,8 @@ Type FSearchInfoType = Record
   AreaNo: Word;
   Found: Boolean;
   ST: Byte;
-  SR: SearchRec;
+  Ents: TFileEnts;                     {the files of the area (MKFileIdx)}
+  Cur: LongInt;                        {the found file}
   End;
 
 
@@ -69,6 +71,7 @@ Type FileSearchObj = Object
                   {ST=1 View, ST=2 DL}
   Procedure FileNext;                       {Find next}
   Procedure SearchThisArea;                 {Internal use only}
+  Procedure NextMatch;                      {Internal use only}
   Function  FileFound: Boolean;             {Was found?}
   Function  GetName: String;                {Get name of found file}
   Function  GetSize: LongInt;               {Get size of found file}
@@ -87,13 +90,13 @@ Procedure NewFileObj.NewFileInit;
   Begin
   New(NewFiles);
   NewFiles^.CurrNew := 0;
-  NewFiles^.FBbs.Init;
+  NewFiles^.Next := 1;
   End;
 
 
 Procedure NewFileObj.NewFileDone;
   Begin
-  NewFiles^.FBbs.Done;
+  IndexFlush;
   Dispose(NewFiles);
   End;
 
@@ -120,79 +123,51 @@ Procedure NewFileObj.NewFileFirst(Sec: SecType; LastDate: LongInt);
 
 
 Procedure NewFileObj.NewFirstThisArea;
-  Var
-    FileList: String[128];
-
   Begin
   NewFiles^.CurrNew := 0;
   LoadNewArray(NewFiles^.AreaNo);
-  If NewFiles^.NewThisArea > 0 Then
-    Begin
-    FileList := Config^.GetFileListPath(NewFiles^.AreaNo);
-    If NewFiles^.FBbs.OpenTextFile(FileList) Then
-      NewNextThisArea;
-    End;
+  NewFiles^.Next := 1;
+  NewNextThisArea;
   End;
 
 
 Procedure NewFileObj.NewNextThisArea;      {Find next new files in area}
-  Var
-    TempName: String[12];
-    j: Word;
-    Match: Boolean;
-
   Begin
-  NewFiles^.TmpStr := NewFiles^.Fbbs.GetString;
-  While ((NewFiles^.Fbbs.StringFound) and (NewFiles^.CurrNew = 0)) Do
+  If NewFiles^.Next <= NewFiles^.NewThisArea Then
     Begin
-    TempName := Copy(Upper(ExtractWord(NewFiles^.TmpStr, 1)),1,12);
-    J := 1;
-    Match := False;
-    While ((j <= NewFiles^.NewThisArea) and (Not Match)) Do
-      Begin
-      If (TempName = NewFiles^.NewArray[j].Name) Then
-        Begin
-        NewFiles^.CurrNew := j;
-        NewFiles^.TmpStr := StripLead(Copy(NewFiles^.TmpStr, Length(TempName) + 1, 240), ' ');
-        Match := True;
-        End;
-      Inc(j);
-      End;
-    If NewFiles^.CurrNew = 0 Then
-      NewFiles^.TmpStr := NewFiles^.Fbbs.GetString;
-    End;
-  If NewFiles^.CurrNew = 0 Then
-    If NewFiles^.Fbbs.CloseTextFile Then;
+    NewFiles^.CurrNew := NewFiles^.Next;
+    Inc(NewFiles^.Next);
+    NewFiles^.TmpStr := NewFiles^.NewArray[NewFiles^.CurrNew].Desc;
+    End
+  Else
+    NewFiles^.CurrNew := 0;
   End;
 
 
 Procedure NewFileObj.LoadNewArray(AreaNo: Word);
+  {the files of the area that are listed (files.bbs or a PCBoard DIR file) and newer than LastDate, by name; from the index of MKFileIdx when it is up to date}
   Var
-    SR2: SearchRec;
-  FilePath: String[128];
-  FileList: String[128];
+    Ents: TFileEnts;
+    i, k: LongInt;
 
   Begin
-  FilePath := Config^.GetFileAreaPath(NewFiles^.AreaNo);
-  FileList := Config^.GetFileListPath(NewFiles^.AreaNo);
   NewFiles^.NewThisArea := 0;
-  If FileExist(FileList) Then
-    Begin
-    FindFirst(FilePath + '*.*', Archive + ReadOnly, SR2);
-    If IoResult <> 0 Then;
-    While ((DosError = 0) and (NewFiles^.NewThisArea < MaxFiles)) Do
+  If (Config^.GetFileAreaPath(AreaNo) = '') Then
+    Exit;
+  AreaFiles(AreaNo, Ents, True);
+  For i := 0 To High(Ents) Do
+    If (Ents[i].Listed) And (DosTimeOf(Ents[i].Time) >= NewFiles^.LastDate) And (NewFiles^.NewThisArea < MaxFiles) Then
       Begin
-      If SR2.Time >= NewFiles^.LastDate Then
-        Begin
-        Inc(NewFiles^.NewThisArea);
-        NewFiles^.NewArray[NewFiles^.NewThisArea].Name := SR2.Name;
-        NewFiles^.NewArray[NewFiles^.NewThisArea].Date := SR2.Time;
-        NewFiles^.NewArray[NewFiles^.NewThisArea].Size := SR2.Size;
-        End;
-      FindNext(SR2);
-      If IoResult <> 0 Then;
+      Inc(NewFiles^.NewThisArea);
+      NewFiles^.NewArray[NewFiles^.NewThisArea].Name := Ents[i].Name;
+      NewFiles^.NewArray[NewFiles^.NewThisArea].Date := DosTimeOf(Ents[i].Time);
+      NewFiles^.NewArray[NewFiles^.NewThisArea].Size := Ents[i].Size;
+      k := Pos(#10, Ents[i].Desc);
+      If k = 0 Then
+        NewFiles^.NewArray[NewFiles^.NewThisArea].Desc := Ents[i].Desc
+      Else
+        NewFiles^.NewArray[NewFiles^.NewThisArea].Desc := Copy(Ents[i].Desc, 1, k - 1);
       End;
-    End;
   End;
 
 
@@ -260,6 +235,7 @@ Procedure FileSearchObj.Init;
 
 Procedure FileSearchObj.Done;
   Begin
+  IndexFlush;
   Dispose(FileSearch);
   End;
 
@@ -286,26 +262,33 @@ Procedure FileSearchObj.FileFirst(Sec: SecType; Mask: String; ST: Byte);
   End;
 
 
-Procedure FileSearchObj.SearchThisArea;
-  Var
-    FilePath: String[128];
-
+Procedure FileSearchObj.NextMatch;
+  {the next file of the area (after Cur) that fits the mask: Found, Cur}
   Begin
-  FilePath := Config^.GetFileAreaPath(FileSearch^.AreaNo);
-  FindFirst(FilePath + FileSearch^.Mask, Archive + ReadOnly, FileSearch^.SR);
-  If IoResult <> 0 Then;
-  If DosError = 0 Then
-    FileSearch^.Found := True;
+  FileSearch^.Found := False;
+  Inc(FileSearch^.Cur);
+  While (FileSearch^.Cur <= High(FileSearch^.Ents)) And (Not FileSearch^.Found) Do
+    Begin
+    If DosMatch(Upper(FileSearch^.Mask), Upper(FileSearch^.Ents[FileSearch^.Cur].Name)) Then
+      FileSearch^.Found := True
+    Else
+      Inc(FileSearch^.Cur);
+    End;
+  End;
+
+
+Procedure FileSearchObj.SearchThisArea;
+  Begin
+  AreaFiles(FileSearch^.AreaNo, FileSearch^.Ents, True);
+  FileSearch^.Cur := -1;
+  NextMatch;
   End;
 
 
 Procedure FileSearchObj.FileNext;           {Find next}
   Begin
-  FileSearch^.Found := False;
-  FindNext(FileSearch^.SR);
-  If DosError = 0 Then
-    FileSearch^.Found := True
-  Else
+  NextMatch;
+  If Not FileSearch^.Found Then
     Inc(FileSearch^.AreaNo);
   While (FileSearch^.AreaNo <= FileSearch^.MaxAreas) And
   (FileSearch^.Found = False) Do
@@ -332,7 +315,7 @@ Function  FileSearchObj.FileFound: Boolean; {Was found?}
 Function  FileSearchObj.GetName: String;    {Get name of found file}
   Begin
   If FileSearch^.Found Then
-    GetName := FileSearch^.SR.Name
+    GetName := FileSearch^.Ents[FileSearch^.Cur].Name
   Else
     GetName := '';
   End;
@@ -341,7 +324,7 @@ Function  FileSearchObj.GetName: String;    {Get name of found file}
 Function  FileSearchObj.GetSize: LongInt;   {Get size of found file}
   Begin
   If FileSearch^.Found Then
-    GetSize := FileSearch^.SR.Size
+    GetSize := FileSearch^.Ents[FileSearch^.Cur].Size
   Else
     GetSize := 0;
   End;
@@ -350,7 +333,7 @@ Function  FileSearchObj.GetSize: LongInt;   {Get size of found file}
 Function  FileSearchObj.GetDate: LongInt;   {Get date of found file}
   Begin
   If FileSearch^.Found Then
-    GetDate := FileSearch^.SR.Time
+    GetDate := DosTimeOf(FileSearch^.Ents[FileSearch^.Cur].Time)
   Else
     GetDate := 0;
   End;
