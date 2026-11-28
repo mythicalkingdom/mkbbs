@@ -90,4 +90,7 @@ It can also be a **PCBoard DIR file**, as PCBFiler makes them (the format of its
 * anything else (headers, footers, rules) is shown as it is; `@Xhh` colour codes are taken out.
 
 The reading is by words and not by columns, so a list that is a few columns off is still taken.  A list with primary lines is a DIR file: its other lines are text,
-not files.  The API (`/v1` file lists) reads the descriptions from both kinds.  New uploads are added to `files.bbs` as before.
+not files.  The API (`/v1` file lists) reads the descriptions from both kinds.  New uploads (and `file.add` of a script) are added to `files.bbs` when the area has one.  An area **without `files.bbs`** whose list is a DIR file
+(the list file that the area names in the configuration, when it is there, or a file `DIR` in the folder, in any case) gets the new file as a primary line
+(name, size, today's date, the first line of the description) and the rest of the description as secondary lines with a bar.  An area with neither gets `files.bbs`.
+(TIC files that are tossed still go to `files.bbs`.)

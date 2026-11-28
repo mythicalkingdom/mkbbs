@@ -36,6 +36,11 @@ Function InArea(Const Dir, Name: String): Boolean;
 
 Procedure AppendList(Const ListFile, Text: String);
 
+Procedure AddListing(Const Dir, ConfList, Name: String; Desc: TStrings);
+  {lists the file Name (it is in Dir) with its description.  Where: files.bbs of Dir when it is there; else the list file that the area names (ConfList) when
+   that is a file that is there, or a file DIR of Dir (any case) and the list is a PCBoard DIR file: a primary line (name, size, date, description) and secondary
+   lines; else files.bbs is made}
+
 Implementation
 
 Uses SysUtils;
@@ -254,6 +259,76 @@ Procedure AppendList(Const ListFile, Text: String);
   Finally
     F.Free;
   End;
+  End;
+
+
+
+Function FindDirFile(Const Dir, ConfList: String): String;
+  {the PCBoard DIR file of an area that has no files.bbs: the list file named by the area, or DIR in the folder; '' when there is none}
+  Var
+    SR: TSearchRec;
+
+  Begin
+  Result := '';
+  If (ConfList <> '') And FileExists(ConfList) And (LowerCase(ExtractFileName(ConfList)) <> 'files.bbs') Then
+    Exit(ConfList);
+  If FindFirst(Dir + '*', faAnyFile, SR) = 0 Then
+    Begin
+    Repeat
+      If ((SR.Attr And faDirectory) = 0) And (LowerCase(SR.Name) = 'dir') Then
+        Result := Dir + SR.Name;
+    Until (FindNext(SR) <> 0) Or (Result <> '');
+    FindClose(SR);
+    End;
+  End;
+
+
+Function PcbListLines(Const Name: String; Size: Int64; Desc: TStrings): String;
+  {name to column 12, the size flush right in column 20, the date from column 24 (MM-DD-YY), the description from column 34, the rest with the bar}
+  Var
+    i: Integer;
+    N, First: String;
+    Y, M, D: Word;
+
+  Begin
+  DecodeDate(Date, Y, M, D);
+  N := Name;
+  While Length(N) < 12 Do
+    N := N + ' ';
+  If Desc.Count > 0 Then
+    First := Desc[0]
+  Else
+    First := '(no description)';
+  Result := N + Format('%8d', [Size]) + '   ' + Format('%.2d-%.2d-%.2d', [M, D, Y Mod 100]) + '  ' + Copy(First, 1, 200) + #10;
+  For i := 1 To Desc.Count - 1 Do
+    Result := Result + StringOfChar(' ', 32) + '| ' + Copy(Desc[i], 1, 200) + #10;
+  End;
+
+
+Procedure AddListing(Const Dir, ConfList, Name: String; Desc: TStrings);
+  Var
+    F, Pcb: String;
+    SR: TSearchRec;
+    Size: Int64;
+
+  Begin
+  F := Dir + 'files.bbs';
+  If Not FileExists(F) Then
+    Begin
+    Pcb := FindDirFile(Dir, ConfList);
+    If Pcb <> '' Then
+      Begin
+      Size := 0;
+      If FindFirst(Dir + Name, faAnyFile, SR) = 0 Then
+        Begin
+        Size := SR.Size;
+        FindClose(SR);
+        End;
+      AppendList(Pcb, PcbListLines(Name, Size, Desc));
+      Exit;
+      End;
+    End;
+  AppendList(F, ListLines(Name, Desc));
   End;
 
 

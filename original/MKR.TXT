@@ -1,0 +1,459 @@
+BBSPath Z:\BBSC\RA\
+NodeListPath Z:\BBSD\NODELIST
+
+Addr 1 1:110/290
+Addr 2 77:100/290
+
+Sysop Mark May
+
+Origin 1 Mythical Kingdom Tech Bbs HST/V32 513-237-7737
+
+MsgArea 1
+  Name General Messages
+  AreaId H001Z:\BBSC\RA\
+  UseAddr 1
+  UseOrig 1
+  MailType Local
+  Allow Both
+  EndArea
+
+MsgArea 2
+  Name Comments to Sysop
+  AreaId H002Z:\BBSC\RA\
+  UseAddr 1
+  UseOrig 1
+  MailType Local
+  Allow Priv
+  EndArea
+
+
+MsgArea 3
+  Name Public - Maximus
+  AreaId SZ:\BBSF\MAX\MSG\PUBLIC
+  MailType Local
+  Allow Both
+  EndArea
+
+MsgArea 4
+  Name Private - Maximus
+  AreaId SZ:\BBSF\max\msg\private
+  MailType Local
+  Allow Private
+  EndArea
+
+MsgArea 5
+  Name Muffin - Maximus
+  AreaId SZ:\Bbsf\max\msg\muffin
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 7
+  Name BBS NetMail
+  AreaId H007Z:\BBSC\RA\
+  UseAddr 1
+  UseOrig 1
+  MailType NetMail
+  Allow Both
+  NoFido
+  EndArea
+
+MsgArea 8
+  Name NetMail
+  AreaId FZ:\BBSD\Mail\
+  UseAddr 1
+  UseOrig 1
+  MailType NetMail
+  Allow Both
+  EndArea
+
+MsgArea 6
+  AreaId H006Z:\BBSC\RA\
+  Name MK
+  MailType Echomail
+  Allow Public
+  EndArea
+
+MsgArea 10
+  AreaId H010Z:\BBSC\RA\
+  Name FIDO-Tri Bbs
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 11
+  AreaId H011Z:\BBSC\RA\
+  Name FIDO-DaytonSysop
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 12
+  AreaId H012Z:\BBSC\RA\
+  Name FIDO-New sysop
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 13
+  AreaId H013Z:\BBSC\RA\
+  Name Miami Valley Bbs Support
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 21
+  AreaId H021Z:\BBSC\RA\
+  Name FIDO-Pascal
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 22
+  AreaId H022Z:\BBSC\RA\
+  Name FIDO-C Programming
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 23
+  AreaId H023Z:\BBSC\RA\
+  Name FIDO-Programmer
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 24
+  AreaId H024Z:\BBSC\RA\
+  Name FIDO-Quickbbs
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 25
+  AreaId H025Z:\BBSC\RA\
+  Name FIDO-Quickbbs Pr
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+MsgArea 26
+  AreaId H026Z:\BBSC\RA\
+  Name FIDO-Lan
+  MailType EchoMail
+  Allow Public
+  EndArea
+
+;H027Z:\BBSC\RA\
+;FIDO-RemoteA
+;FIDO-RemoteAcces
+;H028Z:\BBSC\RA\
+;FIDO-HardDis
+;FIDO-HardDisk
+;H029Z:\BBSC\RA\
+;FIDO-LaserPu
+;FIDO-LaserPub
+;H030Z:\BBSC\RA\
+;FIDO-HST Mod
+;FIDO-HST Modem
+;H031Z:\BBSC\RA\
+;FIDO-Tech
+;FIDO-Tech
+;H032Z:\BBSC\RA\
+;FIDO-Dbase
+;FIDO-Dbase
+;H033Z:\BBSC\RA\
+;FIDO-UF Gate
+;FIDO-UF Gate
+;H034Z:\BBSC\RA\
+;FIDO-Electro
+;FIDO-Electronics
+;H035Z:\BBSC\RA\
+;FIDO-CD Rom
+;FIDO-CD Rom
+;H036Z:\BBSC\RA\
+;RIME-System
+;RIME-System Alys
+;H037Z:\BBSC\RA\
+;RIME-MegaMai
+;RIME-MegaMail
+;H038Z:\BBSC\RA\
+;RIME-RemoteA
+;RIME-RemoteA Bbs
+;H039Z:\BBSC\RA\
+;RIME-ModemZo
+;RIME-ModemZone
+;H040Z:\BBSC\RA\
+;RIME-Music c
+;RIME-Music card
+;H041Z:\BBSC\RA\
+;RIME-Common
+;RIME-Common
+;H042Z:\BBSC\RA\
+;RIME-Program
+;RIME-Programming
+;H043Z:\BBSC\RA\
+;FIDO-RA Util
+;FIDO-RA Utilities
+;H044Z:\BBSC\RA\
+;RIME-Bbs Ads
+;RIME-Bbs Ads
+;H045Z:\BBSC\RA\
+;RIME-CXL-IDC
+;RIME-CXL-IDC
+;H046Z:\BBSC\RA\
+;RIME-Laser P
+;RIME-Laser Print
+;H047Z:\BBSC\RA\
+;RIME-Ansi
+;RIME-Ansi
+;H048Z:\BBSC\RA\
+;RIME-C Progr
+;RIME-C Program
+;H049Z:\BBSC\RA\
+;RIME-Pascal
+;RIME-Pascal
+;H050Z:\BBSC\RA\
+;RIME-Lan
+;RIME-Lan
+;H051Z:\BBSC\RA\
+;RIME-Dbase
+;RIME-Dbase
+;H052Z:\BBSC\RA\
+;RIME-Brief
+;RIME-Brief
+;H053Z:\BBSC\RA\
+;RIME-Lotus
+;RIME-Lotus
+;H054Z:\BBSC\RA\
+;RIME-DTP
+;RIME-DTP
+;H055Z:\BBSC\RA\
+;RIME-Unix
+;RIME-Unix
+;H056Z:\BBSC\RA\
+;RIME-Pets
+;RIME-Pets
+;H057Z:\BBSC\RA\
+;RIME-Compuco
+;RIME-Compucomm Modems
+;H058Z:\BBSC\RA\
+;RIME-Windows
+;RIME-Windows
+;H059Z:\BBSC\RA\
+;RIME-MASM
+;RIME-MASM
+;H060Z:\BBSC\RA\
+;RIME-OOPS Pr
+;RIME-OOPS Progrm
+;H061Z:\BBSC\RA\
+;RIME-Lantast
+;RIME-Lantastic
+;H062Z:\BBSC\RA\
+;RIME-Paradox
+;RIME-Paradox
+;H063Z:\BBSC\RA\
+;RIME-Clipper
+;RIME-Clipper
+;H064Z:\BBSC\RA\
+;RIME-Wildcat
+;RIME-Wildcat
+;H065Z:\BBSC\RA\
+;RIME-Offline
+;RIME-Offline Mail Reading
+;H066Z:\BBSC\RA\
+;RIME-EZ Read
+;RIME-EZ Reader
+;H067Z:\BBSC\RA\
+;RIME-MainFra
+;RIME-MainFrame
+;H068Z:\BBSC\RA\
+;RIME-Qbasic
+;RIME-Qbasic
+;H069Z:\BBSC\RA\
+;RIME-Sysops
+;RIME-Sysops
+;H070Z:\BBSC\RA\
+;RIME-BBS Sof
+;RIME-BBS Softwar
+;H071Z:\BBSC\RA\
+;RIME-Qmodem
+;RIME-Qmodem
+;H072Z:\BBSC\RA\
+;RIME-Qedit
+;RIME-Qedit
+;H073Z:\BBSC\RA\
+;RIME-News
+;RIME-News
+;H074Z:\BBSC\RA\
+;RIME-Admin
+;RIME-Admin
+;H075Z:\BBSC\RA\
+;RIME-SQL
+;RIME-SQL
+;H076Z:\BBSC\RA\
+;RIME-Flight
+;RIME-Flight Simulator
+;H077Z:\BBSC\RA\
+;RIME-SLMR
+;RIME-SLMR
+;H100Z:\BBSC\RA\
+;ICDM-Net
+;ICDM-Net
+;H101Z:\BBSC\RA\
+;ICDM-Bridges
+;ICDM-Bridges
+;H102Z:\BBSC\RA\
+;ICDM-Discipl
+;ICDM-Disciple
+;H103Z:\BBSC\RA\
+;ICDM-Cults
+;ICDM-Cults
+;H104Z:\BBSC\RA\
+;ICDM-Round T
+;ICDM-Round Table
+;H105Z:\BBSC\RA\
+;ICDM-Questio
+;ICDM-Questions
+;H106Z:\BBSC\RA\
+;ICDM-Herbs a
+;ICDM-Herbs and such
+;H107Z:\BBSC\RA\
+;ICDM-Fine Ar
+;ICDM-Fine Arts
+;H108Z:\BBSC\RA\
+;ICDM-Region
+;ICDM-Region 3
+;H109Z:\BBSC\RA\
+;ICDM-Prayer
+;ICDM-Prayer
+;H110Z:\BBSC\RA\
+;ICDM-Dayton
+;ICDM-Dayton
+;H111Z:\BBSC\RA\
+;ICDM-Study
+;ICDM-Study
+;H116Z:\BBSC\RA\
+;FIDO-S King
+;FIDO-S King
+;H117Z:\BBSC\RA\
+;FIDO-SuperBb
+;FIDO-SuperBbs
+;H118Z:\BBSC\RA\
+;FIDO-Binkley
+;FIDO-Binkley
+;H119Z:\BBSC\RA\
+;FIDO-FrontDo
+;FIDO-FrontDoor
+;H120Z:\BBSC\RA\
+;FIDO-Audio
+;FIDO-Audio
+;H121Z:\BBSC\RA\
+;FIDO-Dayton
+;FIDO-Dayton
+;H122Z:\BBSC\RA\
+;FIDO-DesqVie
+;FIDO-DesqView Multitasking
+;H123Z:\BBSC\RA\
+;FIDO-FoxPro
+;FIDO-FoxPro Database
+;H124Z:\BBSC\RA\
+;FIDO-Lotus S
+;FIDO-Lotus Spreadsheet
+;H125Z:\BBSC\RA\
+;FIDO-Quick B
+;FIDO-Quick Basic
+;H126Z:\BBSC\RA\
+;FIDO-Region
+;FIDO-Region 11 Chat
+;H127Z:\BBSC\RA\
+;FIDO-Sysop R
+;FIDO-Sysop R11 Region
+;H128Z:\BBSC\RA\
+;FIDO-Commerc
+;FIDO-Commercial For Sale
+;H129Z:\BBSC\RA\
+;FIDO-For Sal
+;FIDO-For Sale
+;H130Z:\BBSC\RA\
+;FIDO-SDS Reg
+;FIDO-SDS Region 11
+;H131Z:\BBSC\RA\
+;FIDO-Shortwa
+;FIDO-Shortwave
+;H133Z:\BBSC\RA\
+;FIDO-Dayton
+;FIDO-Dayton File
+;H134Z:\BBSC\RA\
+;FIDO-Consume
+;FIDO-Consumer Report
+;H135Z:\BBSC\RA\
+;FIDO-QuickCl
+;FIDO-QuickClone
+;H136Z:\BBSC\RA\
+;FIDO-QMX/XRS
+;FIDO-QMX/XRS
+;H137Z:\BBSC\RA\
+;FIDO-200-300
+;FIDO-200-300
+;H138Z:\BBSC\RA\
+;FIDO-Windows
+;FIDO-Windows
+;H139Z:\BBSC\RA\
+;FIDO-OS2
+;FIDO-OS2
+;H140Z:\BBSC\RA\
+;FIDO-Turbo P
+;FIDO-Turbo Pascal for Windows
+;H141Z:\BBSC\RA\
+;FIDO-RA Mult
+;FIDO-RA Multinode
+;H142Z:\BBSC\RA\
+;FIDO-Lantast
+;FIDO-Lantastic
+;H143Z:\BBSC\RA\
+;FIDO-File Re
+;FIDO-File Request
+;H149Z:\BBSC\RA\
+;COSAURD
+;COSAURD
+;H150Z:\BBSC\RA\
+;PNET-Common
+;PNET-Common
+;H151Z:\BBSC\RA\
+;PNET-Basic
+;PNET-Basic
+;H152Z:\BBSC\RA\
+;PNET-Pascal
+;PNET-Pascal
+;H153Z:\BBSC\RA\
+;PNET-Ada
+;PNET-Ada
+;H154Z:\BBSC\RA\
+;PNET-Modula
+;PNET-Modula 2
+;H155Z:\BBSC\RA\
+;PNET-Rexx
+;PNET-Rexx
+;H156Z:\BBSC\RA\
+;PNET-Assembl
+;PNET-Assembly
+;H157Z:\BBSC\RA\
+;PNET-Fortran
+;PNET-Fortran
+;H158Z:\BBSC\RA\
+;PNET-Cobol
+;PNET-Cobol
+;H159Z:\BBSC\RA\
+;PNET-Databas
+;PNET-Database
+;H160Z:\BBSC\RA\
+;PNET-C
+;PNET-C
+;H161Z:\BBSC\RA\
+;PNET-Admin
+;PNET-Admin
+;H164Z:\BBSC\RA\
+;PNET-Bbs/Uti
+;PNET-Bbs/Utils Development
+

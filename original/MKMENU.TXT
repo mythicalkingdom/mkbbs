@@ -1,0 +1,180 @@
+;
+;                             MKMenu Menu Definition
+;                        By Mark May - Mythical Kingdom Software
+;
+;  Menu command definitions
+;  The menu name is defined on the menu type number
+;  The menu command line is defined on the menu type number + 256
+;
+001 Go To Menu
+257 Menu Name {/F=+-} {/M=+-} {Password}
+002 GoSub Menu
+258 Menu Name {/F=+-} {/M=+-} {Password}
+003 Return from Gosub
+259 None
+004 Go To Menu & Clear GoSubs
+260 Menu Name {/F=+-} {/M=+-} {Password}
+005 Display Asc/Ans/Avt file
+261 Filename (no extension)
+006 Bulletins
+262 Filename (no extension)
+007 Shell to program
+263 Program name command line and options
+008 Version Information
+264 None
+009 End the call
+265 None
+010 Display system usage
+266 None
+011 Sysop chat page
+267 None
+012 Questionaire
+268 Filename (no extension)
+013 User listing
+269 None
+014 Display Time Stats
+270 None
+015 Exit with errorlevel
+271 Errorlevel Options
+016 Change City/State
+272 None
+017 Change Password
+273 None
+018 Change screen length
+274 None
+019 Toggle screen clearing
+275 None
+020 Toggle more? pausing
+276 None
+021 Toggle ansi graphics
+277 None
+022 Check for your mail
+278 None
+023 Read messages
+279 Area# or /M
+024 Scan message headers
+280 Area# or /M
+025 QuickScan messages
+281 Area# or /M
+026 Delete message
+282 Area# or /M
+027 Post a message
+283 Area# or /M /L /T=First_Last
+028 Select combined msg areas
+284 None
+029 Move a file
+285 Source file path
+030 Directory listing
+286 File path or /F
+031 File list
+287 File path or /F
+032 Download file from area
+288 File path or /F
+033 Upload file
+289 File path or /F
+034 View archive contents
+290 None
+035 Keyword file scan
+291 None
+036 Filename scan
+292 None
+037 Display new files
+293 None
+038 Display text file
+294 File Path or /F
+039 Display specific file
+295 File Path and Name
+040 Display Asc/Ans/Avt w/hotkeys
+296 Filename (no extension)
+041 Toggle full screen editor
+297 None
+044 Reset combined msg areas
+300 None
+045 Display Asc/Ans/Avt and wait
+301 Filename (no extension)
+046 Display specific file and wait
+302 File Path and Name
+047 Create a log file entry
+303 Log text
+048 Download specific file
+304 File Path and Name
+049 Select message area
+305 None
+050 Select file area
+306 None
+052 Display nodes/callers
+308 None
+057 Change voice/home phone
+313 None
+058 Change data/busn phone
+314 None
+061 Toggle avatar graphics
+317 None
+065 Change flags
+321 Flag+-* (A2+ B3- C1*)
+149 Select Language
+405 None
+150 CD Rom Access
+406 ControlFile  Info-Directory
+151 Select offline mail areas
+407 None
+152 Reset offline mail areas
+408 None
+153 Select protocol
+409 None
+154 Select compression packer
+410 None
+155 Auto-Script mail run
+411 None
+156 Upload mail packet
+412 None
+157 Download mail packet
+413 None
+158 Select mail packet type
+414 None
+159 Choose NewFiles in Offline
+415 None
+160 Choose Screens in Offline
+416 None
+161 Choose Bulletins in Offline
+417 None
+162 Set # of Msgs Limit for Offline
+418 None
+163 Set Per Area Limit on Offline
+419 None
+164 Choose Verify Want Offline Pkt
+420 None
+165 Choose Offline Flag as Read
+421 None
+166 Choose Offline Recv Own Msgs
+422 None
+167 Choose Offline Your Mail All Areas
+423 None
+168 Choose Offline zero msg pkts
+424 None
+;
+; Menu Type Grouping information
+; Pairs of lines starting with #550/#551 pair
+; First line in each pair is the Group title
+; 2nd line in each pair is a list of the menu types to put in that group
+; These lines must be consecutive, a skipped number is the signal to
+; end menu group definition
+;
+550 Menu Commands
+551 1 2 3 4
+552 File Commands
+553 30 31 32 33 34 35 36 37 38 48 50 150
+554 Message Commands
+555 22 23 24 25 26 27 28 44 49
+556 External & Misc
+557 7 9 11 12 15 47 149
+558 User Options
+559 16 17 18 19 20 21 41 57 58 61 65
+560 Display Commands
+561 6 8 10 13 14 52
+562 File Displays
+563 5 39 40 45 46
+564 Offline mail
+565 151 152 153 154 155 156 157 158
+566 Offline options
+567 159 160 161 162 163 164 165 166 167 168

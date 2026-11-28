@@ -628,9 +628,9 @@ Procedure DoUpload(Data: ShortString);
       Continue;
       End;
     Try
-      AppendList(Dir + 'files.bbs', ListLines(Clean, Desc));
+      AddListing(Dir, Config^.GetFileListPath(Area), Clean, Desc);
     Except
-      LogEntry.WriteEntry('Upload: files.bbs of area ' + IntToStr(Area) + ' cannot be written');
+      LogEntry.WriteEntry('Upload: the file list of area ' + IntToStr(Area) + ' cannot be written');
     End;
     User.UpdateForUL(Size);
     Inc(Got);

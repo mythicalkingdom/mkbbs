@@ -1,0 +1,30 @@
+
+
+
+                               Areafix requests
+
+         Areafix messages are an automated way to configure echomail
+         (to turn echomail areas on and off).
+
+         To create an areafix request, create a *netmail* message
+         addressed To: Areafix at your hubs address (ie something like
+         Areafix @ 1:110/290).  The subject line should contain your
+         areafix password.  The text of the message is where you enter
+         your areafix commands, one command to each line of text.  The
+         following commands are available:
+
+         %LIST   returns a list of available areas
+         %QUERY  returns a list of active areas (ones you have turned
+                 on)
+         %UNLINKED returns a list of inactive areas (ones you have
+                 turned off)
+         %HELP   returns a brief help message that explains the
+                 areafix commands.
+         +AREANAME  will turn the echomail area "AREANAME" on.
+         -AREANAME  will turn the echomail area "AREANAME" off.
+
+
+         If you have any questions, or need any help feel free to ask,
+         and I'll see what I can track down.
+
+         Mark May

@@ -172,9 +172,9 @@ Function HwAddFile(Area: Integer; Const SrcDir, SrcName, Desc: String; Out Name,
     If Trim(Desc) <> '' Then
       D.Add(Trim(Desc));
     Try
-      AppendList(Dir + 'files.bbs', ListLines(Name, D));
+      AddListing(Dir, Config^.GetFileListPath(Area), Name, D);
     Except
-      Err := 'files.bbs of the area cannot be written';
+      Err := 'the file list of the area cannot be written';
       Exit;
     End;
   Finally

@@ -1,0 +1,486 @@
+H001Z:\BBSC\RA\
+L General
+LOCAL-General
+H002Z:\BBSC\RA\
+L Comments
+Local-Comments to Sysop
+H003Z:\BBSC\RA\
+L Log Msgs
+Log File Messages
+H004Z:\BBSC\RA\
+T Netmail
+TechNet NetMail
+H005Z:\BBSC\RA\
+I NetMail
+ICDM-NetMail
+H006Z:\BBSC\RA\
+F MK
+FIDO-MK
+H007Z:\BBSC\RA\
+F NetMail
+FIDO-NetMail
+H008Z:\BBSC\RA\
+D MVBB_LST
+D Miami Vally BBS List
+H009Z:\BBSC\RA\
+P MK Beta
+PRV-MK Beta
+H010Z:\BBSC\RA\
+D BBS Ads
+FIDO-Tri Bbs ads
+H011Z:\BBSC\RA\
+D DaytonSyso
+FIDO-Dayton_syso
+H012Z:\BBSC\RA\
+D New Sysop
+FIDO-New sysops
+H013Z:\BBSC\RA\
+D MVBS
+DAYTON-MVBS
+H014Z:\BBSC\RA\
+F CD Music
+FIDO-CD Echo
+H015Z:\BBSC\RA\
+F Linux
+FIDO-Linux
+H016Z:\BBSC\RA\
+F TP Windows
+FIDO-TP for Windows
+H017Z:\BBSC\RA\
+F Wildcat
+FIDO-Wildcat
+H018Z:\BBSC\RA\
+F Unix
+FIDO-Unix
+H019Z:\BBSC\RA\
+F Clipper
+FIDO-Clipper Database
+H020Z:\BBSC\RA\
+F Astronomy
+FIDO-Astronomy
+H021Z:\BBSC\RA\
+F Pascal
+FIDO-Pascal
+H022Z:\BBSC\RA\
+F C Program
+FIDO-C Program
+H023Z:\BBSC\RA\
+D Programmr
+DAYTON-Programmer
+H024Z:\BBSC\RA\
+F Quickbbs
+FIDO-Quickbbs
+H025Z:\BBSC\RA\
+F Quick Pro
+FIDO-Quickbbs Pr
+H026Z:\BBSC\RA\
+F Lan
+FIDO-Lan
+H027Z:\BBSC\RA\
+F RemoteAcc
+FIDO-RemoteAcces
+H028Z:\BBSC\RA\
+F HardDisk
+FIDO-HardDisk
+H029Z:\BBSC\RA\
+F LaserPup
+FIDO-LaserPub
+H030Z:\BBSC\RA\
+F HST Modem
+FIDO-HST Modem
+H031Z:\BBSC\RA\
+F Tech
+FIDO-Tech
+H032Z:\BBSC\RA\
+F Dbase
+FIDO-Dbase
+H033Z:\BBSC\RA\
+F UF Gate
+FIDO-UF Gate
+H034Z:\BBSC\RA\
+F Electronic
+FIDO-Electronics
+H035Z:\BBSC\RA\
+F CD Rom
+FIDO-CD Rom
+H043Z:\BBSC\RA\
+F RA Utils
+FIDO-RA Utilities
+H100Z:\BBSC\RA\
+I Net
+ICDM-Net
+H101Z:\BBSC\RA\
+I Bridges
+ICDM-Bridges
+H102Z:\BBSC\RA\
+I Disciple
+ICDM-Disciple
+H103Z:\BBSC\RA\
+I Cults
+ICDM-Cults
+H104Z:\BBSC\RA\
+I Round Tble
+ICDM-Round Table
+H105Z:\BBSC\RA\
+I Questions
+ICDM-Questions
+H106Z:\BBSC\RA\
+I Herbs
+ICDM-Herbs and such
+H107Z:\BBSC\RA\
+I Fine Arts
+ICDM-Fine Arts
+H108Z:\BBSC\RA\
+I Region3
+ICDM-Region 3
+H109Z:\BBSC\RA\
+I Prayer
+ICDM-Prayer
+H110Z:\BBSC\RA\
+I Dayton
+ICDM-Dayton
+H111Z:\BBSC\RA\
+I Study
+ICDM-Study
+H112Z:\BBSC\RA\
+I Pfcy
+ICDM-Pfcy
+H113Z:\BBSC\RA\
+I SBC
+ICDM-SBC
+H114Z:\BBSC\RA\
+I DTP
+ICDM-DTP
+H115Z:\BBSC\RA\
+I Chat
+ICDM-Chat
+H116Z:\BBSC\RA\
+F BBSLaw
+FIDO-BBSLAW
+H117Z:\BBSC\RA\
+F SuperBbs
+FIDO-SuperBbs
+H118Z:\BBSC\RA\
+F Net Dev
+FIDO-Net Developers
+H119Z:\BBSC\RA\
+F Offline Ml
+FIDO-Offline mail readers
+H120Z:\BBSC\RA\
+F Audio
+FIDO-Audio
+H121Z:\BBSC\RA\
+D DaytonChat
+DAYTON-Dayton Chat
+H122Z:\BBSC\RA\
+F DesqView
+FIDO-DesqView Multitaskin
+H123Z:\BBSC\RA\
+F FoxPro
+FIDO-FoxPro Database
+H124Z:\BBSC\RA\
+F Lotus Sprd
+FIDO-Lotus Spreadsheet
+H125Z:\BBSC\RA\
+F QuickBasic
+FIDO-Quick Basic
+H126Z:\BBSC\RA\
+F Region 11
+FIDO-Region 11 Chat
+H127Z:\BBSC\RA\
+F Sysop R11
+FIDO-Sysop R11 Region
+H128Z:\BBSC\RA\
+D Cmrcl Sale
+DAYTON-Commercial For Sal
+H129Z:\BBSC\RA\
+D For Sale
+DAYTON-For Sale
+H130Z:\BBSC\RA\
+D SDS R11
+FIDO-SDS Region 11
+H131Z:\BBSC\RA\
+F Shortwave
+FIDO-Shortwave
+H132Z:\BBSC\RA\
+F Vis Basic
+FIDO-Visual Basic
+H133Z:\BBSC\RA\
+D DaytonFile
+DAYTON-Dayton File
+H134Z:\BBSC\RA\
+F ConsumerRe
+FIDO-Consumer Report
+H135Z:\BBSC\RA\
+F QuickClone
+FIDO-QuickClone 
+H136Z:\BBSC\RA\
+F QMX/XRS
+FIDO-QMX/XRS
+H137Z:\BBSC\RA\
+D 200-300
+FIDO-200-300
+H138Z:\BBSC\RA\
+F Windows
+FIDO-Windows
+H139Z:\BBSC\RA\
+F OS2
+FIDO-OS2
+H140Z:\BBSC\RA\
+F Zyxel Modm
+FIDO-Zyxel Modems
+H141Z:\BBSC\RA\
+F RA MultiNd
+FIDO-RA Multinode
+H142Z:\BBSC\RA\
+F Lantastic
+FIDO-Lantastic
+H143Z:\BBSC\RA\
+F File Req
+FIDO-File Request
+H144Z:\BBSC\RA\
+F MS Word
+FIDO-MS Word
+H145Z:\BBSC\RA\
+F MS Excel
+FIDO-MS Excel
+H146Z:\BBSC\RA\
+F Bluewave
+FIDO-Bluewave
+H147Z:\BBSC\RA\
+F HS Modems
+FIDO-High Speed Modems
+H148Z:\BBSC\RA\
+F OS2 Prog
+FIDO-OS2 Prog
+H149Z:\BBSC\RA\
+F OS2 BBS
+FIDO-OS2BBS
+H150Z:\BBSC\RA\
+F Asm 80xxx
+FIDO-Assembler 80xxx
+H151Z:\BBSC\RA\
+F Win32
+FIDO-WIN32
+H152Z:\BBSC\RA\
+F CDROM Sale
+FIDO-CD Rom Sale
+H168Z:\BBSC\RA\
+MK Dev
+MK-Developers
+H169Z:\BBSC\RA\
+Bad Msgs
+Bad Message Area
+H170Z:\BBSC\RA\
+T ??
+T ??
+H171Z:\BBSC\RA\
+T DOS
+T DOS
+H172Z:\BBSC\RA\
+T CyberNet
+T World Cybernet
+H173Z:\BBSC\RA\
+T C Prog
+T C Programming
+H174Z:\BBSC\RA\
+T SYSOP
+T SYSOP
+H175Z:\BBSC\RA\
+T Radio
+T Radio
+H176Z:\BBSC\RA\
+T Communcate
+T Communications
+H177Z:\BBSC\RA\
+T Chemistry
+T Chemistry
+H178Z:\BBSC\RA\
+T Basic
+T Basic
+H179Z:\BBSC\RA\
+T C++
+T C++
+H180Z:\BBSC\RA\
+T Math
+T Math
+H181Z:\BBSC\RA\
+T Electronic
+T Electronics
+H182Z:\BBSC\RA\
+T General
+T General
+H183Z:\BBSC\RA\
+T Pascal
+T Pascal
+H184Z:\BBSC\RA\
+T Bioenginrg
+T Bioengineering
+H187Z:\BBSC\RA\
+T Gravity
+T Gravity
+H188Z:\BBSC\RA\
+T Waste Sys
+T Waste Sys
+H189Z:\BBSC\RA\
+T Fission
+T Fission
+H190Z:\BBSC\RA\
+UseNet Gatew
+UseNet Gateway
+Sz:\bbsf\comp\DOSPROG
+U MSDOS Prog
+Usenet MSDos Programming
+Sz:\bbsf\lang\pascal
+U Pascal
+Usenet Pascal
+Sz:\bbsf\alt\ALTBBS
+U BBS
+Usenet BBS
+Sz:\bbsf\comp\WINPROG
+U WIN Prog
+Usenet Windows Programmng
+Sz:\bbsf\rec\WoodWork
+U Woodwork
+Usenet Woodworking
+Sz:\bbsf\alt\folklore
+U U Folklore
+Usenet Urban Folklore
+Sz:\bbsf\rec\classic
+U Vid Games
+Usenet Video Games
+Sz:\bbsf\alt\folkcomp
+U CompFolklr
+Usenet Computer Folklore
+Sz:\bbsf\alt\fatfree
+U FatFree
+Usenet FatFree Food
+Sz:\bbsf\lang\forth
+U Forth
+Usenet Forth
+Sz:\bbsf\lang\c
+U C
+Usenet C
+Sz:\bbsf\lang\CPP
+U C++
+Usenet C++
+Sz:\bbsf\lang\ada
+U Ada
+Usenet Ada
+Sz:\bbsf\alt\CDROM
+U CDRom
+Usenet CDRom
+Sz:\bbsf\rec\vectrex
+U Vectrex
+Usenet Vectrex
+Sz:\bbsf\comp\gnuann
+U GNU Announ
+Usenet GNU Announcement
+Sz:\bbsf\lang\modula2
+U Modula 2
+Usenet Modula 2
+Sz:\bbsf\lang\modula3
+U Modula 3
+Usenet Modula 3
+Sz:\bbsf\alt\sex
+U Sex
+Usenet Sex
+Sz:\bbsf\rec\nude
+U Nude
+Usenet Nude
+Sz:\bbsf\alt\mast
+U Mast
+Usenet Mast
+SZ:\BBSF\RIME\Postlink
+R Postlink
+Rime-Postlink
+SZ:\BBSF\RIME\sysops
+R Sysops
+Rime-Sysops
+SZ:\BBSF\RIME\common
+R Common
+Rime-Common
+SZ:\BBSF\RIME\admin
+R Admin
+Rime-Admin
+SZ:\BBSF\RIME\BBSSoft
+R BBS Softwr
+Rime-BBS Software
+SZ:\BBSF\RIME\News
+R News
+Rime-News
+SZ:\BBSF\RIME\PCRELAY
+R PC Relay
+Rime-PC Relay
+SZ:\BBSF\RIME\RA
+R RA BBS
+Rime-RA BBS Software
+SZ:\BBSF\RIME\ModemZn
+R ModemZone
+Rime-Modem Zone
+SZ:\BBSF\RIME\Ansi
+R Ansi
+Rime-Ansi
+SZ:\BBSF\RIME\CDROM
+R CD Rom
+Rime-CD Rom
+SZ:\BBSF\RIME\SYSSALE
+R SysopSale
+Rime-Sysop for sale
+SZ:\BBSF\RIME\Program
+R Program
+Rime-Program
+SZ:\BBSF\RIME\Pascal
+R Pascal
+Rime-Pascal
+SZ:\BBSF\RIME\Basic
+R Basic
+Rime-Basic
+SZ:\BBSF\RIME\C
+R C
+Rime-C
+SZ:\BBSF\RIME\masm
+R MASM
+Rime-MASM
+SZ:\BBSF\RIME\OOP
+R OOPS Prog
+Rime-OOPS Programming
+SZ:\BBSF\RIME\Forth
+R Forth
+Rime-Forth
+SZ:\BBSF\RIME\megamail
+R MegaMail
+Rime-MegaMail
+SZ:\BBSF\RIME\maildoor
+R Maildoor
+Rime-Maildoor
+SZ:\BBSF\RIME\offline
+R Offline M
+Rime-Offline Mail
+SZ:\BBSC\RIME2\windows
+R Windows
+Rime-Windows
+SZ:\BBSC\RIME2\unix
+R Unix
+Rime-Unix
+SZ:\BBSC\RIME2\Mainfram
+R Mainframe
+Rime-Mainframe
+SZ:\BBSC\RIME2\Lantast
+R Lantastic
+Rime-Lantastic
+SZ:\BBSC\RIME2\OS2
+R OS/2
+Rime-OS/2
+SZ:\BBSC\RIME2\MidRange
+R Midrange
+Rime-Midrange
+SZ:\BBSC\RIME2\Clipper
+R Clipper
+Rime-Clipper
+SZ:\BBSC\RIME2\Paradox
+R Paradox
+Rime-Paradox
+SZ:\BBSC\RIME2\SQL
+R SQL
+Rime-SQL

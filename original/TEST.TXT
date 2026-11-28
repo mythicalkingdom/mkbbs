@@ -1,0 +1,156 @@
+-------------------------------------------------------------------------
+From: Jimmy Rose
+To:   Mark May
+Subj: Mail & Stuff
+Area: 7
+Num:  91
+MSGID: 1:110/950 508f8caa
+
+Hi Mark,
+
+I haven't recieved any new mail packets for several days now and was just 
+curious if there was a problem down the line somewhere?
+
+Also, since you seem to be the most famous programmer in the area, I was 
+wondering if you've worked with Delphi very much. If so, would happen to have 
+any Delphi code that reads and writes to a JAM format message base? Or maybe 
+you might possibly have developed a native VCL for Delphi that does something 
+similar?
+
+Just thought it might be worth asking. :)
+
+Best Wishes,
+
+Jimmy
+-------------------------------------------------------------------------
+From: Don Arnold
+To:   Mark May
+Subj: fido mail
+Area: 1
+Num:  92
+any chance there's a problem with fido mail? i havent picked up mail in about 
+a week, but when a go to download the qwk packet, it comes up with no new 
+messages. thx.
+-------------------------------------------------------------------------
+From: Johny Smith
+To:   Mark May
+Subj: CAN YOU SEND ME A BBS SO I CAN RUN ONE PLEASE
+Area: 2
+Num:  93
+CAN YOU PLEASE SEND ME A BBS SO I CAN RUN ONE PLEASE
+-------------------------------------------------------------------------
+From: Sheila Melvin
+To:   Mark May
+Subj: Turbo Vision
+Area: 2
+Num:  94
+Hey,
+ 
+        I really need to find some way to talk to you, by chat or voice, 
+because I need to get some help with a problem I am having in Turbo Vision. I 
+am trying to make a customized editor, called SalphEd, and make it so that 
+when a recognized word (that I set) appears, it makes it into a different 
+color, just like TP7 does... it would make my editor easier to use, and also 
+a lot more user-friendly. If you can help me, please do so.
+-------------------------------------------------------------------------
+From: Matthew Kirsch
+To:   Mark May
+Subj: MK Questionaires
+Area: 2
+Num:  2704
+Hiya, I know you aren't offering support for MK BBS, but I was wondering if 
+you could furnish me with an example new user questionaire file (or could 
+point me to someone that can).
+ 
+Thanks in advance!
+ 
+Matthew
+ 
+PS: I have been playing in the source for a few days now and am very 
+impressed - I have been using pascal for a like amount of time and am happy 
+to find that your functions are simple, yet powerful.  I have looked at a few 
+systems and usually get disgusted within a day or two.  Looks like this is 
+the one :)
+ 
+MK
+-------------------------------------------------------------------------
+From: Wilfred van Velzen
+To:   Mark May
+Subj: MKSM106.*
+Area: 7
+Num:  2706
+FMPT 112
+INTL 1:110/290 2:280/464
+MSGID: 2:280/464.112 337ad55c
+PID: GED3 2.51.a1026 UNREG
+Hello Mark,
+
+Could you tell me what the status of your product:
+
+  ษอออออออออออออออออออออออออออหอออออออออออออออออออออออออออออออออออออออออออป
+  บ Mythical Kingdom Software บ           MK Msg Access Source            บ
+  บ      Ü Ü         Ü Ü      บ    Squish, Jam, *.Msg, Hudson, and Ezy    บ
+  บ      ÛÛÛ  Þ฿ Þ฿  ÛÛÛ      บ                                           บ
+  บ      ÛÛÛÛÛÛÛÛÛÛÛÛÛÛÛ      บ     Copyright 1992-1994 by Mark May       บ
+  บ      ÛÛÛÛÛÛฐฐฐÛÛÛÛÛÛ      บ            All Rights Reserved            บ
+  บ  ฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑฑ  บ                                           บ
+  ศอออออออออออออออออออออออออออสอออออออออออออออออออออออออออออออออออออออออออผ
+
+is?
+
+The latest version I could find is Version 1.06. (I wasn't able to login to 
+your BBS yesterday to check there, so I'm sending this message.)
+
+And do you maybe know of a similar product which supports C or C++?
+
+
+Bye,
+
+ ,--------------.--------------------------------------.
+ | Wilfred      | Fido:       2:280/464.12             |
+ |   van Velzen | Internet:   wilfred@aobh.xs4all.nl   |
+ `--------------'--------------------------------------'
+Via Zeus Shovel at 2:280/464.0 on 15 May 97 10:07:36
+Via 2:280/4 @19970516.033808.UTC O/T-Track+ 2.66a
+
+Via D'Bridge 1.58 2:280/0  05/16 10:38
+Via 2:280/100 @19970516.090550.UTC O/T-Track+ 2.66a
+Via 2:280/100 @19970516.110559 GEcho/386 1.11+
+Via 2:280/801@fidonet @19970516.111244.UTC O/T-Track+ 2.65
+Via Squish/386 1.11 2:280/801, Fri May 16 1997 at 11:13 UTC
+Via FLAME 1:270/101, Fri May 16 17:33 UTC (v1.1/b11)
+Via 1:11/1 @19970516.202831.UTC FastEcho 1.46.1 8509
+
+-------------------------------------------------------------------------
+From: Guy Hunter
+To:   Mark May
+Subj: node check
+Area: 7
+Num:  3988
+PID: FM 2.2c.mL OC00012D
+MSGID: 1:110/269@fido 450c344f
+ * Original to: Guy Hunter (1:110/1200)
+
+cc: Ric Walsh, Decker Doggett, Ric Walsh, Jim Duckworth, Jim Earnest
+cc: Rick Calmes, Bob Jackson, Mark Jolly, Bruce Bergemeier, Mike Kemp
+cc: Dennis Mummert, John Folden, Pat Ruhland, Scott Brown, Scott Brown
+cc: Ron Coleman, Art Washabaugh, John Kay, Paul Webb, Edward Simmons
+cc: Dean Tarter, Pete Stan, Mark Thieme, Jerry Millikin, Jerry Millikin
+cc: Darrell Pelan, Bill Scheidel, Jimmy Rose (1:110/950), Don Cheeks
+cc: New Sysop (1:110/999), Tom Graham, Lucia Jameson, Margaret C Elam
+cc: Lawrence Cook, Ronald Schlegel, Bryan Owen, Norm Smith, Rick Lance
+cc: Tony Eversole, Brian Baker, Guy Hunter
+
+Just checking.
+
+NC
+-------------------------------------------------------------------------
+From: Steve Gomo
+To:   Mark May
+Subj: CD-ROM
+Area: 2
+Num:  8773
+It would be nice if you dated your message regarding the CD-ROM setup.  (e.g. 
+date posted, expected date of completion.
+Also, do you have the REDHAT Linnux 4.2 CD?  
+Steven K. Gomo

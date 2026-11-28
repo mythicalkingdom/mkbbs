@@ -1,0 +1,13 @@
+;                           MKUPack Config file
+;                By Mark May - Mythical Kingdom Software
+;
+;   Up to 50 lines may be used
+;   Each line should specify a security level and a number of days
+;
+1 60
+5 60
+10 240
+50 360
+100 360
+145 1
+

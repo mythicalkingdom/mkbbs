@@ -1,0 +1,93 @@
+Listing of archive : MK.LZH
+
+  MK.EXE           BBS Executable
+  MK.OVR           BBS Overlay
+  MKLC.EXE         Language compiler (turns TXT file into LC file)
+  ENGLISH.TXT      English language prompts
+  ENGLISH.LC       Compiled English language prompts (put into BBS directory)
+  MKMENU.TXT       MKMenu menu type list data
+  MKMENU.LC        Compiled MKMenu type list data (put into BBS directory)
+  MKMENU.EXE       Menu editor
+  MKMENU.OVR       Menu editor overlay
+  MKCFGCVT.EXE     Config convertor - run without any options to get
+                   correct command line - both environment vars must be set
+  MKCONFIG.EXE     Config editor
+  MKCONFIG.OVR     Config editor overlay
+  MKUSERED.EXE     User editor (I think alt-C for config, alt-V for validate)
+  MKUSERED.OVR     User editor overlay
+  MKNETMGR.EXE     TSR node manager (shows node activity and allows you to
+                     select a node and remotely snoop)
+  MAKELIST.EXE     Creates the file index for CDRom areas
+  DIRLIST.EXE      Creates the directory list for CDRom areas
+  MKUCVT.EXE       User file convertor (one way!)
+  MKUPACK.EXE      User file packer
+  MKUPACK.TXT      Sample Text file to control user file packer
+  MKDRAW.EXE       Asc/Ans/Avt screen creator
+  CODES.MKD        BBS Control codes list used by MKDraw
+
+
+         In general copy the *.LC files to the BBS directory (the one
+         pointed to by the SET MK=C:\MK environment variable)
+         (alternatively if MK is not SET then most all of these files
+         will look for a SET RA and use that directory and expect/use
+         *.RA format files instead of the normal *.MK files).
+
+         The EXE and OVR files should be copied to a directory on the
+         path or exist in the current directory when you run them.
+
+         The TXT files that created the LC files is included.  You
+         need them only to customize the prompts used in the various
+         programs.  Just type MKLC FileName (no extension) and it will
+         look for FileName.TXT and create a FileName.LC.  The
+         resulting LC files must be in the BBS directory.  They will
+         not be found in the current directory.
+
+         The following files will work in RA, Super, and Quick modes
+         in addition to the native MK mode:
+
+         MK, MKConfig, MKMenu, MKDraw,  and MKUserEd
+
+         Because they do operate in these modes, if the SET MK= is
+         missing, but a real SET RA= exists they will use it (which
+         can make it easy to accidentally be using live files)
+
+         Note that the user file convertor (MKUCvt) only converts from
+         Super/RA/Quick to MK.  I don't have any utility that converts
+         back.
+
+         MKCfgCvt will convert config information to/from any of the 4
+         formats.  It could be used to not only create the initial
+         config, but also to update *.RA/etc files for older doors
+         that needed them.
+
+         You may see a few menu types (particularly offline mail) that
+         are partially implemented so far.
+
+
+         Setting Up CDRom's
+
+         1. Make a directory on your hard drive
+         2. Copy all of the DIR files from the CDRom to this directory
+            (DIRxx has file lists, while DIR itself lists areas)
+         3. In this new directory run DIRLIST to create a text file listing
+            the all of the subdirectories on the CDRom.  You may edit this
+            file with a normal text editor.
+
+            Example: DirList R:\ NO7
+            would create a NO7 text file for all the subdirectories on R:
+
+         4. Run MAKELIST to create an index of all the files in the
+            subdirectories listed in the text file (creating a ctl and
+            dat file).
+
+            Example: MakeList NO7 NO7
+            would take the NO7 text file (first paramater) and create the
+            NO7.Dat and NO7.Ctl files (using the name given as the 2nd
+            command line paramater).  Note that it may take several minutes
+            for MakeList to scan the CDRom and create the index.
+
+         5. Create a CDROM menu choice on one of your menus using menu
+            type #150.  The menu data consists of 2 paramaters the control
+            file name (no extension) and the subdirectory containing the
+            DIR files (which also must contain the CTL and DAT files).
+

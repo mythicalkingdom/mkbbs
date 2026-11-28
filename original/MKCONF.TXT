@@ -1,0 +1,3 @@
+SZ:\BBSF\MAX\MSG\MUFFIN Squish Muffin in Maximus
+FZ:\BBSD\MAIL\ Netmail message area
+H042Z:\BBSC\RA\ Test RA Message area

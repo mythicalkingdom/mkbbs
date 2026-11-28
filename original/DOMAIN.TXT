@@ -1,0 +1,7 @@
+From: Ryan Murray @ 1:153/942                      Date: 02-04-94 17:28
+
+  SPos := Pos(':',AStr) + 1;
+  If Pos('@',AStr) <> 0 then
+
+>> Delete(Astr,Pos('@',Astr),Length(Astr)-Pos('@',Astr)+1); <<
+

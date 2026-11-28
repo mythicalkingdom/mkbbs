@@ -1,0 +1,73 @@
+;  Sample Text config file for MKRead
+
+BBSPath E:\DL\TEST\
+;  BBSPath is used to store config information
+
+NodeListPath Z:\BBSD\NODELIST
+;  NodeListPath is the path to the nodelist directory
+
+Addr 1 1:110/290
+Addr 2 77:100/290
+;  From 1 to 10 addresses (AKA's);
+
+Sysop Mark May
+;  Sysop name
+
+Origin 1 Mythical Kingdom Tech Bbs HST/V32 513-237-7737
+Origin 2 Home of MK Software HST/V32 513-237-7737
+;  From 1 to 10 Origin lines - number 1 is default
+
+EchoLog Z:\BBSF\MAX\EchoToss.Log
+;  Squish-style Echo log file
+
+NodeIdx NodeIdx.MK
+;  Filename (no path) of Node Index file
+
+NodeInc NodeInc.MK
+;  Filename (no path) of Node Include file
+
+MsgArea 1
+;  Start definition of message area
+  Name General Messages
+;   Name of message area
+  AreaId H001Z:\BBSC\RA\
+;   AreaId of message area (H=Hudson, S=Squish, F=*.Msg)
+  UseAddr 1
+;   Which Address (AKA) to use
+  UseOrig 1
+;    Which Origin to Use
+  MailType Local
+;    Which mail type (Local, EchoMail, NetMail)
+  Allow Both
+;    Which type of messages (Public, Priv, Both)
+  EndArea
+;    End of msg area definition for area 1
+
+MsgArea 2
+  Name Comments to Sysop
+  AreaId H002Z:\BBSC\RA\
+  UseAddr 1
+  UseOrig 1
+  MailType Local
+  Allow Priv
+  EndArea
+
+MsgArea 7
+  Name BBS NetMail
+  AreaId H007Z:\BBSC\RA\
+  UseAddr 1
+  UseOrig 1
+  MailType NetMail
+  Allow Both
+  NoFido
+  EndArea
+
+MsgArea 9
+  Name Muffin (Squish)
+  AreaId SZ:\BBSF\Max\Msg\Muffin
+  MailType EchoMail
+  Allow Public
+  AreaTag Muffin
+  EndArea
+
+

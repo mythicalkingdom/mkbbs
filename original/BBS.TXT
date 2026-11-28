@@ -1,0 +1,11 @@
+20                      Mythical Kingdom Tech BBS
+21                 513-237-7737 HST/v32 24 hours a day
+22 Specializing in programming and other technical information
+23 Home of MK Software (creators of MKNet, MKRead, MKSM, MKUTI, etc)
+24 Sysop: Mark May
+40                      Cylestial Wizard BBS
+41 513-237-9772 but rarely online
+42 Doesn't specialize in much, seems to always be testing software
+43 Neat logo ansi screen
+44 Sysop: tHe cYlEStiAl wIzARd (a reaaal d00d)
+

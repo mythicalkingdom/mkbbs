@@ -1,0 +1,27 @@
+    =====================================================================
+    ????????.JLR                                         Lastread storage
+    ---------------------------------------------------------------------
+    The .JLR file is used to maintain a user's position within a message
+    area. The layout of the "lastread" record follows. One record per
+    user is required.
+
+    LastRead:
+        ulong   UserCRC;         // CRC-32 of user name (lowercase)   (1)
+        ulong   UserID;          // Unique UserID
+        ulong   LastReadMsg;     // Last read message number
+        ulong   HighReadMsg;     // Highest read message number
+    end;
+
+    (1) The functions to convert a string to lowercase characters that
+        are provided in the API will only convert characters A-Z (into
+        a-z). It is required that this convention is followed by all
+        applications.
+
+    The UserID field is a unique number for each user. If the "lastread"
+    record is deleted, UserCRC and UserID are both set to -1
+    (ffffffffH). An application may not depend on any specific order in
+    the .JLR file. A user's "lastread" record may appear anywhere in the
+    file and must be searched for when retrieving it and when storing an
+    updated record.
+
+

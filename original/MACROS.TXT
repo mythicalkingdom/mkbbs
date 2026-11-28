@@ -1,0 +1,52 @@
+; Command codes
+; %H Hangup
+; %X Exit
+; Code 271 shift-tab
+271 ^[^I
+; Codes 286 - 295 are Alt-A S D F G H J K L
+288 atdt237-6800^M
+291 %H
+; Codes 300 - 306 are Alt-Z X C V B N M
+300 atz^M
+301 %X
+; Codes 315 thru 324 are for F1 to F10
+315 ^[1
+316 ^[2
+317 ^[3
+318 ^[4
+319 ^[5
+320 ^[6
+321 ^[7
+322 ^[8
+323 ^[9
+324 ^[0
+; Codes 327-339   home, up, pgup,, left,, right,, end, down, pgdn, ins, del
+328 ^[[A
+329 ^[D
+331 ^[[D
+333 ^[[C
+336 ^[[B
+337 ^[U
+; Codes 340 thru 349 are Shift-F1 thru Shift-F12
+340 ^[(
+341 ^[)
+342 ^[_
+343 ^[+
+; Codes 360 thru 369 are for Alt-F1 to Alt-F10
+360 ^[-
+361 ^[=
+362 ^[!
+363 ^[@
+364 ^[#
+365 ^[$
+366 ^[%
+367 ^[^^
+368 ^[&
+369 ^[*
+; Codes 389-394 are F11, F12, shift-f11, shift-12, alt-f11, alt-f12
+389 ^[-
+390 ^[=
+; Code 500 comm port
+500 1
+; Code 501 baud rate
+501 38400

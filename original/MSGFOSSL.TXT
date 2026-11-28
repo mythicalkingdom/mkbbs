@@ -1,0 +1,684 @@
+
+
+
+         Message fossil API - by Mark May - MK Software
+
+
+         The message fossil itself may be implemented through various
+         methods (Device driver, TSR, or a program that installs an
+         ISR and shells to an application program).  The method of
+         providing the ISR is transparant to the application program
+
+         Interrupt $F2 is the default.  This may be overriden by
+         setting an environment variable, ie:
+
+         Set MSGFOS=32
+
+         would set the interrupt to $32.
+
+         --------------------------------------------------------------
+
+         Function $10 = Initialize and Open (Initializes/allocates and
+         opens a message base.  The format of a MsgAreaId is dependent
+         on the message base and may be up to 128 characters long. A
+         message handle is returned that must be used for access to
+         remaining message functions.)
+
+         Input
+             AH = $10
+             ES:BX -> points to null terminated Msg Area Id
+             CH = non-zero value means create if non-existant
+
+         Output
+             AL = Message Handle
+             CL = returns result code
+                  (0=success 1=does not exist 2+ = error)
+
+         --------------------------------------------------------------
+
+         Function $11 = Close and release (Close the message base and
+         free up allocated memory)
+
+         Input
+             AH = $11
+             AL = Message Handle
+
+         Output
+             CL = result code
+
+         --------------------------------------------------------------
+
+         Function $12 = Lock message base (normally handled by the
+            write message function, but locking, writing a block of
+            messages and then unlocking may be faster)
+
+         Input
+             AH = $12
+             AL = Message Handle
+
+         Output
+             CL = Result Code
+
+         --------------------------------------------------------------
+
+         Function $13 = Unlock message base
+
+         Input
+             AH = $13
+             AL = Message Handle
+
+         Output
+             CL = Result Code
+
+         --------------------------------------------------------------
+
+         Function $14 = Set Mail Type for message base (Some message
+         bases keep indexes based on mail type and need this
+         information)
+
+         Input
+             AH = $14
+             AL = Message Handle
+             CH = Mail type
+                  (0=local 1=echomail 2=netmail)
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $15 = Get Highest message number
+
+         Input
+            AH = $15
+            AL = Message Handle
+
+         Output
+            CL = Results
+            ES, BX = Highest message number
+
+         --------------------------------------------------------------
+
+         Function $16 = Get Number of messages
+
+         Input
+            AH = $16
+            AL = Message Handle
+
+         Output
+            CL = Results
+            ES, BX = Number of messages
+
+         --------------------------------------------------------------
+
+         Function $17 = Get Lastread value for user number
+
+         Input
+            AH = $17
+            AL = Message Handle
+            ES, BX = User Number
+
+         Output
+            CL = Results
+            ES, BX = Lastread value
+
+         --------------------------------------------------------------
+
+         Function $18 = Set Lastread value for user number
+
+         Input
+            AH = $17
+            AL = Message Handle
+            DI, DX = User Number
+            ES, BX = Lastread value
+
+         Output
+            CL = Results
+
+         --------------------------------------------------------------
+
+         Function $20 = Seek First (Find first message equal or higher
+         than the message number given.)
+
+         Input
+             AH = $20
+             AL = Message Handle
+             ES, BX = Message Number
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $21 = Seek Next
+
+         Input
+             AH = $21
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $22 = Seek Prior
+
+         Input
+             AH = $22
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $23 = Seek Mail for "To" name
+
+         Input
+             AH = $23
+             AL = Message Handle
+             ES:BX -> Pointer to Search Name
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $24 = Seek "To" Mail next
+
+         Input
+             AH = $24
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $25 (Reserved)
+
+         --------------------------------------------------------------
+
+         Function $26 = Get message location id (returns a long
+             identifier that may allow faster message seeking
+             than using a seek first to return to a previously
+             accessed message.  Some implementations may pass this
+             as a file position or record number, but you should
+             make no assumptions about its content.)
+
+         Input
+             AH = $26
+             AL = Message Handle
+
+         Output
+             CL = Results
+             ES, BX = Message location id
+
+         --------------------------------------------------------------
+
+         Function $27 = Set message location (seeks to message that
+             matches the message location id)
+
+         Input
+             AH = $27
+             AL = Message Handle
+             ES, BX = Message location id
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $30 = Initialize message for reading header
+         (Must be called prior to reading any of the message header
+         fields)
+
+         Input
+             AH = $30
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $31 = Initialize message text for reading
+         (Should be called after calling function $30 and prior to
+         attempting to read the message text - this is separate from
+         function $30 to speed up some types of searches on many
+         message base types)
+
+         Input
+             AH = $31
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $32 = Initialize for writing new message
+         (Must be called prior to setting any of the fields when
+         creating a new message.  It also initializes the fields to
+         default values).
+
+         Input
+             AH = $32
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $33 = Write new message
+         (Save message header and text to the message base)
+
+         Input
+             AH = $33
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $34 = Rewrite message header
+         (Rewrite the message header - used after some of the message
+         attributes have been changed)
+
+         Input
+             AH = $34
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $35 = Delete message (Deletes current message)
+
+         Input
+             AH = $35
+             AL = Message Handle
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $40 = Get From
+
+         Input
+             AH = $40
+             AL = Message Handle
+             ES, BX -> Points to 256 byte buffer
+
+         Output
+             CL = Results
+             ES, BX -> Points to From: string
+
+         --------------------------------------------------------------
+
+         Function $41 = Get To
+
+         Input
+             AH = $41
+             AL = Message Handle
+             ES, BX -> Points to 256 byte buffer
+
+         Output
+             CL = Results
+             ES, BX -> Points to To: String
+
+         --------------------------------------------------------------
+
+         Function $42 = Get Subject
+
+         Input
+             AH = $42
+             AL = Message Handle
+             ES, BX -> Points to 256 byte buffer
+
+         Output
+             CL = Results
+             ES, BX -> Points to Subject String
+
+         --------------------------------------------------------------
+
+         Function $43 = Get Date
+
+         Input
+             AH = $43
+             AL = Message Handle
+
+         Output
+             CL = Results
+             ES = Year
+             BH = Month
+             BL = Day
+
+         --------------------------------------------------------------
+
+         Function $44 = Get Time
+
+         Input
+             AH = $44
+             AL = Message Handle
+             ES, BX -> Points to 256 byte buffer
+
+         Output
+             CL = Results
+             BH = Hour (0 thru 23)
+             BL = Min (0 thru 59)
+             CH = Seconds (0 thru 59)
+
+         --------------------------------------------------------------
+
+         Function $45 = Get Cost
+
+         Input
+             AH = $45
+             AL = Message Handle
+
+         Output
+             CL = Results
+             DX = Cost
+
+         --------------------------------------------------------------
+
+         Function $46 = Get Reference
+
+         Input
+             AH = $46
+             AL = Message Handle
+
+         Output
+             CL = Results
+             ES, BX = Reference number
+
+         --------------------------------------------------------------
+
+         Function $47 = Get See Also
+
+         Input
+             AH = $47
+             AL = Message Handle
+
+         Output
+             CL = Results
+             ES, BX = See also number
+
+         --------------------------------------------------------------
+
+         Function $48 = Get Attributes
+
+         Input
+             AH = $48
+             AL = Message Handle
+
+         Output
+             CL = Results
+             ES, BX = message attributes
+
+
+                                 Attributes
+
+                  ES                                BX
+         $0001 = Local                       $0001 = Crash Netmail
+         $0002 = Received                    $0002 = Kill/Sent
+         $0004 = Private                     $0004 = Sent
+         $0008 = Echoed                      $0008 = Request Receipt
+         $0010 = File Request                $0010 = Request Audit
+         $0020 = File Attach                 $0020 = Return Receipt
+
+         --------------------------------------------------------------
+
+         Function $49 = Get originating address
+
+         Input
+             AH = $49
+             AL = Message Handle
+             ES, BX -> Points to 8 byte buffer
+
+         Output
+             CL = Results
+             ES, BX -> Record with Zone, Net, Node, Point as words
+
+         --------------------------------------------------------------
+
+         Function $4A = Get destination address
+
+         Input
+             AH = $4A
+             AL = Message Handle
+             ES, BX -> Points to 8 byte buffer
+
+         Output
+             CL = Results
+             ES, BX -> Record with Zone, Net, Node, Point as words
+
+         --------------------------------------------------------------
+
+         Function $50 = Set From
+
+         Input
+             AH = $50
+             AL = Message Handle
+             ES, BX -> Points to From: string
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $51 = Set To
+
+         Input
+             AH = $51
+             AL = Message Handle
+             ES, BX -> Points to To: String
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $52 = Set Subject
+
+         Input
+             AH = $52
+             AL = Message Handle
+             ES, BX -> Points to Subject String
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $53 = Set Date
+
+         Input
+             AH = $53
+             AL = Message Handle
+             ES = Year
+             BH = Month
+             BL = Day
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $54 = Set Time
+
+         Input
+             AH = $54
+             AL = Message Handle
+             BH = Hour
+             BL = Minutes
+             CH = Seconds
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $55 = Set Cost
+
+         Input
+             AH = $55
+             AL = Message Handle
+             DX = Cost
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $56 = Set Reference
+
+         Input
+             AH = $56
+             AL = Message Handle
+             ES, BX = Reference number
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $57 = Set See Also
+
+         Input
+             AH = $57
+             AL = Message Handle
+             ES, BX = See also number
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $58 = Set Attributes (See service $48 for list of
+         attribute values)
+
+         Input
+             AH = $58
+             AL = Message Handle
+             ES, BX = message attributes
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $59 = Set originating address
+
+         Input
+             AH = $59
+             AL = Message Handle
+             ES, BX -> Record with Zone, Net, Node, Point as words
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $5A = Set destination address
+
+         Input
+             AH = $5A
+             AL = Message Handle
+             ES, BX -> Record with Zone, Net, Node, Point as words
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $60 = Get message text character
+
+         Input
+             AH = $60
+             AL = Message Handle
+
+         Output
+             CL = Results
+             BL = Character from message text
+
+         --------------------------------------------------------------
+
+         Function $61 = Get message text string
+
+         Input
+             AH = $61
+             AL = Message Handle
+             CH = Maximum length
+             ES: BX -> Points to a 256 byte buffer
+
+         Output
+             ES: BX -> Points to message text string
+             CL = Results
+             DH = Attributes ($0001 = softwrapped text)
+             DL = EOM ($FF = no more text, $00 = normal)
+
+         --------------------------------------------------------------
+
+         Function $62 = Get Text position (returns a long identifier
+         to current position within the text - Note that this is *not*
+         a character counter (although some implementations may use a
+         character counter as the identifier).  It is to be used only
+         to reseek to a text position marked earlier.)
+
+         Input
+             AH = $62
+             AL = Message Handle
+
+         Output
+             ES: BX = Message text position indicator
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $63 = Set text position (Sets text position based
+         on a long identifier previously returns by a call to function
+         $62.)
+
+         Input
+             AH = $63
+             AL = Message Handle
+             ES: BX = Message text position indicator
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+         Function $69 = Put text character into messsage being created
+
+         Input
+             AH = $69
+             AL = Message Handle
+             DL = Character
+
+         Output
+            CL = Results
+
+         --------------------------------------------------------------
+
+         Function $6A = Put text string into message being created
+
+         Input
+             AH = $6A
+             AL = Message Handle
+             ES: BX -> points to buffer containing text string
+             DL = $01 means add hard CR after string ($00 means
+               text is assumed to be soft-wrapped)
+
+         Output
+             CL = Results
+
+         --------------------------------------------------------------
+
+

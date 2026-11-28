@@ -297,6 +297,11 @@ try:
     check('paging: limit 2 gives "next" (the last name), after= continues, the last page has next null', st == 200 and j['count'] == 2 and j['next'] == 'Beta.TXT' and [f['name'] for f in j2['files']] == ['gamma.lzh', 'unlisted.dat'] and j2['next'] is None, (body, body2))
     j = json.loads(get('/v1/areas/files/%d?q=beta' % FA, allq)[2])
     check('q searches names and descriptions (any case)', [f['name'] for f in j['files']] == ['Beta.TXT'] and len(json.loads(get('/v1/areas/files/%d?q=second%%20line' % FA, allq)[2])['files']) == 1)
+    saved = open(fdir + 'files.bbs', encoding='latin-1').read()
+    open(fdir + 'files.bbs', 'w', encoding='latin-1').write('PCBoard file list\nalpha.zip    100  15-NOV-23  00:00:00  The @X0Efirst file\n  | with a second line\nBeta.TXT   2000  11-14-23  Beta notes\n')
+    fl = {f['name']: f for f in json.loads(get('/v1/areas/files/%d' % FA, allq)[2])['files']}
+    check('a PCBoard DIR list: descriptions from primary lines (@X codes stripped) and secondary lines (without the bar)', fl.get('alpha.zip', {}).get('description') == 'The first file\nwith a second line' and fl.get('Beta.TXT', {}).get('description') == 'Beta notes', fl)
+    open(fdir + 'files.bbs', 'w', encoding='latin-1').write(saved)
     check('an area that is not there: 404', get('/v1/areas/files/9999', allq)[0] == 404 and get('/v1/areas/files/x', allq)[0] == 404)
     tf = tool('add', 'areasonly', '-s', 'areas', '-q').stdout.strip()
     check('the files need their own scope: "areas" lists the areas, not the files (403)', get('/v1/areas/files', tf)[0] == 200 and get('/v1/areas/files/%d' % FA, tf)[0] == 403)
